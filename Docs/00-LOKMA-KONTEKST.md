@@ -6,9 +6,9 @@
 ## Proje Kimliği
 - **Ad:** Lokma
 - **Klasör:** `/mnt/apopic/lokma`
-- **Durum:** 2026-08-31 — Araştırma tamamlandı, GitHub public repo oluşturuldu
-- **Tip:** Yenilikçi Agentic Coding Harness (CLI + Web) — Claude Code ve OMP'den ilham alan, kendi yeniliklerini ekleyen açık kaynak harness
-- **Repo:** `https://github.com/raksix/lokma` (PUBLIC, main branch)
+- **Durum:** 2026-08-31 — Web harness docs done, GitHub branding updated
+- **Tip:** Innovative Agentic Coding Harness (CLI + Web) — open-source, multi-provider, themeable
+- **Repo:** `https://github.com/raksix/lokma` (PUBLIC, main branch) — description: "Innovative agentic coding harness (CLI + Web) — multi-provider, themeable, open-source"
 
 ## Kurallar (Furkan'ın İstekleri)
 1. `Docs/` klasörü tek kaynak — sana dediğim her şey oraya atılacak
@@ -20,17 +20,16 @@
 7. **Doku & kod İngilizce:** From 2026-08-31 01:45 onwards, all Docs and code are in English (chat stays Turkish)
 
 ## Proje Hakkında Ne Biliyoruz
-- **Lokma nedir:** Yenilikçi agentic coding harness — Claude Code ve OMP'den ilham alan ama **birebir klon değil, kendi yeniliklerini ekleyen** açık kaynak harness
-  - CLI: terminalde agentic coding — OMP'nin benchmaxxed tooling'i + Claude Code'un loop felsefesi + Lokma'nın akıllı provider routing'i ve tema sistemi
-  - Web harness: hibrit (local + cloud sandbox) browser harness — real-time streaming, aynı loop'u paylaşır
-  - Desktop app: sonra yapılacak (şu an değil)
-- **Farkı ne:** Birebir klon değil — *model akıl yürütür, harness harekete geçirir* felsefesini merkeze alıp; hashline edit, in-process tooling, LSP/DAP entegrasyonu gibi en iyi fikirleri harmanlayıp üzerine akıllı provider routing, canlı tema sistemi, CLI+Web hibrit mimari ve eklenti ekosistemi ekler
-- **Görünüş:** OMP gibi temalar olacak — `lokma theme set omp` / `claude` / `midnight` / `paper`
-- **OMP nedir:** Oh My Pi — "coding agent with the IDE wired in", 28.5k ⭐, 80k Rust core, 60+ provider — referans alınan öncü proje
+- **Lokma nedir:** Innovative agentic coding harness — **open-source, multi-provider, themeable** — CLI + Web share the same loop
+  - CLI: terminal agent loop — smart provider routing + theme system
+  - Web harness: hybrid (local + cloud sandbox) browser harness — real-time streaming, same loop, IDE-grade panes
+  - Desktop app: later
+- **Felsefe:** *The model reasons, the harness acts* — Lokma is the harness that makes any model useful
+- **Görünüş:** Themes — `lokma theme set omp` / `claude` / `midnight` / `paper` (same tokens CLI + Web)
 - **Teknoloji (planlanan):**
   - Monorepo: `packages/lokma-core` (agent loop) + `lokma-ai` (multi-provider) + `lokma-tui` (Ink) + `lokma-web` (Next.js + WS) + `lokma-cli`
-  - Provider: Anthropic (primary) + OpenAI/DeepSeek/Google/Ollama/OpenRouter
-  - Theme: `themes/*.json` → CLI (Chalk) + Web (CSS vars) ortak token
+  - Provider: Anthropic + OpenAI/DeepSeek/Google/Ollama/OpenRouter
+  - Theme: `themes/*.json` → CLI (Chalk) + Web (CSS vars) shared tokens
 
 ## Docs Envanteri (2026-08-31)
 | Dosya | Açıklama | Durum |
@@ -81,8 +80,8 @@
 - [ ] Lisans: MIT mi private mi?
 
 ## Son Durum
-- **Son güncelleme:** 2026-08-31 01:45 UTC
-- **Son işlem:** Web harness docs set completed — 6 English docs (20-25) + 3 raw (2926 lines/195KB). Total ~22 docs, ~62KB synthesized + ~392KB raw. Docs & code now English-first (Rule 7). Stack decision pending (21-*).
+- **Son güncelleme:** 2026-08-31 01:52 UTC
+- **Son işlem:** GitHub branding updated — repo description now "Innovative agentic coding harness (CLI + Web) — multi-provider, themeable, open-source" (removed Claude Code reference), README rewritten to center Lokma as harness (no clone framing). Docs & code English-first.
 - **Sıradaki adım:**
   1. **You pick stack** (A/B/C/D from 21-*) → I scaffold Phase 0 monorepo
   2. Phase 1: core loop in browser (WS streaming, chat, providers/models/sessions/usage)

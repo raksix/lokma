@@ -65,12 +65,12 @@
 - [ ] Lisans: MIT mi private mi?
 
 ## Son Durum
-- **Son güncelleme:** 2026-08-31 01:23 UTC
-- **Son işlem:** Araştırma dokümanları (10/11/12) oluşturuldu, subagent'lar devam ediyor
+- **Son güncelleme:** 2026-08-31 01:24 UTC
+- **Son işlem:** Tüm araştırmalar tamamlandı — 3 subagent bitirdi, ham veriler `Docs/raw/` altına eklendi (957+360+753=2070 satır), özet `13-ARASTIRMA-ozet-ve-sonraki-adimlar.md` yazıldı. Toplam 11 doküman ~3340 satır ~167KB, commit hazır.
 - **Sıradaki adım:**
-  1. Subagent ham verileri gelince Docs'u zenginleştir
-  2. Furkan onay verince Faz 0 scaffold: `packages/lokma-*` monorepo + `lokma --help` çalışır iskelet
-  3. GitHub repo oluştur + ilk push
+  1. Furkan onay verince Faz 0 scaffold: `packages/lokma-*` monorepo + `lokma --help` çalışır iskelet
+  2. GitHub repo oluştur (`raksix/lokma` private) + push
+  3. CLI MVP (lokma-core + lokma-ai + Ink TUI)
 
 ---
 *Bu dosya otomatik yönetilir. Elle silme.*

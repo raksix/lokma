@@ -65,8 +65,8 @@
 - [ ] Lisans: MIT mi private mi?
 
 ## Son Durum
-- **Son güncelleme:** 2026-08-31 01:27 UTC
-- **Son işlem:** GitHub public repo `raksix/lokma` oluşturuldu, 3 commit push'landı (5fe6bf1, d17cc5a, 96ac29c README). Repo: https://github.com/raksix/lokma
+- **Son güncelleme:** 2026-08-31 01:30 UTC
+- **Son işlem:** `.gitignore` genişletildi (env/secrets/build/OS/IDE/cache) + `.env.example` eklendi, commit af2217a push'landı
 - **Sıradaki adım:**
   1. Faz 0 scaffold: `packages/lokma-*` monorepo + `lokma --help` iskelet
   2. CLI MVP (lokma-core + lokma-ai + Ink TUI)

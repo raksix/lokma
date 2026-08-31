@@ -2,18 +2,18 @@
 
 > Stack and architecture decisions accumulate here. Each decision is dated and reasoned.
 
-## Stack (Pending Decision)
+## Stack — Decided 2026-08-31
 
-User must pick web stack from `21-WEB-STACK-alternatives.md` §9 before Phase 0 scaffold. Options:
+**Picked: A — Next.js 15 + Tailwind + shadcn/ui + React 19 + Fastify 5 + flexlayout-react + WS/SSE** (your choice via clarify, 2026-08-31). Phase 0 scaffold unblocked.
 
 | ID | Frontend | Backend | Pane | Realtime | Status |
 |----|----------|---------|------|----------|--------|
-| **A (Recommended)** | Next.js 15 + Tailwind + shadcn/ui + React 19 | Fastify 5 | flexlayout-react | WS + SSE | ⏳ Awaiting pick |
-| **B** | SvelteKit 2 | Hono (Bun) | flexlayout-react | WS | ⏳ |
-| **C** | Next.js 15 | Fastify 5 | dnd-kit + Resizable (custom) | WS + SSE | ⏳ |
-| **D** | Next.js 15 | NestJS 11 | flexlayout-react | WS | ⏳ |
+| **A — ✅ Selected** | Next.js 15 + Tailwind + **shadcn/ui** + React 19 | Fastify 5 | flexlayout-react | WS + SSE | ✅ Picked 2026-08-31 |
+| **B** | SvelteKit 2 | Hono (Bun) | flexlayout-react | WS | ❌ Not picked |
+| **C** | Next.js 15 | Fastify 5 | dnd-kit + Resizable (custom) | WS + SSE | ❌ Not picked |
+| **D** | Next.js 15 | NestJS 11 | flexlayout-react | WS | ❌ Not picked |
 
-**Recommendation:** **A** — proven on your infra (67: Randevona, notes.fermag, Sunumly all Next.js+Fastify+PM2+nginx+shadcn), least risk, fastest to MVP, hiring pool, IDE-grade panes out of the box.
+**Why A:** Proven on your infra (67: Randevona, notes.fermag, Sunumly all Next.js+Fastify+PM2+nginx+shadcn), least risk, fastest to MVP, hiring pool, IDE-grade panes out of the box. Design system is **shadcn/ui** (https://ui.shadcn.com/) — see Design row below.
 
 Other fixed choices (stack-independent):
 
@@ -43,6 +43,10 @@ Other fixed choices (stack-independent):
 | Design canvas | Open Design-inspired 6 artifacts + `DESIGN.md` brand contract + `design-systems/` + Design Studio pane — see `34-DESIGN-open-design-inspired.md` | Agent-native design engine |
 | Testing | TestSprite-inspired self-hosted harness: plan→inventory→codegen→sandbox(video+trace)→classify→heal + Shannon/security — see `33-TESTING-autonomous-harness-testsprite-inspired.md` | `test_app` skill + Test Lab pane |
 | Bots | Grok-bots-inspired `bot.json` spec, Bot Gallery, persona→bot→agent, fork/share/marketplace — see `35-BOTS-lokma-bots.md` | Lightweight shareable specialists |
+| Design system | **shadcn/ui** (https://ui.shadcn.com/) — Radix + Tailwind, `npx shadcn@latest add`, themes via CSS vars, dark/light, CLI `shadcn` | Your request 2026-08-31 *"tasarım için shadcn kullanak"* — canonical design system for all Lokma UI (panes, dialogs, forms, charts) |
+| Domain | `lokma.fermag.com.tr` (prod on 67, PM2+nginx, same as Randevona/notes/Sunumly) — `lokma.sh` reserved for future marketing/CLI | Your pick 2026-08-31 (clarify) — infra already on 67 |
+| Desktop | **Tauri** (Rust, lightweight) — Phase 3, after Web MVP | Your pick 2026-08-31 — lighter than Electron, same `lokma-web` bundle behind Tauri |
+| License | **Dual:** `core` MIT (open-source, `raksix/lokma` PUBLIC) + `cloud` private (hosted `lokma.fermag.com.tr`, S3/Postgres) | Your pick 2026-08-31 — open core + private cloud |
 
 ## Architecture
 
@@ -70,7 +74,12 @@ Other fixed choices (stack-independent):
 | 2026-08-31 | Testing autonomous harness — TestSprite-inspired but self-hosted: plan→inventory(codegen)→sandbox(video+trace)→classify→heal, element `expect` guarantee, API + Shannon/security suite, Test Lab pane — see `33-TESTING-autonomous-harness-testsprite-inspired.md` | Your request: *"testsprite bağımsız ama daha iyi — video/rapor/plan/buton coverage/API/Shannon"* — 655+1,136 lines |
 | 2026-08-31 | Design canvas — Open Design-inspired: 6 artifact types (Prototype/Deck/Mobile/Image/Document/HyperFrame), `DESIGN.md` brand contract (7+ H2), `design-systems/` + `templates/`, Design Studio pane + `/api/design/*` + export HTML/PDF/PPTX/MP4 — see `34-DESIGN-open-design-inspired.md` | Your request: *"lokmanın kendi içinde tasarım da yapılabilsin, claude design gibi"* — open-design 92.9k★ (1,325+831 lines) |
 | 2026-08-31 | Lokma Bots — Grok-bots-inspired: `bot.json` spec, persona→bot→agent mapping, Bot Gallery pane, lifecycle create→playground→publish→fork→run as agent, sharing/marketplace — see `35-BOTS-lokma-bots.md` | Your request: *"hermese bots geldi grok bots gibi lokma bots planı çıkar"* — grok-bots 1,121 lines |
+| 2026-08-31 | Stack picked: **A — Next.js 15 + Tailwind + shadcn/ui + React 19 + Fastify 5 + flexlayout-react** — see `21-*` §9 | Your clarify 2026-08-31 — proven on 67, Phase 0 unblocked |
+| 2026-08-31 | Domain picked: `lokma.fermag.com.tr` (PM2+nginx on 67) — `lokma.sh` reserved | Your clarify 2026-08-31 |
+| 2026-08-31 | Desktop picked: **Tauri** (Phase 3) | Your clarify 2026-08-31 — lightweight Rust vs Electron |
+| 2026-08-31 | License picked: **Dual — core MIT + cloud private** (`raksix/lokma` PUBLIC) | Your clarify 2026-08-31 — open core |
+| 2026-08-31 | Design system picked: **shadcn/ui** (https://ui.shadcn.com/) — Radix+Tailwind for all UI | Your request 2026-08-31 *"tasarım için shadcn kullanak"* |
 
 ---
 
-*Pending: your stack pick (A/B/C/D) → Phase 0 scaffold.*
+*Stack picked A (Next+Fastify+shadcn) 2026-08-31 — Phase 0 scaffold ready. Remaining: Desktop already picked Tauri (Phase 3), no blockers.*

@@ -164,6 +164,12 @@ lokma design export <id> --format pdf --out ./out.pdf
 
 ---
 
+## 9. Design System — shadcn/ui (Canonical)
+
+**Picked 2026-08-31:** **shadcn/ui** (https://ui.shadcn.com/) — Radix primitives + Tailwind + CSS vars + `npx shadcn@latest add` — is the **canonical UI kit for all Lokma surfaces** (panes, dialogs, forms, charts). `DESIGN.md` is the **brand contract** (colors/typo/spacing/voice); `shadcn/ui` is the **component implementation** that realizes it. Tokens flow `DESIGN.md` → `themes/*.json` → `tokens.css` CSS vars → `shadcn` theme (`--background`/`--foreground` etc) → Web + CLI. See `02-TEKNIK-KARARLAR.md` Design system row.
+
+---
+
 ## 9. Agent as Design Engine (Any Agent Can Design)
 
 Any Lokma agent (per-agent `model` + `SOUL.md` + `MEMORY.md` from `30-*`) can be a design agent:

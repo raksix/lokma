@@ -8,7 +8,7 @@
 |------|------|--------|
 | `00-LOKMA-KONTEKST.md` | **MAIN FILE** — read & update every prompt | ✅ |
 | `01-PROJE-TANIMI.md` | What Lokma is (innovative harness) | ✅ |
-| `02-TEKNIK-KARARLAR.md` | Stack & architecture decisions | ⏳ Stack pick pending |
+| `02-TEKNIK-KARARLAR.md` | Stack **A picked** + arch (shadcn/domain/Tauri/dual) | ✅ Decided 2026-08-31 |
 | `03-YOL-HARITASI.md` | Roadmap — ultra-detailed Phases 0–3 (agents + testing + design + bots + setup) | ✅ EN (03-25 synced, 30-35) |
 | `10-ARASTIRMA-claude-code-birebir-analiz.md` | Claude Code full inventory (18KB) | ✅ |
 | `11-ARASTIRMA-omp-temalar-ve-tasarim.md` | OMP themes & design language (7.6KB) | ✅ |

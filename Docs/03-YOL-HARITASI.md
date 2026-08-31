@@ -1,6 +1,6 @@
 # 03 — Roadmap (Ultra-Detailed)
 
-> **Status 2026-08-31 02:30 UTC:** Docs set 01–35 complete (~210KB synthesized + ~1.5 MB raw / 12,240 lines) · Stack pick pending (A/B/C/D from `21-*`) · Code scaffold is Phase 0
+> **Status 2026-08-31 02:35 UTC:** Docs set 01–35 complete (~210KB synthesized + ~1.5 MB raw / 12,240 lines) · **Stack A picked** (Next+Fastify+shadcn) + domain lokma.fermag.com.tr + Tauri + dual license + shadcn — Phase 0 unblocked · Code scaffold next
 > **English from 2026-08-31 01:45 (chat Turkish) · Single source: `00-LOKMA-KONTEKST.md`**
 > **Detail docs:** `20-overview` · `21-stack` · `22-features` · `23-plugins` · `24-panes` · `25-roadmap` · `26-config` · `27-skills` · `28-memory` · `29-obsidian` · `30-agent-system` · `31-archify` · `32-setup` · `33-testing` · `34-design` · `35-bots`
 
@@ -8,7 +8,7 @@
 
 ## Phase 0 — Setup ✅ + Scaffolding (Next, 1–2 days)
 
-> **Blocked on:** stack decision A/B/C/D from `21-*` §9 (recommendation **A: Next+Fastify+flexlayout+Zustand+WS/SSE** — proven on your 67: Randevona/notes.fermag/Sunumly)
+> **Stack picked A** (Next 15 + Tailwind + shadcn/ui + Fastify 5 + flexlayout-react) — 2026-08-31 clarify — Phase 0 unblocked. See `02-TEKNIK-KARARLAR.md`.
 
 ### Already done (✅)
 
@@ -22,7 +22,7 @@
 - [x] Infinite memory + vault + graph — `28-*` (1390 lines) + `29-*` (879 lines, 2112 Obsidian MCPs scanned) — FTS5 `session_search` + `VaultPort` + `react-force-graph-2d`
 - [x] **Agent system — ultra-detailed** — `30-*` (40KB synthesized + 2699 lines ham, 4 subagents): per-agent `SOUL`/`MEMORY`/`model`/`budgets`, `maxAgents=20`/`maxConcurrent=5` + queue + priority + aging, self-spawn via `create_agent` (skill-gated), bus + coordinator + heartbeat/lease, 3-layer collision-free (advisory `.agentlocks` + `git worktree` + `expectedSha` hashline + `diff3`), 23 extras — see `30-*` §2–14
 
-### Scaffold next (blocked on stack pick)
+### Scaffold next — UNBLOCKED (Stack A picked 2026-08-31)
 
 - [ ] Monorepo: `bun workspaces` (`pnpm` alt), `packages/lokma-core` + `lokma-ai` + `lokma-shared` (Zod schemas) + `lokma-web` (`web/` Next.js + `server/` Fastify 5) + `themes/` + `.lokma/worktrees/` + `.agentlocks/`
 - [ ] `lokma-core`: `Context` kernel (~300 lines), `ToolRegistry`, `SessionStore` (JSONL `~/.lokma/projects/<hash>/sessions/*.jsonl`), `Provider` types Zod in `lokma-shared`
@@ -125,10 +125,10 @@ Goal: beautiful, shippable, shareable — the "ballandır" that makes Lokma inno
 
 ## What I Need From You Now
 
-1. **Stack decision:** reply `A` / `B` / `C` / `D` or a mix — see `21-WEB-STACK-alternatives.md` §9 (recommendation **A**).
-2. Then: **"Scaffold Phase 0"** — monorepo builds in the chosen stack, `git push`, and `lokma web` runs locally.
+~~1. **Stack decision:** reply `A` / `B` / `C` / `D`~~ — **DONE 2026-08-31:** A picked (Next+Fastify+shadcn), domain lokma.fermag.com.tr, Tauri, dual license, shadcn design system.
+2. **"Scaffold Phase 0"** — monorepo builds in stack A, `git push`, and `lokma web` runs locally on :3456 (PM2+nginx on 67).
 
-No code until you decide. Docs are the contract — code follows the contract.
+Docs are the contract — code follows the contract. Phase 0 ready to start.
 
 ---
 

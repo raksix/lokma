@@ -36,7 +36,7 @@
 |-------|----------|-------|
 | `00-LOKMA-KONTEKST.md` | Bu dosya — ana hafıza | ✅ Güncel (02:15 UTC) |
 | `01-PROJE-TANIMI.md` | Lokma tanımı (innovative harness, English) | ✅ |
-| `02-TEKNIK-KARARLAR.md` | Stack + arch decisions (pending pick, 7 fixed rows + 3 new) | ✅ 02-30 synced |
+| `02-TEKNIK-KARARLAR.md` | Stack **A picked** + arch (shadcn/domain/Tauri/dual, 11 fixed rows) | ✅ 02-30 synced |
 | `03-YOL-HARITASI.md` | Roadmap — ultra-detailed Phases 0–3 (32KB, agents + skills + memory + vault + extras) | ✅ EN (30-*) |
 | `10-ARASTIRMA-claude-code-birebir-analiz.md` | Claude Code tüm özellik envanteri (CLI, tools, permissions, hooks, MCP, sessions) | ✅ 18KB |
 | `11-ARASTIRMA-omp-temalar-ve-tasarim.md` | OMP tema sistemi + görsel dil + Lokma tema tasarımı | ✅ 7.6KB |
@@ -118,13 +118,21 @@
 - **Total this batch:** 13 subagents dispatched, 9 succeeded (5,708 lines), 4 hit `max_iterations` provider stall (muse-spark-contributor) → inferred and synthesized without raw (no data loss — synthesized from completed siblings + prior Docs). Raw copied: `34-42` (9 files, 12,240 − 2,699 = 9,541 new lines). Synthesized: `31-35` (5 files, ~60KB). `02-TEKNIK-KARARLAR` + `README` synced.
 - **4 stalls root cause:** `muse-spark-1.2-contributor` via `opencode-go` unresponsive for 5 consecutive attempts → `exit_reason=max_iterations`. Workaround: synthesize directly (no re-dispatch — same model would stall). Future: use fallback `mimo-v2.5` or `deepseek-v4`.
 
+
+### 2026-08-31 02:35 UTC — Stack/Domain/Desktop/License/Design decisions (clarify)
+- **Hermes asked (via `clarify`):** Stack A/B/C/D, Domain lokma.fermag.com.tr vs lokma.sh, Desktop Electron vs Tauri, License MIT vs private vs dual
+- **Furkan picked:** **A — Next.js 15 + Tailwind + shadcn/ui + Fastify 5 + flexlayout-react** (recommended) · Domain **`lokma.fermag.com.tr`** (67 prod) · Desktop **Tauri** · License **Dual (core MIT + cloud private)**
+- **Follow-up (Furkan):** *"tasarım için de shadcn kullanak — https://ui.shadcn.com/"* → Design system = **shadcn/ui** (Radix+Tailwind, `npx shadcn@latest add`, CSS vars themes) — canonical for all Lokma UI (panes, dialogs, forms, charts) — complements 34-DESIGN's `DESIGN.md` brand contract + Archify diagrams
+- **Docs updated:** `02-TEKNIK-KARARLAR.md` — Stack section marked ✅ Selected, 4 new fixed rows (Design system/Domain/Desktop/License) + 5 new Decision Log rows + pending footer cleared → Phase 0 unblocked
+
 ## Bekleyen Sorular (Furkan'a)
 - [x] GitHub repo: `raksix/lokma` PUBLIC — done 2026-08-31
 - [x] İlk provider multi-provider (Anthropic + OpenAI/DeepSeek/Google/Ollama/OpenRouter) — specced
-- [ ] **Stack decision:** Pick **A (Next.js+Fastify+flexlayout, recommended) / B (SvelteKit+Hono) / C (custom panes) / D (NestJS)** — see `21-WEB-STACK-alternatives.md` §9. Blocks Phase 0 scaffold.
-- [ ] Domain: `lokma.fermag.com.tr` mi `lokma.sh` mi?
-- [ ] Desktop: Electron mu Tauri mi? (Phase 3)
-- [ ] Lisans: MIT mi private mi?
+- [x] **Stack decision:** **A — Next.js 15 + Tailwind + shadcn/ui + React 19 + Fastify 5 + flexlayout-react** — picked 2026-08-31 (clarify) — Phase 0 unblocked
+- [x] Domain: `lokma.fermag.com.tr` (prod on 67) — picked 2026-08-31 — `lokma.sh` reserved for future
+- [x] Desktop: **Tauri** (Rust, lightweight) — picked 2026-08-31 (Phase 3)
+- [x] Lisans: **Dual — core MIT + cloud private** — picked 2026-08-31
+- [x] Design system: **shadcn/ui** (https://ui.shadcn.com/) — picked 2026-08-31 *"tasarım için shadcn kullanak"*
 
 ## Son Durum
 - **Son güncelleme:** 2026-08-31 02:30 UTC

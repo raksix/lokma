@@ -410,34 +410,37 @@
       </div>
 
       <!-- ===== Sticky Composer — glued to bottom ===== -->
-      <div class="shrink-0 bg-[#FAF9F5]/85 backdrop-blur-xl border-t border-line">
-        <div class="max-w-[640px] mx-auto w-full px-3 sm:px-4 py-2.5">
-          <div class="rounded-xl bg-white border border-line shadow-card overflow-hidden">
-            <!-- Composer top bar -->
-            <div class="flex items-center gap-1.5 px-2.5 h-8 border-b border-line bg-[#FDFCFB]">
-              <span class="text-[10px] font-semibold tracking-widest uppercase text-zinc-400">Prompt</span>
-              <span class="ml-auto flex items-center gap-1">
-                <button class="w-6 h-6 grid place-items-center rounded-md hover:bg-white hover:border hover:border-line border border-transparent transition text-zinc-500" aria-label="Attach">
+      <div class="shrink-0 bg-[#FAF9F5]/90 backdrop-blur-xl border-t border-line">
+        <div class="max-w-[640px] mx-auto w-full px-3 sm:px-4 py-2">
+          <div id="composer-card" class="rounded-lg bg-white border border-line shadow-card overflow-hidden transition">
+            <!-- Input — compact -->
+            <div class="p-2">
+              <textarea id="composer-input" rows="1" placeholder="Ask Lokma to plan, code, or explain — try “add 60/min rate limit per user”" class="w-full resize-none bg-transparent text-[13px] leading-[1.5] placeholder:text-zinc-400 focus:outline-none min-h-[28px] py-1"></textarea>
+              <!-- File chips (hidden until files added) -->
+              <div id="file-chips" class="hidden flex flex-wrap gap-1 mt-1.5"></div>
+              <!-- Composer bottom bar — compact (attach + mic + steer/queue + model) -->
+              <div class="flex items-center gap-1 mt-1.5 flex-wrap relative">
+                <!-- File attach -->
+                <button id="attach-btn" class="w-7 h-7 grid place-items-center rounded-md bg-white border border-line hover:bg-muted text-zinc-600 transition shrink-0" title="Dosya / belge yükle" aria-label="Attach file">
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5.5 8.2l4.2-4.2a1.8 1.8 0 112.5 2.5L6.8 12a2.8 2.8 0 01-4-4L7 3.8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </button>
-                <button class="w-6 h-6 grid place-items-center rounded-md hover:bg-white hover:border hover:border-line border border-transparent transition text-zinc-500" aria-label="Code">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M6 4l-4 4 4 4M10 4l4 4-4 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </button>
-                <button class="w-6 h-6 grid place-items-center rounded-md hover:bg-white hover:border hover:border-line border border-transparent transition text-zinc-500" aria-label="Voice">
+                <input id="file-input" type="file" multiple hidden accept=".pdf,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp,.doc,.docx" />
+                <!-- Mic -->
+                <button id="mic-btn" class="w-7 h-7 grid place-items-center rounded-md bg-white border border-line hover:bg-muted text-zinc-600 transition shrink-0" title="Mikrofon — sesle yaz" aria-label="Voice input">
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="6" y="3" width="4" height="7" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 8.5a3.5 3.5 0 007 0M8 12v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
                 </button>
-              </span>
-            </div>
-            <!-- Input -->
-            <div class="p-2.5">
-              <textarea id="composer-input" rows="2" placeholder="Ask Lokma to plan, code, or explain — try “add 60/min rate limit per user”" class="w-full resize-none bg-transparent text-[13.5px] leading-5 placeholder:text-zinc-400 focus:outline-none min-h-[40px]"></textarea>
-              <!-- Composer bottom bar — MODEL SELECTOR (screenshot dark dropdown) -->
-              <div class="flex items-center gap-1.5 mt-2 flex-wrap relative">
+                <span id="mic-status" class="hidden text-[11px] text-red-600 font-medium animate-pulse">● Rec</span>
+                <div class="w-px h-4 bg-line mx-0.5 hidden sm:block"></div>
+                <!-- Steer / Queue — compact toggle -->
+                <div class="inline-flex p-0.5 rounded-full bg-muted border border-line shrink-0" role="tablist" aria-label="Mode">
+                  <button data-mode="steer" class="mode-btn px-2.5 py-1 rounded-full bg-[#262624] text-white text-[11px] font-medium leading-none">Steer</button>
+                  <button data-mode="queue" class="mode-btn px-2.5 py-1 rounded-full text-zinc-600 hover:bg-white text-[11px] font-medium leading-none">Queue</button>
+                </div>
                 <!-- Model trigger — dark, like screenshot bottom bar -->
-                <button id="model-trigger" class="inline-flex items-center gap-2 pl-1.5 pr-2.5 h-7 rounded-full bg-[#1E1E20] border border-[#2A2A2E] text-white text-[12px] font-medium hover:bg-[#252529] transition shrink-0">
-                  <span class="w-5 h-5 rounded-full bg-white/10 grid place-items-center text-[10px]">◐</span>
-                  <span id="model-current" class="max-w-[160px] truncate">Muse Spark 1.2 Contributor</span>
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" class="opacity-60 shrink-0"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <button id="model-trigger" class="inline-flex items-center gap-1.5 pl-1.5 pr-2 h-6 rounded-full bg-[#1E1E20] border border-[#2A2A2E] text-white text-[11px] font-medium hover:bg-[#252529] transition shrink-0">
+                  <span class="w-4 h-4 rounded-full bg-white/10 grid place-items-center text-[9px]">◐</span>
+                  <span id="model-current" class="max-w-[120px] sm:max-w-[140px] truncate">Muse Spark</span>
+                  <svg width="10" height="10" viewBox="0 0 16 16" fill="none" class="opacity-60 shrink-0"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </button>
                 <!-- dark dropdown — exact ss replication -->
                 <div id="model-dropdown" class="hidden absolute bottom-[calc(100%+8px)] left-0 w-[340px] max-w-[92vw] z-50">
@@ -804,7 +807,8 @@
   document.addEventListener('keydown', (e) => { if(e.key==='Escape') dropdown.classList.add('hidden'); });
   document.querySelectorAll('.model-opt').forEach(btn => {
     btn.addEventListener('click', () => {
-      currentLabel.textContent = btn.textContent.trim().replace(/\s+(Free|High|Ultra)$/, '');
+      const clean = btn.textContent.trim().replace(/\s+(Free|High|Ultra)$/, '').trim();
+      currentLabel.textContent = clean.length > 18 ? clean.slice(0,18)+'…' : clean;
       dropdown.classList.add('hidden');
       document.querySelectorAll('.model-opt').forEach(b=> b.classList.remove('bg-white/[0.08]','border','border-white/5'));
       btn.classList.add('bg-white/[0.08]','border','border-white/5');
@@ -816,7 +820,6 @@
       const txt = el.textContent.toLowerCase();
       el.style.display = txt.includes(q) ? '' : 'none';
     });
-    // hide empty group headers
     document.querySelectorAll('#model-list > div').forEach(header => {
       if(header.textContent.includes('·') || header.classList.contains('h-1')) return;
       let next = header.nextElementSibling; let hasVisible=false;
@@ -825,6 +828,83 @@
         next = next.nextElementSibling;
       }
       header.style.display = hasVisible ? '' : 'none';
+    });
+  });
+
+  // ——— File / belge yükleme ———
+  const attachBtn = document.getElementById('attach-btn');
+  const fileInput = document.getElementById('file-input');
+  const fileChips = document.getElementById('file-chips');
+  const composerCard = document.getElementById('composer-card');
+  let attachedFiles = [];
+  function renderChips(){
+    if(attachedFiles.length===0){ fileChips.classList.add('hidden'); fileChips.innerHTML=''; return; }
+    fileChips.classList.remove('hidden');
+    fileChips.innerHTML = attachedFiles.map((f,i)=>`
+      <span class="inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-md bg-[#FDF0E6] border border-[#F2D5C2] text-[11px]">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" class="text-terracotta shrink-0"><path d="M5 3.5h4l3 3v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-8a1 1 0 011-1z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 3.5v3h3" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+        <span class="max-w-[120px] truncate font-medium">${f.name}</span>
+        <span class="text-zinc-500">${(f.size/1024).toFixed(0)} KB</span>
+        <button onclick="removeFile(${i})" class="w-4 h-4 grid place-items-center rounded hover:bg-black/5 ml-0.5">×</button>
+      </span>
+    `).join('');
+  }
+  window.removeFile = (i)=>{ attachedFiles.splice(i,1); renderChips(); };
+  attachBtn.addEventListener('click', ()=> fileInput.click());
+  fileInput.addEventListener('change', ()=>{
+    attachedFiles.push(...Array.from(fileInput.files));
+    renderChips(); fileInput.value='';
+  });
+  // drag & drop
+  ['dragenter','dragover'].forEach(ev=> composerCard.addEventListener(ev, e=>{ e.preventDefault(); composerCard.classList.add('ring-2','ring-terracotta/30','border-terracotta/30'); }));
+  ['dragleave','drop'].forEach(ev=> composerCard.addEventListener(ev, e=>{ e.preventDefault(); composerCard.classList.remove('ring-2','ring-terracotta/30','border-terracotta/30'); }));
+  composerCard.addEventListener('drop', e=>{
+    const files = Array.from(e.dataTransfer.files||[]);
+    if(files.length){ attachedFiles.push(...files); renderChips(); }
+  });
+  // paste image/files
+  document.addEventListener('paste', e=>{
+    const files = Array.from(e.clipboardData?.files||[]);
+    if(files.length){ attachedFiles.push(...files); renderChips(); }
+  });
+
+  // ——— Mikrofon (Web Speech API mock + real) ———
+  const micBtn = document.getElementById('mic-btn');
+  const micStatus = document.getElementById('mic-status');
+  let recognizing = false;
+  let recognition = null;
+  if('webkitSpeechRecognition' in window || 'SpeechRecognition' in window){
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SR();
+    recognition.lang='tr-TR'; recognition.interimResults=true; recognition.continuous=false;
+    recognition.onresult = (e)=>{
+      const txt = Array.from(e.results).map(r=>r[0].transcript).join('');
+      const ta2 = document.getElementById('composer-input');
+      ta2.value = (ta2.value ? ta2.value+' ' : '') + txt;
+      ta2.dispatchEvent(new Event('input'));
+    };
+    recognition.onend = ()=>{ recognizing=false; micBtn.classList.remove('bg-red-50','border-red-200','text-red-600'); micStatus.classList.add('hidden'); micBtn.innerHTML=`<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="6" y="3" width="4" height="7" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 8.5a3.5 3.5 0 007 0M8 12v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>`; };
+  }
+  micBtn.addEventListener('click', ()=>{
+    if(recognition){
+      if(!recognizing){ recognizing=true; recognition.start(); micBtn.classList.add('bg-red-50','border-red-200','text-red-600'); micStatus.classList.remove('hidden'); } else { recognition.stop(); }
+    } else {
+      // mock: toggle visuallei
+      recognizing=!recognizing;
+      if(recognizing){ micBtn.classList.add('bg-red-50','border-red-200','text-red-600'); micStatus.classList.remove('hidden'); micBtn.innerHTML=`<span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>`; }
+      else { micBtn.classList.remove('bg-red-50','border-red-200','text-red-600'); micStatus.classList.add('hidden'); micBtn.innerHTML=`<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="6" y="3" width="4" height="7" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 8.5a3.5 3.5 0 007 0M8 12v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>`; }
+    }
+  });
+
+  // ——— Steer / Queue toggle ———
+  document.querySelectorAll('.mode-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.mode-btn').forEach(b=>{
+        b.className='mode-btn px-2.5 py-1 rounded-full text-zinc-600 hover:bg-white text-[11px] font-medium leading-none';
+      });
+      btn.className='mode-btn px-2.5 py-1 rounded-full bg-[#262624] text-white text-[11px] font-medium leading-none';
+      // optional: send mode to console / persist
+      console.log('mode:', btn.dataset.mode);
     });
   });
 

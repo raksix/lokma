@@ -370,15 +370,21 @@
 
     <!-- Center — flex col with scroll + sticky composer -->
     <main class="flex-1 min-w-0 flex flex-col bg-[#FAF9F5] relative overflow-hidden">
+      <!-- Single chat view (default) -->
+      <div id="single-view" class="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div class="flex-1 overflow-y-auto" id="main-scroll">
-        <div class="max-w-[640px] mx-auto w-full px-4 sm:px-5 py-5 sm:py-6">
+        <div class="max-w-[820px] mx-auto w-full px-4 sm:px-5 py-5 sm:py-6">
           <!-- Eyebrow compact -->
           <div class="flex items-center gap-2 mb-4">
             <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white border border-line text-[10.5px] font-medium tracking-wide uppercase text-zinc-600 shadow-sm">
               <span class="w-1.5 h-1.5 rounded-full bg-terracotta"></span> Lokma Harness · #482
             </span>
             <span class="hidden sm:inline text-[11.5px] text-zinc-400">Today · 14:31</span>
-            <span class="ml-auto hidden sm:inline-flex items-center gap-1 text-[11.5px] text-zinc-500">
+            <button onclick="toggleTiling(true)" class="ml-auto hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-line text-[11px] font-medium hover:bg-muted transition" title="Chatleri pane olarak aç">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M6 3v10M10 3v10M3 6h10M3 10h10" stroke="currentColor" stroke-width="1" opacity=".6"/></svg>
+              Pane olarak aç
+            </button>
+            <span class="hidden sm:inline-flex items-center gap-1 text-[11.5px] text-zinc-500">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 3v8M3 8h10" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity=".5"/></svg>
               Share
             </span>
@@ -535,7 +541,7 @@
 
       <!-- ===== Sticky Composer — glued to bottom ===== -->
       <div class="shrink-0 bg-[#FAF9F5]/90 backdrop-blur-xl border-t border-line">
-        <div class="max-w-[640px] mx-auto w-full px-3 sm:px-4 py-2">
+        <div class="max-w-[820px] mx-auto w-full px-3 sm:px-4 py-2">
           <div id="composer-card" class="rounded-lg bg-white border border-line shadow-card overflow-hidden transition">
             <!-- Input — compact -->
             <div class="p-2">
@@ -646,6 +652,96 @@
             </div>
           </div>
           <p class="text-center text-[10.5px] text-zinc-400 mt-1.5">Lokma can make mistakes. Review patches before applying.</p>
+        </div>
+      </div>
+      </div><!-- /#single-view -->
+
+      <!-- Tiling workspace — chatler pane olarak (screenshot gibi) -->
+      <div id="tiling-view" class="hidden flex-1 flex-col min-h-0 overflow-hidden">
+        <div class="flex items-center gap-2 px-3 h-8 border-b border-line bg-[#FDFCFB] shrink-0">
+          <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#262624] text-white text-[11px] font-medium"><svg width="10" height="10" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M6 3v10M10 3v10M3 6h10M3 10h10" stroke="currentColor" stroke-width="1" opacity=".7"/></svg> Tiling</span>
+          <span class="text-[11px] text-zinc-500 hidden sm:inline">pane’leri sürükle · ayırıcıyı çek · çift tıkla sıfırla</span>
+          <span class="ml-auto flex items-center gap-1.5">
+            <button onclick="addPane()" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-terracotta text-white text-[11px] font-medium hover:bg-terracotta-hover">+ Pane</button>
+            <button onclick="toggleTiling(false)" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-line text-[11px] font-medium hover:bg-muted">Tekil görünüme dön</button>
+          </span>
+        </div>
+        <div id="tiling-grid" class="flex flex-1 min-h-0 overflow-hidden">
+          <!-- Pane A — Chat -->
+          <div class="tiling-pane flex-1 flex flex-col min-w-[300px] bg-[#FAF9F5] overflow-hidden" data-pane="a">
+            <div class="h-7 flex items-center gap-1.5 px-2.5 border-b border-line/60 bg-[#FDFCFB] shrink-0">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              <span class="text-[11px] font-medium truncate">Chat #482 — Refactor auth middleware</span>
+              <span class="ml-auto flex items-center gap-1">
+                <button onclick="splitPane(this)" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Yanına pane ekle">⊞</button>
+                <button onclick="closePane(this)" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Kapat">×</button>
+              </span>
+            </div>
+            <div class="flex-1 overflow-y-auto p-3 space-y-3 bg-[#FAF9F5]">
+              <div class="p-3 rounded-xl bg-white border border-line shadow-sm">
+                <div class="text-[12.5px] font-semibold">Aylin</div>
+                <div class="text-[13px] leading-5 mt-1">Let\'s refactor the auth middleware. Move JWT verification into a Fastify <code class="px-1 py-0.5 rounded bg-muted border border-line text-[11px] font-mono">preHandler</code> hook.</div>
+              </div>
+              <div class="p-3 rounded-xl bg-[#262624] text-white">
+                <div class="text-[12.5px] font-semibold">Lokma — Claude 4 Sonnet</div>
+                <div class="text-[13px] leading-5 mt-1 text-white/90">Perfect — one hook, one decorator, zero magic. <span class="underline decoration-white/30">Apply patch</span></div>
+              </div>
+              <div class="text-[11px] text-zinc-400 text-center">— pane A scroll —</div>
+            </div>
+            <div class="shrink-0 p-2 border-t border-line bg-white/90 backdrop-blur">
+              <div class="flex gap-1.5">
+                <input placeholder="Pane A — ask Lokma..." class="flex-1 h-7 px-2.5 rounded-md bg-white border border-line text-[13px] placeholder:text-zinc-400 focus:outline-none focus:border-terracotta/40" />
+                <button class="px-3 h-7 rounded-full bg-terracotta text-white text-[12px] font-medium">Send</button>
+              </div>
+            </div>
+          </div>
+          <!-- Divider -->
+          <div id="tiling-divider" class="w-1.5 bg-line hover:bg-[#CFC9BF] cursor-col-resize shrink-0 relative flex items-center justify-center" title="Sürükle · çift tıkla sıfırla">
+            <span class="w-0.5 h-7 bg-zinc-300 rounded-full pointer-events-none"></span>
+          </div>
+          <!-- Pane B — Code / Second chat -->
+          <div class="tiling-pane flex-1 flex flex-col min-w-[300px] bg-[#FAF9F5] overflow-hidden" data-pane="b">
+            <div class="h-7 flex items-center gap-1.5 px-2.5 border-b border-line/60 bg-[#FDFCFB] shrink-0">
+              <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+              <span class="text-[11px] font-medium truncate">Code — plugins/auth.ts</span>
+              <span class="ml-auto flex items-center gap-1">
+                <button onclick="splitPane(this)" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Böl">⊞</button>
+                <button onclick="closePane(this)" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Kapat">×</button>
+              </span>
+            </div>
+            <div class="flex-1 overflow-y-auto p-0 bg-white">
+              <div class="px-3 py-1.5 bg-muted/50 border-b border-line text-[11px] font-mono text-zinc-500">plugins/auth.ts — diff</div>
+              <pre class="p-3 text-[11.5px] leading-5 font-mono overflow-x-auto"><code><span class="text-zinc-400">// Fastify preHandler</span>
+<span class="text-[#9A6B4A]">app</span>.addHook(<span class="text-[#6A8A4A]">'preHandler'</span>, <span class="text-[#9A6B4A]">async</span> (req, reply) =&gt; {
+  <span class="text-[#9A6B4A]">if</span> (!req.routeOptions.config?.auth) <span class="text-[#9A6B4A]">return</span>
+})</code></pre>
+            </div>
+            <div class="shrink-0 p-2 border-t border-line bg-white/90 backdrop-blur">
+              <div class="flex gap-1.5">
+                <input placeholder="Pane B — ask about code..." class="flex-1 h-7 px-2.5 rounded-md bg-white border border-line text-[13px] placeholder:text-zinc-400 focus:outline-none focus:border-terracotta/40" />
+                <button class="px-3 h-7 rounded-full bg-[#262624] text-white text-[12px] font-medium">Ask</button>
+              </div>
+            </div>
+          </div>
+          <!-- Pane C — hidden initially, for + Pane demo -->
+          <div id="pane-c" class="tiling-pane hidden flex-1 flex flex-col min-w-[280px] bg-[#FAF9F5] border-l border-line overflow-hidden" data-pane="c">
+            <div class="h-7 flex items-center gap-1.5 px-2.5 border-b border-line/60 bg-[#FDFCFB] shrink-0">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+              <span class="text-[11px] font-medium truncate">Chat #483 — New pane</span>
+              <span class="ml-auto flex items-center gap-1">
+                <button onclick="closePane(this)" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500">×</button>
+              </span>
+            </div>
+            <div class="flex-1 overflow-y-auto p-3">
+              <div class="rounded-lg border border-dashed border-line-strong p-6 text-center">
+                <div class="text-[13px] font-medium">Yeni pane</div>
+                <div class="text-[12px] text-zinc-500 mt-1">Boş pane — buraya chat, terminal veya artifact gelebilir.</div>
+              </div>
+            </div>
+            <div class="shrink-0 p-2 border-t border-line bg-white/90">
+              <input placeholder="Yeni pane..." class="w-full h-7 px-2.5 rounded-md bg-white border border-line text-[13px]" />
+            </div>
+          </div>
         </div>
       </div>
     </main>
@@ -1148,6 +1244,107 @@
       console.log('mode:', btn.dataset.mode);
     });
   });
+
+  // --- Tiling workspace (chatler pane olarak) ---
+  window.toggleTiling = function(show){
+    const single = document.getElementById('single-view');
+    const tiling = document.getElementById('tiling-view');
+    if(show){
+      single.classList.add('hidden');
+      single.classList.remove('flex');
+      tiling.classList.remove('hidden');
+      tiling.classList.add('flex');
+    } else {
+      tiling.classList.add('hidden');
+      tiling.classList.remove('flex');
+      single.classList.remove('hidden');
+      single.classList.add('flex');
+    }
+  };
+  window.addPane = function(){
+    const c = document.getElementById('pane-c');
+    c.classList.remove('hidden');
+    c.classList.add('flex');
+    // ensure divider visible
+    document.getElementById('tiling-divider').style.display = '';
+  };
+  window.closePane = function(btn){
+    const pane = btn.closest('.tiling-pane');
+    if(!pane) return;
+    // if only one pane visible, don't close last, instead toggle back to single view
+    const visible = Array.from(document.querySelectorAll('#tiling-grid .tiling-pane')).filter(p=> !p.classList.contains('hidden'));
+    if(visible.length <= 1){
+      toggleTiling(false);
+      return;
+    }
+    pane.classList.add('hidden');
+    pane.classList.remove('flex');
+  };
+  window.splitPane = function(btn){
+    addPane();
+  };
+  // Tiling divider drag
+  (function(){
+    const divider = document.getElementById('tiling-divider');
+    const grid = document.getElementById('tiling-grid');
+    if(!divider || !grid) return;
+    let dragging=false, startX=0, startA=0, startB=0;
+    const paneA = grid.querySelector('[data-pane="a"]');
+    const paneB = grid.querySelector('[data-pane="b"]');
+    divider.addEventListener('mousedown', e=>{
+      dragging=true; startX=e.clientX;
+      startA=paneA.getBoundingClientRect().width;
+      startB=paneB.getBoundingClientRect().width;
+      divider.classList.add('dragging');
+      document.body.classList.add('resizing');
+      e.preventDefault();
+    });
+    divider.addEventListener('dblclick', ()=>{
+      paneA.style.flex='1 1 0%';
+      paneB.style.flex='1 1 0%';
+      paneA.style.width=''; paneB.style.width='';
+    });
+    window.addEventListener('mousemove', e=>{
+      if(!dragging) return;
+      const dx=e.clientX-startX;
+      const total=startA+startB;
+      let newA=startA+dx;
+      let newB=total-newA;
+      const min=280;
+      if(newA<min) newA=min;
+      if(newB<min) newB=min;
+      // apply as flex-basis
+      paneA.style.flex=`0 0 ${newA}px`;
+      paneB.style.flex=`0 0 ${newB}px`;
+    });
+    window.addEventListener('mouseup', ()=>{
+      if(!dragging) return;
+      dragging=false;
+      divider.classList.remove('dragging');
+      document.body.classList.remove('resizing');
+    });
+    // touch
+    divider.addEventListener('touchstart', e=>{
+      dragging=true; startX=e.touches[0].clientX;
+      startA=paneA.getBoundingClientRect().width;
+      startB=paneB.getBoundingClientRect().width;
+      divider.classList.add('dragging'); document.body.classList.add('resizing');
+    }, {passive:false});
+    window.addEventListener('touchmove', e=>{
+      if(!dragging) return;
+      const dx=e.touches[0].clientX-startX;
+      let newA=startA+dx; let newB=(startA+startB)-newA;
+      const min=280;
+      if(newA<min) newA=min;
+      if(newB<min) newB=min;
+      paneA.style.flex=`0 0 ${newA}px`;
+      paneB.style.flex=`0 0 ${newB}px`;
+    }, {passive:false});
+    window.addEventListener('touchend', ()=>{
+      if(!dragging) return;
+      dragging=false; divider.classList.remove('dragging'); document.body.classList.remove('resizing');
+    });
+  })();
 
   // auto-resize textarea
   const ta = document.getElementById('composer-input');

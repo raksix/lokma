@@ -54,7 +54,7 @@ async function main(): Promise<void> {
     // Delegate to lokma-server package if available
     try {
       // Dynamic import so lokma-core doesn't hard-depend on server at build time
-      const serverPath = new URL('../../lokma-web/server/dist/index.js', import.meta.url).pathname;
+      const serverPath = new URL('../../../lokma-web/server/dist/index.js', import.meta.url).pathname;
       const { startServer } = await import(serverPath);
       await startServer({ port });
     } catch (e) {

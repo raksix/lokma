@@ -30,6 +30,7 @@
 | `33-TESTING-autonomous-harness-testsprite-inspired.md` | **Testing — autonomous harness** — TestSprite-inspired self-hosted: video+trace, expect/actual, API, Shannon/security | ✅ EN 13KB (raw 655+1,136) |
 | `34-DESIGN-open-design-inspired.md` | **Design — Open Design-inspired canvas** — 6 artifacts, DESIGN.md, design-systems, Design Studio, export | ✅ EN 13KB (raw 1,325+831) |
 | `35-BOTS-lokma-bots.md` | **Lokma Bots — Grok-bots-inspired** — bot.json, persona→bot→agent, Gallery, lifecycle, sharing | ✅ EN 12KB (raw 1,121) |
+| `36-AUTH-and-PERMISSIONS.md` | **Auth & permissions — RBAC + project-scoped** — admin/member/viewer, project visibility/creation policy, session inheritance, JWT, `can()` | ✅ EN 19KB |
 | `raw/10-claude-code-ham-arastirma.md` | Raw: Claude Code 957 lines, 53KB | ✅ |
 | `raw/11-omp-ham-arastirma.md` | Raw: OMP 360 lines, 30KB | ✅ |
 | `raw/12-harness-ham-arastirma.md` | Raw: Harness 753 lines, 41KB | ✅ |

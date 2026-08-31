@@ -6,9 +6,9 @@
 ## Proje Kimliği
 - **Ad:** Lokma
 - **Klasör:** `/mnt/apopic/lokma`
-- **Durum:** 2026-08-31 — Araştırma Fazı tamamlandı, harness mimarisi dokümante edildi
+- **Durum:** 2026-08-31 — Araştırma tamamlandı, GitHub public repo oluşturuldu
 - **Tip:** Claude Code birebir klonu — Agentic Coding Harness (CLI + Web)
-- **Repo:** `/mnt/apopic/lokma` (git init yapıldı, GitHub remote henüz yok)
+- **Repo:** `https://github.com/raksix/lokma` (PUBLIC, main branch, 3 commit push'landı)
 
 ## Kurallar (Furkan'ın İstekleri)
 1. `Docs/` klasörü tek kaynak — sana dediğim her şey oraya atılacak
@@ -65,12 +65,11 @@
 - [ ] Lisans: MIT mi private mi?
 
 ## Son Durum
-- **Son güncelleme:** 2026-08-31 01:24 UTC
-- **Son işlem:** Tüm araştırmalar tamamlandı — 3 subagent bitirdi, ham veriler `Docs/raw/` altına eklendi (957+360+753=2070 satır), özet `13-ARASTIRMA-ozet-ve-sonraki-adimlar.md` yazıldı. Toplam 11 doküman ~3340 satır ~167KB, commit hazır.
+- **Son güncelleme:** 2026-08-31 01:27 UTC
+- **Son işlem:** GitHub public repo `raksix/lokma` oluşturuldu, 3 commit push'landı (5fe6bf1, d17cc5a, 96ac29c README). Repo: https://github.com/raksix/lokma
 - **Sıradaki adım:**
-  1. Furkan onay verince Faz 0 scaffold: `packages/lokma-*` monorepo + `lokma --help` çalışır iskelet
-  2. GitHub repo oluştur (`raksix/lokma` private) + push
-  3. CLI MVP (lokma-core + lokma-ai + Ink TUI)
+  1. Faz 0 scaffold: `packages/lokma-*` monorepo + `lokma --help` iskelet
+  2. CLI MVP (lokma-core + lokma-ai + Ink TUI)
 
 ---
 *Bu dosya otomatik yönetilir. Elle silme.*

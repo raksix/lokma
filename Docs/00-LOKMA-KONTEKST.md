@@ -6,8 +6,8 @@
 ## Proje Kimliği
 - **Ad:** Lokma
 - **Klasör:** `/mnt/apopic/lokma`
-- **Durum:** 2026-08-31 — Web harness docs done, GitHub branding updated
-- **Tip:** Innovative Agentic Coding Harness (CLI + Web) — open-source, multi-provider, themeable
+- **Durum:** 2026-08-31 — Docs ultra-detailed: agent system (30) + skills/memory/vault (27-29) + config (26)
+- **Tip:** Innovative Agentic Coding Harness (CLI + Web) — open-source, multi-provider, themeable, collision-free multi-agent
 - **Repo:** `https://github.com/raksix/lokma` (PUBLIC, main branch) — description: "Innovative agentic coding harness (CLI + Web) — multi-provider, themeable, open-source"
 
 ## Kurallar (Furkan'ın İstekleri)
@@ -34,10 +34,10 @@
 ## Docs Envanteri (2026-08-31)
 | Dosya | Açıklama | Durum |
 |-------|----------|-------|
-| `00-LOKMA-KONTEKST.md` | Bu dosya — ana hafıza | ✅ Güncel |
+| `00-LOKMA-KONTEKST.md` | Bu dosya — ana hafıza | ✅ Güncel (02:15 UTC) |
 | `01-PROJE-TANIMI.md` | Lokma tanımı (innovative harness, English) | ✅ |
-| `02-TEKNIK-KARARLAR.md` | Stack kararları (pending pick) | ⏳ Stack pick pending |
-| `03-YOL-HARITASI.md` | Roadmap (Phases 0-3) | ✅ |
+| `02-TEKNIK-KARARLAR.md` | Stack + arch decisions (pending pick, 7 fixed rows + 3 new) | ✅ 02-30 synced |
+| `03-YOL-HARITASI.md` | Roadmap — ultra-detailed Phases 0–3 (32KB, agents + skills + memory + vault + extras) | ✅ EN (30-*) |
 | `10-ARASTIRMA-claude-code-birebir-analiz.md` | Claude Code tüm özellik envanteri (CLI, tools, permissions, hooks, MCP, sessions) | ✅ 18KB |
 | `11-ARASTIRMA-omp-temalar-ve-tasarim.md` | OMP tema sistemi + görsel dil + Lokma tema tasarımı | ✅ 7.6KB |
 | `12-HARNESS-MIMARI-cli-web-nasil-kurulur.md` | CLI+Web harness nasıl inşa edilir (katmanlar, loop, WS, provider) | ✅ 17KB |
@@ -47,15 +47,27 @@
 | `22-WEB-FEATURES-provider-model-session.md` | Provider/model/session/usage + full Claude Code parity spec (EN) | ✅ 13KB |
 | `23-PLUGIN-SYSTEM-deepseek-cordis.md` | Plugin system — DeepSeek Cordis inspiration + Lokma kernel (EN) | ✅ 9.4KB |
 | `24-WEB-PANE-SYSTEM-and-orchestration.md` | Pane system, sidebars, file browser, live logs, browser, orchestration (EN) | ✅ 12KB |
-| `25-WEB-ROADMAP.md` | Phased roadmap (0 scaffold → 1 core loop → 2 parity → 3 polish) (EN) | ✅ 7.6KB |
+| `25-WEB-ROADMAP.md` | Web roadmap — ultra-detailed Phases 0→3 (14KB, agents 30-*) | ✅ EN (14KB, synced 03) |
+| `26-CONFIG-and-CREDENTIALS.md` | Config & credentials — layered config + encrypted credentials.json (EN) | ✅ 8KB |
+| `27-SKILLS-auto-discovery-hermes-inspired.md` | Auto skill discovery — Hermes <available_skills> + skill_view + curator (EN) | ✅ 11KB (raw 1044 lines) |
+| `28-MEMORY-infinite-vault-graph.md` | Infinite memory + vault + graph — FTS5 + VaultPort + react-force-graph-2d (EN) | ✅ 12KB (raw 1390 lines) |
+| `29-OBSIDIAN-MCP-vault-and-graph.md` | Obsidian MCP vs file vault — 2112 MCPs scanned, VaultPort wins (EN) | ✅ 7.5KB (raw 879 lines) |
+| `30-AGENT-SYSTEM-personality-memory-orchestration-collision.md` | **Agent system — ULTRA-DETAILED** — personality, per-agent memory/model, maxAgents/maxConcurrent+queue, self-spawn, orchestration, bus+coordinator+heartbeat, 3-layer collision-free, 23 extras (EN) | ✅ 40KB (raw 2699 lines) |
 | `99-NOTLAR.md` | Hızlı notlar | ✅ |
-| `README.md` | Docs index | ✅ |
+| `README.md` | Docs index (37 files) | ✅ |
 | `raw/10-claude-code-ham-arastirma.md` | Ham: Claude Code 957 lines, 53KB | ✅ |
 | `raw/11-omp-ham-arastirma.md` | Ham: OMP 360 lines, 30KB | ✅ |
 | `raw/12-harness-ham-arastirma.md` | Ham: Harness 753 lines, 41KB | ✅ |
 | `raw/21-web-stack-ham-arastirma.md` | Ham: Web stack 712 lines, 60KB | ✅ |
 | `raw/22-web-features-ham-arastirma.md` | Ham: Web features 1068 lines, 61KB | ✅ |
 | `raw/23-dsh-plugin-ham-arastirma.md` | Ham: DSH Cordis plugin 1146 lines, 74KB | ✅ |
+| `raw/27-hermes-skills-ham-arastirma.md` | Ham: Hermes skills 1044 lines, 64KB | ✅ |
+| `raw/28-hermes-memory-ham-arastirma.md` | Ham: Hermes memory 1390 lines, 59KB | ✅ |
+| `raw/29-obsidian-mcp-ham-arastirma.md` | Ham: Obsidian MCP 879 lines, 50KB | ✅ |
+| `raw/30-agent-orchestration-ham-arastirma.md` | Ham: Agent orchestration 603 lines, 68KB | ✅ |
+| `raw/31-agent-personality-ham-arastirma.md` | Ham: Agent personality & memory 826 lines, 59KB | ✅ |
+| `raw/32-agent-conflict-ham-arastirma.md` | Ham: Agent conflict-free editing 857 lines, 64KB | ✅ |
+| `raw/33-agent-extras-ham-arastirma.md` | Ham: Agent extras 20+ ideas 413 lines, 50KB | ✅ |
 
 ## Konuşma Geçmişi (Kronolojik)
 ### 2026-08-31 — Kurulum
@@ -71,6 +83,16 @@
 - Furkan: "Web tarafını yapmak için dökümantasyon ve roadmap olacak. Provider/model/session/token usage, tüm Claude Code özellikleri web'de, stack alternatifleri sun, plugin sistemi deepseek-harness'ten bak, pane sistemi (sol/sağ sidebar, file browser, live logs, browser, drag session into session), kod ve doküman bundan sonra İngilizce"
 - Hermes: 3 parallel research subagents (DSH plugin Cordis 1146 lines/74KB, web stack 712/60KB, web features 1068/61KB) + DSH docs scrape (cordis-primer, architecture, plugin-guide). Produced **6 new English docs**: `20-overview` (6.4KB), `21-stack-alternatives` (9.8KB, decision matrix A/B/C/D), `22-features` (13KB, provider/model/session/usage + parity checklist), `23-plugin-system` (9.4KB, Cordis 5 ideas + Lokma kernel), `24-pane-system` (12KB, flexlayout + sidebars + orchestration), `25-roadmap` (7.6KB, Phase 0→3). Raw saved to `raw/21-23` (2926 lines, 195KB). Total docs: 22 files, ~62KB synthesized + ~392KB raw.
 
+### 2026-08-31 — Config & Credentials + Hermes Research
+- Furkan: "abi bu arada bu keyler falan. config de tutulcak .claude/config.json settings.json gibi onun için de bi refactor çakarsın"
+- Hermes: `26-CONFIG-and-CREDENTIALS.md` (8KB, layered `~/.lokma/config.json` + `~/.lokma/credentials.json` AES-GCM 0600 + `.lokma/settings.json` per project + env `LOKMA_*` + Zod + watcher + masked GET /api/config, parallels `02-`/`03-` updates, commit 0d889aa+d6edc0d)
+- Furkan: "hermes agent kendi kendine skill araştırıp onu kullanabiliyor onu ekle. kendi sonsuz memorysi. obsidian mcpler var vault memory sistemi ve graph görüntüleyicisi. bunları da ekle"
+- Hermes: 3 parallel hermes research subagents (463s total): `hermes-skills` (1044 lines, `prompt_builder.py` + `skills_list/view/manage` trilogy + `<available_skills>` index + LRU snapshot cache + `Use when` first-57-chars routing), `hermes-memory` (1390 lines, frozen MEMORY/USER + FTS5 session_search + 2-tier compression + vault sync `memory-vault-sync.py` + `memory-vault-routes.json` + `vault/**/*.md` 370 notes + Honcho), `obsidian-mcp` (879 lines, 2112 Obsidian MCPs scanned via GitHub API, 8 READMEs, mcp-obsidian 4357★ + local-rest-api 2867★ built-in MCP, graph only in cyanheads/basic-memory). Synthesized `27-SKILLS-auto-discovery-hermes-inspired.md` (11KB) + `28-MEMORY-infinite-vault-graph.md` (12KB) + `29-OBSIDIAN-MCP-vault-and-graph.md` (7.5KB, VaultPort wins).
+
+### 2026-08-31 — Ultra-Detailed Agent System + Roadmap Expansion
+- Furkan: "web roadmap daha da genişlet. ai ajan yönetimi de ekle. ajanların kendi kişiliği kendi memoryleri olacak. istersem şu ajana şu modelde çalışsın diye seçebilir olcak. ai da skill ya da mcp ile kendi de ajan oluşturabilecek. maks açabileceği ajan sayısı olcak. ve aynı da çalışabilecek ajan sayısı da olcak. paralel ajan manuel yönetiminde aynı dosyayı editleyip çakışma olmaması için birbirleriyle haberleşecekler. bu şekilde detaylı ajan sistemi de ekle. ve internette araştır daha ne ekleyebiliriz diye. roadmap genişlet ve detaylandır. aşırı detaylı olsun"
+- Hermes: 4 parallel agent research subagents (182s): `orchestration` (603 lines, Claude Code Agent/workflow/worktree + OpenHands events/ToolRegistry + AutoGen pub/sub + CrewAI Agent/Task/Crew + LangGraph Supervisor, 18 sources), `personality` (826 lines, SOUL.md + USER.md + Honcho dialectic + per-agent memory + model per agent + marketplace `agentskills.io`), `conflict-free editing` (857 lines, advisory locks + worktree isolation + hashline expectedSha + diff3 + BUS + coordinator + lease/heartbeat + CRDT/OT), `extras` (413 lines, 23 ranked ideas from 2025-26 harness trends: templates marketplace, per-agent budgets, eval harness, time-travel, cron per agent, human-in-the-loop, observability, handoff, auto-scaling, sandbox per agent, browser per agent, skill sharing, voice, adversarial review, etc). Synthesized one mega spec `30-AGENT-SYSTEM-personality-memory-orchestration-collision.md` (40KB, 15 sections, 23 extras table, caps + queue + self-spawn + bus + 3-layer collision-free `lease→sha→worktree`, per-agent SOUL/MEMORY/model/budgets, Web Agent Hub + DnD session→agent, Zod + REST+WS). **Roadmaps expanded:** `03-YOL-HARITASI.md` (32KB, ultra-detailed Phases 0-3 with agents in Phase 1/2 + extras 3) + `25-WEB-ROADMAP.md` (14KB, web-specific + agents MVP 1.5 + parallel+safe 2 + communication 2.5 + orchestration). `02-TEKNIK-KARARLAR.md` + `Docs/README.md` synced.
+
 ## Bekleyen Sorular (Furkan'a)
 - [x] GitHub repo: `raksix/lokma` PUBLIC — done 2026-08-31
 - [x] İlk provider multi-provider (Anthropic + OpenAI/DeepSeek/Google/Ollama/OpenRouter) — specced
@@ -80,13 +102,13 @@
 - [ ] Lisans: MIT mi private mi?
 
 ## Son Durum
-- **Son güncelleme:** 2026-08-31 02:00 UTC
-- **Son işlem:** Config hierarchy refactor — `26-CONFIG-and-CREDENTIALS.md` (EN, 8KB) + 02/03 updates; keys in `~/.lokma/credentials.json` (encrypted 0600) layered like Claude Code `config.json`/`settings.json`. Commit 0d889aa. **In-flight:** hermes-agent research fan-out (3 subagents: auto-skill discovery, infinite memory, Obsidian MCP vault+graph — repos/docs scraping, ~1200 lines raw expected) — will land as `Docs/30-*` set + roadmap auto-append when done.
+- **Son güncelleme:** 2026-08-31 02:15 UTC
+- **Son işlem:** Ultra-detailed agent system — `30-AGENT-SYSTEM-personality-memory-orchestration-collision.md` (40KB, 15 sections, 23 extras) + 27-29 (skills+memory+vault) + expanded `03-YOL-HARITASI.md` (32KB, Phases 0–3 with agents in 1/1.5/2/2.5 + extras 3) + `25-WEB-ROADMAP.md` (14KB) + `02-TEKNIK-KARARLAR.md` (7 new rows) + `Docs/README.md` (37 files, ~140KB synth + ~900KB raw). 7 subagents total (3 hermes 463s + 4 agent 182s), 6012 lines raw synthesized. **Next commit:** `docs: agent system + roadmap ultra-detailed (30 + 27-29 + 03/25/02/README/00)` — push to `raksix/lokma`.
 - **Sıradaki adım:**
-  1. **You pick stack** (A/B/C/D from 21-*) → I scaffold Phase 0 monorepo
-  2. Phase 1: core loop in browser (WS streaming, chat, providers/models/sessions/usage)
-  3. Phase 2: full parity (MCP/permissions/hooks/skills/plugins/git/terminal/browser/orchestration)
-  4. Phase 3: themes, cloud, sharing, polish
+  1. **You pick stack** (A/B/C/D from 21-*) → I scaffold Phase 0 monorepo (packages/lokma-core+ai+shared+web + themes + agents scaffolds + `.agentlocks`/worktrees/personas)
+  2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5)**
+  3. Phase 2: MCP+hooks+skills+plugins+git+terminal+browser + **memory deep+vault graph + agents parallel+safe+communication+orchestration + panes v2**
+  4. Phase 3: themes+sharing+cloud + **extras (marketplace, cron per agent, approvals, observability, handoff, browser per agent, adversarial review, … 23 ranked)** + mobile+perf+a11y
 
 ---
 *Bu dosya otomatik yönetilir. Elle silme.*

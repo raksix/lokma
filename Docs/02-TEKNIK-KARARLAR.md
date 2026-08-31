@@ -31,6 +31,13 @@ Other fixed choices (stack-independent):
 | Plugin kernel | Lightweight Cordis-inspired (~300 lines) — no vendored Cordis fork | Same semantics, smaller surface — see `23-*` |
 | Themes | `themes/*.json` → CSS vars + Chalk tokens (4 MVP: claude/omp/midnight/paper) | Single token source for CLI+Web |
 | Language | **Docs & code English from 2026-08-31 01:45** (Rule 7), chat stays Turkish | Your request |
+| Auto-skills | Hermes-inspired `<available_skills>` index + `skill_view` progressive disclosure + curator self-patching — see `27-SKILLS-auto-discovery-hermes-inspired.md` | LLM matches `Use when <trigger>.` (first 57 chars) — no embeddings in hot path |
+| Memory | Infinite via `MEMORY.md/USER.md` (§-delimited) + FTS5 `session_search` + compaction + vault sync (`lokma-vault` / `memory.fermag.com.tr`) — see `28-MEMORY-infinite-vault-graph.md` | Hermes frozen prompt + 2-tier compression + vault graph (react-force-graph-2d) |
+| Obsidian / vault | File-based vault + `VaultPort` + `GET /api/vault/graph` — no Obsidian desktop required; optional `obsidian-rest` backend — see `29-OBSIDIAN-MCP-vault-and-graph.md` | VPS-friendly, no `27124` daemon |
+| Agents | Per-agent `SOUL.md` + `MEMORY.md` + `model` + `budgets` + SCOPED FTS5; `maxAgents=20` + `maxConcurrent=5` + queue + priority; `.agentlocks/` advisory + `git worktree` + `expectedSha` hashline + bus + coordinator — see `30-AGENT-SYSTEM-personality-memory-orchestration-collision.md` | Multi-provider, themeable, collision-free paralellism |
+| Locks | `.agentlocks/locks/<sha1(path)>.json` + 30s heartbeat + 60s lease + `edit_file` snapshot guard | Cheapest reliable layer before worktree |
+| Worktrees | `git worktree add .lokma/worktrees/<agentId>` per concurrent agent, merge via coordinator `diff3` | Strongest isolation — no runtime file collision |
+| Orchestration | `parallel()` / `pipeline()` / Team / workflow-script (Cordis jobs) — see `30-*` §8 | Fan-out 3–20, then coalesce |
 
 ## Architecture
 
@@ -50,6 +57,9 @@ Other fixed choices (stack-independent):
 | 2026-08-31 | Docs & code → English (chat Turkish) | Your request 2026-08-31 01:45 |
 | 2026-08-31 | Config hierarchy: `~/.lokma/config.json` + provider `credentials.json` (encrypted 0600) + `.lokma/settings.json` per project + env override — see `26-CONFIG-and-CREDENTIALS.md` | Your request: keys in config like `~/.claude/config.json`/`settings.json`, refactor spec'd |
 | 2026-08-31 | Web harness docs set (20-25) completed — 62KB synthesized + 195KB raw | 3 research subagents + DSH scrape |
+| 2026-08-31 | Auto-skill discovery (Hermes-inspired) — `<available_skills>` + `skill_view` + curator patch — see `27-*` | Your request: "hermes agent kendi kendine skill araştırıp onu kullanabiliyor" — 1044 lines raw |
+| 2026-08-31 | Infinite memory + vault + graph — `MEMORY.md/USER.md` + FTS5 `session_search` + compaction + vault sync + graph view — see `28-*` + `29-*` | Your request: "kendi sonsuz memorysi. obsidian mcpler ... vault memory sistemi ve graph görüntüleyicisi" — 1390+879 lines raw |
+| 2026-08-31 | Agent system — per-agent `SOUL`/`MEMORY`/`model` + `maxAgents`/`maxConcurrent` + queue + self-spawn + bus + locks/worktree/hashline collision-free — see `30-*` | Your request: web roadmap genişlet + ultra-detailed agent system — 2699 lines raw (4 subagents) |
 
 ---
 

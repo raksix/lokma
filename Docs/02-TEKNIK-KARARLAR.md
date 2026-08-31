@@ -35,9 +35,14 @@ Other fixed choices (stack-independent):
 | Memory | Infinite via `MEMORY.md/USER.md` (§-delimited) + FTS5 `session_search` + compaction + vault sync (`lokma-vault` / `memory.fermag.com.tr`) — see `28-MEMORY-infinite-vault-graph.md` | Hermes frozen prompt + 2-tier compression + vault graph (react-force-graph-2d) |
 | Obsidian / vault | File-based vault + `VaultPort` + `GET /api/vault/graph` — no Obsidian desktop required; optional `obsidian-rest` backend — see `29-OBSIDIAN-MCP-vault-and-graph.md` | VPS-friendly, no `27124` daemon |
 | Agents | Per-agent `SOUL.md` + `MEMORY.md` + `model` + `budgets` + SCOPED FTS5; `maxAgents=20` + `maxConcurrent=5` + queue + priority; `.agentlocks/` advisory + `git worktree` + `expectedSha` hashline + bus + coordinator — see `30-AGENT-SYSTEM-personality-memory-orchestration-collision.md` | Multi-provider, themeable, collision-free paralellism |
+| Setup | `lokma init/setup` Ink TUI checkboxes: browser (Browser Use/Playwright/CDP) + web search (SearXNG/Exa/Brave) + gateway (Telegram/Discord/Slack/WA/Signal) + MCP + memory/vault — see `32-SETUP-optional-stack-and-connections.md` | Optional stack — mirrors `hermes setup` wizard |
 | Locks | `.agentlocks/locks/<sha1(path)>.json` + 30s heartbeat + 60s lease + `edit_file` snapshot guard | Cheapest reliable layer before worktree |
 | Worktrees | `git worktree add .lokma/worktrees/<agentId>` per concurrent agent, merge via coordinator `diff3` | Strongest isolation — no runtime file collision |
 | Orchestration | `parallel()` / `pipeline()` / Team / workflow-script (Cordis jobs) — see `30-*` §8 | Fan-out 3–20, then coalesce |
+| Diagrams | Archify typed JSON IR → HTML/SVG, 5 types, 4 presets, viewer contract — see `31-ARCHIFY-diagrams-and-viewer.md` | Agent produces IR, Lokma renders |
+| Design canvas | Open Design-inspired 6 artifacts + `DESIGN.md` brand contract + `design-systems/` + Design Studio pane — see `34-DESIGN-open-design-inspired.md` | Agent-native design engine |
+| Testing | TestSprite-inspired self-hosted harness: plan→inventory→codegen→sandbox(video+trace)→classify→heal + Shannon/security — see `33-TESTING-autonomous-harness-testsprite-inspired.md` | `test_app` skill + Test Lab pane |
+| Bots | Grok-bots-inspired `bot.json` spec, Bot Gallery, persona→bot→agent, fork/share/marketplace — see `35-BOTS-lokma-bots.md` | Lightweight shareable specialists |
 
 ## Architecture
 
@@ -60,6 +65,11 @@ Other fixed choices (stack-independent):
 | 2026-08-31 | Auto-skill discovery (Hermes-inspired) — `<available_skills>` + `skill_view` + curator patch — see `27-*` | Your request: "hermes agent kendi kendine skill araştırıp onu kullanabiliyor" — 1044 lines raw |
 | 2026-08-31 | Infinite memory + vault + graph — `MEMORY.md/USER.md` + FTS5 `session_search` + compaction + vault sync + graph view — see `28-*` + `29-*` | Your request: "kendi sonsuz memorysi. obsidian mcpler ... vault memory sistemi ve graph görüntüleyicisi" — 1390+879 lines raw |
 | 2026-08-31 | Agent system — per-agent `SOUL`/`MEMORY`/`model` + `maxAgents`/`maxConcurrent` + queue + self-spawn + bus + locks/worktree/hashline collision-free — see `30-*` | Your request: web roadmap genişlet + ultra-detailed agent system — 2699 lines raw (4 subagents) |
+| 2026-08-31 | Archify diagrams — typed JSON IR → HTML/SVG, 5 types, 4 presets, viewer contract, `~/.lokma/archify/` + Design Studio pane + `/api/archify/*` — see `31-ARCHIFY-diagrams-and-viewer.md` | `tt-a1i/archify` 34.9k★ research (970 lines) — integration via skill + pane |
+| 2026-08-31 | Setup optional stack — `lokma init/setup` Ink TUI checkboxes: browser (Browser Use/Playwright/CDP) + web search (SearXNG/Exa/Brave fallback) + gateway (Telegram/Discord/Slack/WA/Signal) + MCP + memory/vault — see `32-SETUP-optional-stack-and-connections.md` | Your request: *"hermesi kurarken browser/web search/bağlantı kurulumda isteğe bağlı seçilebilsin"* — hermes setup/browse/gateway trio (1,190+1,349+964 lines) |
+| 2026-08-31 | Testing autonomous harness — TestSprite-inspired but self-hosted: plan→inventory(codegen)→sandbox(video+trace)→classify→heal, element `expect` guarantee, API + Shannon/security suite, Test Lab pane — see `33-TESTING-autonomous-harness-testsprite-inspired.md` | Your request: *"testsprite bağımsız ama daha iyi — video/rapor/plan/buton coverage/API/Shannon"* — 655+1,136 lines |
+| 2026-08-31 | Design canvas — Open Design-inspired: 6 artifact types (Prototype/Deck/Mobile/Image/Document/HyperFrame), `DESIGN.md` brand contract (7+ H2), `design-systems/` + `templates/`, Design Studio pane + `/api/design/*` + export HTML/PDF/PPTX/MP4 — see `34-DESIGN-open-design-inspired.md` | Your request: *"lokmanın kendi içinde tasarım da yapılabilsin, claude design gibi"* — open-design 92.9k★ (1,325+831 lines) |
+| 2026-08-31 | Lokma Bots — Grok-bots-inspired: `bot.json` spec, persona→bot→agent mapping, Bot Gallery pane, lifecycle create→playground→publish→fork→run as agent, sharing/marketplace — see `35-BOTS-lokma-bots.md` | Your request: *"hermese bots geldi grok bots gibi lokma bots planı çıkar"* — grok-bots 1,121 lines |
 
 ---
 

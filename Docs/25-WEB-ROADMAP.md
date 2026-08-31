@@ -112,6 +112,21 @@ Goal: beautiful, shippable, shareable — the "ballandır" that makes Lokma inno
 
 ---
 
+
+## Cross-Cutting — Archify / Setup / Testing / Design / Bots (Phases 0–2.5)
+
+These 5 new systems are scaffolded in Phase 0 and deepened in Phases 1–2.5 — each has a pane + REST + CLI + agent tool:
+
+| System | Phase 0 Scaffold | Phase 1 Pane | Phase 2 Deep | Doc |
+|--------|------------------|--------------|--------------|-----|
+| **Archify** | `~/.lokma/archify/<id>/` + `archify` tool stub | Diagram Studio (list+viewer+JSON+receipt) | Delta + share cards + `guide` | `31-ARCHIFY` |
+| **Setup** | `lokma init/setup` TUI + `config.json` layered + `credentials.json` 0600 | Settings checkboxes (browser/search/gateway/MCP/vault) | `lokma doctor` probes | `32-SETUP` |
+| **Testing** | `~/.lokma/test-runs/<id>/` + `test_app` stub + `lokma test` | Test Lab (Plan→Run→Report) | Video+trace+Shannon+security suite | `33-TESTING` |
+| **Design** | `~/.lokma/design/` + `.lokma/DESIGN.md` guard + `design_canvas` stub | Design Studio (brief+DESIGN.md+6 types) | 5D critique + export HTML/PDF/PPTX/MP4 | `34-DESIGN` |
+| **Bots** | `~/.lokma/bots/<id>/bot.json` + `BotSchema` + `GET /api/bots` | Bot Gallery (Featured/Mine/Shared) + playground | Fork/publish/hub + `run as agent` | `35-BOTS` |
+
+All 5 share the same principles: **agent produces, harness renders** — the agent is the engine (writes IR/HTML/tests/bot.json), Lokma validates, stores, previews, exports.
+
 ## What I Need From You Now
 
 1. **Stack decision:** `A` / `B` / `C` / `D` or a mix — `21-WEB-STACK-alternatives.md` §9 (recommendation **A**).

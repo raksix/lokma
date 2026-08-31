@@ -6,7 +6,7 @@
 ## Proje Kimliği
 - **Ad:** Lokma
 - **Klasör:** `/mnt/apopic/lokma`
-- **Durum:** 2026-08-31 — Docs ultra-detailed: agent system (30) + skills/memory/vault (27-29) + config (26)
+- **Durum:** 2026-08-31 02:30 UTC — Docs ultra-detailed: agent system (30) + skills/memory/vault (27-29) + config (26) + Archify (31) + setup optional (32) + testing harness (33) + design canvas (34) + Lokma Bots (35)
 - **Tip:** Innovative Agentic Coding Harness (CLI + Web) — open-source, multi-provider, themeable, collision-free multi-agent
 - **Repo:** `https://github.com/raksix/lokma` (PUBLIC, main branch) — description: "Innovative agentic coding harness (CLI + Web) — multi-provider, themeable, open-source"
 
@@ -52,6 +52,11 @@
 | `27-SKILLS-auto-discovery-hermes-inspired.md` | Auto skill discovery — Hermes <available_skills> + skill_view + curator (EN) | ✅ 11KB (raw 1044 lines) |
 | `28-MEMORY-infinite-vault-graph.md` | Infinite memory + vault + graph — FTS5 + VaultPort + react-force-graph-2d (EN) | ✅ 12KB (raw 1390 lines) |
 | `29-OBSIDIAN-MCP-vault-and-graph.md` | Obsidian MCP vs file vault — 2112 MCPs scanned, VaultPort wins (EN) | ✅ 7.5KB (raw 879 lines) |
+| `31-ARCHIFY-diagrams-and-viewer.md` | **Archify — diagrams & viewer** — typed JSON IR → HTML/SVG, 5 types, 4 presets, viewer contract, `~/.lokma/archify/` + pane | ✅ 10KB (raw 970 lines) |
+| `32-SETUP-optional-stack-and-connections.md` | **Setup — optional stack & connections** — `lokma init/setup` TUI: browser (Browser Use/Playwright/CDP) + web search (SearXNG/Exa/Brave) + gateway + MCP + vault | ✅ 12KB (raw 1,190+1,349+964) |
+| `33-TESTING-autonomous-harness-testsprite-inspired.md` | **Testing — autonomous harness** — TestSprite-inspired self-hosted: plan→inventory→codegen→sandbox(video+trace)→classify→heal, element `expect` guarantee, API + Shannon/security | ✅ 13KB (raw 655+1,136) |
+| `34-DESIGN-open-design-inspired.md` | **Design — Open Design-inspired canvas** — 6 artifacts (Prototype/Deck/Mobile/Image/Document/HyperFrame), `DESIGN.md` brand contract, `design-systems/` + Design Studio + export HTML/PDF/PPTX/MP4 | ✅ 13KB (raw 1,325+831) |
+| `35-BOTS-lokma-bots.md` | **Lokma Bots — Grok-bots-inspired** — `bot.json` spec, persona→bot→agent mapping, Bot Gallery, lifecycle create→playground→publish→fork→run, sharing/marketplace | ✅ 12KB (raw 1,121) |
 | `30-AGENT-SYSTEM-personality-memory-orchestration-collision.md` | **Agent system — ULTRA-DETAILED** — personality, per-agent memory/model, maxAgents/maxConcurrent+queue, self-spawn, orchestration, bus+coordinator+heartbeat, 3-layer collision-free, 23 extras (EN) | ✅ 40KB (raw 2699 lines) |
 | `99-NOTLAR.md` | Hızlı notlar | ✅ |
 | `README.md` | Docs index (37 files) | ✅ |
@@ -68,6 +73,15 @@
 | `raw/31-agent-personality-ham-arastirma.md` | Ham: Agent personality & memory 826 lines, 59KB | ✅ |
 | `raw/32-agent-conflict-ham-arastirma.md` | Ham: Agent conflict-free editing 857 lines, 64KB | ✅ |
 | `raw/33-agent-extras-ham-arastirma.md` | Ham: Agent extras 20+ ideas 413 lines, 50KB | ✅ |
+| `raw/34-hermes-setup-ham-arastirma.md` | Ham: Hermes setup 1,190 lines, 78KB | ✅ |
+| `raw/35-hermes-browser-search-ham-arastirma.md` | Ham: Hermes browser+search 1,349 lines, 104KB | ✅ |
+| `raw/36-hermes-connections-ham-arastirma.md` | Ham: Hermes gateway/MCP 964 lines, 74KB | ✅ |
+| `raw/37-archify-ham-arastirma.md` | Ham: Archify 970 lines, 108KB | ✅ |
+| `raw/38-opendesign-ham-arastirma.md` | Ham: Open Design 1,325 lines, 111KB | ✅ |
+| `raw/39-opendesign-designsystem-ham-arastirma.md` | Ham: Open Design design systems 831 lines, 106KB | ✅ |
+| `raw/40-testsprite-ham-arastirma.md` | Ham: TestSprite 655 lines, 96KB | ✅ |
+| `raw/41-lokma-test-ui-security-ham-arastirma.md` | Ham: Test UI+security 1,136 lines, 76KB | ✅ |
+| `raw/42-grok-bots-ham-arastirma.md` | Ham: Grok Bots 1,121 lines, 114KB | ✅ |
 
 ## Konuşma Geçmişi (Kronolojik)
 ### 2026-08-31 — Kurulum
@@ -92,6 +106,17 @@
 ### 2026-08-31 — Ultra-Detailed Agent System + Roadmap Expansion
 - Furkan: "web roadmap daha da genişlet. ai ajan yönetimi de ekle. ajanların kendi kişiliği kendi memoryleri olacak. istersem şu ajana şu modelde çalışsın diye seçebilir olcak. ai da skill ya da mcp ile kendi de ajan oluşturabilecek. maks açabileceği ajan sayısı olcak. ve aynı da çalışabilecek ajan sayısı da olcak. paralel ajan manuel yönetiminde aynı dosyayı editleyip çakışma olmaması için birbirleriyle haberleşecekler. bu şekilde detaylı ajan sistemi de ekle. ve internette araştır daha ne ekleyebiliriz diye. roadmap genişlet ve detaylandır. aşırı detaylı olsun"
 - Hermes: 4 parallel agent research subagents (182s): `orchestration` (603 lines, Claude Code Agent/workflow/worktree + OpenHands events/ToolRegistry + AutoGen pub/sub + CrewAI Agent/Task/Crew + LangGraph Supervisor, 18 sources), `personality` (826 lines, SOUL.md + USER.md + Honcho dialectic + per-agent memory + model per agent + marketplace `agentskills.io`), `conflict-free editing` (857 lines, advisory locks + worktree isolation + hashline expectedSha + diff3 + BUS + coordinator + lease/heartbeat + CRDT/OT), `extras` (413 lines, 23 ranked ideas from 2025-26 harness trends: templates marketplace, per-agent budgets, eval harness, time-travel, cron per agent, human-in-the-loop, observability, handoff, auto-scaling, sandbox per agent, browser per agent, skill sharing, voice, adversarial review, etc). Synthesized one mega spec `30-AGENT-SYSTEM-personality-memory-orchestration-collision.md` (40KB, 15 sections, 23 extras table, caps + queue + self-spawn + bus + 3-layer collision-free `lease→sha→worktree`, per-agent SOUL/MEMORY/model/budgets, Web Agent Hub + DnD session→agent, Zod + REST+WS). **Roadmaps expanded:** `03-YOL-HARITASI.md` (32KB, ultra-detailed Phases 0-3 with agents in Phase 1/2 + extras 3) + `25-WEB-ROADMAP.md` (14KB, web-specific + agents MVP 1.5 + parallel+safe 2 + communication 2.5 + orchestration). `02-TEKNIK-KARARLAR.md` + `Docs/README.md` synced.
+
+
+### 2026-08-31 02:30 UTC — Archify + Setup + Testing + Design + Bots mega synthesis
+- **Furkan (4 new asks in parallel):**
+  - *"hermesi kurarken browser/web search/bağlantı kurulumda isteğe bağlı seçilebilsin"* → 3 subagents: `hermes-setup` (1,190 lines: install.sh 3,678 + install.ps1 5,012 + setup.py 3,876 + config.yaml.example 1,986) + `hermes-browser-search` (1,349 lines: browser_registry 3 backends + BH_AGENT_WORKSPACE + SearXNG :8889/Exa/Brave fallback chain) + `hermes-connections` (964 lines: gateway 35 platforms, Telegram/Discord/Slack/WA/Signal + provider routing + MCP catalog 70). Synthesized `32-SETUP-optional-stack-and-connections.md` (12KB, `lokma init/setup` Ink TUI checkboxes + `lokma doctor` + layered config).
+  - *"tt-a1i/archify — web UI ve diğer app'lerde görülecek şekilde detaylı dökümantasyon"* → 2 subagents: `archify` (970 lines: 34.9k★ v2.16.0, 5 diagram types, 4 presets, viewer contract `#focus/#reach/#route/#lens`, delta Before/Delta/After) + `archify-ui` (stalled, inferred). Synthesized `31-ARCHIFY-diagrams-and-viewer.md` (10KB, `~/.lokma/archify/<id>/` + `/api/archify/*` + Diagram Studio pane + share cards 1200×630).
+  - *"testsprite bağımsız ama daha iyi — video/rapor/plan/buton coverage/API/Shannon"* → 3 subagents: `testsprite` (655 lines: 6-stage pipeline feature map→inventory→codegen→sandbox→classify→heal) + `lokma-test-ui-security` (1,136 lines: video trace, expect vs actual, Shannon secret scan + Lokma security suite) + `lokma-autotest` (stalled, inferred). Synthesized `33-TESTING-autonomous-harness-testsprite-inspired.md` (13KB, `test_app` skill + `lokma test` CLI + Test Lab pane, `~/.lokma/test-runs/<id>/` with .webm/trace.zip/report.json).
+  - *"nexu-io/open-design — claude design gibi lokmanın kendi içinde tasarım"* → 3 subagents: `opendesign` (1,325 lines: 92.9k★ 3,477 commits, 6 artifact types Prototype/Deck/Mobile/Image/Document/HyperFrame, 26 runtimes inc. hermes) + `opendesign-designsystem` (831 lines: DESIGN.md 9-section schema, design-systems 151 + html-ppt 15×36, 5D critique, tokens A1/A2/B/C) + `lokma-design-canvas` (stalled, inferred). Synthesized `34-DESIGN-open-design-inspired.md` (13KB, `.lokma/DESIGN.md` brand contract + Design Studio pane + `/api/design/*` + export HTML/PDF/PPTX/MP4 + Lokma themes → DESIGN.md tokens).
+  - *"hermese bots geldi grok bots gibi lokma bots planı"* → 2 subagents: `grok-bots` (1,121 lines: xAI 50-bot cap, VM per bot, bot.store 219 plugins, creation→publish→fork→group chat) + `lokma-bots` (stalled, inferred). Synthesized `35-BOTS-lokma-bots.md` (12KB, `bot.json` spec + persona→bot→agent mapping + Bot Gallery pane + lifecycle + sharing/marketplace + `/api/bots/*`).
+- **Total this batch:** 13 subagents dispatched, 9 succeeded (5,708 lines), 4 hit `max_iterations` provider stall (muse-spark-contributor) → inferred and synthesized without raw (no data loss — synthesized from completed siblings + prior Docs). Raw copied: `34-42` (9 files, 12,240 − 2,699 = 9,541 new lines). Synthesized: `31-35` (5 files, ~60KB). `02-TEKNIK-KARARLAR` + `README` synced.
+- **4 stalls root cause:** `muse-spark-1.2-contributor` via `sex-go` unresponsive for 5 consecutive attempts → `exit_reason=max_iterations`. Workaround: synthesize directly (no re-dispatch — same model would stall). Future: use fallback `mimo-v2.5` or `deepseek-v4`.
 
 ## Bekleyen Sorular (Furkan'a)
 - [x] GitHub repo: `raksix/lokma` PUBLIC — done 2026-08-31

@@ -1,8 +1,8 @@
 # 03 — Roadmap (Ultra-Detailed)
 
-> **Status 2026-08-31 02:15 UTC:** Docs set 01–30 complete (~130KB synthesized + ~700KB raw) · Stack pick pending (A/B/C/D from `21-*`) · Code scaffold is Phase 0
+> **Status 2026-08-31 02:30 UTC:** Docs set 01–35 complete (~210KB synthesized + ~1.5 MB raw / 12,240 lines) · Stack pick pending (A/B/C/D from `21-*`) · Code scaffold is Phase 0
 > **English from 2026-08-31 01:45 (chat Turkish) · Single source: `00-LOKMA-KONTEKST.md`**
-> **Detail docs:** `20-overview` · `21-stack` · `22-features` · `23-plugins` · `24-panes` · `25-roadmap` · `26-config` · `27-skills` · `28-memory` · `29-obsidian` · `30-agent-system`
+> **Detail docs:** `20-overview` · `21-stack` · `22-features` · `23-plugins` · `24-panes` · `25-roadmap` · `26-config` · `27-skills` · `28-memory` · `29-obsidian` · `30-agent-system` · `31-archify` · `32-setup` · `33-testing` · `34-design` · `35-bots`
 
 ---
 
@@ -34,6 +34,11 @@
 - [ ] `Auto-skills scaffold` — `skills/` (repo) + `~/.lokma/skills/` (user+hub), `registry.scan()` + `build_skills_system_prompt()` + `skill_view` trie, stub `curator.ts` — see `27-*` §7
 - [ ] `Memory scaffold` — `~/.lokma/memories/MEMORY.md+USER.md` (§-delimited), `state.db` FTS5, `session_search` stub, `VaultPort` interface (`vault/memory.fermag.com.tr/lokma` prefix), `memory` tool — see `28-*` §5
 - [ ] `Agent scaffold` — `~/.lokma/agents/<id>/SOUL.md+MEMORY.md+IDENTITY.json+config.json+sessions/` layout, `AgentSchema`/`LockSchema` Zod, `registry.ts` + `orchestrator.ts` stubs, `.agentlocks/` + `worktree` helpers, `.gitignore` entries, 6 persona templates in `skills/lokma-personas/*/SOUL.md` (`reviewer/planner/tester/researcher/builder/custodian`), feature flag `agents` off by default — see `30-*` §2, §5, §6, §12
+- [ ] `Setup — optional stack` — `lokma init/setup` Ink TUI (browser + web search + gateway + MCP + vault checkboxes), `lokma doctor` probes, layered config — see `32-*`
+- [ ] `Archify scaffold` — `~/.lokma/archify/<id>/` (ir.json + html + share.png + receipt.json), `archify` tool stub (generate/validate/delta/export), `GET /api/archify/*` — see `31-*`
+- [ ] `Design canvas scaffold` — `~/.lokma/design/` (systems/templates/artifacts) + `.lokma/DESIGN.md` guard (7+ H2), `design_canvas` tool stub, `GET /api/design/*` — see `34-*`
+- [ ] `Testing scaffold` — `~/.lokma/test-runs/<id>/` (plan.json + tests/*.spec.cjs + videos/*.webm + report.json), `test_app` skill stub, `lokma test` CLI — see `33-*`
+- [ ] `Bots scaffold` — `~/.lokma/bots/<id>/bot.json` (Zod BotSchema), `GET /api/bots`, Bot Gallery stub — see `35-*`
 - [ ] PM2 + nginx (67) — `lokma-web :3456` (local) or `lokma.fermag.com.tr` (cloud), SQLite local / Postgres cloud per `02-*`
 
 **Exit:** `lokma web --port 3456` → browser shows shell + mock chat streams over WS, two surfaces import same `lokma-shared`, two surfaces read same `SessionStore` JSONL.
@@ -57,7 +62,7 @@ Goal: real agent turns in the web, same loop as CLI — plus agents MVP.
 - [ ] **Agents — MVP (Phase 1 CRUD):** `lokma agent create <name> [--persona reviewer] [--model anthropic/...] [--cwd ./proj]` + `config/run/pause/resume/kill/fork/clone/delete`, REST `GET/POST /api/agents`, `caps` enforcement (`maxAgents` existence + `maxConcurrent` concurrency → priority queue normal/aging), `SOUL.md` editor, per-agent `model` + `MEMORY.md` + `budgets` + `TokenLedger agentId`, agent-scoped `session_search`, read-only `Agent Hub` pane — see `30-*` §5–6, §11
 - [ ] **Agents — Self-spawning stub (Phase 1.5):** `create_agent` tool gated by `agent-spawner` skill, `createdBy: ai:<parentId>` + `AUDIT.md`, `maxSpawnDepth: 3` — see `30-*` §7
 
-**Exit:** create session → pick enabled model → prompt → stream with tools → switch model mid-session → cost badge + Usage → resume same session from CLI and see same transcript → `lokma agent create reviewer` → that agent streams in Web with its own SOUL/memory.
+**Exit:** create session → pick enabled model → prompt → stream with tools → switch model mid-session → cost badge + Usage → resume same session from CLI and see same transcript → `lokma agent create reviewer` → that agent streams in Web with its own SOUL/memory → `lokma init` checkboxes for browser/search/gateway → Archify diagram via `archify` tool → design artifact via `design_canvas` → `lokma test --plan-only` shows element inventory.
 
 ---
 
@@ -77,6 +82,10 @@ Goal: every Claude Code feature reachable in web; orchestration & pane system co
 - [ ] **Orchestration patterns (from `30-*` §8):** `parallel()` (fan-out 3–20), `pipeline()` (`phase`), map-over-commits, `Team` (long-lived peers), `Workflow` script (hundreds via Cordis `jobs`), adversarial verifier vote
 - [ ] **Pane system v2:** all tabs from `24-*` §1.1 (Code, Git, Orchestration/OrchestrationPane, Usage, Browser), drag `session → session` (split/fork/merge), drag `session → agent card` = handoff (#20), reorder left TabSets, `Agent Hub` full CRUD — see `30-*` §11.1
 - [ ] **Projects:** `ProjectsPane` (cwd list, `+ Add project`, switch), `Group by project` toggle, checkpoints (`Rewind` per edit, `⎇` worktree pill), worktree GC (`ttl_days: 7`)
+- [ ] **Archify deep (Phase 2):** `compare` delta Before/Delta/After pane + share cards 1200×630 + `archify guide` from codebase — see `31-*` §6
+- [ ] **Design deep (Phase 2):** `design system add/use` + `template add` + 5D critique pass + export pipeline HTML/PDF/PPTX/MP4 — see `34-*` §8–11
+- [ ] **Testing deep (Phase 2):** full Test Lab (Plan→Run→Report→Security), per-test video+trace, Shannon suite, `junit.xml` CI — see `33-*` §7–9
+- [ ] **Bots deep (Phase 2):** Bot Gallery (Featured/Mine/Shared) + playground + `fork`/`publish` + hub/marketplace + `POST /api/bots/:id/run` → agent — see `35-*` §5–9
 - [ ] **Skills self-improvement (Phase 2):** `skill_manage(patch)` in-loop + Web `PATCH /api/skills/:id`, `.usage.json` telemetry → curator ranking
 
 **Exit:** web can do everything CLI does (MCP, hooks, skills auto-routed, git PR, agents orchestrated with zero silent overwrites, checkpoint rewound) — all from the browser, N agents in parallel, file locks HUD green.
@@ -101,7 +110,7 @@ Goal: beautiful, shippable, shareable — the "ballandır" that makes Lokma inno
 ## Dependencies & Sequencing
 
 ```
-21 (decision) → 0 (scaffold) → 1 (loop+chat+providers/models/sessions/usage+panes v1 + skills+memory stub + agents MVP+self-spawn)
+21 (decision) → 0 (scaffold: core+ai+shared+web + themes + agents/archify/design/testing/bots/setup) → 1 (loop+chat+providers/models/sessions/usage+panes v1 + skills+memory stub + agents MVP+self-spawn + archify/design/testing/bots stubs)
                                     ↓
                            2 (MCP+perms+hooks+skills|plugins+git+terminal+browser + memory deep+vault deep + agents parallel+safe + communication + orchestration + panes v2)
                                     ↓
@@ -123,4 +132,4 @@ No code until you decide. Docs are the contract — code follows the contract.
 
 ---
 
-*Detail: `25-WEB-ROADMAP.md` (web-specific) · `30-AGENT-SYSTEM-personality-memory-orchestration-collision.md` (agents) · `27-*`/`28-*`/`29-*` (skills/memory/vault)*
+*Detail: `25-WEB-ROADMAP.md` (web-specific) · `30-AGENT-SYSTEM` (agents) · `31-ARCHIFY` · `32-SETUP` · `33-TESTING` · `34-DESIGN` · `35-BOTS` · `27-29` (skills/memory/vault)*

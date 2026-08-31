@@ -1,17 +1,54 @@
-# 02 — Teknik Kararlar
+# 02 — Technical Decisions
 
-> Stack ve mimari kararlar burada birikir.
+> Stack and architecture decisions accumulate here. Each decision is dated and reasoned.
 
-## Stack
-- Henüz seçilmedi
+## Stack (Pending Decision)
 
-## Mimari
-- Henüz çizilmedi
+User must pick web stack from `21-WEB-STACK-alternatives.md` §9 before Phase 0 scaffold. Options:
 
-## Karar Logu
-| Tarih | Karar | Neden |
-|-------|-------|-------|
-| 2026-08-31 | Docs/ sistemi kuruldu | Furkan isteği — tek kaynak dokümantasyon |
+| ID | Frontend | Backend | Pane | Realtime | Status |
+|----|----------|---------|------|----------|--------|
+| **A (Recommended)** | Next.js 15 + Tailwind + shadcn/ui + React 19 | Fastify 5 | flexlayout-react | WS + SSE | ⏳ Awaiting pick |
+| **B** | SvelteKit 2 | Hono (Bun) | flexlayout-react | WS | ⏳ |
+| **C** | Next.js 15 | Fastify 5 | dnd-kit + Resizable (custom) | WS + SSE | ⏳ |
+| **D** | Next.js 15 | NestJS 11 | flexlayout-react | WS | ⏳ |
+
+**Recommendation:** **A** — proven on your infra (67: Randevona, notes.fermag, Sunumly all Next.js+Fastify+PM2+nginx+shadcn), least risk, fastest to MVP, hiring pool, IDE-grade panes out of the box.
+
+Other fixed choices (stack-independent):
+
+| Area | Choice | Why |
+|------|--------|-----|
+| Monorepo | `bun` workspaces (`pnpm` alt) | You use `bun` on DSH, `pnpm` on others — either works |
+| State | Zustand 5 | Minimal, per-domain stores, persist to localStorage |
+| Validation | Zod in `lokma-shared` | Single source of truth for API ↔ client |
+| Terminal | xterm.js + fit + web-links | Proven, same as VS Code |
+| Editor | Monaco (file preview/diff) | VS Code parity; Codemirror 6 alt |
+| Tree | react-arborist (virtualized, drag-drop) | Or custom ul + dnd-kit |
+| Charts | recharts | You already use it |
+| DB | drizzle-orm + SQLite (local) / Postgres (cloud) | Light, typed, migrations |
+| Plugin kernel | Lightweight Cordis-inspired (~300 lines) — no vendored Cordis fork | Same semantics, smaller surface — see `23-*` |
+| Themes | `themes/*.json` → CSS vars + Chalk tokens (4 MVP: claude/omp/midnight/paper) | Single token source for CLI+Web |
+| Language | **Docs & code English from 2026-08-31 01:45** (Rule 7), chat stays Turkish | Your request |
+
+## Architecture
+
+- **Shared core:** `packages/lokma-core` (agent loop, tool registry, sessions, plugin kernel) + `lokma-ai` (provider abstraction, streaming) + `lokma-shared` (Zod schemas, WS protocol) — shared by CLI (Ink TUI) and Web (Fastify WS + Next.js).
+- **Plugin system:** Everything is a plugin (DeepSeek Harness Cordis-inspired) — see `23-PLUGIN-SYSTEM-deepseek-cordis.md` for 5 Cordis ideas, service keys, events, `inject`, `waterfall` etc. No vendored Cordis.
+- **Pane system:** IDE-grade draggable panes (flexlayout-react) — see `24-WEB-PANE-SYSTEM-and-orchestration.md` for left/right sidebars, file browser, live logs, browser preview, drag session into session, orchestration.
+
+## Decision Log
+
+| Date | Decision | Reason |
+|------|----------|--------|
+| 2026-08-31 | Docs/ system created | Your request — single source docs |
+| 2026-08-31 | Reposition to innovative harness (not clone) | Your correction — "ballandır orda" |
+| 2026-08-31 | Multi-provider (6: Anthropic/OpenAI/DeepSeek/Google/Ollama/OpenRouter) | Web harness requirement |
+| 2026-08-31 | Plugin system: Cordis-inspired lightweight kernel | DeepSeek Harness research (74KB/1146 lines) — everything-is-a-plugin |
+| 2026-08-31 | Pane system: flexlayout-react (provisional) | Pending your pick from 21-* |
+| 2026-08-31 | Docs & code → English (chat Turkish) | Your request 2026-08-31 01:45 |
+| 2026-08-31 | Web harness docs set (20-25) completed — 62KB synthesized + 195KB raw | 3 research subagents + DSH scrape |
 
 ---
-*Durum: BOŞ*
+
+*Pending: your stack pick (A/B/C/D) → Phase 0 scaffold.*

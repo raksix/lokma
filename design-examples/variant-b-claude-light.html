@@ -62,6 +62,10 @@
   /* compact tweaks */
   .compact-title { font-size: 28px; line-height: 1.08; }
   @media (min-width: 640px) { .compact-title { font-size: 30px; } }
+  /* dark model dropdown — matches screenshot */
+  .model-dd::-webkit-scrollbar { width: 6px; }
+  .model-dd::-webkit-scrollbar-thumb { background: #3A3A3E; border-radius: 999px; }
+  .model-dd::-webkit-scrollbar-track { background: transparent; }
 </style>
 </head>
 <body class="font-sans antialiased min-h-screen flex flex-col overflow-hidden h-screen">
@@ -164,20 +168,20 @@
       </div>
       <nav class="px-2 space-y-3 overflow-y-auto flex-1 pb-3">
         <div class="space-y-0.5">
-          <a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[#262624] text-white text-[12.5px] font-medium">
+          <a href="/" class="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[#262624] text-white text-[12.5px] font-medium">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Chat
             <span class="ml-auto text-[10px] bg-white/15 px-1 py-0.5 rounded">⌘K</span>
           </a>
-          <a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-zinc-600 hover:bg-white hover:border hover:border-line border border-transparent text-[12.5px] transition">
+          <a href="/sessions.html" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-zinc-600 hover:bg-white hover:border hover:border-line border border-transparent text-[12.5px] transition">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="3" width="11" height="10" rx="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M5 6h6M5 8.5h6M5 11h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
             Sessions <span class="ml-auto text-[11px] bg-muted px-1.5 py-0.5 rounded-full">12</span>
           </a>
-          <a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-zinc-600 hover:bg-white border border-transparent text-[12.5px] transition">
+          <a href="/artifacts.html" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-zinc-600 hover:bg-white border border-transparent text-[12.5px] transition">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3.5L3 6.5v5L8 13.5 13 11v-5L8 3.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M3 6.5l5 3 5-3M8 9.5v4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
             Artifacts
           </a>
-          <a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-zinc-600 hover:bg-white border border-transparent text-[12.5px] transition">
+          <a href="/docs.html" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-zinc-600 hover:bg-white border border-transparent text-[12.5px] transition">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 7.5h8M4 10.5h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><rect x="3" y="3" width="10" height="10" rx="1.2" stroke="currentColor" stroke-width="1.2"/></svg>
             Docs
           </a>
@@ -427,13 +431,75 @@
             <!-- Input -->
             <div class="p-2.5">
               <textarea id="composer-input" rows="2" placeholder="Ask Lokma to plan, code, or explain — try “add 60/min rate limit per user”" class="w-full resize-none bg-transparent text-[13.5px] leading-5 placeholder:text-zinc-400 focus:outline-none min-h-[40px]"></textarea>
-              <!-- Composer bottom bar — MODEL SELECTOR HERE -->
-              <div class="flex items-center gap-1.5 mt-2 flex-wrap">
-                <!-- Model selector (moved from header to input) -->
-                <div class="flex items-center gap-1 p-0.5 rounded-full bg-muted border border-line">
-                  <button data-model="claude" class="model-btn px-2.5 py-1 rounded-full bg-[#262624] text-white text-[11.5px] font-medium leading-none">Claude 4 Sonnet</button>
-                  <button data-model="gpt5" class="model-btn px-2.5 py-1 rounded-full text-zinc-600 hover:bg-white text-[11.5px] font-medium leading-none">GPT-5</button>
-                  <button data-model="gemini" class="model-btn px-2.5 py-1 rounded-full text-zinc-600 hover:bg-white text-[11.5px] font-medium leading-none">Gemini 2.5</button>
+              <!-- Composer bottom bar — MODEL SELECTOR (screenshot dark dropdown) -->
+              <div class="flex items-center gap-1.5 mt-2 flex-wrap relative">
+                <!-- Model trigger — dark, like screenshot bottom bar -->
+                <button id="model-trigger" class="inline-flex items-center gap-2 pl-1.5 pr-2.5 h-7 rounded-full bg-[#1E1E20] border border-[#2A2A2E] text-white text-[12px] font-medium hover:bg-[#252529] transition shrink-0">
+                  <span class="w-5 h-5 rounded-full bg-white/10 grid place-items-center text-[10px]">◐</span>
+                  <span id="model-current" class="max-w-[160px] truncate">Muse Spark 1.2 Contributor</span>
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" class="opacity-60 shrink-0"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <!-- dark dropdown — exact ss replication -->
+                <div id="model-dropdown" class="hidden absolute bottom-[calc(100%+8px)] left-0 w-[340px] max-w-[92vw] z-50">
+                  <div class="rounded-xl bg-[#111113] border border-[#2A2A2E] shadow-[0_16px_48px_rgba(0,0,0,0.5),0_4px_16px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col max-h-[420px]">
+                    <!-- Search -->
+                    <div class="p-2 border-b border-white/[0.06]">
+                      <div class="relative">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500"><circle cx="7" cy="7" r="4.2" stroke="currentColor" stroke-width="1.3"/><path d="M10.2 10.2L13 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                        <input id="model-search" placeholder="Search models" class="w-full h-8 pl-8 pr-3 rounded-lg bg-[#1E1E20] border border-white/10 text-[13px] text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/15 focus:bg-[#242428]" />
+                      </div>
+                    </div>
+                    <!-- List -->
+                    <div id="model-list" class="flex-1 overflow-y-auto model-dd py-1">
+                      <div class="px-2.5 pt-2 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">Anthropic</div>
+                      <button data-model-value="claude-4-sonnet" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]">
+                        <span class="text-white font-[450]">Claude 4 Sonnet</span><span class="text-[11px] text-zinc-500">High</span>
+                      </button>
+                      <button data-model-value="claude-4-opus" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]">
+                        <span class="text-white">Claude 4 Opus</span><span class="text-[11px] text-zinc-500">High</span>
+                      </button>
+                      <div class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">AIHUBMIX</div>
+                      <button data-model-value="deepseek-v4-flash" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]">
+                        <span class="text-white">Deepseek V4 Flash</span><span class="text-[11px] px-1.5 py-0.5 rounded bg-white/10 text-zinc-300">Free</span>
+                      </button>
+                      <button data-model-value="mimo-v2.5" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]">
+                        <span class="text-white">Mimo V2.5</span><span class="text-[11px] px-1.5 py-0.5 rounded bg-white/10 text-zinc-300">Free</span>
+                      </button>
+                      <div class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">CMD-ROUTER-SE</div>
+                      <button data-model-value="muse-spark-1.2-contributor" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between bg-white/[0.08] text-[13px] border border-white/5">
+                        <span class="text-white font-medium flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-terracotta"></span> Muse Spark 1.2 Contributor</span><span class="text-[11px] text-zinc-400">High</span>
+                      </button>
+                      <button data-model-value="big-pickle" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]">
+                        <span class="text-white">Big Pickle Ultra</span><span class="text-[11px] text-zinc-500">Ultra</span>
+                      </button>
+                      <div class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">BAI</div>
+                      <button data-model-value="nemotron-3-ultra" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.08] transition text-[13px] bg-white/[0.04]">
+                        <span class="text-white">Nemotron 3 Ultra</span><span class="text-[11px] text-zinc-500">Ultra</span>
+                      </button>
+                      <button data-model-value="nemotron-3-nano" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]">
+                        <span class="text-white">Nemotron 3 Nano</span><span class="text-[11px] text-zinc-500">Free</span>
+                      </button>
+                      <div class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">OpenAI</div>
+                      <button data-model-value="gpt-5" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]">
+                        <span class="text-white">GPT-5</span><span class="text-[11px] text-zinc-500">High</span>
+                      </button>
+                      <button data-model-value="gpt-5-mini" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]">
+                        <span class="text-white">GPT-5 Mini</span><span class="text-[11px] text-zinc-500">Free</span>
+                      </button>
+                      <div class="h-1"></div>
+                    </div>
+                    <!-- Bottom actions -->
+                    <div class="border-t border-white/[0.06] p-1 bg-[#0F0F11]">
+                      <button class="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-white/[0.06] text-[13px] text-zinc-300 flex items-center gap-2">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3a5 5 0 015 5M8 13a5 5 0 01-5-5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11 3l1 1-1 1M5 13l-1-1 1-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Refresh models
+                      </button>
+                      <button class="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-white/[0.06] text-[13px] text-zinc-300 flex items-center gap-2">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M11.5 3.5l1 1-7 7H4v-1.5l7-7z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 4l1-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                        Edit models…
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 <span class="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white border border-line text-[11px] font-medium text-zinc-600">
                   <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M8 3v10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
@@ -719,13 +785,46 @@
     }
   });
 
-  // model selector in composer
-  document.querySelectorAll('.model-btn').forEach(btn => {
+  // model selector in composer — dark dropdown like screenshot
+  const trigger = document.getElementById('model-trigger');
+  const dropdown = document.getElementById('model-dropdown');
+  const currentLabel = document.getElementById('model-current');
+  const search = document.getElementById('model-search');
+  function toggleModel(e){
+    e.stopPropagation();
+    dropdown.classList.toggle('hidden');
+    if(!dropdown.classList.contains('hidden')) search.focus();
+  }
+  trigger.addEventListener('click', toggleModel);
+  document.addEventListener('click', (e) => {
+    if(!dropdown.contains(e.target) && e.target !== trigger && !trigger.contains(e.target)){
+      dropdown.classList.add('hidden');
+    }
+  });
+  document.addEventListener('keydown', (e) => { if(e.key==='Escape') dropdown.classList.add('hidden'); });
+  document.querySelectorAll('.model-opt').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.model-btn').forEach(b => {
-        b.className = 'model-btn px-2.5 py-1 rounded-full text-zinc-600 hover:bg-white text-[11.5px] font-medium leading-none';
-      });
-      btn.className = 'model-btn px-2.5 py-1 rounded-full bg-[#262624] text-white text-[11.5px] font-medium leading-none';
+      currentLabel.textContent = btn.textContent.trim().replace(/\s+(Free|High|Ultra)$/, '');
+      dropdown.classList.add('hidden');
+      document.querySelectorAll('.model-opt').forEach(b=> b.classList.remove('bg-white/[0.08]','border','border-white/5'));
+      btn.classList.add('bg-white/[0.08]','border','border-white/5');
+    });
+  });
+  search.addEventListener('input', () => {
+    const q = search.value.toLowerCase();
+    document.querySelectorAll('.model-opt').forEach(el => {
+      const txt = el.textContent.toLowerCase();
+      el.style.display = txt.includes(q) ? '' : 'none';
+    });
+    // hide empty group headers
+    document.querySelectorAll('#model-list > div').forEach(header => {
+      if(header.textContent.includes('·') || header.classList.contains('h-1')) return;
+      let next = header.nextElementSibling; let hasVisible=false;
+      while(next && !next.matches('div')){
+        if(next.style.display !== 'none') hasVisible=true;
+        next = next.nextElementSibling;
+      }
+      header.style.display = hasVisible ? '' : 'none';
     });
   });
 

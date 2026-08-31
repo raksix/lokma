@@ -56,9 +56,15 @@
   ::-webkit-scrollbar-thumb:hover { background: #CFC9BF; }
   .pane { transition: width 220ms cubic-bezier(.2,.8,.2,1), opacity 160ms ease, border-color 160ms ease; overflow: hidden; }
   .pane.collapsed { width: 0 !important; opacity: 0; border-width: 0 !important; pointer-events: none; }
-  .pane-divider { width: 1px; background: #E8E4DE; flex-shrink: 0; position: relative; }
-  .pane-divider::after { content:""; position:absolute; top:0; bottom:0; left:-3px; right:-3px; }
-  .pane-divider:hover { background: #DDD8D0; }
+  .pane-divider { width: 1px; background: #E8E4DE; flex-shrink: 0; position: relative; cursor: col-resize; }
+  .pane-divider::after { content:""; position:absolute; top:0; bottom:0; left:-4px; right:-4px; }
+  .pane-divider:hover { background: #CFC9BF; }
+  .pane-divider.dragging { background: #C96442 !important; width: 2px; }
+  .pane-divider::before { content:""; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:2px; height:20px; border-radius:999px; background:#CFC9BF; opacity:0; transition:opacity 120ms; }
+  .pane-divider:hover::before { opacity:1; }
+  .pane-divider.dragging::before { background:#C96442; opacity:1; height:28px; }
+  body.resizing { user-select:none !important; cursor:col-resize !important; }
+  body.resizing .pane { transition:none !important; }
   /* compact tweaks */
   .compact-title { font-size: 28px; line-height: 1.08; }
   @media (min-width: 640px) { .compact-title { font-size: 30px; } }
@@ -777,6 +783,68 @@
   document.getElementById('toggle-right').addEventListener('click', toggleRight);
   function closeMobileLeft(){ document.getElementById('mobile-left').classList.add('hidden'); }
   function closeMobileRight(){ document.getElementById('mobile-right').classList.add('hidden'); }
+
+  // ——— Resize sidebars (drag) ———
+  (function(){
+    const MIN_L = 180, MAX_L = 380, MIN_R = 240, MAX_R = 480;
+    // restore from localStorage
+    try{
+      const savedL = parseInt(localStorage.getItem('lokma-pane-left')||'',10);
+      if(savedL && savedL>=MIN_L && savedL<=MAX_L) left.style.width = savedL+'px';
+      const savedR = parseInt(localStorage.getItem('lokma-pane-right')||'',10);
+      if(savedR && savedR>=MIN_R && savedR<=MAX_R) right.style.width = savedR+'px';
+    }catch{}
+    function makeResizer(divider, pane, isLeft){
+      let startX=0, startW=0, dragging=false;
+      divider.addEventListener('dblclick', ()=>{
+        // double-click = collapse
+        if(isLeft) toggleLeft(); else toggleRight();
+      });
+      divider.addEventListener('mousedown', (e)=>{
+        if(pane.classList.contains('collapsed')) return;
+        dragging=true; startX=e.clientX; startW=pane.getBoundingClientRect().width;
+        divider.classList.add('dragging');
+        document.body.classList.add('resizing');
+        e.preventDefault();
+      });
+      window.addEventListener('mousemove', (e)=>{
+        if(!dragging) return;
+        const dx = e.clientX - startX;
+        let newW = isLeft ? startW + dx : startW - dx;
+        const min = isLeft ? MIN_L : MIN_R;
+        const max = isLeft ? MAX_L : MAX_R;
+        newW = Math.max(min, Math.min(max, newW));
+        pane.style.width = newW+'px';
+      });
+      window.addEventListener('mouseup', ()=>{
+        if(!dragging) return;
+        dragging=false;
+        divider.classList.remove('dragging');
+        document.body.classList.remove('resizing');
+        try{ localStorage.setItem(isLeft?'lokma-pane-left':'lokma-pane-right', parseInt(pane.style.width,10)); }catch{}
+      });
+      // touch
+      divider.addEventListener('touchstart', (e)=>{
+        if(pane.classList.contains('collapsed')) return;
+        dragging=true; startX=e.touches[0].clientX; startW=pane.getBoundingClientRect().width;
+        divider.classList.add('dragging'); document.body.classList.add('resizing');
+      }, {passive:false});
+      window.addEventListener('touchmove', (e)=>{
+        if(!dragging) return;
+        const dx = e.touches[0].clientX - startX;
+        let newW = isLeft ? startW + dx : startW - dx;
+        newW = Math.max(isLeft?MIN_L:MIN_R, Math.min(isLeft?MAX_L:MAX_R, newW));
+        pane.style.width = newW+'px';
+      }, {passive:false});
+      window.addEventListener('touchend', ()=>{
+        if(!dragging) return;
+        dragging=false; divider.classList.remove('dragging'); document.body.classList.remove('resizing');
+        try{ localStorage.setItem(isLeft?'lokma-pane-left':'lokma-pane-right', parseInt(pane.style.width,10)); }catch{}
+      });
+    }
+    makeResizer(divLeft, left, true);
+    makeResizer(divRight, right, false);
+  })();
 
   // keyboard shortcuts [ and ]
   document.addEventListener('keydown', (e) => {

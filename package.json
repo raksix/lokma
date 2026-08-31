@@ -2,7 +2,7 @@
   "name": "lokma",
   "private": true,
   "version": "0.0.1",
-  "description": "Innovative agentic coding harness \u2014 CLI + Web",
+  "description": "Innovative agentic coding harness — CLI + Web",
   "packageManager": "bun@1.2.3",
   "workspaces": [
     "packages/*",
@@ -25,6 +25,7 @@
     "doctor": "bun --filter lokma-core run doctor"
   },
   "devDependencies": {
+    "@types/node": "^26.4.0",
     "concurrently": "^9.1.2",
     "prettier": "^3.4.2",
     "typescript": "^5.7.3"

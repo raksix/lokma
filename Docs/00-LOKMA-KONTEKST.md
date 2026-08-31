@@ -80,8 +80,8 @@
 - [ ] Lisans: MIT mi private mi?
 
 ## Son Durum
-- **Son güncelleme:** 2026-08-31 01:52 UTC
-- **Son işlem:** GitHub branding updated — repo description now "Innovative agentic coding harness (CLI + Web) — multi-provider, themeable, open-source" (removed Claude Code reference), README rewritten to center Lokma as harness (no clone framing). Docs & code English-first.
+- **Son güncelleme:** 2026-08-31 02:00 UTC
+- **Son işlem:** Config hierarchy refactor — `26-CONFIG-and-CREDENTIALS.md` (EN, 8KB) + 02/03 updates; keys in `~/.lokma/credentials.json` (encrypted 0600) layered like Claude Code `config.json`/`settings.json`. Commit 0d889aa. **In-flight:** hermes-agent research fan-out (3 subagents: auto-skill discovery, infinite memory, Obsidian MCP vault+graph — repos/docs scraping, ~1200 lines raw expected) — will land as `Docs/30-*` set + roadmap auto-append when done.
 - **Sıradaki adım:**
   1. **You pick stack** (A/B/C/D from 21-*) → I scaffold Phase 0 monorepo
   2. Phase 1: core loop in browser (WS streaming, chat, providers/models/sessions/usage)

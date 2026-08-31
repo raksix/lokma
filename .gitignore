@@ -74,3 +74,4 @@ Cargo.lock
 # Misc
 *.tmp
 *.temp
+*.tsbuildinfo

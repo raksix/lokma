@@ -7,8 +7,8 @@
 - **Ad:** Lokma
 - **Klasör:** `/mnt/apopic/lokma`
 - **Durum:** 2026-08-31 — Araştırma tamamlandı, GitHub public repo oluşturuldu
-- **Tip:** Claude Code birebir klonu — Agentic Coding Harness (CLI + Web)
-- **Repo:** `https://github.com/raksix/lokma` (PUBLIC, main branch, 3 commit push'landı)
+- **Tip:** Yenilikçi Agentic Coding Harness (CLI + Web) — Claude Code ve OMP'den ilham alan, kendi yeniliklerini ekleyen açık kaynak harness
+- **Repo:** `https://github.com/raksix/lokma` (PUBLIC, main branch)
 
 ## Kurallar (Furkan'ın İstekleri)
 1. `Docs/` klasörü tek kaynak — sana dediğim her şey oraya atılacak
@@ -19,12 +19,13 @@
 6. Türkçe konuş, commit'ler İngilizce
 
 ## Proje Hakkında Ne Biliyoruz
-- **Lokma nedir:** Claude Code'un birebir aynı harness'ının yeniden implementasyonu
-  - CLI tarafı: terminalde agentic coding (claude-code gibi)
-  - Web harness: Claude Code'un tüm özellikleriyle çalışan browser harness'ı (claude.ai/code gibi)
+- **Lokma nedir:** Yenilikçi agentic coding harness — Claude Code ve OMP'den ilham alan ama **birebir klon değil, kendi yeniliklerini ekleyen** açık kaynak harness
+  - CLI: terminalde agentic coding — OMP'nin benchmaxxed tooling'i + Claude Code'un loop felsefesi + Lokma'nın akıllı provider routing'i ve tema sistemi
+  - Web harness: hibrit (local + cloud sandbox) browser harness — real-time streaming, aynı loop'u paylaşır
   - Desktop app: sonra yapılacak (şu an değil)
-- **Görünüş:** Claude Code'a benzer ama OMP (https://omp.sh / https://github.com/can1357/oh-my-pi) gibi temalar olacak
-- **OMP nedir:** Oh My Pi — "coding agent with the IDE wired in", 28.5k ⭐, 80k Rust core, 60+ provider, 31 tools. Pi fork'u. Lokma temaları OMP estetiğinden ilham alacak.
+- **Farkı ne:** Birebir klon değil — *model akıl yürütür, harness harekete geçirir* felsefesini merkeze alıp; hashline edit, in-process tooling, LSP/DAP entegrasyonu gibi en iyi fikirleri harmanlayıp üzerine akıllı provider routing, canlı tema sistemi, CLI+Web hibrit mimari ve eklenti ekosistemi ekler
+- **Görünüş:** OMP gibi temalar olacak — `lokma theme set omp` / `claude` / `midnight` / `paper`
+- **OMP nedir:** Oh My Pi — "coding agent with the IDE wired in", 28.5k ⭐, 80k Rust core, 60+ provider — referans alınan öncü proje
 - **Teknoloji (planlanan):**
   - Monorepo: `packages/lokma-core` (agent loop) + `lokma-ai` (multi-provider) + `lokma-tui` (Ink) + `lokma-web` (Next.js + WS) + `lokma-cli`
   - Provider: Anthropic (primary) + OpenAI/DeepSeek/Google/Ollama/OpenRouter
@@ -48,13 +49,10 @@
 - Furkan: "selam bu projenin adı lokma. her prompta uyabileceğin bir dosya oluştur zamanla güncellesin. Docs diye klasör oluştur sana dediğim şeyleri oraya atacaksın. bir şey yaparken docs klasöründen okuyup bak tamam mı"
 - Hermes: Docs/ klasörü + bu dosya oluşturuldu. Sistem kuruldu.
 
-### 2026-08-31 — Araştırma Fazı (Claude Code Harness)
-- Furkan: "amac şu. https://github.com/anthropics/claude-code bunu birebir baştan yapmak için döküman hazırla tüm özellikler falan olacak. görünüş de benzer olabilir ama omp gibi temalar olacak (https://omp.sh). CLI tarafı + web harness aynı şekilde claude code tüm özellikleriyle çalışacak. desktop sonra. Şu anlık sadece CLI + Web harness nasıl yapılır onu araştır, Docs içine kaydet."
-- Hermes: 3 paralel araştırma subagent'ı dispatch edildi + doğrudan web_extract ile claude docs / OMP repo scrape edildi.
-  - Subagent'lar: claude-code-features, omp-themes, harness-architecture (deleg_f88f44d7)
-  - Doğrudan çekilenler: code.claude.com/docs (overview, how-it-works, cli-reference, tools, mcp, agent-sdk), github.com/can1357/oh-my-pi
-  - Üretilen Docs: 10, 11, 12 (toplam ~43KB detaylı doküman)
-  - Bekleyen: 2 subagent hala çalışıyor, ham verileri gelince Docs zenginleştirilecek
+### 2026-08-31 — Araştırma Fazı (Harness)
+- Furkan: "Claude Code'u birebir baştan yapmak için döküman hazırla, OMP gibi temalar olacak. CLI + web harness aynı özelliklerle çalışacak. Desktop sonra."
+- Hermes: 3 paralel subagent + doğrudan scrape (code.claude.com, github.com/can1357/oh-my-pi). Sentez: 10/11/12 + ham raw/ (2070 satır)
+- **Düzeltme (Furkan):** "birebir clone demek doğru olmaz, yenilikçi harness olsun, ballandır orda" → README + kontekst güncellendi: Lokma artık **ilham alan yenilikçi harness** olarak konumlanıyor, klon değil.
 
 ## Bekleyen Sorular (Furkan'a)
 - [ ] GitHub repo oluşturulsun mu? `raksix/lokma` private?

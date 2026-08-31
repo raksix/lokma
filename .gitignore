@@ -1,9 +1,76 @@
+# Dependencies
 node_modules/
+.pnp/
+.pnp.js
+bun.lockb
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
 dist/
+build/
+out/
 .next/
 .turbo/
-*.log
-.DS_Store
+.nuxt/
+.output/
+coverage/
+
+# Env & secrets — ASLA commit'lenmez
 .env
-.env.local
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+secrets.json
+.tokens/
+
+# Lokma runtime
+.lokma/
 ~/.lokma/
+sessions/
+checkpoints/
+*.jsonl
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+.cursor/
+
+# Cache
+.cache/
+.parcel-cache/
+.eslintcache
+.turbo/
+
+# Python (harness worker)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Rust (ileride)
+target/
+Cargo.lock
+
+# Misc
+*.tmp
+*.temp

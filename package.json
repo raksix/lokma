@@ -4,6 +4,9 @@
   "version": "0.0.1",
   "description": "Innovative agentic coding harness — CLI + Web",
   "packageManager": "bun@1.2.3",
+  "bin": {
+    "lokma": "./bin/lokma"
+  },
   "workspaces": [
     "packages/*",
     "packages/lokma-web/*"

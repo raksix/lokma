@@ -1,0 +1,20 @@
+#!/usr/bin/env bun
+/**
+ * Lokma CLI entry — thin wrapper around lokma-core.
+ * Delegates to packages/lokma-core/dist/cli/index.js (built via `bun run build:core`).
+ * Single entry for CLI + Web harness (lokma web --port 3456).
+ */
+
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const coreCli = join(__dirname, '../packages/lokma-core/dist/cli/index.js');
+
+try {
+  await import(coreCli);
+} catch (e) {
+  console.error('[lokma] Failed to load core CLI. Did you run `bun run build`?');
+  console.error(String(e));
+  process.exit(1);
+}

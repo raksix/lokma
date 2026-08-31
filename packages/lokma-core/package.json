@@ -1,0 +1,35 @@
+{
+  "name": "lokma-core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Agent loop kernel — Context, ToolRegistry, SessionStore (JSONL), config, skills, memory",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "lokma": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "cli": "bun run dist/cli/index.js",
+    "doctor": "bun run dist/cli/doctor.js"
+  },
+  "dependencies": {
+    "chokidar": "^5.0.0",
+    "lokma-shared": "workspace:*",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "@types/node": "^22.0.0"
+  }
+}

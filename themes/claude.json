@@ -1,0 +1,39 @@
+{
+  "name": "claude",
+  "label": "Claude \u2014 cream/terracotta, warm light",
+  "description": "Light minimal with cream #FAF9F5 + terracotta #C96442 + ink #262624 \u2014 the 'Claude colors' Furkan likes",
+  "cssVars": {
+    "background": "40 33% 98%",
+    "foreground": "30 8% 15%",
+    "card": "40 33% 98%",
+    "card-foreground": "30 8% 15%",
+    "popover": "0 0% 100%",
+    "popover-foreground": "30 8% 15%",
+    "primary": "15 55% 52%",
+    "primary-foreground": "0 0% 98%",
+    "secondary": "30 10% 94%",
+    "secondary-foreground": "30 8% 15%",
+    "muted": "30 10% 94%",
+    "muted-foreground": "30 6% 45%",
+    "accent": "30 10% 94%",
+    "accent-foreground": "30 8% 15%",
+    "destructive": "0 84% 60%",
+    "destructive-foreground": "0 0% 98%",
+    "border": "30 8% 88%",
+    "input": "30 8% 88%",
+    "ring": "15 55% 52%",
+    "radius": "0.5rem",
+    "chart-1": "15 55% 52%",
+    "chart-2": "173 58% 39%",
+    "chart-3": "197 37% 24%",
+    "chart-4": "43 74% 66%",
+    "chart-5": "27 87% 67%"
+  },
+  "chalk": {
+    "primary": "#C96442",
+    "background": "#FAF9F5",
+    "foreground": "#262624",
+    "muted": "#8a8684",
+    "border": "#e6e2de"
+  }
+}

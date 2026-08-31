@@ -1,0 +1,39 @@
+{
+  "name": "paper",
+  "label": "Paper \u2014 pure white + neutral",
+  "description": "Pure white #ffffff + neutral #52525b + accent indigo \u2014 clean light, print-friendly",
+  "cssVars": {
+    "background": "0 0% 100%",
+    "foreground": "240 10% 4%",
+    "card": "0 0% 100%",
+    "card-foreground": "240 10% 4%",
+    "popover": "0 0% 100%",
+    "popover-foreground": "240 10% 4%",
+    "primary": "240 6% 10%",
+    "primary-foreground": "0 0% 98%",
+    "secondary": "240 5% 96%",
+    "secondary-foreground": "240 6% 10%",
+    "muted": "240 5% 96%",
+    "muted-foreground": "240 4% 46%",
+    "accent": "240 5% 96%",
+    "accent-foreground": "240 6% 10%",
+    "destructive": "0 84% 60%",
+    "destructive-foreground": "0 0% 98%",
+    "border": "240 6% 90%",
+    "input": "240 6% 90%",
+    "ring": "240 6% 10%",
+    "radius": "0.5rem",
+    "chart-1": "240 6% 10%",
+    "chart-2": "173 58% 39%",
+    "chart-3": "197 37% 24%",
+    "chart-4": "43 74% 66%",
+    "chart-5": "27 87% 67%"
+  },
+  "chalk": {
+    "primary": "#18181b",
+    "background": "#ffffff",
+    "foreground": "#18181b",
+    "muted": "#71717a",
+    "border": "#e4e4e7"
+  }
+}

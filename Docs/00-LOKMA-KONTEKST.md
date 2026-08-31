@@ -6,7 +6,7 @@
 ## Proje Kimliği
 - **Ad:** Lokma
 - **Klasör:** `/mnt/apopic/lokma`
-- **Durum:** 2026-08-31 02:30 UTC — Docs ultra-detailed: agent system (30) + skills/memory/vault (27-29) + config (26) + Archify (31) + setup optional (32) + testing harness (33) + design canvas (34) + Lokma Bots (35)
+- **Durum:** 2026-08-31 15:40 UTC — Phase 0 scaffold canlı (lokma.fermag.com.tr) + Docs ultra-detailed: agent system (30) + skills/memory/vault (27-29) + config (26) + Archify (31) + setup optional (32) + testing harness (33) + design canvas (34) + Lokma Bots (35) + Auth & Permissions (36)
 - **Tip:** Innovative Agentic Coding Harness (CLI + Web) — open-source, multi-provider, themeable, collision-free multi-agent
 - **Repo:** `https://github.com/raksix/lokma` (PUBLIC, main branch) — description: "Innovative agentic coding harness (CLI + Web) — multi-provider, themeable, open-source"
 
@@ -61,7 +61,8 @@
 | `33-TESTING-autonomous-harness-testsprite-inspired.md` | **Testing — autonomous harness** — TestSprite-inspired self-hosted: plan→inventory→codegen→sandbox(video+trace)→classify→heal, element `expect` guarantee, API + Shannon/security | ✅ 13KB (raw 655+1,136) |
 | `34-DESIGN-open-design-inspired.md` | **Design — Open Design-inspired canvas** — 6 artifacts (Prototype/Deck/Mobile/Image/Document/HyperFrame), `DESIGN.md` brand contract, `design-systems/` + Design Studio + export HTML/PDF/PPTX/MP4 | ✅ 13KB (raw 1,325+831) |
 | `35-BOTS-lokma-bots.md` | **Lokma Bots — Grok-bots-inspired** — `bot.json` spec, persona→bot→agent mapping, Bot Gallery, lifecycle create→playground→publish→fork→run, sharing/marketplace | ✅ 12KB (raw 1,121) |
-| `30-AGENT-SYSTEM-personality-memory-orchestration-collision.md` | **Agent system — ULTRA-DETAILED** — personality, per-agent memory/model, maxAgents/maxConcurrent+queue, self-spawn, orchestration, bus+coordinator+heartbeat, 3-layer collision-free, 23 extras (EN) | ✅ 40KB (raw 2699 lines) |
+| `30-AGENT-SYSTEM-personality-memory-orchestration-collision.md` | **Agent system — ULTRA-DETAILED** — personality, per-agent memory, per-agent model, caps+queue, self-spawn, orchestration, bus+coordinator+heartbeat, 3-layer collision-free, 23 extras (EN) | ✅ 40KB (raw 2699 lines) |
+| `36-AUTH-and-PERMISSIONS.md` | **Auth & permissions — RBAC + project-scoped** — admin/member/viewer, project visibility/creation policy, session inheritance, JWT, `can()` | ✅ 19KB |
 | `99-NOTLAR.md` | Hızlı notlar | ✅ |
 | `README.md` | Docs index (37 files) | ✅ |
 | `raw/10-claude-code-ham-arastirma.md` | Ham: Claude Code 957 lines, 53KB | ✅ |
@@ -139,10 +140,10 @@
 - [x] Design system: **shadcn/ui** (https://ui.shadcn.com/) — picked 2026-08-31 *"tasarım için shadcn kullanak"*
 
 ## Son Durum
-- **Son güncelleme:** 2026-08-31 02:30 UTC
-- **Son işlem:** Mega synthesis — `31-ARCHIFY` (Archify 34.9k★ diagrams) + `32-SETUP` (optional browser/search/gateway) + `33-TESTING` (self-hosted TestSprite harness video+trace+Shannon) + `34-DESIGN` (Open Design 92.9k★ canvas 6 artifacts + DESIGN.md) + `35-BOTS` (Grok-bots-inspired bot.json + Gallery) — 5 files ~60KB + `02/03/25/README/00` sync — **Commit 1b578ec** (19 files, 10,782 lines) push `main→main` · 13 subagents (9 succeeded 5,708 lines, 4 stalled muse-spark max_iterations → inferred) · Vault synced `projeler/lokma-ana-kontekst.md` 144 lines · https://github.com/raksix/lokma
+- **Son güncelleme:** 2026-08-31 15:40 UTC
+- **Son işlem:** `36-AUTH-and-PERMISSIONS.md` (19KB, RBAC admin/member/viewer + project visibility/creation policy + session inheritance + JWT + `can()`) + `Docs/README` + `00` sync — **Commit 1c56c0e/9ca5063** + Phase 0 scaffold canlı (`lokma.fermag.com.tr` PM2 :3456/:3457, `bun install → bun run build → lokma web --port 3456` teyitli, `design-examples/` 13 HTML)
 - **Sıradaki adım:**
-  1. **You pick stack** (A/B/C/D from 21-*) → I scaffold Phase 0 monorepo (packages/lokma-core+ai+shared+web + themes + agents/archify/design/testing/bots/setup scaffolds + `.agentlocks`/worktrees/personas)
+  1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**
   3. Phase 2: MCP+hooks+skills+plugins+git+terminal+browser + **memory deep+vault graph + agents parallel+safe+communication+orchestration + archify/design/testing/bots deep + panes v2**
   4. Phase 3: themes+sharing+cloud + **extras (marketplace, cron per agent, approvals, observability, handoff, browser per agent, adversarial review, … 23 ranked)** + mobile+perf+a11y

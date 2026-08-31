@@ -10,19 +10,19 @@
   ],
   "scripts": {
     "build": "bun run build:shared && bun run build:core && bun run build:ai && bun run build:server",
-    "build:shared": "bun --filter lokma-shared run build",
-    "build:core": "bun --filter lokma-core run build",
-    "build:ai": "bun --filter lokma-ai run build",
-    "build:server": "bun --filter lokma-server run build",
-    "build:web": "bun --filter lokma-web run build",
+    "build:shared": "bun --filter=lokma-shared run build",
+    "build:core": "bun --filter=lokma-core run build",
+    "build:ai": "bun --filter=lokma-ai run build",
+    "build:server": "bun --filter=lokma-server run build",
+    "build:web": "bun --filter=lokma-web run build",
     "build:all": "bun run build:shared && bun run build:core && bun run build:ai && bun run build:server && bun run build:web",
-    "dev": "concurrently -n server,web -c blue,green \"bun --filter lokma-server run dev\" \"bun --filter lokma-web run dev\"",
-    "dev:server": "bun --filter lokma-server run dev",
-    "dev:web": "bun --filter lokma-web run dev",
+    "dev": "concurrently -n server,web -c blue,green \"bun --filter=lokma-server run dev\" \"bun --filter=lokma-web run dev\"",
+    "dev:server": "bun --filter=lokma-server run dev",
+    "dev:web": "bun --filter=lokma-web run dev",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,css,md}\"",
     "typecheck": "tsc --noEmit",
-    "doctor": "bun --filter lokma-core run doctor"
+    "doctor": "bun --filter=lokma-core run doctor"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

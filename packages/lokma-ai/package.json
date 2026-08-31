@@ -1,0 +1,29 @@
+{
+  "name": "lokma-ai",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Multi-provider abstraction \u2014 stream() with Anthropic/OpenAI adapters + mock catalog",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "lokma-shared": "workspace:*",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "@types/node": "^22.0.0"
+  }
+}

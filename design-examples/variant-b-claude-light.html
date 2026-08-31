@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script>
   tailwind.config = {
+    darkMode: 'class',
     theme: {
       extend: {
         fontFamily: {
@@ -72,6 +73,49 @@
   .model-dd::-webkit-scrollbar { width: 6px; }
   .model-dd::-webkit-scrollbar-thumb { background: #3A3A3E; border-radius: 999px; }
   .model-dd::-webkit-scrollbar-track { background: transparent; }
+  /* === Dark theme overrides === */
+  html.dark body { background:#0F0F11 !important; color:#EDE9E2 !important; }
+  html.dark body::before { opacity:0.08 !important; }
+  html.dark header { background:rgba(15,15,17,0.88) !important; border-color:#232326 !important; }
+  html.dark #pane-left, html.dark #pane-right { background:#161618 !important; border-color:#232326 !important; }
+  html.dark .bg-white { background-color:#1E1E21 !important; border-color:#2A2A2E !important; color:#EDE9E2 !important; }
+  html.dark .bg-\[\#FDFCFB\] { background-color:#161618 !important; }
+  html.dark .bg-\[\#FAF9F5\], html.dark .bg-\[\#FAF9F5\]\/85, html.dark .bg-\[\#FAF9F5\]\/90 { background-color:rgba(15,15,17,0.9) !important; }
+  html.dark .bg-muted { background-color:#1E1E21 !important; border-color:#2A2A2E !important; }
+  html.dark .bg-\[\#FDF0E6\] { background-color:#2A1E15 !important; border-color:#3A2A1A !important; }
+  html.dark .border-line, html.dark .border-line\/50, html.dark .border-line\/60, html.dark .border-line\/70 { border-color:#232326 !important; }
+  html.dark .border-line-strong { border-color:#2A2A2E !important; }
+  html.dark .text-ink { color:#EDE9E2 !important; }
+  html.dark .text-zinc-800 { color:#E0E0E5 !important; }
+  html.dark .text-zinc-700 { color:#C8C8CD !important; }
+  html.dark .text-zinc-600 { color:#A8A8AD !important; }
+  html.dark .text-zinc-500 { color:#8E8E93 !important; }
+  html.dark .text-zinc-400 { color:#6E6E73 !important; }
+  html.dark .placeholder\:text-zinc-400::placeholder { color:#6E6E73 !important; }
+  html.dark .shadow-card { box-shadow: 0 1px 2px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.3) !important; }
+  html.dark .bg-\[\#262624\] { background:#EDE9E2 !important; color:#0F0F11 !important; }
+  html.dark .bg-\[\#262624\].text-white { color:#0F0F11 !important; }
+  html.dark input, html.dark textarea { background:transparent !important; color:#EDE9E2 !important; }
+  html.dark input.bg-white { background:#1E1E21 !important; }
+  html.dark pre { background:#1C1C1E !important; }
+  html.dark code { background:#232326 !important; border-color:#2A2A2E !important; }
+  html.dark ::-webkit-scrollbar-thumb { background:#2A2A2E !important; }
+  html.dark ::-webkit-scrollbar-thumb:hover { background:#3A3A3E !important; }
+  html.dark .pane-divider { background:#232326 !important; }
+  html.dark .pane-divider:hover { background:#3A3A3E !important; }
+  html.dark .bg-emerald-50 { background:#0F241A !important; border-color:#1E3A2A !important; color:#6EE7B7 !important; }
+  html.dark .bg-amber-50 { background:#241E0F !important; border-color:#3A2E1E !important; }
+  html.dark .bg-terracotta\/5 { background:rgba(201,100,66,0.08) !important; }
+  html.dark .text-terracotta { color:#E07A4F !important; }
+  html.dark .bg-terracotta\/10 { background:rgba(201,100,66,0.12) !important; }
+
+
+  /* robust dark fallbacks via attribute selector */
+  html.dark [class*="bg-[#FAF9F5]"] { background-color:#0F0F11 !important; }
+  html.dark [class*="bg-[#FDFCFB]"] { background-color:#161618 !important; }
+  html.dark [class*="bg-white"] { background-color:#1E1E21 !important; }
+  html.dark [class*="border-line"] { border-color:#232326 !important; }
+
 </style>
 </head>
 <body class="font-sans antialiased min-h-screen flex flex-col overflow-hidden h-screen">
@@ -135,6 +179,10 @@
         <button class="hidden sm:inline-flex items-center gap-1.5 px-2.5 h-7 rounded-full bg-white border border-line text-[12.5px] font-medium hover:bg-zinc-50 transition">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
           New
+        </button>
+        <button id="theme-toggle" class="w-7 h-7 grid place-items-center rounded-full bg-white border border-line hover:bg-muted transition" title="Tema değiştir (dark/light)" aria-label="Toggle theme">
+          <svg id="icon-moon" width="14" height="14" viewBox="0 0 16 16" fill="none" class="text-zinc-600"><path d="M11.5 3.5A5.5 5.5 0 104.5 12 3.8 3.8 0 0011.5 3.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+          <svg id="icon-sun" width="14" height="14" viewBox="0 0 16 16" fill="none" class="text-zinc-600 hidden"><circle cx="8" cy="8" r="3.5" stroke="currentColor" stroke-width="1.2"/><path d="M8 3v1.2M8 11.8V13M3 8h1.2M11.8 8H13M4.2 4.2l.8.8M11 11l.8.8M11.8 4.2l-.8.8M4.2 11.8l-.8.8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
         </button>
         <button class="w-7 h-7 grid place-items-center rounded-full bg-white border border-line hover:bg-muted transition" aria-label="Search">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="3.8" stroke="currentColor" stroke-width="1.3"/><path d="M10.2 10.2L13 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -940,6 +988,36 @@
       });
     });
   }
+
+  // --- Dark theme toggle ---
+  (function(){
+    const html = document.documentElement;
+    const btn = document.getElementById('theme-toggle');
+    const moon = document.getElementById('icon-moon');
+    const sun = document.getElementById('icon-sun');
+    const stored = localStorage.getItem('lokma-theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if(stored === 'dark' || (!stored && prefersDark)) html.classList.add('dark');
+    function updateIcon(){
+      const isDark = html.classList.contains('dark');
+      moon.classList.toggle('hidden', isDark);
+      sun.classList.toggle('hidden', !isDark);
+      btn.title = isDark ? 'Açık temaya geç' : 'Koyu temaya geç';
+    }
+    updateIcon();
+    btn.addEventListener('click', ()=>{
+      html.classList.toggle('dark');
+      localStorage.setItem('lokma-theme', html.classList.contains('dark') ? 'dark' : 'light');
+      updateIcon();
+    });
+    // also listen system change if no stored pref
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)=>{
+      if(!localStorage.getItem('lokma-theme')){
+        html.classList.toggle('dark', e.matches);
+        updateIcon();
+      }
+    });
+  })();
 
   // keyboard shortcuts [ and ]
   document.addEventListener('keydown', (e) => {

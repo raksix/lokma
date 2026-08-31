@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Variant B Alt 4 — Arc Browser — Lokma</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        cream: '#FAF9F5',
+        ink: '#262624',
+        terracotta: '#C96442',
+        line: '#E8E4DE',
+        muted: '#F2F0EB',
+      },
+      fontFamily: {
+        serif: ['Instrument Serif','serif'],
+        sans: ['Inter','sans-serif'],
+        mono: ['JetBrains Mono','monospace'],
+      }
+    }
+  }
+}
+</script>
+<style>
+:root { --cream:#FAF9F5; --terracotta:#C96442; --ink:#262624; --line:#E8E4DE; }
+* { font-family: Inter, sans-serif; }
+.sheet { background: rgba(255,255,255,0.7); backdrop-filter: blur(12px); }
+.glass { background: rgba(255,255,255,0.85); backdrop-filter: blur(16px); border: 1px solid rgba(232,228,222,0.8); }
+</style>
+</head>
+<body class="bg-cream text-ink min-h-screen">
+<!-- Banner -->
+<div class="bg-ink text-white text-center py-2 text-xs tracking-wide">Variant B Alt 4 — Arc Browser · cream #FAF9F5 · terracotta #C96442 · glass + vertical tabs · Throwaway preview</div>
+
+<div class="flex h-[calc(100vh-28px)]">
+  <!-- Left: Arc vertical tabs rail (56px) + folders -->
+  <aside class="hidden lg:flex w-[280px] flex-col bg-[#FDFCFB] border-r border-line">
+    <div class="h-12 flex items-center gap-2 px-3 border-b border-line">
+      <div class="w-7 h-7 rounded-lg bg-terracotta flex items-center justify-center text-white text-xs font-bold">◐</div>
+      <div>
+        <div class="text-xs font-semibold">lokma</div>
+        <div class="text-[10px] text-ink/60">harness · 3 spaces</div>
+      </div>
+      <button class="ml-auto w-6 h-6 rounded-full bg-line flex items-center justify-center text-xs">＋</button>
+    </div>
+    <!-- Spaces / Profiles -->
+    <div class="flex gap-1.5 px-3 py-2 border-b border-line">
+      <div class="w-6 h-6 rounded-full bg-terracotta text-white flex items-center justify-center text-[10px]">A</div>
+      <div class="w-6 h-6 rounded-full bg-line flex items-center justify-center text-[10px]">F</div>
+      <div class="w-6 h-6 rounded-full bg-line flex items-center justify-center text-[10px]">◈</div>
+    </div>
+    <!-- Pinned -->
+    <div class="px-3 py-2">
+      <div class="text-[10px] tracking-widest text-ink/40 mb-1">PINNED</div>
+      <div class="space-y-1">
+        <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white border border-terracotta/30 shadow-sm">
+          <span class="w-2 h-2 rounded-full bg-terracotta"></span>
+          <span class="text-xs font-medium">Chat — Auth hook</span>
+          <span class="ml-auto text-[10px] bg-terracotta text-white px-1.5 rounded">● Live</span>
+        </div>
+        <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white">
+          <span class="text-xs">◍</span>
+          <span class="text-xs">Sessions</span>
+          <span class="ml-auto text-[10px] text-ink/40">12</span>
+        </div>
+        <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white">
+          <span class="text-xs">⬢</span>
+          <span class="text-xs">Vault</span>
+        </div>
+      </div>
+    </div>
+    <!-- Folders -->
+    <div class="px-3 py-2 flex-1 overflow-auto">
+      <div class="text-[10px] tracking-widest text-ink/40 mb-1">FOLDERS</div>
+      <div class="space-y-2">
+        <details open class="group">
+          <summary class="text-xs font-medium cursor-pointer list-none flex items-center gap-1">▾ Today</summary>
+          <div class="mt-1 ml-2 pl-2 border-l border-line space-y-1">
+            <div class="text-xs px-2 py-1 rounded bg-white border">Refactor auth middleware</div>
+            <div class="text-xs px-2 py-1 rounded hover:bg-white">Design review — pricing</div>
+          </div>
+        </details>
+        <details class="group">
+          <summary class="text-xs font-medium cursor-pointer list-none flex items-center gap-1">▸ Earlier</summary>
+        </details>
+      </div>
+      <!-- Split view hint -->
+      <div class="mt-4 p-2 rounded-lg bg-muted border border-line">
+        <div class="text-[11px] font-medium">Split View</div>
+        <div class="text-[11px] text-ink/60">Drag a tab to split → chat + code side by side</div>
+      </div>
+    </div>
+    <div class="p-2 border-t border-line">
+      <div class="flex items-center gap-2 text-xs">
+        <img src="https://i.pravatar.cc/24?img=5" class="w-6 h-6 rounded-full" />
+        <span>Aylin</span>
+        <span class="ml-auto text-[10px] bg-white border px-1.5 rounded">Pro</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Center: Chat with glass cards -->
+  <main class="flex-1 flex flex-col min-w-0 bg-cream">
+    <!-- Top: Arc toolbar imitation -->
+    <div class="h-12 flex items-center gap-2 px-4 bg-white/70 backdrop-blur border-b border-line sticky top-0 z-10">
+      <div class="flex items-center gap-1 text-xs">
+        <span class="px-2 py-1 rounded-full bg-white border">lokma</span>
+        <span class="text-ink/30">/</span>
+        <span class="px-2 py-1 rounded-full bg-terracotta text-white">lokma-web</span>
+      </div>
+      <button id="cmdkBtn" class="mx-auto hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-line text-xs text-ink/60">⌘ K <span class="text-[10px] bg-muted px-1 rounded">Ask</span></button>
+      <div class="ml-auto flex items-center gap-1.5">
+        <span class="text-[11px] px-2 py-1 rounded-full bg-white border">● Active</span>
+        <button class="text-xs px-2 py-1 rounded-full border">Share</button>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-auto p-4 md:p-6 space-y-4">
+      <!-- Hero -->
+      <div class="max-w-[760px] mx-auto w-full">
+        <div class="glass rounded-2xl p-5">
+          <div class="text-[11px] tracking-widest text-ink/40">SESSION #482 · Today 14:31</div>
+          <h1 class="font-serif text-2xl mt-1">Refactor auth middleware</h1>
+          <p class="text-sm text-ink/60 mt-1">Move JWT verification into Fastify preHandler — clean, typed, opt-in.</p>
+        </div>
+      </div>
+
+      <!-- Chat bubbles as glass cards -->
+      <div class="max-w-[760px] mx-auto w-full space-y-3">
+        <div class="flex justify-end">
+          <div class="glass rounded-2xl rounded-br-sm px-4 py-3 max-w-[78%]">
+            <div class="text-xs font-medium">Aylin 14:32</div>
+            <div class="text-sm mt-1">Let's refactor the auth middleware. Move JWT verification into Fastify preHandler so every route can opt-in with a decorator. Keep it framework-native.</div>
+          </div>
+        </div>
+        <div class="flex justify-start">
+          <div class="bg-white rounded-2xl rounded-bl-sm px-4 py-3 max-w-[78%] border border-line shadow-sm">
+            <div class="text-xs font-medium flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-terracotta"></span> Lokma · Claude 4 Sonnet · 1.2s</div>
+            <div class="text-sm mt-2">Perfect — here's a minimal typed implementation. One hook, one decorator, zero magic.</div>
+            <div class="mt-2 rounded-xl bg-ink text-white p-3 font-mono text-xs overflow-auto">
+              <div class="text-ink/40 text-[10px]">plugins/auth.ts</div>
+              <pre>app.decorateRequest('user', null)
+app.addHook('preHandler', async (req, reply) => {
+  if (!req.routeOptions.config?.auth) return
+  req.user = await verifyJwt(token)
+})</pre>
+            </div>
+            <div class="mt-2 flex gap-1.5">
+              <button class="text-xs px-2 py-1 rounded-full bg-terracotta text-white">Apply patch</button>
+              <button class="text-xs px-2 py-1 rounded-full border">Show diff</button>
+            </div>
+          </div>
+        </div>
+        <!-- Thinking glass -->
+        <div class="flex justify-start">
+          <div class="glass rounded-2xl px-4 py-3 max-w-[78%] flex items-center gap-2 text-xs text-ink/60">
+            <span class="w-2 h-2 rounded-full bg-terracotta animate-pulse"></span> Thinking — checking rate-limit patterns…
+          </div>
+        </div>
+      </div>
+
+      <!-- Composer as glass -->
+      <div class="max-w-[760px] mx-auto w-full sticky bottom-4">
+        <div class="glass rounded-2xl p-2 flex gap-2">
+          <input placeholder="Ask Lokma… (⌘K for palette)" class="flex-1 bg-transparent px-3 py-2 text-sm outline-none placeholder:text-ink/40" />
+          <button class="px-4 py-2 rounded-xl bg-terracotta text-white text-sm">Send</button>
+        </div>
+        <div class="text-center text-[11px] text-ink/40 mt-1">Auto-apply off · Press ↵ to send</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Right: Preview pane (Arc split) -->
+  <aside class="hidden xl:flex w-[360px] flex-col bg-[#FDFCFB] border-l border-line">
+    <div class="h-12 flex items-center px-3 border-b border-line">
+      <span class="text-xs font-medium">Preview</span>
+      <span class="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-white border">plugins/auth.ts</span>
+    </div>
+    <div class="flex-1 p-3 space-y-3 overflow-auto">
+      <div class="rounded-xl bg-ink text-white p-3 font-mono text-xs">
+        <div class="text-[10px] text-white/40 mb-1">DIFF PREVIEW</div>
+        <pre class="whitespace-pre-wrap">+18 −4 · Fastify hook
+  app.addHook('preHandler', ...)</pre>
+      </div>
+      <div class="rounded-xl bg-white border border-line p-3">
+        <div class="text-xs font-medium">Artifacts</div>
+        <div class="text-xs mt-1">plugins/auth.ts · Modified</div>
+        <div class="text-xs">auth.spec.ts · Proposed</div>
+      </div>
+      <div class="rounded-xl bg-muted p-3">
+        <div class="text-xs font-medium">Context</div>
+        <div class="text-xs text-ink/60">Tokens 8.2k / 128k · temp 0.2</div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- Cmd+K Glass Modal -->
+<dialog id="cmdk" class="p-0 rounded-2xl backdrop:bg-ink/30 open:backdrop-blur-sm">
+  <div class="w-[560px] max-w-[90vw] glass rounded-2xl overflow-hidden">
+    <div class="p-3 border-b border-line flex gap-2">
+      <span class="text-ink/40">⌘</span>
+      <input placeholder="Ask, jump, or run…" class="flex-1 bg-transparent outline-none text-sm" autofocus />
+    </div>
+    <div class="p-2 text-xs">
+      <div class="px-2 py-1.5 rounded-lg bg-terracotta text-white">Refactor auth middleware</div>
+      <div class="px-2 py-1.5 hover:bg-white rounded-lg">Scaffold a new API</div>
+      <div class="px-2 py-1.5 hover:bg-white rounded-lg">Review this PR</div>
+    </div>
+  </div>
+</dialog>
+
+<script>
+document.getElementById('cmdkBtn')?.addEventListener('click',()=>document.getElementById('cmdk').showModal());
+document.getElementById('cmdk')?.addEventListener('click',e=>{ if(e.target===e.currentTarget) e.currentTarget.close(); });
+</script>
+</body>
+</html>

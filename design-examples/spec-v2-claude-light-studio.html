@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Spec V2 — Claude Light Studio (1:1 docs) — Lokma</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>tailwind.config={theme:{extend:{colors:{cream:'#FAF9F5',ink:'#262624',terracotta:'#C96442',line:'#E8E4DE',muted:'#F2F0EB'},fontFamily:{serif:['Instrument Serif','serif'],sans:['Inter','sans-serif'],mono:['JetBrains Mono','monospace']}}}}</script>
+<style>body{font-family:Inter,sans-serif;background:#FAF9F5;color:#262624}</style>
+</head>
+<body class="min-h-screen bg-cream">
+<div class="bg-ink text-white text-center py-2 text-xs">Spec V2 — Claude Light Studio (1:1 docs) · cream #FAF9F5 · terracotta #C96442 · Docs 20/22/24 1:1 · Studio polish</div>
+<div class="sticky top-0 z-20 bg-[#FDFCFB]/90 backdrop-blur border-b border-line">
+  <div class="flex items-center gap-3 px-4 py-2.5">
+    <div class="flex items-center gap-2"><div class="w-7 h-7 rounded-lg bg-terracotta text-white flex items-center justify-center text-xs font-bold">◐</div><span class="font-semibold text-sm">Lokma</span><span class="text-ink/30">▸</span><span class="text-xs px-2 py-1 rounded-full bg-white border">my-project</span><span class="text-ink/30">▸</span><span class="text-xs font-medium">Refactor auth</span></div>
+    <div class="hidden md:flex items-center gap-2 ml-4"><span class="text-xs px-2 py-1 rounded-full bg-white border">claude-sonnet-4-5 ▾ 200k</span><span class="text-xs px-2 py-1 rounded-full bg-terracotta text-white">12k · $0.04</span><span class="text-xs px-1.5 py-0.5 rounded bg-white border">⎇ fix/auth</span></div>
+    <div class="ml-auto flex items-center gap-1.5"><span class="text-[11px] px-2 py-1 rounded-full bg-white border">Ask · Shift+Tab</span><span class="text-[11px] px-2 py-1 rounded-full border">● Live</span></div>
+  </div>
+</div>
+<div class="flex h-[calc(100vh-68px)]">
+  <aside class="w-[260px] hidden lg:flex flex-col bg-[#FDFCFB] border-r border-line">
+    <div class="flex border-b border-line text-xs"><button class="flex-1 py-2 bg-white font-medium border-b-2 border-terracotta">Sessions</button><button class="flex-1 py-2 text-ink/60">Projects</button></div>
+    <div class="p-2 border-b border-line"><div class="flex gap-2"><input placeholder="Search sessions…  Ctrl+K" class="flex-1 px-2 py-1.5 rounded-lg bg-white border border-line text-xs" /><button class="px-2 py-1 rounded-lg bg-terracotta text-white text-xs">＋ New</button></div></div>
+    <div class="flex-1 overflow-auto p-2 space-y-3">
+      <div><div class="text-[10px] tracking-widest text-ink/40">TODAY</div><div class="mt-1 space-y-1"><div class="p-2 rounded-lg bg-white border-l-2 border-terracotta border shadow-sm"><div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span><span class="text-xs font-medium">Refactor auth</span><span class="ml-auto text-[10px] px-1 rounded bg-terracotta text-white">● Live</span></div><div class="text-[11px] text-ink/60">claude-sonnet-4-5 · 12k · 2m</div></div><div class="p-2 rounded-lg hover:bg-white flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-ink/20"></span><span class="text-xs">Add tests</span><span class="ml-auto text-[10px]">○</span></div></div></div>
+      <div><div class="text-[10px] tracking-widest text-ink/40">YESTERDAY</div><div class="p-2 rounded-lg hover:bg-white text-xs">Design review — pricing</div></div>
+      <div class="border-t border-line pt-2"><div class="text-[10px] tracking-widest text-ink/40">PROJECTS</div><div class="mt-1 space-y-1"><div class="p-2 rounded-lg bg-white border flex justify-between"><span class="text-xs">my-project</span><span class="text-[10px] px-1 rounded-full border">⎇ main · 3</span></div><div class="p-2 rounded-lg hover:bg-white text-xs flex justify-between"><span>blog</span><span class="text-ink/40">2</span></div></div></div>
+      <div class="rounded-xl bg-white border border-line p-3"><div class="text-xs font-medium">Providers</div><div class="text-[11px]">Anthropic <span class="w-2 h-2 bg-green-500 inline-block rounded-full"></span> · OpenAI <span class="w-2 h-2 bg-green-500 inline-block rounded-full"></span></div></div>
+    </div>
+    <div class="p-2 border-t border-line text-[11px] text-ink/60">Drag Sessions/Projects to reorder · ⋮⋮ to drag session into chat</div>
+  </aside>
+  <main class="flex-1 flex flex-col min-w-0">
+    <div class="flex-1 overflow-auto p-4 space-y-3 bg-cream">
+      <!-- Chat header with model switcher -->
+      <div class="max-w-[760px] mx-auto w-full flex items-center gap-2 text-xs"><span class="px-2 py-1 rounded-full bg-white border">claude-sonnet-4-5 ▾</span><span class="text-ink/40">Fallback: gpt-4o → deepseek</span><span class="ml-auto px-2 py-1 rounded-full border">● Streaming</span></div>
+      <!-- Permission banner -->
+      <div class="max-w-[760px] mx-auto w-full rounded-xl bg-amber-50 border border-amber-200 p-3 flex items-center gap-2"><span class="text-xs">🔒 Permission: Edit plugins/auth.ts ?</span><button class="ml-auto text-xs px-2 py-1 rounded-full bg-terracotta text-white">Allow</button><button class="text-xs px-2 py-1 rounded-full border">Deny</button><button class="text-xs px-2 py-1 rounded-full border">Always allow</button></div>
+      <!-- Chat bubbles -->
+      <div class="max-w-[760px] mx-auto w-full space-y-3">
+        <div class="flex justify-end"><div class="bg-white border border-line rounded-2xl px-4 py-3 max-w-[78%] shadow-sm"><div class="text-xs font-medium">Aylin 14:32</div><div class="text-sm mt-1">Let's refactor the auth middleware. Move JWT verification into <span class="font-mono bg-muted px-1 rounded">@plugins/auth.ts</span> preHandler.</div></div></div>
+        <div class="flex justify-start"><div class="bg-white border border-line rounded-2xl px-4 py-3 max-w-[78%]"><div class="text-xs font-medium flex items-center gap-2"><span class="w-2 h-2 bg-terracotta rounded-full"></span> Lokma · Claude 4 Sonnet · 1.2s</div><div class="text-sm mt-2">Perfect — here's a minimal typed implementation. <span class="font-mono bg-muted px-1 rounded">app.decorateRequest('user')</span></div><pre class="mt-2 bg-ink text-white p-2 rounded-lg text-xs font-mono overflow-auto">app.addHook('preHandler', async (req) => {
+  if (!req.routeOptions.config?.auth) return
+  req.user = await verifyJwt(token)
+})</pre><div class="mt-2 flex gap-1.5"><button class="text-xs px-2 py-1 rounded-full bg-terracotta text-white">Apply patch</button><button class="text-xs px-2 py-1 rounded-full border">Show diff</button><button class="text-xs px-2 py-1 rounded-full border">Rewind</button></div></div></div>
+        <!-- AskUserQuestion -->
+        <div class="flex justify-start"><div class="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 max-w-[78%]"><div class="text-xs font-medium">Lokma asks:</div><div class="text-sm mt-1">Which rate-limit strategy? (60 req/min)</div><div class="mt-2 grid grid-cols-1 gap-1"><button class="text-xs text-left px-3 py-2 rounded-lg bg-white border">A · In same hook (simple)</button><button class="text-xs text-left px-3 py-2 rounded-lg bg-white border">B · Separate plugin (isolated)</button><button class="text-xs text-left px-3 py-2 rounded-lg bg-white border">C · Redis (distributed)</button></div></div></div>
+      </div>
+      <!-- Slash menu -->
+      <div class="max-w-[760px] mx-auto w-full rounded-xl bg-white border border-line shadow-lg p-2"><div class="text-[11px] text-ink/40">Slash menu · type /</div><div class="mt-1 grid grid-cols-3 gap-1 text-xs"><span class="px-2 py-1 rounded bg-terracotta text-white">/model</span><span class="px-2 py-1 rounded hover:bg-muted">/clear</span><span class="px-2 py-1 rounded hover:bg-muted">/commit</span></div></div>
+      <!-- Usage mini -->
+      <div class="max-w-[760px] mx-auto w-full grid grid-cols-3 gap-2"><div class="bg-white border rounded-xl p-2"><div class="text-[11px] text-ink/40">Tokens 7d</div><div class="text-sm font-semibold">1.42M</div></div><div class="bg-white border rounded-xl p-2"><div class="text-[11px] text-ink/40">Cost 7d</div><div class="text-sm font-semibold">$18.42</div></div><div class="bg-white border rounded-xl p-2"><div class="text-[11px] text-ink/40">Avg/session</div><div class="text-sm font-semibold">47k</div></div></div>
+    </div>
+    <div class="border-t border-line bg-[#FDFCFB] p-2">
+      <div class="max-w-[760px] mx-auto flex gap-2"><input placeholder="Ask Lokma…  / for commands, @ for files" class="flex-1 px-3 py-2 rounded-xl bg-white border border-line text-sm" /><button class="px-4 py-2 rounded-xl bg-terracotta text-white text-sm">Send</button></div>
+      <div class="max-w-[760px] mx-auto text-center text-[11px] text-ink/40 mt-1">/ slash menu · @ file mention · Ctrl+K palette · Ctrl+B bars</div>
+    </div>
+  </main>
+  <aside class="w-[340px] hidden xl:flex flex-col bg-[#FDFCFB] border-l border-line">
+    <div class="flex text-xs border-b"><button class="flex-1 py-2 bg-white font-medium border-b-2 border-terracotta">Files</button><button class="flex-1 py-2 text-ink/40">Terminal</button><button class="flex-1 py-2 text-ink/40">Browser</button></div>
+    <div class="flex-1 overflow-auto p-3 space-y-3">
+      <div class="rounded-xl bg-white border p-2"><div class="text-xs font-medium">File Tree · react-arborist</div><div class="text-xs mt-1 font-mono">▾ src/ <span class="text-green-600">M</span><br/>  auth.ts <span class="text-green-600">M</span><br/>  auth.test.ts <span class="text-ink/40">?</span></div><div class="text-[11px] text-ink/40 mt-1">Drag file → chat inserts @path · Ctrl+P quick-open</div></div>
+      <div class="rounded-xl bg-ink text-white p-2 font-mono text-xs"><div class="text-[11px] text-white/40">TERMINAL — xterm.js · bash:1</div><div class="mt-1">$ npm test<br/>✓ 12 tests · 1.2s</div></div>
+      <div class="rounded-xl bg-white border p-2"><div class="text-xs font-medium">Browser Preview</div><div class="border rounded-lg h-24 flex items-center justify-center text-xs text-ink/40">iframe — localhost:3000<br/>[Lokma preview]</div><div class="text-[11px] mt-1">Tools: browser_navigate / click / screenshot</div></div>
+      <div class="rounded-xl bg-white border p-2"><div class="text-xs font-medium">Orchestration · Alt+A</div><div class="text-xs">● agent-1: find files 1.2s<br/>✓ agent-2: read auth 0.8s<br/>● agent-3: edit tests 2.1s</div></div>
+      <div class="rounded-xl bg-white border p-2"><div class="text-xs font-medium">Git · @lokma</div><div class="text-xs">⎇ main → fix/auth · PR #482</div></div>
+      <div class="rounded-xl bg-white border p-2"><div class="text-xs font-medium">MCP · 4 transports</div><div class="text-xs">stdio / sse / http / ws · Test</div></div>
+    </div>
+  </aside>
+</div>
+<div class="text-center text-[11px] text-ink/40 py-2 border-t border-line">Spec V2 — 1:1 docs 20/22/24 · Provider cards + Model catalog (Allow All/Disable All, provider pills, fallback) + Sessions/Usage + Files/Terminal/Browser + Orchestration + Theming</div>
+</body>
+</html>

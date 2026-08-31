@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Variant B — Claude Light Compact Pane — Lokma</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter','ui-sans-serif','system-ui','-apple-system','sans-serif'],
+          serif: ['Instrument Serif','Georgia','serif'],
+          mono: ['JetBrains Mono','ui-monospace','monospace'],
+        },
+        colors: {
+          cream: '#FAF9F5',
+          paper: '#FFFFFF',
+          ink: '#262624',
+          terracotta: '#C96442',
+          'terracotta-hover': '#B85736',
+          muted: '#F2F0EB',
+          'muted-2': '#EDE9E2',
+          line: '#E8E4DE',
+          'line-strong': '#DDD8D0',
+        },
+        borderRadius: { md: '8px', lg: '12px', xl: '16px' },
+        boxShadow: {
+          card: '0 1px 2px rgba(38,38,36,0.06), 0 4px 12px rgba(38,38,36,0.04)',
+          'card-hover': '0 2px 8px rgba(38,38,36,0.08), 0 8px 24px rgba(38,38,36,0.06)',
+        }
+      }
+    }
+  }
+</script>
+<style>
+  :root {
+    --background: 40 33% 97%;
+    --foreground: 60 3% 15%;
+    --border: 36 18% 88%;
+  }
+  * { font-feature-settings: "cv02","cv03","cv04","cv11"; }
+  html { scrollbar-gutter: stable; }
+  body { background: #FAF9F5; color: #262624; }
+  body::before {
+    content: "";
+    position: fixed; inset: 0; pointer-events: none; opacity: 0.22;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-thumb { background: #DDD8D0; border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #CFC9BF; }
+  .pane { transition: width 220ms cubic-bezier(.2,.8,.2,1), opacity 160ms ease, border-color 160ms ease; overflow: hidden; }
+  .pane.collapsed { width: 0 !important; opacity: 0; border-width: 0 !important; pointer-events: none; }
+  .pane-divider { width: 1px; background: #E8E4DE; flex-shrink: 0; position: relative; }
+  .pane-divider::after { content:""; position:absolute; top:0; bottom:0; left:-3px; right:-3px; }
+  .pane-divider:hover { background: #DDD8D0; }
+  /* compact tweaks */
+  .compact-title { font-size: 28px; line-height: 1.08; }
+  @media (min-width: 640px) { .compact-title { font-size: 30px; } }
+</style>
+</head>
+<body class="font-sans antialiased min-h-screen flex flex-col overflow-hidden h-screen">
+  <!-- Top variant label -->
+  <div class="w-full bg-[#262624] text-[#FAF9F5] text-[11.5px] leading-none shrink-0">
+    <div class="w-full px-3 h-7 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-2.5">
+        <span class="inline-flex items-center gap-1.5 font-medium tracking-wide">
+          <span class="w-1.5 h-1.5 rounded-full bg-[#C96442] inline-block"></span>
+          Variant B — Claude Light · Compact Pane
+        </span>
+        <span class="hidden sm:inline-flex items-center gap-2 text-white/55 font-normal">
+          <span class="w-px h-3 bg-white/20"></span>
+          cream #FAF9F5 · terracotta #C96442 · compact
+        </span>
+      </div>
+      <div class="hidden md:flex items-center gap-1.5 text-[10.5px]">
+        <span class="px-2 py-1 rounded-full bg-white/10 border border-white/10">Pane system</span>
+        <span class="px-2 py-1 rounded-full bg-white/10 border border-white/10">Sticky composer</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Header — full bleed, compact ===== -->
+  <header class="shrink-0 z-40 bg-[#FAF9F5]/80 backdrop-blur-xl border-b border-line">
+    <div class="w-full px-2 sm:px-3 h-[44px] flex items-center gap-1.5 sm:gap-2">
+      <!-- pane toggles + brand -->
+      <div class="flex items-center gap-1">
+        <button id="toggle-left" class="w-7 h-7 grid place-items-center rounded-md hover:bg-white border border-transparent hover:border-line transition text-zinc-600" title="Sol paneli kapat/aç [">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="3" width="11" height="10" rx="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M6 3v10" stroke="currentColor" stroke-width="1.2"/><path d="M3 5h3M3 8h3M3 11h3" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity=".7"/></svg>
+        </button>
+        <a href="#" class="flex items-center gap-2 ml-1 shrink-0">
+          <span class="w-6 h-6 rounded-md bg-[#262624] text-white grid place-items-center text-[12px] font-semibold tracking-tight">◐</span>
+          <span class="font-serif text-[17px] tracking-tight leading-none hidden sm:block">lokma</span>
+          <span class="hidden md:inline-flex ml-0.5 px-1 py-0.5 rounded bg-white border border-line text-[9px] font-medium tracking-widest uppercase text-zinc-500">harness</span>
+        </a>
+        <span class="hidden lg:block w-px h-4 bg-line ml-2"></span>
+        <nav class="hidden lg:flex items-center gap-1 text-[12.5px]">
+          <a href="#" class="px-2 py-1 rounded-md hover:bg-white border border-transparent hover:border-line transition text-zinc-600">Workspace</a>
+          <span class="text-zinc-300">/</span>
+          <a href="#" class="px-2 py-1 rounded-md bg-white border border-line shadow-sm font-medium text-[12.5px]">lokma-web</a>
+          <span class="px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-medium">● Active</span>
+        </nav>
+      </div>
+
+      <!-- Center: breadcrumb compact on mobile -->
+      <div class="flex-1 flex justify-center lg:hidden">
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-line shadow-sm text-[12px]">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> lokma-web · main
+        </span>
+      </div>
+      <div class="hidden lg:flex flex-1 justify-center">
+        <span class="text-[12px] text-zinc-500 flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> main
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" class="opacity-40"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        </span>
+      </div>
+
+      <!-- Right actions -->
+      <div class="flex items-center gap-1 shrink-0">
+        <button class="hidden sm:inline-flex items-center gap-1.5 px-2.5 h-7 rounded-full bg-white border border-line text-[12.5px] font-medium hover:bg-zinc-50 transition">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          New
+        </button>
+        <button class="w-7 h-7 grid place-items-center rounded-full bg-white border border-line hover:bg-muted transition" aria-label="Search">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="3.8" stroke="currentColor" stroke-width="1.3"/><path d="M10.2 10.2L13 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        </button>
+        <div class="w-px h-4 bg-line mx-0.5 hidden sm:block"></div>
+        <button id="toggle-right" class="w-7 h-7 grid place-items-center rounded-md hover:bg-white border border-transparent hover:border-line transition text-zinc-600" title="Sağ paneli kapat/aç ]">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="3" width="11" height="10" rx="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M10 3v10" stroke="currentColor" stroke-width="1.2"/><circle cx="5.2" cy="5.5" r="1" fill="currentColor" opacity=".7"/><circle cx="5.2" cy="8" r="1" fill="currentColor" opacity=".7"/><circle cx="5.2" cy="10.5" r="1" fill="currentColor" opacity=".7"/></svg>
+        </button>
+        <button class="inline-flex items-center gap-1.5 pl-1 pr-2 h-7 rounded-full bg-white border border-line shadow-sm hover:shadow transition ml-0.5">
+          <img src="https://i.pravatar.cc/100?img=33" alt="avatar" class="w-5 h-5 rounded-full object-cover" />
+          <span class="hidden sm:block text-[12.5px] font-medium">Aylin</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== Shell — edge-glued panes ===== -->
+  <div class="flex flex-1 min-h-0 w-full overflow-hidden">
+    <!-- Left Pane — glued to left edge -->
+    <aside id="pane-left" class="pane hidden xl:flex w-[240px] shrink-0 border-r border-line bg-[#FDFCFB] flex-col">
+      <div class="h-[36px] shrink-0 flex items-center justify-between px-3 border-b border-line/70">
+        <span class="text-[10px] font-semibold tracking-widest uppercase text-zinc-400">Recents</span>
+        <div class="flex items-center gap-1">
+          <button class="w-6 h-6 grid place-items-center rounded-md hover:bg-white border border-transparent hover:border-line transition" aria-label="New chat">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          </button>
+          <button onclick="toggleLeft()" class="w-6 h-6 grid place-items-center rounded-md hover:bg-white border border-transparent hover:border-line transition text-zinc-500" title="Kapat [">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8l4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="px-2.5 pt-2.5 pb-2">
+        <div class="relative">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400"><circle cx="7" cy="7" r="3.8" stroke="currentColor" stroke-width="1.2"/><path d="M10 10l2.5 2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          <input placeholder="Search chats…" class="w-full h-7 pl-7 pr-3 rounded-md bg-white border border-line text-[12.5px] placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-terracotta/20 focus:border-terracotta/30" />
+        </div>
+      </div>
+      <nav class="px-2 space-y-3 overflow-y-auto flex-1 pb-3">
+        <div class="space-y-0.5">
+          <a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[#262624] text-white text-[12.5px] font-medium">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Chat
+            <span class="ml-auto text-[10px] bg-white/15 px-1 py-0.5 rounded">⌘K</span>
+          </a>
+          <a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-zinc-600 hover:bg-white hover:border hover:border-line border border-transparent text-[12.5px] transition">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="3" width="11" height="10" rx="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M5 6h6M5 8.5h6M5 11h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            Sessions <span class="ml-auto text-[11px] bg-muted px-1.5 py-0.5 rounded-full">12</span>
+          </a>
+          <a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-zinc-600 hover:bg-white border border-transparent text-[12.5px] transition">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3.5L3 6.5v5L8 13.5 13 11v-5L8 3.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M3 6.5l5 3 5-3M8 9.5v4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            Artifacts
+          </a>
+          <a href="#" class="flex items-center gap-2 px-2 py-1.5 rounded-md text-zinc-600 hover:bg-white border border-transparent text-[12.5px] transition">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 7.5h8M4 10.5h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><rect x="3" y="3" width="10" height="10" rx="1.2" stroke="currentColor" stroke-width="1.2"/></svg>
+            Docs
+          </a>
+        </div>
+        <div>
+          <div class="px-2 mb-1.5 text-[10px] font-semibold tracking-widest uppercase text-zinc-400">Today</div>
+          <div class="space-y-1">
+            <a href="#" class="block px-2.5 py-2 rounded-md bg-white border border-line shadow-sm">
+              <div class="text-[12.5px] font-medium leading-tight line-clamp-1">Refactor auth middleware</div>
+              <div class="text-[11.5px] text-zinc-500 line-clamp-1 mt-0.5">You: Can we move the guard to Fastify hooks?</div>
+              <div class="flex items-center gap-1.5 mt-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span class="text-[10.5px] text-zinc-500">2 min ago · 8 msgs</span>
+              </div>
+            </a>
+            <a href="#" class="block px-2.5 py-1.5 rounded-md hover:bg-white hover:border hover:border-line border border-transparent transition">
+              <div class="text-[12.5px] leading-tight line-clamp-1 text-zinc-700">Design review — pricing page</div>
+              <div class="text-[11.5px] text-zinc-500 line-clamp-1">Claude: Here's a cleaner hierarchy…</div>
+            </a>
+            <a href="#" class="block px-2.5 py-1.5 rounded-md hover:bg-white border border-transparent transition">
+              <div class="text-[12.5px] leading-tight line-clamp-1 text-zinc-700">Lokma deploy pipeline</div>
+              <div class="text-[11.5px] text-zinc-500">3 participants · yesterday</div>
+            </a>
+          </div>
+        </div>
+        <div>
+          <div class="px-2 mb-1.5 text-[10px] font-semibold tracking-widest uppercase text-zinc-400">Earlier</div>
+          <div class="space-y-0.5">
+            <a href="#" class="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-white text-[12.5px] text-zinc-600">
+              <span class="w-5 h-5 rounded-md bg-muted grid place-items-center text-[10px]">◍</span>
+              API spec — webhooks
+            </a>
+            <a href="#" class="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-white text-[12.5px] text-zinc-600">
+              <span class="w-5 h-5 rounded-md bg-muted grid place-items-center text-[10px]">◎</span>
+              Onboarding flow copy
+            </a>
+            <a href="#" class="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-white text-[12.5px] text-zinc-600">
+              <span class="w-5 h-5 rounded-md bg-muted grid place-items-center text-[10px]">⬢</span>
+              Drizzle schema audit
+            </a>
+          </div>
+        </div>
+      </nav>
+      <div class="p-2.5 border-t border-line bg-[#FDFCFB] shrink-0">
+        <div class="rounded-lg bg-white border border-line p-2.5 shadow-sm">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="w-6 h-6 rounded-md bg-terracotta text-white grid place-items-center text-[11px] font-bold">3</span>
+            <div>
+              <div class="text-[11.5px] font-semibold leading-none">Pro plan</div>
+              <div class="text-[10.5px] text-zinc-500">12 / 20 seats</div>
+            </div>
+          </div>
+          <div class="h-1 rounded-full bg-muted overflow-hidden">
+            <div class="h-full w-[60%] bg-terracotta rounded-full"></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- divider left (desktop) -->
+    <div id="div-left" class="pane-divider hidden xl:block"></div>
+
+    <!-- Center — flex col with scroll + sticky composer -->
+    <main class="flex-1 min-w-0 flex flex-col bg-[#FAF9F5] relative overflow-hidden">
+      <div class="flex-1 overflow-y-auto" id="main-scroll">
+        <div class="max-w-[640px] mx-auto w-full px-4 sm:px-5 py-5 sm:py-6">
+          <!-- Eyebrow compact -->
+          <div class="flex items-center gap-2 mb-4">
+            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white border border-line text-[10.5px] font-medium tracking-wide uppercase text-zinc-600 shadow-sm">
+              <span class="w-1.5 h-1.5 rounded-full bg-terracotta"></span> Lokma Harness · #482
+            </span>
+            <span class="hidden sm:inline text-[11.5px] text-zinc-400">Today · 14:31</span>
+            <span class="ml-auto hidden sm:inline-flex items-center gap-1 text-[11.5px] text-zinc-500">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 3v8M3 8h10" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity=".5"/></svg>
+              Share
+            </span>
+          </div>
+
+          <!-- Hero — more compact -->
+          <div class="mb-6">
+            <h1 class="font-serif compact-title tracking-tight text-ink">
+              Good afternoon, Aylin.<br />
+              <span class="italic font-normal text-zinc-500">What are we building today?</span>
+            </h1>
+            <p class="mt-2 text-[13px] leading-5 text-zinc-500 max-w-[56ch]">
+              Start with a brief. Lokma will scaffold the plan, run tools, and keep an inspectable trail.
+            </p>
+          </div>
+
+          <!-- Quick starters — compact -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-6">
+            <button class="group text-left p-3 rounded-lg bg-white border border-line shadow-card hover:shadow-card-hover hover:border-line-strong transition">
+              <div class="w-6 h-6 rounded-md bg-[#FDF0E6] border border-[#F2D5C2] grid place-items-center text-terracotta mb-2">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M5 11.5L8 3l3 8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.8 9.5h4.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              </div>
+              <div class="text-[12.5px] font-semibold leading-tight">Scaffold a new API</div>
+              <div class="text-[11.5px] text-zinc-500 leading-snug mt-0.5">Fastify + Drizzle + auth</div>
+            </button>
+            <button class="group text-left p-3 rounded-lg bg-white border border-line shadow-card hover:shadow-card-hover transition">
+              <div class="w-6 h-6 rounded-md bg-zinc-50 border border-line grid place-items-center text-zinc-700 mb-2">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M6 8h4M8 6v4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+              </div>
+              <div class="text-[12.5px] font-semibold leading-tight">Review this PR</div>
+              <div class="text-[11.5px] text-zinc-500 leading-snug mt-0.5">Security, types, tests</div>
+            </button>
+            <button class="group text-left p-3 rounded-lg bg-white border border-line shadow-card hover:shadow-card-hover transition">
+              <div class="w-6 h-6 rounded-md bg-emerald-50 border border-emerald-200 grid place-items-center text-emerald-700 mb-2">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+              </div>
+              <div class="text-[12.5px] font-semibold leading-tight">Design a landing</div>
+              <div class="text-[11.5px] text-zinc-500 leading-snug mt-0.5">Figma → code</div>
+            </button>
+          </div>
+
+          <!-- Conversation — compact spacing -->
+          <div class="space-y-5">
+            <!-- User -->
+            <div class="flex gap-2.5">
+              <img src="https://i.pravatar.cc/100?img=33" alt="Aylin" class="w-6 h-6 rounded-full mt-0.5 object-cover shrink-0" />
+              <div class="flex-1 min-w-0">
+                <div class="flex items-baseline gap-2">
+                  <span class="text-[12.5px] font-semibold">Aylin</span>
+                  <span class="text-[10.5px] text-zinc-400">14:32</span>
+                </div>
+                <div class="mt-1.5 p-3 rounded-xl bg-white border border-line shadow-card">
+                  <p class="text-[13.5px] leading-[1.6] text-ink">
+                    Let's refactor the auth middleware. Move JWT verification into a Fastify <code class="px-1 py-0.5 rounded bg-muted border border-line text-[11px] font-mono">preHandler</code> hook so every route can opt-in with a single decorator. Keep it framework-native — no extra deps.
+                  </p>
+                  <div class="mt-2 flex flex-wrap gap-1.5">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted border border-line text-[11px]"><span class="w-1 h-1 rounded-full bg-zinc-400"></span> lokma-server</span>
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted border border-line text-[11px]">Fastify 5</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Assistant -->
+            <div class="flex gap-2.5">
+              <div class="w-6 h-6 rounded-full bg-[#262624] text-white grid place-items-center shrink-0 mt-0.5 text-[11px] font-medium">◐</div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-baseline gap-2">
+                  <span class="text-[12.5px] font-semibold">Lokma</span>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-white border border-line">Claude 4 Sonnet</span>
+                  <span class="text-[10.5px] text-zinc-400">14:32 · 1.2s</span>
+                </div>
+                <div class="mt-2 space-y-3 text-[13.5px] leading-[1.65] text-zinc-700">
+                  <p>Perfect — that's the cleanest approach. Here's a minimal, typed implementation you can drop in. One hook, one decorator, zero magic.</p>
+                  <div class="rounded-lg overflow-hidden border border-line bg-white shadow-card">
+                    <div class="flex items-center justify-between px-3 h-7 bg-muted/60 border-b border-line">
+                      <div class="flex items-center gap-1.5 text-[11px]">
+                        <span class="w-2 h-2 rounded-full bg-zinc-300"></span>
+                        <span class="w-2 h-2 rounded-full bg-zinc-300"></span>
+                        <span class="w-2 h-2 rounded-full bg-zinc-300"></span>
+                        <span class="ml-1.5 font-mono text-zinc-600">plugins/auth.ts</span>
+                      </div>
+                      <button class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white border border-line text-[10.5px] font-medium hover:bg-zinc-50">
+                        <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M6 6h5v5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                        Copy
+                      </button>
+                    </div>
+                    <pre class="p-3 overflow-x-auto text-[11.5px] leading-5 font-mono bg-white"><code><span class="text-zinc-400">// Fastify preHandler — opt-in per route</span>
+<span class="text-[#9A6B4A]">import</span> fp <span class="text-[#9A6B4A]">from</span> <span class="text-[#6A8A4A]">'fastify-plugin'</span>
+<span class="text-[#9A6B4A]">import</span> { verifyJwt } <span class="text-[#9A6B4A]">from</span> <span class="text-[#6A8A4A]">'./jwt'</span>
+
+<span class="text-[#9A6B4A]">export default</span> fp(<span class="text-[#9A6B4A]">async</span> (app) =&gt; {
+  app.decorateRequest(<span class="text-[#6A8A4A]">'user'</span>, <span class="text-[#9A6B4A]">null</span>)
+  app.addHook(<span class="text-[#6A8A4A]">'preHandler'</span>, <span class="text-[#9A6B4A]">async</span> (req, reply) =&gt; {
+    <span class="text-[#9A6B4A]">if</span> (!req.routeOptions.config?.auth) <span class="text-[#9A6B4A]">return</span>
+    <span class="text-[#9A6B4A]">const</span> token = req.headers.authorization?.replace(<span class="text-[#6A8A4A]">'Bearer '</span>, <span class="text-[#6A8A4A]">''</span>)
+    <span class="text-[#9A6B4A]">if</span> (!token) <span class="text-[#9A6B4A]">return</span> reply.code(<span class="text-[#B05A3A]">401</span>).send({ error: <span class="text-[#6A8A4A]">'missing token'</span> })
+    req.user = <span class="text-[#9A6B4A]">await</span> verifyJwt(token)
+  })
+})</code></pre>
+                    <div class="px-3 py-1.5 bg-[#FDFCFB] border-t border-line flex items-center gap-2 text-[11px] text-zinc-600">
+                      <span class="w-1 h-1 rounded-full bg-emerald-500"></span> No new dependencies · hook runs only when <code class="px-1 py-0.5 rounded bg-white border border-line font-mono text-[10px]">config.auth</code> is set
+                    </div>
+                  </div>
+                  <h3 class="font-serif text-[15px] leading-tight text-ink pt-1">Why this works well</h3>
+                  <ul class="space-y-1 list-none pl-0 text-[13px]">
+                    <li class="flex gap-2"><span class="mt-[7px] w-1 h-1 rounded-full bg-terracotta shrink-0"></span><span><strong class="font-medium text-ink">Framework-native.</strong> Uses Fastify's own hook system.</span></li>
+                    <li class="flex gap-2"><span class="mt-[7px] w-1 h-1 rounded-full bg-terracotta shrink-0"></span><span><strong class="font-medium text-ink">Opt-in per route.</strong> Only routes with <code class="px-1 py-0.5 rounded bg-white border border-line font-mono text-[11px]">config.auth</code> pay the cost.</span></li>
+                    <li class="flex gap-2"><span class="mt-[7px] w-1 h-1 rounded-full bg-terracotta shrink-0"></span><span><strong class="font-medium text-ink">Inspectable.</strong> Attaches to <code class="px-1 py-0.5 rounded bg-white border border-line font-mono text-[11px]">request.user</code>.</span></li>
+                  </ul>
+                  <div class="flex flex-wrap gap-1.5 pt-1">
+                    <button class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#262624] text-white text-[12.5px] font-medium hover:bg-black transition">
+                      Apply patch
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <button class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white border border-line text-[12.5px] font-medium hover:bg-muted transition">Show diff</button>
+                    <button class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white border border-line text-[12.5px] font-medium hover:bg-muted transition">Explain tests</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- User follow-up -->
+            <div class="flex gap-2.5">
+              <img src="https://i.pravatar.cc/100?img=33" alt="Aylin" class="w-6 h-6 rounded-full mt-0.5 object-cover shrink-0" />
+              <div class="flex-1 min-w-0">
+                <div class="flex items-baseline gap-2">
+                  <span class="text-[12.5px] font-semibold">Aylin</span>
+                  <span class="text-[10.5px] text-zinc-400">14:33</span>
+                </div>
+                <div class="mt-1.5">
+                  <p class="text-[13.5px] leading-[1.6]">Add rate limiting per user — 60 req/min. Keep it in the same hook if possible.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Thinking -->
+            <div class="flex gap-2.5">
+              <div class="w-6 h-6 rounded-full bg-white border border-line grid place-items-center shrink-0 mt-0.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-terracotta animate-pulse"></span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-line text-[12px] text-zinc-600 shadow-sm">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" class="animate-spin"><circle cx="8" cy="8" r="6" stroke="#DDD8D0" stroke-width="1.4"/><path d="M8 2a6 6 0 016 6" stroke="#C96442" stroke-width="1.4" stroke-linecap="round"/></svg>
+                  Thinking — checking rate-limit patterns…
+                </div>
+              </div>
+            </div>
+            <!-- extra bottom padding so last msg not hidden behind sticky composer -->
+            <div class="h-2"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Sticky Composer — glued to bottom ===== -->
+      <div class="shrink-0 bg-[#FAF9F5]/85 backdrop-blur-xl border-t border-line">
+        <div class="max-w-[640px] mx-auto w-full px-3 sm:px-4 py-2.5">
+          <div class="rounded-xl bg-white border border-line shadow-card overflow-hidden">
+            <!-- Composer top bar -->
+            <div class="flex items-center gap-1.5 px-2.5 h-8 border-b border-line bg-[#FDFCFB]">
+              <span class="text-[10px] font-semibold tracking-widest uppercase text-zinc-400">Prompt</span>
+              <span class="ml-auto flex items-center gap-1">
+                <button class="w-6 h-6 grid place-items-center rounded-md hover:bg-white hover:border hover:border-line border border-transparent transition text-zinc-500" aria-label="Attach">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5.5 8.2l4.2-4.2a1.8 1.8 0 112.5 2.5L6.8 12a2.8 2.8 0 01-4-4L7 3.8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <button class="w-6 h-6 grid place-items-center rounded-md hover:bg-white hover:border hover:border-line border border-transparent transition text-zinc-500" aria-label="Code">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M6 4l-4 4 4 4M10 4l4 4-4 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <button class="w-6 h-6 grid place-items-center rounded-md hover:bg-white hover:border hover:border-line border border-transparent transition text-zinc-500" aria-label="Voice">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="6" y="3" width="4" height="7" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 8.5a3.5 3.5 0 007 0M8 12v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                </button>
+              </span>
+            </div>
+            <!-- Input -->
+            <div class="p-2.5">
+              <textarea id="composer-input" rows="2" placeholder="Ask Lokma to plan, code, or explain — try “add 60/min rate limit per user”" class="w-full resize-none bg-transparent text-[13.5px] leading-5 placeholder:text-zinc-400 focus:outline-none min-h-[40px]"></textarea>
+              <!-- Composer bottom bar — MODEL SELECTOR HERE -->
+              <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+                <!-- Model selector (moved from header to input) -->
+                <div class="flex items-center gap-1 p-0.5 rounded-full bg-muted border border-line">
+                  <button data-model="claude" class="model-btn px-2.5 py-1 rounded-full bg-[#262624] text-white text-[11.5px] font-medium leading-none">Claude 4 Sonnet</button>
+                  <button data-model="gpt5" class="model-btn px-2.5 py-1 rounded-full text-zinc-600 hover:bg-white text-[11.5px] font-medium leading-none">GPT-5</button>
+                  <button data-model="gemini" class="model-btn px-2.5 py-1 rounded-full text-zinc-600 hover:bg-white text-[11.5px] font-medium leading-none">Gemini 2.5</button>
+                </div>
+                <span class="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white border border-line text-[11px] font-medium text-zinc-600">
+                  <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M8 3v10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                  Auto-apply off
+                </span>
+                <span class="hidden lg:inline text-[10.5px] text-zinc-400 ml-1">↵ send · ⇧↵ new line</span>
+                <div class="ml-auto flex items-center gap-1.5">
+                  <span class="hidden sm:inline text-[10.5px] text-zinc-400">⌘K</span>
+                  <button class="inline-flex items-center gap-1 pl-3 pr-1.5 h-7 rounded-full bg-terracotta text-white text-[12.5px] font-medium hover:bg-terracotta-hover transition shadow-sm">
+                    Send
+                    <span class="w-5 h-5 rounded-full bg-white/15 grid place-items-center">
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M5 8l3 3 4-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="text-center text-[10.5px] text-zinc-400 mt-1.5">Lokma can make mistakes. Review patches before applying.</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- divider right -->
+    <div id="div-right" class="pane-divider hidden xl:block"></div>
+
+    <!-- Right Inspector — glued to right edge -->
+    <aside id="pane-right" class="pane hidden xl:flex w-[300px] shrink-0 border-l border-line bg-[#FDFCFB] flex-col overflow-hidden">
+      <div class="h-[36px] shrink-0 flex items-center justify-between px-3 border-b border-line/70">
+        <h2 class="font-serif text-[13px] tracking-tight">Inspector</h2>
+        <div class="flex items-center gap-1">
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-white border border-line text-[10px] font-medium shadow-sm">
+            <span class="w-1 h-1 rounded-full bg-emerald-500"></span> Live
+          </span>
+          <button onclick="toggleRight()" class="w-6 h-6 grid place-items-center rounded-md hover:bg-white border border-transparent hover:border-line transition text-zinc-500" title="Kapat ]">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="flex-1 overflow-y-auto p-3 space-y-3">
+        <!-- Session -->
+        <div class="rounded-lg bg-white border border-line shadow-card overflow-hidden">
+          <div class="px-3 h-7 flex items-center justify-between border-b border-line bg-[#FDFCFB]">
+            <span class="text-[10.5px] font-semibold tracking-wide uppercase text-zinc-600">Session</span>
+            <button class="w-5 h-5 grid place-items-center rounded-md hover:bg-white border border-transparent hover:border-line transition">
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="4" cy="8" r="1.2" fill="currentColor"/><circle cx="12" cy="8" r="1.2" fill="currentColor"/></svg>
+            </button>
+          </div>
+          <div class="p-3 space-y-2.5">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-[#262624] text-white grid place-items-center text-[12px] font-medium">◐</div>
+              <div>
+                <div class="text-[12.5px] font-medium leading-none">lokma-web · main</div>
+                <div class="text-[10.5px] text-zinc-500 mt-0.5">482 · 9 msgs · 14:31</div>
+              </div>
+              <span class="ml-auto px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-medium">Healthy</span>
+            </div>
+            <div class="grid grid-cols-3 gap-1.5 text-center">
+              <div class="p-1.5 rounded-md bg-muted border border-line">
+                <div class="text-[14px] font-semibold leading-none">8</div>
+                <div class="text-[9px] tracking-widest uppercase text-zinc-500 mt-0.5">Tools</div>
+              </div>
+              <div class="p-1.5 rounded-md bg-muted border border-line">
+                <div class="text-[14px] font-semibold leading-none">3</div>
+                <div class="text-[9px] tracking-widest uppercase text-zinc-500 mt-0.5">Patches</div>
+              </div>
+              <div class="p-1.5 rounded-md bg-white border border-line">
+                <div class="text-[14px] font-semibold leading-none text-terracotta">2</div>
+                <div class="text-[9px] tracking-widest uppercase text-zinc-500 mt-0.5">Pending</div>
+              </div>
+            </div>
+            <div class="flex gap-1.5">
+              <button class="flex-1 h-7 rounded-md bg-[#262624] text-white text-[11.5px] font-medium hover:bg-black transition">View graph</button>
+              <button class="flex-1 h-7 rounded-md bg-white border border-line text-[11.5px] font-medium hover:bg-muted transition">Export</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tools -->
+        <div class="rounded-lg bg-white border border-line shadow-card overflow-hidden">
+          <div class="px-3 h-7 flex items-center justify-between border-b border-line bg-[#FDFCFB]">
+            <span class="text-[10.5px] font-semibold tracking-wide uppercase text-zinc-600">Tools</span>
+            <span class="text-[10.5px] text-zinc-500">Last 15 min</span>
+          </div>
+          <div class="p-3 space-y-3">
+            <div class="flex gap-2.5">
+              <div class="flex flex-col items-center">
+                <span class="w-6 h-6 rounded-full bg-emerald-50 border border-emerald-200 grid place-items-center text-emerald-700">
+                  <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+                <span class="w-px flex-1 bg-line mt-1"></span>
+              </div>
+              <div class="flex-1 pb-1">
+                <div class="text-[12px] font-medium leading-none">read · plugins/auth.ts</div>
+                <div class="text-[11px] text-zinc-500 mt-0.5">240 ms · found existing guard</div>
+              </div>
+              <span class="text-[10.5px] text-zinc-400">14:32</span>
+            </div>
+            <div class="flex gap-2.5">
+              <div class="flex flex-col items-center">
+                <span class="w-6 h-6 rounded-full bg-amber-50 border border-amber-200 grid place-items-center text-amber-700">
+                  <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M8 3v5l3 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="8" r="5.2" stroke="currentColor" stroke-width="1.2"/></svg>
+                </span>
+                <span class="w-px flex-1 bg-line mt-1"></span>
+              </div>
+              <div class="flex-1 pb-1">
+                <div class="text-[12px] font-medium leading-none">write · plugins/auth.ts</div>
+                <div class="text-[11px] text-zinc-500 mt-0.5">Patch ready — awaiting approval</div>
+                <div class="mt-1.5 flex gap-1">
+                  <span class="px-1.5 py-0.5 rounded-md bg-terracotta/10 border border-terracotta/20 text-terracotta text-[10.5px] font-medium">+18 −4</span>
+                  <span class="px-1.5 py-0.5 rounded-md bg-white border border-line text-[10.5px]">View diff</span>
+                </div>
+              </div>
+              <span class="text-[10.5px] text-zinc-400">14:32</span>
+            </div>
+            <div class="flex gap-2.5">
+              <span class="w-6 h-6 rounded-full bg-white border border-line grid place-items-center text-zinc-500">
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="currentColor" stroke-width="1.2"/><path d="M8 5.5v3.2l2.2 1.3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+              </span>
+              <div class="flex-1">
+                <div class="text-[12px] font-medium leading-none text-zinc-600">test · auth.spec.ts</div>
+                <div class="text-[11px] text-zinc-500 mt-0.5">Queued · after apply</div>
+              </div>
+              <span class="text-[10.5px] text-zinc-400">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Artifacts -->
+        <div class="rounded-lg bg-white border border-line shadow-card overflow-hidden">
+          <div class="px-3 h-7 flex items-center justify-between border-b border-line bg-[#FDFCFB]">
+            <span class="text-[10.5px] font-semibold tracking-wide uppercase text-zinc-600">Artifacts</span>
+            <span class="px-1.5 py-0.5 rounded-full bg-muted border border-line text-[10px]">2</span>
+          </div>
+          <div class="divide-y divide-line">
+            <a href="#" class="flex items-center gap-2.5 p-2.5 hover:bg-muted/50 transition">
+              <span class="w-7 h-7 rounded-md bg-[#FDF0E6] border border-[#F2D5C2] grid place-items-center text-terracotta">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M5 3.5h4l3 3v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-8a1 1 0 011-1z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 3.5v3h3" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+              </span>
+              <div class="min-w-0">
+                <div class="text-[12px] font-medium leading-none truncate">plugins/auth.ts</div>
+                <div class="text-[10.5px] text-zinc-500">Modified · 18 additions</div>
+              </div>
+              <span class="ml-auto w-5 h-5 rounded-full bg-white border border-line grid place-items-center">
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+            </a>
+            <a href="#" class="flex items-center gap-2.5 p-2.5 hover:bg-muted/50 transition">
+              <span class="w-7 h-7 rounded-md bg-zinc-50 border border-line grid place-items-center text-zinc-600">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M5.5 8h5M8 5.5v5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+              </span>
+              <div class="min-w-0">
+                <div class="text-[12px] font-medium leading-none truncate">auth.spec.ts</div>
+                <div class="text-[10.5px] text-zinc-500">Proposed · not yet created</div>
+              </div>
+              <span class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 font-medium">Draft</span>
+            </a>
+          </div>
+          <div class="p-2 bg-[#FDFCFB] border-t border-line">
+            <button class="w-full h-7 rounded-md bg-white border border-line text-[11.5px] font-medium hover:bg-muted transition">Open in editor</button>
+          </div>
+        </div>
+
+        <!-- Context -->
+        <div class="rounded-lg bg-white border border-line shadow-card overflow-hidden">
+          <div class="px-3 h-7 flex items-center border-b border-line bg-[#FDFCFB]">
+            <span class="text-[10.5px] font-semibold tracking-wide uppercase text-zinc-600">Context</span>
+          </div>
+          <div class="p-3 space-y-2.5">
+            <div class="flex items-center justify-between text-[11.5px]">
+              <span class="text-zinc-500">Tokens</span>
+              <span class="font-mono font-medium">8.2k / 128k</span>
+            </div>
+            <div class="h-1 rounded-full bg-muted overflow-hidden">
+              <div class="h-full w-[14%] bg-terracotta rounded-full"></div>
+            </div>
+            <div class="flex gap-1">
+              <span class="flex-1 text-center px-1.5 py-1 rounded-md bg-muted border border-line text-[10.5px]">temp 0.2</span>
+              <span class="flex-1 text-center px-1.5 py-1 rounded-md bg-muted border border-line text-[10.5px]">top-p 0.95</span>
+              <span class="flex-1 text-center px-1.5 py-1 rounded-md bg-white border border-line text-[10.5px] font-medium">stream</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-lg border border-dashed border-line-strong bg-white/60 p-2.5">
+          <div class="text-[11.5px] font-medium">Need something else?</div>
+          <div class="text-[11.5px] text-zinc-500 mt-0.5">Run tests, open a PR, or explain the diff.</div>
+          <div class="flex gap-1.5 mt-2">
+            <button class="flex-1 h-6 rounded-md bg-white border border-line text-[11.5px] font-medium hover:bg-muted transition">Run tests</button>
+            <button class="flex-1 h-6 rounded-md bg-terracotta text-white text-[11.5px] font-medium hover:bg-terracotta-hover transition">Create PR</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Mobile overlay drawers -->
+  <div id="mobile-left" class="xl:hidden fixed inset-0 z-50 hidden">
+    <div onclick="closeMobileLeft()" class="absolute inset-0 bg-black/20 backdrop-blur-sm"></div>
+    <div class="absolute left-0 top-0 bottom-0 w-[84%] max-w-[300px] bg-[#FDFCFB] border-r border-line overflow-y-auto flex flex-col">
+      <div class="h-11 flex items-center justify-between px-3 border-b border-line">
+        <span class="font-serif text-[16px]">lokma</span>
+        <button onclick="closeMobileLeft()" class="w-7 h-7 grid place-items-center rounded-md hover:bg-white border border-line">✕</button>
+      </div>
+      <div class="p-3 text-[13px] text-zinc-600">Mobilde sol panel — masaüstündekiyle aynı içerik. Kapatıp devam et.</div>
+    </div>
+  </div>
+  <div id="mobile-right" class="xl:hidden fixed inset-0 z-50 hidden">
+    <div onclick="closeMobileRight()" class="absolute inset-0 bg-black/20 backdrop-blur-sm"></div>
+    <div class="absolute right-0 top-0 bottom-0 w-[84%] max-w-[340px] bg-[#FDFCFB] border-l border-line overflow-y-auto p-4">
+      <div class="flex items-center justify-between mb-3">
+        <span class="font-serif text-[16px]">Inspector</span>
+        <button onclick="closeMobileRight()" class="w-7 h-7 grid place-items-center rounded-md hover:bg-white border border-line">✕</button>
+      </div>
+      <div class="text-[13px] text-zinc-600">Mobil inspector — masaüstü sağ pane ile aynı kartlar.</div>
+    </div>
+  </div>
+
+  <!-- collapsed pane restore bars -->
+  <div id="restore-left" class="hidden fixed left-0 top-[44px] bottom-0 w-7 bg-[#FDFCFB] border-r border-line z-30 xl:flex flex-col items-center pt-2 gap-1" style="display:none">
+    <button onclick="toggleLeft()" class="w-6 h-6 grid place-items-center rounded-md bg-white border border-line shadow-sm hover:bg-muted transition" title="Sol paneli aç [">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+  <div id="restore-right" class="hidden fixed right-0 top-[44px] bottom-0 w-7 bg-[#FDFCFB] border-l border-line z-30 xl:flex flex-col items-center pt-2 gap-1" style="display:none">
+    <button onclick="toggleRight()" class="w-6 h-6 grid place-items-center rounded-md bg-white border border-line shadow-sm hover:bg-muted transition" title="Sağ paneli aç ]">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8l4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+
+<script>
+  const left = document.getElementById('pane-left');
+  const right = document.getElementById('pane-right');
+  const divLeft = document.getElementById('div-left');
+  const divRight = document.getElementById('div-right');
+  const restoreLeft = document.getElementById('restore-left');
+  const restoreRight = document.getElementById('restore-right');
+
+  function toggleLeft(){
+    const isCollapsed = left.classList.contains('collapsed');
+    if(window.innerWidth < 1280){ // mobile
+      document.getElementById('mobile-left').classList.toggle('hidden');
+      return;
+    }
+    if(isCollapsed){
+      left.classList.remove('collapsed');
+      divLeft.style.display = '';
+      restoreLeft.style.display = 'none';
+    } else {
+      left.classList.add('collapsed');
+      divLeft.style.display = 'none';
+      restoreLeft.style.display = 'flex';
+    }
+  }
+  function toggleRight(){
+    const isCollapsed = right.classList.contains('collapsed');
+    if(window.innerWidth < 1280){
+      document.getElementById('mobile-right').classList.toggle('hidden');
+      return;
+    }
+    if(isCollapsed){
+      right.classList.remove('collapsed');
+      divRight.style.display = '';
+      restoreRight.style.display = 'none';
+    } else {
+      right.classList.add('collapsed');
+      divRight.style.display = 'none';
+      restoreRight.style.display = 'flex';
+    }
+  }
+  document.getElementById('toggle-left').addEventListener('click', toggleLeft);
+  document.getElementById('toggle-right').addEventListener('click', toggleRight);
+  function closeMobileLeft(){ document.getElementById('mobile-left').classList.add('hidden'); }
+  function closeMobileRight(){ document.getElementById('mobile-right').classList.add('hidden'); }
+
+  // keyboard shortcuts [ and ]
+  document.addEventListener('keydown', (e) => {
+    if(e.key === '[' && !e.metaKey && !e.ctrlKey && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA'){
+      e.preventDefault(); toggleLeft();
+    }
+    if(e.key === ']' && !e.metaKey && !e.ctrlKey && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA'){
+      e.preventDefault(); toggleRight();
+    }
+  });
+
+  // model selector in composer
+  document.querySelectorAll('.model-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.model-btn').forEach(b => {
+        b.className = 'model-btn px-2.5 py-1 rounded-full text-zinc-600 hover:bg-white text-[11.5px] font-medium leading-none';
+      });
+      btn.className = 'model-btn px-2.5 py-1 rounded-full bg-[#262624] text-white text-[11.5px] font-medium leading-none';
+    });
+  });
+
+  // auto-resize textarea
+  const ta = document.getElementById('composer-input');
+  ta.addEventListener('input', () => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+  });
+</script>
+</body>
+</html>

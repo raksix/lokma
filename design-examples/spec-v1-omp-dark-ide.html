@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Spec V1 — OMP Dark IDE (1:1 docs)</title>
+<!-- Tailwind CDN — standalone, no build (spec: 24 §6 wireframe + 22 provider/model/usage + theming omp) -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter','ui-sans-serif','system-ui','sans-serif'],
+          mono: ['JetBrains Mono','ui-monospace','monospace'],
+        },
+        colors: {
+          border: 'hsl(var(--border))',
+          background: 'hsl(var(--background))',
+          foreground: 'hsl(var(--foreground))',
+          primary: { DEFAULT: 'hsl(var(--primary))', foreground: 'hsl(var(--primary-foreground))' },
+          muted: { DEFAULT: 'hsl(var(--muted))', foreground: 'hsl(var(--muted-foreground))' },
+          card: { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' },
+        },
+        borderRadius: { lg: 'var(--radius)', md: 'calc(var(--radius) - 2px)', sm: 'calc(var(--radius) - 4px)' }
+      }
+    }
+  }
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root, .dark {
+    --background: 240 10% 4%; /* #0a0a0f */
+    --foreground: 0 0% 98%;
+    --card: 240 6% 10%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 6% 10%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 239 84% 67%; /* #6366f1 */
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 64%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 98%;
+    --border: 240 4% 16%; /* #27272a ~ */
+    --input: 240 4% 16%;
+    --ring: 239 84% 67%;
+    --radius: 0.5rem;
+  }
+  * { border-color: hsl(var(--border)); }
+  body {
+    background: #0a0a0f;
+    color: hsl(var(--foreground));
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  /* subtle OMP grid */
+  .omp-grid {
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  .omp-glow {
+    background: radial-gradient(ellipse 70% 50% at 50% -10%, rgba(99,102,241,0.14), transparent 60%),
+                radial-gradient(ellipse 45% 35% at 95% 85%, rgba(99,102,241,0.06), transparent 50%);
+  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  .xterm-bg { background: #09090b; }
+  /* flexlayout tab drag affordance */
+  .tab-drag-handle { opacity: 0; transition: opacity 0.15s; }
+  .group:hover .tab-drag-handle { opacity: 1; }
+  /* diff colors */
+  .diff-add { background: rgba(16,185,129,0.10); border-left: 2px solid #10b981; }
+  .diff-del { background: rgba(239,68,68,0.10); border-left: 2px solid #ef4444; }
+  .diff-ctx { border-left: 2px solid transparent; }
+  @keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }
+  .cursor-blink { animation: blink 1s step-end infinite; }
+  @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+  .pulse-dot { animation: pulse 1.2s ease-in-out infinite; }
+</style>
+</head>
+<body class="dark min-h-screen bg-[#0a0a0f] text-zinc-100 selection:bg-[#6366f1]/30">
+  <!-- background grid + glow -->
+  <div class="pointer-events-none fixed inset-0 omp-grid"></div>
+  <div class="pointer-events-none fixed inset-0 omp-glow"></div>
+
+  <div class="relative flex h-screen flex-col">
+    <!-- ================= TOP BAR (24 §6: Lokma ▸ project ▸ session [model ▾] 12k·$0.04) ================= -->
+    <header class="flex h-[44px] shrink-0 items-center justify-between border-b border-white/[0.06] bg-[#0a0a0f]/90 px-3 backdrop-blur-xl">
+      <!-- left: breadcrumb -->
+      <div class="flex min-w-0 items-center gap-3">
+        <!-- Lokma mark -->
+        <a href="#" class="flex items-center gap-2.5">
+          <span class="flex h-7 w-7 items-center justify-center rounded-md bg-[#6366f1] text-white shadow-lg shadow-[#6366f1]/20">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3a6 6 0 0 0 9 9c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9Z"/><path d="M12 7v6l4 2"/></svg>
+          </span>
+          <span class="hidden text-[13px] font-semibold tracking-tight text-white sm:block">Lokma</span>
+        </a>
+        <span class="hidden text-zinc-600 sm:block">▸</span>
+        <!-- project -->
+        <button class="hidden items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-zinc-300 hover:bg-white/[0.06] sm:inline-flex">
+          <span class="flex h-5 w-5 items-center justify-center rounded bg-white/[0.06] text-[10px] font-bold text-zinc-400">P</span>
+          my-project
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-zinc-500"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <span class="hidden text-zinc-600 sm:block">▸</span>
+        <!-- session -->
+        <div class="flex min-w-0 items-center gap-2">
+          <span class="truncate text-[13px] font-semibold text-white">Refactor auth</span>
+          <span class="hidden items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] text-zinc-500 md:inline-flex">sess_8f3a9c</span>
+          <!-- worktree badge (22 §4.2) -->
+          <span class="hidden items-center gap-1 rounded-full border border-[#6366f1]/30 bg-[#6366f1]/15 px-2 py-0.5 font-mono text-[10px] font-medium text-[#a5b4fc] md:inline-flex">⎇ fix/auth</span>
+        </div>
+      </div>
+
+      <!-- center: model switcher + usage -->
+      <div class="hidden items-center gap-2 lg:flex">
+        <!-- model switcher (22 §2.2) -->
+        <div class="relative" id="model-switcher">
+          <button id="model-btn" class="flex items-center gap-2 rounded-full border border-white/10 bg-[#1a1a1f] px-3 py-1.5 text-[12px] font-medium text-zinc-200 hover:border-[#6366f1]/30 hover:bg-[#1f1f25]">
+            <span class="h-2 w-2 rounded-full bg-emerald-500 shadow shadow-emerald-500/30"></span>
+            claude-sonnet-4-5
+            <span class="rounded bg-[#6366f1]/20 px-1 py-0 font-mono text-[10px] text-[#a5b4fc]">200k</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-zinc-500"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <!-- dropdown -->
+          <div id="model-dropdown" class="absolute left-1/2 top-[calc(100%+8px)] hidden w-[360px] -translate-x-1/2 overflow-hidden rounded-xl border border-white/10 bg-[#14141b] shadow-2xl shadow-black/50">
+            <div class="border-b border-white/[0.06] p-2">
+              <div class="relative">
+                <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+                <input placeholder="Search models… (provider / id)" class="w-full rounded-md border border-white/10 bg-[#0a0a0f] py-1.5 pl-8 pr-3 text-[12px] text-white placeholder:text-zinc-500 focus:border-[#6366f1]/40 focus:outline-none" />
+              </div>
+            </div>
+            <div class="max-h-[260px] overflow-y-auto p-2">
+              <p class="px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Anthropic</p>
+              <button class="flex w-full items-center justify-between rounded-md bg-[#6366f1]/15 px-2.5 py-2 text-left">
+                <span class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-[#6366f1]"></span><span class="font-mono text-[12px] font-medium text-white">claude-sonnet-4-5</span><span class="rounded bg-white/10 px-1 py-0 text-[10px] text-zinc-400">200k</span></span><span class="text-[11px] text-[#a5b4fc]">✓</span>
+              </button>
+              <button class="flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left hover:bg-white/[0.04]"><span class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-white/20"></span><span class="font-mono text-[12px] text-zinc-300">claude-opus-4-5</span><span class="rounded bg-white/10 px-1 py-0 text-[10px] text-zinc-500">200k</span></span><span class="text-[11px] text-zinc-600">$15/$75</span></button>
+              <p class="mt-2 px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">OpenAI</p>
+              <button class="flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left hover:bg-white/[0.04]"><span class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-white/20"></span><span class="font-mono text-[12px] text-zinc-300">gpt-4o</span><span class="rounded bg-white/10 px-1 py-0 text-[10px] text-zinc-500">128k</span></span><span class="text-[11px] text-zinc-500">● enabled</span></button>
+              <button class="flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left hover:bg-white/[0.04]"><span class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-white/20"></span><span class="font-mono text-[12px] text-zinc-300">o1-mini</span></span><span class="text-[11px] text-zinc-600">○ disabled</span></button>
+            </div>
+            <div class="flex items-center justify-between border-t border-white/[0.06] bg-white/[0.02] px-3 py-2">
+              <span class="font-mono text-[11px] text-zinc-500">Ctrl+M to switch · Fallback chain: Sonnet → gpt-4o</span>
+              <button class="text-[11px] font-medium text-[#a5b4fc] hover:text-white">Manage →</button>
+            </div>
+          </div>
+        </div>
+        <!-- usage badge (22 §3.2) -->
+        <button id="usage-badge" class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 font-mono text-[11px] font-medium text-zinc-300 hover:bg-white/[0.06]">
+          <span class="h-1.5 w-1.5 rounded-full bg-[#6366f1]"></span>
+          12k · $0.04
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-zinc-500"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="h-4 w-px bg-white/10"></div>
+        <span class="hidden font-mono text-[11px] text-zinc-500 xl:inline">context 12% · streaming</span>
+      </div>
+
+      <!-- right: actions -->
+      <div class="flex items-center gap-1">
+        <!-- mobile usage -->
+        <span class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-[11px] text-zinc-400 lg:hidden">12k·$0.04</span>
+        <button class="hidden h-7 items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-2.5 text-[12px] font-medium text-zinc-300 hover:bg-white/[0.08] md:inline-flex">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg> New
+        </button>
+        <button class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-white">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+        </button>
+        <button class="hidden h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-white md:inline-flex">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 0 0 6 8c0 7-6 9-6 9h16s-6-2-6-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </button>
+        <div class="ml-1 hidden items-center gap-2 pl-1 md:flex">
+          <img src="https://i.pravatar.cc/100?img=33" alt="user" class="h-7 w-7 rounded-full border border-white/10" />
+        </div>
+      </div>
+    </header>
+
+    <!-- header title row: spec compliance label (required) -->
+    <div class="flex h-[28px] shrink-0 items-center gap-2 border-b border-[#6366f1]/20 bg-[#6366f1]/[0.06] px-3">
+      <span class="inline-flex h-5 items-center rounded bg-[#6366f1] px-1.5 text-[10px] font-bold uppercase tracking-widest text-white">Spec</span>
+      <h1 class="text-[12px] font-semibold tracking-tight text-white">Spec V1 — OMP Dark IDE (1:1 docs)</h1>
+      <span class="hidden text-[11px] text-zinc-500 md:inline">· 24 §6 wireframe · Left 260 · Right 340 · flexlayout · single loop · omp #0a0a0f + #6366f1</span>
+      <span class="ml-auto hidden items-center gap-1.5 font-mono text-[11px] text-zinc-500 md:inline-flex">
+        <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> 1:1 · Tailwind CDN · no build
+        <span class="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0">Docs: 20/22/24</span>
+      </span>
+    </div>
+
+    <!-- ================= APP SHELL: Left 260 · Center · Right 340 (flexlayout model) ================= -->
+    <div class="flex flex-1 overflow-hidden">
+      <!-- LEFT 260 (24 §1.1 Border LEFT 260px) -->
+      <aside class="flex w-[260px] shrink-0 flex-col border-r border-white/[0.06] bg-[#0f0f12]/70 backdrop-blur-sm">
+        <!-- Left tabs (draggable reorder — 24 §1.2 Reorder left) -->
+        <div class="flex h-[36px] shrink-0 items-center gap-1 border-b border-white/[0.06] bg-[#0a0a0f] px-1">
+          <button class="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-white/[0.06] py-1.5 text-[11px] font-semibold text-white">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Sessions
+            <span class="rounded bg-[#6366f1] px-1 py-0 text-[10px] leading-none text-white">8</span>
+          </button>
+          <button class="flex items-center justify-center gap-1 rounded-md px-2.5 py-1.5 text-[11px] font-medium text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300">
+            Projects
+            <span class="tab-drag-handle text-zinc-600">⋮⋮</span>
+          </button>
+          <button class="flex items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-zinc-500 hover:bg-white/[0.04]">Chats</button>
+          <span class="ml-auto flex h-6 w-6 items-center justify-center rounded text-zinc-600" title="Drag to reorder tabs — flexlayout"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 9h6M9 15h6M9 12h6"/></svg></span>
+        </div>
+
+        <!-- Sessions pane (24 §2.1 + 22 §4.2) -->
+        <div class="flex flex-1 flex-col overflow-hidden">
+          <!-- search + +New (24 §2.1) -->
+          <div class="shrink-0 border-b border-white/[0.06] p-2">
+            <div class="relative">
+              <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+              <input id="session-search" placeholder="Search sessions…  Ctrl+K" class="h-7 w-full rounded-md border border-white/10 bg-[#0a0a0f] pl-8 pr-2 text-[12px] text-white placeholder:text-zinc-500 focus:border-[#6366f1]/40 focus:outline-none" />
+            </div>
+            <button class="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-[#6366f1] py-1.5 text-[12px] font-semibold text-white shadow shadow-[#6366f1]/20 hover:bg-[#5558e6]">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> + New Session
+              <span class="rounded bg-white/20 px-1 py-0 text-[10px] font-normal">Ctrl+N</span>
+            </button>
+            <!-- grouping toggle -->
+            <div class="mt-2 flex items-center justify-between">
+              <span class="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Grouped by recency</span>
+              <button class="rounded bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-medium text-zinc-400 hover:bg-white/[0.08]">By project ▾</button>
+            </div>
+          </div>
+
+          <!-- session list (virtualized, grouped) -->
+          <div id="session-list" class="flex-1 overflow-y-auto px-1.5 py-2">
+            <!-- Today -->
+            <div class="sticky top-0 z-10 -mx-1.5 bg-[#0f0f12]/90 px-2 py-1 backdrop-blur-sm">
+              <p class="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-500"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg> Today</p>
+            </div>
+
+            <!-- Row: active (Refactor auth) — status dot running, model pill, tokens, … menu, drag ⋮⋮ -->
+            <div draggable="true" data-session-name="refactor auth" class="group/session relative mb-1 rounded-lg border border-[#6366f1]/30 bg-[#6366f1]/[0.08] p-2.5 shadow-sm cursor-grab active:cursor-grabbing">
+              <div class="absolute inset-y-2 left-0 w-[2px] rounded-full bg-[#6366f1]"></div>
+              <div class="flex items-start justify-between gap-1.5">
+                <div class="flex min-w-0 flex-1 items-center gap-1.5">
+                  <span class="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow shadow-emerald-500/30" title="running"></span>
+                  <p class="truncate text-[12.5px] font-semibold leading-none text-white">Refactor auth</p>
+                </div>
+                <div class="flex shrink-0 items-center gap-1">
+                  <span class="tab-drag-handle cursor-grab text-[11px] leading-none text-zinc-500" title="Drag ⋮⋮ to Chat pane">⋮⋮</span>
+                  <button class="rounded p-0.5 text-zinc-500 hover:bg-white/10 hover:text-white">…</button>
+                </div>
+              </div>
+              <div class="mt-1 flex flex-wrap items-center gap-1">
+                <span class="inline-flex items-center rounded-full bg-[#6366f1]/20 px-1.5 py-0 text-[10px] font-medium text-[#a5b4fc]">claude-sonnet-4-5</span>
+                <span class="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-1.5 py-0 font-mono text-[10px] text-zinc-400"><span class="h-1 w-1 rounded-full bg-emerald-500"></span> 12k</span>
+                <span class="font-mono text-[10px] text-zinc-600">· 2m ago</span>
+              </div>
+              <div class="mt-2 h-1 overflow-hidden rounded-full bg-white/10"><div class="h-full w-[68%] rounded-full bg-[#6366f1]"></div></div>
+              <p class="mt-1 font-mono text-[10px] text-zinc-600">Drop on Chat → Open side-by-side / Merge / Fork</p>
+            </div>
+
+            <!-- Row: Add theme switcher -->
+            <div draggable="true" data-session-name="add theme switcher" class="group/session mb-1 flex flex-col gap-1 rounded-lg border border-white/[0.06] bg-white/[0.02] p-2.5 hover:bg-white/[0.04] cursor-grab">
+              <div class="flex items-start justify-between gap-1.5">
+                <div class="flex min-w-0 flex-1 items-center gap-1.5">
+                  <span class="h-2 w-2 shrink-0 rounded-full bg-zinc-600" title="idle"></span>
+                  <p class="truncate text-[12.5px] font-medium leading-none text-zinc-200">Add theme switcher</p>
+                </div>
+                <div class="flex shrink-0 items-center gap-1">
+                  <span class="tab-drag-handle cursor-grab text-[11px] text-zinc-600">⋮⋮</span>
+                  <button class="rounded p-0.5 text-zinc-500 hover:bg-white/10">…</button>
+                </div>
+              </div>
+              <div class="flex items-center gap-1">
+                <span class="rounded-full bg-white/10 px-1.5 py-0 text-[10px] font-medium text-zinc-400">gpt-4o</span>
+                <span class="font-mono text-[10px] text-zinc-500">842 tok</span>
+                <span class="font-mono text-[10px] text-zinc-600">· 18m ago</span>
+              </div>
+            </div>
+
+            <!-- Row: Tests failing -->
+            <div draggable="true" data-session-name="tests failing" class="group/session mb-1 flex flex-col gap-1 rounded-lg border border-amber-500/20 bg-amber-500/[0.06] p-2.5 cursor-grab">
+              <div class="flex items-start justify-between gap-1.5">
+                <div class="flex min-w-0 flex-1 items-center gap-1.5">
+                  <span class="h-2 w-2 shrink-0 rounded-full bg-amber-500" title="running"></span>
+                  <p class="truncate text-[12.5px] font-medium leading-none text-zinc-200">Tests — auth flow</p>
+                </div>
+                <div class="flex shrink-0 items-center gap-1"><span class="tab-drag-handle text-[11px] text-zinc-600">⋮⋮</span><button class="rounded p-0.5 text-zinc-500">…</button></div>
+              </div>
+              <div class="flex items-center gap-1">
+                <span class="rounded-full bg-white/10 px-1.5 py-0 text-[10px] text-zinc-400">deepseek-chat</span>
+                <span class="font-mono text-[10px] text-zinc-500">2.1k tok</span>
+                <span class="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0 text-[10px] font-medium text-amber-400">queued</span>
+              </div>
+            </div>
+
+            <!-- Row: data ingest error -->
+            <div draggable="true" data-session-name="data ingest" class="group/session mb-2 flex flex-col gap-1 rounded-lg border border-red-500/20 bg-red-500/[0.06] p-2.5 cursor-grab">
+              <div class="flex items-start justify-between gap-1.5">
+                <div class="flex min-w-0 flex-1 items-center gap-1.5">
+                  <span class="h-2 w-2 shrink-0 rounded-full bg-red-500" title="error"></span>
+                  <p class="truncate text-[12.5px] font-medium leading-none text-zinc-200">Data ingest — cron</p>
+                </div>
+                <div class="flex shrink-0 items-center gap-1"><span class="tab-drag-handle text-[11px] text-zinc-600">⋮⋮</span><button class="rounded p-0.5 text-zinc-500">…</button></div>
+              </div>
+              <div class="flex items-center gap-1">
+                <span class="rounded-full bg-white/10 px-1.5 py-0 text-[10px] text-zinc-400">o1-mini</span>
+                <span class="font-mono text-[10px] text-red-400">error · 1h ago</span>
+                <span class="font-mono text-[10px] text-zinc-500">412 tok</span>
+              </div>
+            </div>
+
+            <!-- Yesterday -->
+            <div class="sticky top-0 z-10 -mx-1.5 bg-[#0f0f12]/90 px-2 py-1 backdrop-blur-sm">
+              <p class="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-500"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg> Yesterday</p>
+            </div>
+            <div draggable="true" data-session-name="harness spec" class="group/session mb-1 rounded-lg border border-white/[0.04] p-2.5 hover:bg-white/[0.03] cursor-grab">
+              <div class="flex items-center justify-between"><p class="truncate text-[12.5px] font-medium text-zinc-300">Harness spec sync</p><span class="tab-drag-handle text-[11px] text-zinc-600">⋮⋮</span></div>
+              <div class="mt-1 flex items-center gap-1"><span class="rounded-full bg-white/10 px-1.5 py-0 text-[10px] text-zinc-500">claude-sonnet-4-5</span><span class="font-mono text-[11px] text-zinc-600">3.4k · Yesterday 18:42</span></div>
+            </div>
+            <div draggable="true" data-session-name="onboarding qa" class="group/session rounded-lg border border-white/[0.04] p-2.5 hover:bg-white/[0.03] cursor-grab">
+              <div class="flex items-center justify-between"><p class="truncate text-[12.5px] font-medium text-zinc-300">Onboarding flow — QA</p><span class="tab-drag-handle text-[11px] text-zinc-600">⋮⋮</span></div>
+              <div class="mt-1 flex items-center gap-1"><span class="rounded-full bg-white/10 px-1.5 py-0 text-[10px] text-zinc-500">gemini-2.0-flash</span><span class="font-mono text-[11px] text-zinc-600">976 tok</span></div>
+            </div>
+
+            <!-- … menu preview (hidden, show on click) -->
+            <div id="session-menu" class="hidden mt-2 overflow-hidden rounded-lg border border-white/10 bg-[#1a1a1f] shadow-xl">
+              <button class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-zinc-300 hover:bg-white/[0.06]">Rename</button>
+              <button class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-zinc-300 hover:bg-white/[0.06]">Fork (branch transcript → new ID)</button>
+              <button class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-zinc-300 hover:bg-white/[0.06]">Export JSONL</button>
+              <button class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-red-400 hover:bg-red-500/10">Delete …</button>
+            </div>
+          </div>
+
+          <!-- Projects pane (24 §2.2) -->
+          <div class="shrink-0 border-t border-white/[0.06] bg-[#0a0a0f]/50">
+            <div class="flex items-center justify-between px-3 py-2">
+              <p class="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Projects</p>
+              <button class="rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-zinc-300 hover:bg-white/[0.08]">+ Add project</button>
+            </div>
+            <div class="space-y-1 px-2 pb-2">
+              <div class="flex items-center justify-between rounded-md border border-[#6366f1]/20 bg-[#6366f1]/10 px-2.5 py-2">
+                <div class="min-w-0">
+                  <p class="text-[12px] font-semibold leading-none text-white">my-project</p>
+                  <p class="truncate font-mono text-[11px] leading-none text-zinc-500">/home/lokma/my-project</p>
+                </div>
+                <div class="ml-2 flex shrink-0 flex-col items-end gap-1">
+                  <span class="rounded-full bg-white/10 px-1.5 py-0 text-[10px] font-medium text-zinc-300">8 sess</span>
+                  <span class="rounded-full bg-emerald-500/15 px-1.5 py-0 text-[10px] font-medium text-emerald-400">⎇ main</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between rounded-md border border-white/[0.06] bg-white/[0.02] px-2.5 py-2 hover:bg-white/[0.04]">
+                <div class="min-w-0">
+                  <p class="text-[12px] font-medium leading-none text-zinc-300">lokma-docs</p>
+                  <p class="truncate font-mono text-[11px] leading-none text-zinc-500">~/lokma/Docs</p>
+                </div>
+                <div class="ml-2 flex shrink-0 flex-col items-end gap-1">
+                  <span class="rounded-full bg-white/10 px-1.5 py-0 text-[10px] text-zinc-400">2 sess</span>
+                  <span class="rounded-full bg-zinc-700 px-1.5 py-0 text-[10px] text-zinc-400">⎇ docs</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between rounded-md border border-white/[0.06] bg-white/[0.02] px-2.5 py-2 hover:bg-white/[0.04]">
+                <div class="min-w-0">
+                  <p class="text-[12px] font-medium leading-none text-zinc-300">blog</p>
+                  <p class="truncate font-mono text-[11px] leading-none text-zinc-500">~/sites/blog</p>
+                </div>
+                <div class="ml-2 flex shrink-0 flex-col items-end gap-1">
+                  <span class="rounded-full bg-white/10 px-1.5 py-0 text-[10px] text-zinc-400">1 sess</span>
+                  <span class="rounded-full bg-zinc-700 px-1.5 py-0 text-[10px] text-zinc-400">⎇ main</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center justify-between border-t border-white/[0.06] px-3 py-1.5">
+              <span class="font-mono text-[10px] text-zinc-600">Ctrl+B to collapse</span>
+              <span class="text-[10px] text-zinc-600">View → Reset Layout</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- CENTER (flexlayout Center row, flex:1) — Chat + Code split + Orchestration -->
+      <main class="flex min-w-0 flex-1 flex-col bg-[#0a0a0f]">
+        <!-- center splitter: Chat | Code (24 §1.1 Center: TabSet A Chat + TabSet B Code) -->
+        <div class="flex flex-1 overflow-hidden">
+          <!-- Chat pane (22 §4.2 + 24 §1.1) -->
+          <section class="flex min-w-0 flex-1 flex-col border-r border-white/[0.06] bg-[#0a0a0f]">
+            <!-- Chat header Tabs (flexlayout TabSet A) -->
+            <div class="flex h-[36px] shrink-0 items-center justify-between border-b border-white/[0.06] bg-[#0f0f13] px-2">
+              <div class="flex items-center gap-1">
+                <span class="flex items-center gap-1.5 rounded-md bg-[#6366f1] px-2 py-1 text-[11px] font-semibold text-white">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Chat
+                  <span class="rounded bg-white/20 px-1 py-0 text-[10px] leading-none">Refactor auth</span>
+                </span>
+                <span class="hidden text-[11px] text-zinc-500 md:inline">· streaming · 42 tok/s</span>
+                <span class="hidden h-3 w-px bg-white/10 md:block"></span>
+                <span class="hidden font-mono text-[10px] text-zinc-600 md:inline">/model · /clear</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <span class="hidden items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 md:inline-flex"><span class="h-1 w-1 animate-pulse rounded-full bg-emerald-400"></span> live</span>
+                <button class="inline-flex h-6 w-6 items-center justify-center rounded text-zinc-500 hover:bg-white/[0.06]"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
+                <button class="inline-flex h-6 w-6 items-center justify-center rounded text-zinc-500 hover:bg-white/[0.06]"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
+              </div>
+            </div>
+
+            <!-- drop zone hint (24 §1.2 Drag session into session) -->
+            <div id="chat-drop-zone" class="hidden shrink-0 border-b border-dashed border-[#6366f1]/40 bg-[#6366f1]/10 px-3 py-2 text-center">
+              <p class="text-[11px] font-medium text-[#a5b4fc]">Drop session here → <span class="rounded bg-[#6366f1] px-1.5 py-0.5 text-white">Open side-by-side</span> · Merge transcript · Fork into this session</p>
+            </div>
+
+            <!-- messages -->
+            <div id="chat-scroll" class="flex-1 overflow-y-auto px-3 py-4">
+              <div class="mx-auto flex max-w-[640px] flex-col gap-4">
+                <!-- system notice -->
+                <div class="flex justify-center"><span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] text-zinc-400"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg> Session resumed · 3.2k / 200k · checkpoint available · <button class="font-medium text-[#a5b4fc] hover:text-white">Rewind</button></span></div>
+
+                <!-- user -->
+                <div class="flex gap-2.5">
+                  <img src="https://i.pravatar.cc/100?img=33" alt="user" class="mt-0.5 h-6 w-6 shrink-0 rounded-full border border-white/10" />
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-baseline gap-2"><span class="text-[12px] font-semibold text-white">You</span><span class="text-[11px] text-zinc-500">09:42</span><span class="rounded bg-white/10 px-1 py-0 font-mono text-[10px] text-zinc-500">user</span></div>
+                    <div class="mt-1 rounded-lg border border-white/[0.06] bg-white/[0.04] px-3 py-2.5">
+                      <p class="text-[13px] leading-relaxed text-zinc-200">Fix <code class="rounded bg-white/10 px-1 py-0 font-mono text-[12px] text-white">src/auth.ts</code> — token refresh race. Also update tests. Use <span class="rounded bg-[#6366f1]/20 px-1 py-0 font-mono text-[#a5b4fc]">@src/auth.test.ts</span></p>
+                      <div class="mt-2 flex flex-wrap gap-1.5"><span class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-[#0a0a0f] px-2 py-1 font-mono text-[11px] text-zinc-400"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg> src/auth.ts · 62 lines</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- assistant tool: Read -->
+                <div class="flex gap-2.5">
+                  <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#6366f1] text-white shadow shadow-[#6366f1]/20"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8V4H8"/><rect x="8" y="12" width="8" height="8" rx="2"/><path d="M16 8v4h4"/></svg></span>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-baseline gap-2"><span class="text-[12px] font-semibold text-white">Lokma</span><span class="rounded-full bg-[#6366f1]/15 px-1.5 py-0 text-[10px] font-semibold text-[#a5b4fc]">claude-sonnet-4-5</span><span class="text-[11px] text-zinc-500">tool</span></div>
+                    <div class="mt-1.5 overflow-hidden rounded-lg border border-white/[0.06] bg-[#14141b]">
+                      <div class="flex items-center justify-between border-b border-white/[0.06] bg-white/[0.03] px-2.5 py-1.5">
+                        <span class="flex items-center gap-1.5 font-mono text-[11px] font-medium text-zinc-300"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg> Read <span class="text-zinc-500">src/auth.ts</span></span>
+                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0 text-[10px] font-medium text-emerald-400">done · 0.2s</span>
+                      </div>
+                      <div class="max-h-[96px] overflow-auto bg-[#0a0a0f] p-2 font-mono text-[11px] leading-relaxed text-zinc-400">
+                        <span class="text-zinc-600">1</span> <span class="text-[#a5b4fc]">import</span> { <span class="text-zinc-200">refreshToken</span> } <span class="text-[#a5b4fc]">from</span> <span class="text-emerald-400">'./token'</span>;<br/>
+                        <span class="text-zinc-600">2</span> <span class="text-zinc-500">// TODO: race on parallel refresh</span><br/>
+                        <span class="text-zinc-600">3</span> <span class="text-[#a5b4fc]">export async function</span> <span class="text-amber-300">getAuth</span>() { … }
+                      </div>
+                    </div>
+                    <!-- diff preview -->
+                    <div class="mt-2 overflow-hidden rounded-lg border border-white/[0.06] bg-[#14141b]">
+                      <div class="flex items-center justify-between border-b border-white/[0.06] bg-white/[0.03] px-2.5 py-1.5">
+                        <span class="font-mono text-[11px] font-medium text-zinc-300">Diff · src/auth.ts</span>
+                        <span class="text-[11px] text-zinc-500">hashline · -61% tokens</span>
+                      </div>
+                      <div class="divide-y divide-white/[0.04] font-mono text-[11px]">
+                        <div class="diff-del px-3 py-1 text-red-300">- <span class="text-zinc-500">12</span>  <span class="text-zinc-400">const token = await refreshToken();</span></div>
+                        <div class="diff-add px-3 py-1 text-emerald-300">+ <span class="text-zinc-500">12</span>  <span class="text-zinc-200">const token = await dedupedRefresh(); // singleflight</span></div>
+                        <div class="diff-ctx px-3 py-1 text-zinc-500">  <span class="text-zinc-600">13</span>   return { token, expiresAt };</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- permission prompt (22 checklist) -->
+                <div class="ml-8 rounded-lg border border-amber-500/30 bg-amber-500/[0.08] p-3">
+                  <div class="flex items-start justify-between gap-3">
+                    <div>
+                      <p class="text-[12px] font-semibold text-amber-200">Permission required — Edit src/auth.ts</p>
+                      <p class="mt-1 font-mono text-[11px] text-amber-200/70">Allow / Deny / Always allow · <span class="rounded bg-white/10 px-1 py-0 text-zinc-200">Shift+Tab</span> to toggle mode (auto/manual/plan/bypass)</p>
+                    </div>
+                    <span class="rounded-full bg-amber-500/20 px-2 py-0.5 text-[11px] font-medium text-amber-300">ask</span>
+                  </div>
+                  <div class="mt-2 flex gap-1.5">
+                    <button class="rounded-md bg-[#6366f1] px-3 py-1 text-[12px] font-semibold text-white hover:bg-[#5558e6]">Allow</button>
+                    <button class="rounded-md border border-white/10 bg-white/[0.04] px-3 py-1 text-[12px] font-medium text-zinc-300 hover:bg-white/[0.08]">Deny</button>
+                    <button class="rounded-md border border-white/10 bg-white/[0.04] px-3 py-1 text-[12px] font-medium text-zinc-300 hover:bg-white/[0.08]">Always allow</button>
+                  </div>
+                </div>
+
+                <!-- AskUserQuestion -->
+                <div class="ml-8 rounded-lg border border-[#6366f1]/30 bg-[#6366f1]/[0.06] p-3">
+                  <p class="text-[12px] font-semibold text-white">Lokma asks — How to handle concurrent refresh?</p>
+                  <div class="mt-2 grid gap-1.5">
+                    <button class="flex items-center gap-2 rounded-md border border-[#6366f1]/30 bg-[#6366f1]/15 px-2.5 py-2 text-left text-[12px] text-white hover:bg-[#6366f1]/20"><span class="flex h-5 w-5 items-center justify-center rounded-full bg-[#6366f1] text-[11px] font-bold text-white">A</span> Singleflight dedup (recommended) — one inflight promise</button>
+                    <button class="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-2 text-left text-[12px] text-zinc-300 hover:bg-white/[0.06]"><span class="flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-[11px] font-bold text-zinc-400">B</span> Mutex per user — heavier but stricter</button>
+                  </div>
+                </div>
+
+                <!-- streaming assistant -->
+                <div class="flex gap-2.5">
+                  <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#6366f1] text-white"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8V4H8"/><rect x="8" y="12" width="8" height="8" rx="2"/><path d="M16 8v4h4"/></svg></span>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-baseline gap-2"><span class="text-[12px] font-semibold text-white">Lokma</span><span id="stream-meta" class="text-[11px] text-zinc-500">streaming…</span></div>
+                    <div class="mt-1 rounded-lg border border-white/[0.06] bg-[#14141b] px-3 py-2.5">
+                      <div id="stream-target" class="prose prose-invert max-w-none text-[13px] leading-relaxed text-zinc-200"></div>
+                      <div id="typing" class="mt-2 flex items-center gap-2 border-t border-white/[0.06] pt-2">
+                        <span class="flex gap-1"><span class="pulse-dot h-1.5 w-1.5 rounded-full bg-[#6366f1]"></span><span class="pulse-dot h-1.5 w-1.5 rounded-full bg-[#6366f1]" style="animation-delay:0.2s"></span><span class="pulse-dot h-1.5 w-1.5 rounded-full bg-[#6366f1]" style="animation-delay:0.4s"></span></span>
+                        <span class="text-[11px] text-zinc-500">Generating · mock WS (press Replay)</span>
+                      </div>
+                      <div id="stream-actions" class="hidden mt-2 flex gap-1.5 border-t border-white/[0.06] pt-2">
+                        <button class="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] text-zinc-300">Copy</button>
+                        <button class="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] text-zinc-300">Insert to Code</button>
+                        <button class="rounded-md bg-[#6366f1] px-2 py-1 text-[11px] font-medium text-white">Share →</button>
+                      </div>
+                    </div>
+                    <div class="mt-1.5 flex items-center gap-2 text-[11px] text-zinc-500"><span id="tok" class="font-mono">0 tokens</span><span class="h-1 w-1 rounded-full bg-white/20"></span><div class="h-1 w-24 overflow-hidden rounded-full bg-white/10"><div id="tok-bar" class="h-full bg-[#6366f1]" style="width:0%"></div></div><span class="hidden md:inline">~$0.002 · 12% context</span></div>
+                  </div>
+                </div>
+
+                <!-- slash/@ hint -->
+                <div class="ml-8 flex flex-wrap gap-1">
+                  <button class="rounded-full border border-[#6366f1]/30 bg-[#6366f1]/10 px-2.5 py-1 text-[11px] font-medium text-[#a5b4fc]">/clear</button>
+                  <button class="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] text-zinc-400">/model</button>
+                  <button class="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono text-[11px] text-zinc-400">@src/auth.test.ts</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- composer (22 §4.2 Input: textarea + Send + Model switcher + / slash + @ mention) -->
+            <div class="shrink-0 border-t border-white/[0.06] bg-[#0f0f13]/80 p-2 backdrop-blur-xl">
+              <div class="rounded-xl border border-white/[0.08] bg-[#1a1a1f] p-1.5 shadow-xl">
+                <div class="flex items-end gap-2">
+                  <button class="hidden h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-zinc-400 hover:text-white md:inline-flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg></button>
+                  <textarea id="composer" rows="1" placeholder="Message Lokma…  / for commands · @ for files · Shift+Tab permission" class="max-h-[96px] min-h-[32px] flex-1 resize-none bg-transparent px-2 py-1.5 text-[13px] leading-relaxed text-white placeholder:text-zinc-500 focus:outline-none"></textarea>
+                  <button id="send-btn" class="inline-flex h-7 shrink-0 items-center gap-1 rounded-md bg-[#6366f1] px-3 text-[12px] font-semibold text-white hover:bg-[#5558e6]">Send <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg></button>
+                </div>
+                <div class="mt-1.5 flex items-center justify-between border-t border-white/[0.06] pt-1.5">
+                  <span class="hidden text-[11px] text-zinc-500 md:inline">Enter send · Shift+Enter newline · <span class="rounded bg-white/10 px-1 py-0 font-mono text-zinc-400">/</span> slash · <span class="rounded bg-white/10 px-1 py-0 font-mono text-zinc-400">@</span> file</span>
+                  <span class="text-[11px] text-zinc-600">tokens 12k · cost $0.04 · model claude-sonnet-4-5 · 12%</span>
+                  <button id="replay-btn" class="inline-flex items-center gap-1 rounded bg-white/[0.06] px-2 py-1 text-[11px] font-medium text-zinc-400 hover:bg-white/[0.08]">Replay stream</button>
+                </div>
+              </div>
+              <!-- slash menu (hidden by default) -->
+              <div id="slash-menu" class="hidden mt-2 overflow-hidden rounded-lg border border-white/10 bg-[#14141b] shadow-xl">
+                <div class="px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Slash commands</div>
+                <button class="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/[0.04]"><span class="font-mono text-[12px] text-white">/clear</span><span class="text-[11px] text-zinc-500">Clear conversation</span></button>
+                <button class="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/[0.04]"><span class="font-mono text-[12px] text-white">/model</span><span class="text-[11px] text-zinc-500">Switch model</span></button>
+                <button class="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/[0.04]"><span class="font-mono text-[12px] text-white">/rewind</span><span class="text-[11px] text-zinc-500">Checkpoint rewind</span></button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Code / Diff pane (24 §1.1 TabSet B Code — Monaco) -->
+          <section class="hidden min-w-0 flex-1 flex-col bg-[#09090b] lg:flex">
+            <!-- Code header -->
+            <div class="flex h-[36px] shrink-0 items-center justify-between border-b border-white/[0.06] bg-[#0f0f13] px-2">
+              <div class="flex items-center gap-1">
+                <span class="inline-flex items-center gap-1.5 rounded-md bg-white/[0.06] px-2 py-1 text-[11px] font-medium text-zinc-200">
+                  <span class="h-2 w-2 rounded-full bg-[#6366f1]"></span> Code / Diff
+                </span>
+                <span class="hidden rounded-md bg-[#6366f1]/15 px-2 py-1 font-mono text-[11px] text-[#a5b4fc] md:inline">src/auth.ts</span>
+                <span class="hidden text-[11px] text-zinc-600 md:inline">· read-only preview → Open in editor</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <button class="rounded bg-white/[0.06] px-2 py-1 text-[11px] font-medium text-zinc-300">Split</button>
+                <button class="h-6 w-6 rounded text-zinc-500 hover:bg-white/[0.06]"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+              </div>
+            </div>
+
+            <!-- file tabs (flexlayout tabs) -->
+            <div class="flex h-8 shrink-0 items-center gap-1 border-b border-white/[0.06] bg-[#0a0a0f] px-1">
+              <span class="inline-flex items-center gap-1.5 rounded-t-md border border-b-0 border-white/10 bg-[#14141b] px-3 py-1 text-[11px] font-medium text-white">
+                <span class="h-3 w-3 rounded-sm bg-[#6366f1]/20 text-center text-[9px] leading-3 text-[#a5b4fc]">TS</span> auth.ts
+                <span class="ml-1 h-1.5 w-1.5 rounded-full bg-amber-500" title="Modified"></span>
+              </span>
+              <span class="inline-flex items-center gap-1.5 rounded-t-md px-3 py-1 text-[11px] text-zinc-500 hover:bg-white/[0.04]">auth.test.ts</span>
+              <span class="inline-flex items-center gap-1.5 rounded-t-md px-3 py-1 text-[11px] text-zinc-500 hover:bg-white/[0.04]">token.ts</span>
+            </div>
+
+            <!-- Monaco-like code -->
+            <div class="flex-1 overflow-auto bg-[#0a0a0f] p-0 font-mono text-[12px] leading-6">
+              <div class="flex">
+                <!-- line numbers -->
+                <div class="select-none border-r border-white/[0.06] bg-[#09090b] px-2 py-3 text-right text-zinc-600">
+                  <div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div>8</div><div>9</div><div>10</div><div>11</div><div>12</div><div>13</div><div>14</div><div>15</div>
+                </div>
+                <div class="flex-1 py-3">
+                  <div class="diff-ctx px-3"><span class="text-zinc-600">import</span> <span class="text-zinc-200">{ dedupedRefresh }</span> <span class="text-zinc-600">from</span> <span class="text-emerald-400">'./token'</span>;</div>
+                  <div class="diff-ctx px-3 text-zinc-500">// singleflight — prevents parallel refresh race</div>
+                  <div class="diff-ctx px-3"><span class="text-[#a78bfa]">let</span> <span class="text-zinc-200">inflight</span>: <span class="text-amber-300">Promise&lt;string&gt;</span> | <span class="text-zinc-500">null</span> = <span class="text-zinc-500">null</span>;</div>
+                  <div class="diff-ctx px-3">&nbsp;</div>
+                  <div class="diff-ctx px-3"><span class="text-[#a78bfa]">export async function</span> <span class="text-amber-300">getAuth</span>() {</div>
+                  <div class="diff-del px-3"><span class="text-zinc-500">-&nbsp;</span> <span class="text-zinc-400">const token = await refreshToken();</span></div>
+                  <div class="diff-add px-3"><span class="text-zinc-500">+&nbsp;</span> <span class="text-zinc-200">if (!inflight) inflight = dedupedRefresh().finally(() =&gt; inflight = null);</span></div>
+                  <div class="diff-add px-3"><span class="text-zinc-500">+&nbsp;</span> <span class="text-zinc-200">const token = await inflight;</span></div>
+                  <div class="diff-ctx px-3">&nbsp;  <span class="text-[#a78bfa]">return</span> { token, <span class="text-zinc-200">expiresAt</span>: <span class="text-amber-300">Date.now</span>() + <span class="text-emerald-400">3600_000</span> };</div>
+                  <div class="diff-ctx px-3">}</div>
+                  <div class="diff-ctx px-3">&nbsp;</div>
+                  <div class="diff-ctx px-3 text-zinc-500">// @file mention via drag from Files → chat inserts @src/auth.ts</div>
+                  <div class="px-3 pt-2 text-[11px] text-zinc-600">─ ─ ─ diff rendered with hashline anchors · <span class="text-[#a5b4fc]">hash • abc123</span> ─ ─ ─</div>
+                </div>
+              </div>
+            </div>
+            <!-- footer: git + search -->
+            <div class="flex h-7 shrink-0 items-center justify-between border-t border-white/[0.06] bg-[#0f0f13] px-2 font-mono text-[11px] text-zinc-500">
+              <span class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> main · <span class="text-zinc-300">M auth.ts</span> <span class="text-zinc-600">A auth.test.ts</span></span>
+              <span>Ctrl+P quick open · Drag file → @mention</span>
+            </div>
+          </section>
+        </div>
+
+        <!-- Orchestration pane (24 §4 — 3 agents) — bottom of Center -->
+        <section class="shrink-0 border-t border-white/[0.06] bg-[#0f0f13]/80 backdrop-blur-sm">
+          <div class="flex h-9 items-center justify-between border-b border-white/[0.06] px-3">
+            <div class="flex items-center gap-2">
+              <span class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8V4H8"/><rect x="8" y="12" width="8" height="8" rx="2"/><path d="M16 8v4h4"/></svg> Orchestration
+              </span>
+              <span class="rounded-full bg-[#6366f1] px-2 py-0.5 text-[11px] font-bold text-white">3 agents</span>
+              <span class="hidden text-[11px] text-zinc-500 md:inline">· root sess_8f3a9c → child agents · Alt+A Agent Hub</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="hidden items-center gap-1 font-mono text-[11px] text-zinc-500 md:inline-flex"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> 2 running · 1 done</span>
+              <button class="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-medium text-zinc-300 hover:bg-white/[0.08]">Cancel all</button>
+              <button class="rounded-md bg-white/[0.06] px-2 py-1 text-[11px] font-medium text-zinc-400">View logs</button>
+            </div>
+          </div>
+          <!-- tree -->
+          <div class="grid gap-2 p-2 md:grid-cols-3">
+            <!-- agent-1 running -->
+            <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] p-2.5">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="flex items-center gap-1.5 text-[12px] font-semibold text-white"><span class="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></span> agent-1: find files</p>
+                  <p class="mt-0.5 font-mono text-[11px] text-zinc-400">task · Grep · 1.2s</p>
+                </div>
+                <span class="shrink-0 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-400">running</span>
+              </div>
+              <div class="mt-2 rounded bg-[#0a0a0f] p-2 font-mono text-[11px] leading-relaxed text-zinc-500">
+                <span class="text-zinc-600">›</span> rg "refreshToken" — 4 hits<br/>
+                <span class="text-zinc-600">›</span> reading src/token.ts …
+              </div>
+              <div class="mt-2 flex gap-1"><button class="flex-1 rounded bg-white/[0.06] py-1 text-[11px] font-medium text-zinc-300 hover:bg-white/[0.08]">Expand transcript</button><button class="rounded border border-white/10 bg-transparent px-2 py-1 text-[11px] text-zinc-400">Cancel</button></div>
+            </div>
+            <!-- agent-2 done -->
+            <div class="rounded-lg border border-white/[0.06] bg-white/[0.03] p-2.5">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="flex items-center gap-1.5 text-[12px] font-semibold text-white"><span class="h-2 w-2 rounded-full bg-zinc-500"></span> agent-2: read auth</p>
+                  <p class="mt-0.5 font-mono text-[11px] text-zinc-500">tool · Read · 0.8s</p>
+                </div>
+                <span class="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-300">✓ done</span>
+              </div>
+              <div class="mt-2 rounded bg-[#0a0a0f] p-2 font-mono text-[11px] text-zinc-400">
+                <span class="text-emerald-400">✓</span> src/auth.ts (62 lines)<br/>
+                <span class="text-zinc-600">→</span> diff prepared
+              </div>
+              <div class="mt-2 flex gap-1"><button class="flex-1 rounded bg-white/[0.06] py-1 text-[11px] font-medium text-zinc-300">View transcript</button><button class="rounded border border-white/10 px-2 py-1 text-[11px] text-zinc-400">Resume</button></div>
+            </div>
+            <!-- agent-3 running -->
+            <div class="rounded-lg border border-[#6366f1]/20 bg-[#6366f1]/[0.06] p-2.5">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="flex items-center gap-1.5 text-[12px] font-semibold text-white"><span class="h-2 w-2 animate-pulse rounded-full bg-[#6366f1]"></span> agent-3: edit tests</p>
+                  <p class="mt-0.5 font-mono text-[11px] text-zinc-400">task · Edit · 2.1s</p>
+                </div>
+                <span class="shrink-0 rounded-full bg-[#6366f1]/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#a5b4fc]">running</span>
+              </div>
+              <div class="mt-2 rounded bg-[#0a0a0f] p-2 font-mono text-[11px] leading-relaxed text-zinc-500">
+                <span class="text-zinc-600">›</span> Edit auth.test.ts<br/>
+                <span class="text-amber-400">●</span> waiting permission
+              </div>
+              <div class="mt-2 h-1 overflow-hidden rounded-full bg-white/10"><div class="h-full w-[45%] rounded-full bg-[#6366f1]"></div></div>
+              <div class="mt-1 flex items-center justify-between font-mono text-[10px] text-zinc-500"><span>progress</span><span>45%</span></div>
+            </div>
+          </div>
+          <!-- task fan-out / worktree bar -->
+          <div class="flex items-center justify-between border-t border-white/[0.06] bg-white/[0.02] px-3 py-1.5">
+            <span class="flex items-center gap-2 text-[11px] text-zinc-500">
+              <span class="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 font-mono text-zinc-300">Task fan-out → worktrees</span>
+              <span class="hidden md:inline">task-0 · task-1 · task-2</span>
+              <span class="rounded-full bg-emerald-500/15 px-1.5 py-0 text-[10px] font-medium text-emerald-400">3/5 done</span>
+            </span>
+            <span class="hidden font-mono text-[11px] text-zinc-600 md:inline">WS: agent/start · agent/delta · agent/end on /ws/:sessionId</span>
+          </div>
+        </section>
+
+        <!-- Providers / Models / Usage mini cards (22) — collapsible strip -->
+        <section class="shrink-0 border-t border-white/[0.06] bg-[#0a0a0f]">
+          <div class="flex h-7 items-center justify-between bg-white/[0.02] px-3">
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Providers · Models · Usage — mini cards (22)</span>
+              <span class="hidden rounded bg-[#6366f1]/15 px-1.5 py-0 text-[10px] font-medium text-[#a5b4fc] md:inline">Drag handle = priority · fallback chain</span>
+            </div>
+            <button id="toggle-mini" class="rounded bg-white/[0.06] px-2 py-0.5 text-[11px] font-medium text-zinc-400 hover:bg-white/[0.08]">Hide ▾</button>
+          </div>
+          <div id="mini-cards" class="grid gap-2 p-2 md:grid-cols-3">
+            <!-- Providers mini -->
+            <div class="overflow-hidden rounded-lg border border-white/[0.06] bg-[#14141b]">
+              <div class="flex items-center justify-between border-b border-white/[0.06] bg-white/[0.03] px-2.5 py-1.5">
+                <span class="text-[11px] font-semibold text-zinc-200">Providers</span>
+                <button class="rounded bg-[#6366f1] px-2 py-0.5 text-[10px] font-semibold text-white">+ Add Provider</button>
+              </div>
+              <div class="space-y-1.5 p-2">
+                <div class="flex items-center justify-between rounded-md border border-emerald-500/20 bg-emerald-500/[0.06] px-2.5 py-2">
+                  <div class="flex items-center gap-2">
+                    <span class="flex h-6 w-6 items-center justify-center rounded bg-white text-[10px] font-bold text-black">A</span>
+                    <div><p class="text-[12px] font-medium leading-none text-white">Anthropic</p><p class="font-mono text-[10px] text-zinc-500">3 models · 2 enabled</p></div>
+                  </div>
+                  <div class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-emerald-500"></span><span class="text-[10px] font-medium text-emerald-400">ok</span><span class="cursor-grab text-zinc-600" title="Reorder — priority">⋮⋮</span></div>
+                </div>
+                <div class="flex items-center justify-between rounded-md border border-white/[0.06] bg-white/[0.02] px-2.5 py-2">
+                  <div class="flex items-center gap-2"><span class="flex h-6 w-6 items-center justify-center rounded bg-white text-[10px] font-bold text-black">O</span><div><p class="text-[12px] font-medium leading-none text-zinc-200">OpenAI</p><p class="font-mono text-[10px] text-zinc-500">4 models · 1 enabled</p></div></div>
+                  <div class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-emerald-500"></span><span class="text-[10px] text-zinc-400">ok</span><span class="cursor-grab text-zinc-600">⋮⋮</span></div>
+                </div>
+                <div class="flex items-center justify-between rounded-md border border-red-500/20 bg-red-500/[0.06] px-2.5 py-2">
+                  <div class="flex items-center gap-2"><span class="flex h-6 w-6 items-center justify-center rounded bg-white text-[10px] font-bold text-black">D</span><div><p class="text-[12px] font-medium leading-none text-zinc-200">DeepSeek</p><p class="font-mono text-[10px] text-zinc-500">not configured</p></div></div>
+                  <div class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-zinc-500"></span><span class="text-[10px] text-zinc-500">unconf</span><span class="text-zinc-600">⋮⋮</span></div>
+                </div>
+                <div class="flex items-center justify-between rounded-md border border-white/[0.06] bg-white/[0.02] px-2.5 py-2 opacity-60">
+                  <div class="flex items-center gap-2"><span class="flex h-6 w-6 items-center justify-center rounded bg-white text-[10px] font-bold text-black">Ol</span><div><p class="text-[12px] font-medium leading-none text-zinc-300">Ollama (local)</p><p class="font-mono text-[10px] text-zinc-500">none · localhost</p></div></div>
+                  <span class="h-2 w-2 rounded-full bg-zinc-600"></span>
+                </div>
+                <p class="font-mono text-[10px] text-zinc-600">Test → GET /v1/models · keys AES-GCM, never returned (keySet)</p>
+              </div>
+            </div>
+            <!-- Models mini (catalog table) -->
+            <div class="overflow-hidden rounded-lg border border-white/[0.06] bg-[#14141b]">
+              <div class="flex items-center justify-between border-b border-white/[0.06] bg-white/[0.03] px-2.5 py-1.5">
+                <span class="text-[11px] font-semibold text-zinc-200">Models</span>
+                <span class="font-mono text-[10px] text-zinc-500">Fallback: Sonnet → gpt-4o</span>
+              </div>
+              <div class="overflow-auto">
+                <table class="w-full text-left text-[11px]">
+                  <thead class="border-b border-white/[0.06] bg-white/[0.02] text-[10px] uppercase tracking-widest text-zinc-500">
+                    <tr><th class="px-2 py-1"><input type="checkbox" checked class="accent-[#6366f1]" /></th><th class="px-2 py-1">Model</th><th class="px-2 py-1">Provider</th><th class="px-2 py-1">Ctx</th><th class="px-2 py-1">En</th></tr>
+                  </thead>
+                  <tbody class="divide-y divide-white/[0.04] font-mono">
+                    <tr class="bg-[#6366f1]/[0.06]"><td class="px-2 py-1"><input type="checkbox" checked class="accent-[#6366f1]" /></td><td class="px-2 py-1 text-white">claude-sonnet-4-5</td><td class="px-2 py-1"><span class="rounded bg-[#6366f1]/20 px-1 py-0 text-[10px] text-[#a5b4fc]">anthropic</span></td><td class="px-2 py-1 text-zinc-400">200k</td><td class="px-2 py-1"><span class="h-1.5 w-1.5 inline-block rounded-full bg-emerald-500"></span></td></tr>
+                    <tr><td class="px-2 py-1"><input type="checkbox" class="accent-[#6366f1]" /></td><td class="px-2 py-1 text-zinc-300">claude-opus-4-5</td><td class="px-2 py-1"><span class="rounded bg-[#6366f1]/20 px-1 py-0 text-[10px] text-[#a5b4fc]">anthropic</span></td><td class="px-2 py-1 text-zinc-500">200k</td><td class="px-2 py-1"><span class="h-1.5 w-1.5 inline-block rounded-full bg-zinc-600"></span></td></tr>
+                    <tr class="bg-white/[0.02]"><td class="px-2 py-1"><input type="checkbox" checked class="accent-[#6366f1]" /></td><td class="px-2 py-1 text-zinc-200">gpt-4o</td><td class="px-2 py-1"><span class="rounded bg-emerald-500/15 px-1 py-0 text-[10px] text-emerald-300">openai</span></td><td class="px-2 py-1 text-zinc-400">128k</td><td class="px-2 py-1"><span class="h-1.5 w-1.5 inline-block rounded-full bg-emerald-500"></span></td></tr>
+                    <tr><td class="px-2 py-1"><input type="checkbox" checked class="accent-[#6366f1]" /></td><td class="px-2 py-1 text-zinc-200">deepseek-chat</td><td class="px-2 py-1"><span class="rounded bg-amber-500/15 px-1 py-0 text-[10px] text-amber-300">deepseek</span></td><td class="px-2 py-1 text-zinc-500">64k</td><td class="px-2 py-1"><span class="h-1.5 w-1.5 inline-block rounded-full bg-emerald-500"></span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="flex items-center justify-between border-t border-white/[0.06] bg-white/[0.02] px-2 py-1">
+                <span class="font-mono text-[10px] text-zinc-500">Allow All / Disable All per provider</span>
+                <button class="rounded bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-zinc-300">Refresh</button>
+              </div>
+            </div>
+            <!-- Usage mini (KPI + chart + table) -->
+            <div class="overflow-hidden rounded-lg border border-white/[0.06] bg-[#14141b]">
+              <div class="flex items-center justify-between border-b border-white/[0.06] bg-white/[0.03] px-2.5 py-1.5">
+                <span class="text-[11px] font-semibold text-zinc-200">Usage</span>
+                <span class="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0 font-mono text-[10px] text-zinc-400">7d · 30d · 90d</span>
+              </div>
+              <div class="grid grid-cols-3 gap-1.5 p-2">
+                <div class="rounded-md border border-white/[0.06] bg-[#0a0a0f] px-2 py-1.5"><p class="text-[10px] uppercase tracking-widest text-zinc-500">Tokens 7d</p><p class="font-mono text-[12px] font-semibold text-white">48.2k</p></div>
+                <div class="rounded-md border border-white/[0.06] bg-[#0a0a0f] px-2 py-1.5"><p class="text-[10px] uppercase tracking-widest text-zinc-500">Cost 7d</p><p class="font-mono text-[12px] font-semibold text-white">$0.42</p></div>
+                <div class="rounded-md border border-white/[0.06] bg-[#0a0a0f] px-2 py-1.5"><p class="text-[10px] uppercase tracking-widest text-zinc-500">Top model</p><p class="font-mono text-[11px] font-semibold text-[#a5b4fc]">sonnet</p></div>
+              </div>
+              <!-- mini AreaChart (recharts-like with divs) -->
+              <div class="px-2">
+                <div class="flex h-[56px] items-end gap-[2px] rounded-md border border-white/[0.06] bg-[#0a0a0f] p-2">
+                  <div class="flex-1 rounded-t bg-[#6366f1]/30" style="height:22%"></div>
+                  <div class="flex-1 rounded-t bg-[#6366f1]/50" style="height:38%"></div>
+                  <div class="flex-1 rounded-t bg-[#6366f1]/70" style="height:55%"></div>
+                  <div class="flex-1 rounded-t bg-[#6366f1]" style="height:78%"></div>
+                  <div class="flex-1 rounded-t bg-[#6366f1]/80" style="height:64%"></div>
+                  <div class="flex-1 rounded-t bg-[#6366f1]/60" style="height:42%"></div>
+                  <div class="flex-1 rounded-t bg-[#6366f1]" style="height:84%"></div>
+                </div>
+                <p class="mt-1 text-center font-mono text-[10px] text-zinc-600">tokens/day · stacked by model · 7/30/90d</p>
+              </div>
+              <div class="mt-2 overflow-hidden rounded-md border border-white/[0.06] bg-[#0a0a0f] font-mono text-[11px]">
+                <div class="flex items-center justify-between border-b border-white/[0.06] bg-white/[0.03] px-2 py-1 text-[10px] uppercase tracking-widest text-zinc-500"><span>Recent sessions</span><span class="rounded bg-white/10 px-1 py-0">CSV</span></div>
+                <div class="divide-y divide-white/[0.04]">
+                  <div class="flex justify-between px-2 py-1"><span class="truncate text-zinc-300">Refactor auth</span><span class="text-zinc-500">sonnet · 12k · $0.04</span></div>
+                  <div class="flex justify-between px-2 py-1"><span class="truncate text-zinc-400">Add theme</span><span class="text-zinc-600">gpt-4o · 842 · $0.01</span></div>
+                </div>
+              </div>
+              <div class="p-2 text-right"><button class="rounded bg-white/[0.06] px-2 py-1 text-[11px] font-medium text-zinc-300">Export CSV →</button></div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- RIGHT 340 (24 §1.1 Border RIGHT 340px) -->
+      <aside class="hidden w-[340px] shrink-0 flex-col border-l border-white/[0.06] bg-[#0f0f12]/70 backdrop-blur-sm xl:flex">
+        <!-- Right tabs (Files / Terminal / Browser) -->
+        <div class="flex h-[36px] shrink-0 items-center gap-1 border-b border-white/[0.06] bg-[#0a0a0f] px-1">
+          <button class="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-white/[0.06] py-1.5 text-[11px] font-semibold text-white">Files</button>
+          <button class="flex flex-1 items-center justify-center gap-1 rounded-md py-1.5 text-[11px] font-medium text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300">Terminal</button>
+          <button class="flex flex-1 items-center justify-center gap-1 rounded-md py-1.5 text-[11px] font-medium text-zinc-500 hover:bg-white/[0.04]">Browser</button>
+          <span class="ml-auto text-[10px] text-zinc-600">Ctrl+Shift+B</span>
+        </div>
+
+        <div class="flex flex-1 flex-col overflow-hidden">
+          <!-- Files (24 §3.1 react-arborist + git overlay + drag @file + Ctrl+P) -->
+          <div class="flex flex-col border-b border-white/[0.06] bg-[#0a0a0f]/50">
+            <div class="flex items-center justify-between px-3 py-2">
+              <span class="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Files</span>
+              <span class="flex items-center gap-1">
+                <span class="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0 font-mono text-[10px] text-zinc-400">Ctrl+P</span>
+                <span class="rounded bg-[#6366f1]/15 px-1.5 py-0 text-[10px] font-medium text-[#a5b4fc]">arborist</span>
+              </span>
+            </div>
+            <!-- search quick open -->
+            <div class="px-2 pb-2">
+              <div class="relative">
+                <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+                <input placeholder="Quick open…  (fuzzy)" class="h-7 w-full rounded-md border border-white/10 bg-[#0a0a0f] pl-8 pr-2 text-[12px] text-white placeholder:text-zinc-500 focus:border-[#6366f1]/30 focus:outline-none" />
+              </div>
+            </div>
+            <!-- tree -->
+            <div class="max-h-[176px] overflow-y-auto px-1.5 pb-2 font-mono text-[12px]">
+              <div class="flex items-center gap-1 rounded px-1 py-0.5 text-zinc-400 hover:bg-white/[0.04]">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-zinc-500"><path d="M6 9l6 6 6-6"/></svg>
+                <span class="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> src/</span>
+                <span class="ml-auto text-[10px] text-zinc-600">git</span>
+              </div>
+              <div draggable="true" class="group flex items-center gap-1 rounded bg-white/[0.04] px-1 py-0.5 pl-5 text-zinc-200 border border-white/[0.04] cursor-grab" title="Drag → drop on chat to insert @src/auth.ts">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                auth.ts
+                <span class="ml-auto flex items-center gap-1">
+                  <span class="rounded bg-amber-500/15 px-1 py-0 text-[10px] font-bold text-amber-400" title="Modified">M</span>
+                  <span class="hidden text-[10px] text-zinc-500 group-hover:inline">drag @file</span>
+                </span>
+              </div>
+              <div draggable="true" class="flex items-center gap-1 rounded px-1 py-0.5 pl-5 text-zinc-300 hover:bg-white/[0.04] cursor-grab">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                auth.test.ts
+                <span class="ml-auto rounded bg-emerald-500/15 px-1 py-0 text-[10px] font-bold text-emerald-400">A</span>
+              </div>
+              <div class="flex items-center gap-1 rounded px-1 py-0.5 pl-5 text-zinc-400 hover:bg-white/[0.04]">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                token.ts
+                <span class="ml-auto text-[10px] text-zinc-600">·</span>
+              </div>
+              <div class="flex items-center gap-1 rounded px-1 py-0.5 pl-5 text-zinc-500 hover:bg-white/[0.04]">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                legacy.ts
+                <span class="ml-auto rounded bg-red-500/15 px-1 py-0 text-[10px] font-bold text-red-400">D</span>
+              </div>
+              <div class="flex items-center gap-1 rounded px-1 py-0.5 text-zinc-400 hover:bg-white/[0.04]">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                <span class="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> tests/</span>
+              </div>
+              <div class="flex items-center gap-1 rounded px-1 py-0.5 pl-5 text-zinc-500 hover:bg-white/[0.04]">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+                e2e.spec.ts
+                <span class="ml-auto text-[10px] text-zinc-600">?</span>
+              </div>
+            </div>
+            <p class="px-3 pb-2 font-mono text-[10px] text-zinc-600">Click → Code · Drag → @file mention · Right-click Copy path</p>
+          </div>
+
+          <!-- Terminal (24 §3.2 xterm $ npm test ✓) -->
+          <div class="flex flex-col border-b border-white/[0.06] bg-[#09090b]">
+            <div class="flex h-8 items-center justify-between border-b border-white/[0.06] bg-[#0f0f13] px-2">
+              <span class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
+                <span class="h-2 w-2 rounded-full bg-emerald-500"></span> Terminal
+                <span class="rounded bg-white/10 px-1 py-0 font-mono text-[10px] text-zinc-500">xterm.js</span>
+              </span>
+              <div class="flex items-center gap-1">
+                <button class="rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-zinc-400 hover:bg-white/[0.08]">Clear</button>
+                <button class="rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-zinc-400 hover:bg-white/[0.08]">Copy</button>
+                <label class="flex items-center gap-1 text-[10px] text-zinc-500"><input type="checkbox" checked class="accent-[#6366f1] h-3 w-3" /> Follow</label>
+              </div>
+            </div>
+            <!-- PTY tabs -->
+            <div class="flex gap-1 border-b border-white/[0.06] bg-[#0a0a0f] px-1 py-1">
+              <span class="rounded bg-[#6366f1]/15 px-2 py-0.5 font-mono text-[11px] font-medium text-[#a5b4fc]">bash:1</span>
+              <span class="rounded px-2 py-0.5 font-mono text-[11px] text-zinc-500 hover:bg-white/[0.04]">bash:2</span>
+            </div>
+            <div class="xterm-bg overflow-auto p-2 font-mono text-[11px] leading-relaxed">
+              <div class="text-zinc-500">$ <span class="text-white">npm test</span> <span class="text-zinc-600">— harness PTY · /ws/:sessionId terminal/data</span></div>
+              <div class="mt-1 text-zinc-400">▶ src/auth.test.ts</div>
+              <div class="text-emerald-400">  ✓ dedupedRefresh singleflight (12ms)</div>
+              <div class="text-emerald-400">  ✓ getAuth returns cached token (4ms)</div>
+              <div class="text-emerald-400">  ✓ concurrent refresh → one call (18ms)</div>
+              <div class="text-zinc-500">  ─ 12 tests <span class="rounded bg-emerald-500/15 px-1 py-0 text-emerald-400">✓ passed</span> · 0 failed · 1.2s</div>
+              <div class="mt-1 flex items-center gap-1 text-zinc-500">$ <span class="inline-block h-3 w-1.5 bg-[#6366f1] cursor-blink"></span> <span class="text-zinc-600">exit code 0 · terminal/exit</span></div>
+            </div>
+            <div class="flex items-center justify-between border-t border-white/[0.06] bg-white/[0.02] px-2 py-1 font-mono text-[10px] text-zinc-600">
+              <span>Open in dedicated terminal (split center)</span><span>WS: terminal/data</span>
+            </div>
+          </div>
+
+          <!-- Browser (24 §3.3 localhost:3000 iframe) -->
+          <div class="flex flex-1 flex-col bg-[#0a0a0f]">
+            <div class="flex h-8 items-center justify-between border-b border-white/[0.06] bg-[#0f0f13] px-2">
+              <span class="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Browser</span>
+              <span class="rounded bg-white/10 px-1.5 py-0 font-mono text-[10px] text-zinc-400">iframe · harness-driven</span>
+            </div>
+            <!-- address bar -->
+            <div class="flex items-center gap-1 border-b border-white/[0.06] bg-[#14141b] p-1.5">
+              <button class="flex h-6 w-6 items-center justify-center rounded text-zinc-500 hover:bg-white/[0.06]"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+              <button class="flex h-6 w-6 items-center justify-center rounded text-zinc-500 hover:bg-white/[0.06]"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+              <button class="flex h-6 w-6 items-center justify-center rounded text-zinc-500 hover:bg-white/[0.06]"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.7 1 6.3 2.7"/><path d="M21 3v7h-7"/></svg></button>
+              <div class="flex flex-1 items-center gap-1.5 rounded-md border border-white/10 bg-[#0a0a0f] px-2 py-1">
+                <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                <span class="font-mono text-[11px] font-medium text-white">localhost:3000</span>
+                <span class="hidden font-mono text-[10px] text-zinc-500 md:inline">/dashboard</span>
+                <button class="ml-auto rounded bg-white/10 px-1 py-0 text-[10px] text-zinc-400">Copy</button>
+              </div>
+            </div>
+            <div class="flex gap-1 border-b border-white/[0.06] bg-[#0a0a0f] px-1 py-1">
+              <span class="rounded bg-white/[0.06] px-2 py-0.5 font-mono text-[11px] text-zinc-300">Preview</span>
+              <span class="rounded px-2 py-0.5 font-mono text-[11px] text-zinc-500">DevTools</span>
+              <span class="ml-auto hidden items-center gap-1 text-[10px] text-zinc-600 md:inline-flex">browser_navigate · screenshot · eval</span>
+            </div>
+            <!-- iframe placeholder -->
+            <div class="relative flex-1 bg-white">
+              <!-- fake page -->
+              <div class="flex h-8 items-center justify-between border-b border-zinc-200 bg-zinc-50 px-3">
+                <span class="text-[12px] font-semibold text-zinc-800">Lokma — Preview</span>
+                <span class="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white">200 OK</span>
+              </div>
+              <div class="p-4">
+                <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                  <p class="text-[12px] font-semibold text-zinc-800">Auth status</p>
+                  <p class="mt-1 font-mono text-[11px] text-zinc-600">token: <span class="rounded bg-emerald-500/15 px-1 py-0 text-emerald-700">valid</span> · expires in 58m</p>
+                  <div class="mt-2 h-2 overflow-hidden rounded-full bg-zinc-200"><div class="h-full w-[82%] bg-[#6366f1]"></div></div>
+                </div>
+                <p class="mt-3 font-mono text-[11px] text-zinc-500">Harness controls this iframe via POST /api/browser/open · WS tool events drive actions. <br/>Use <span class="rounded bg-zinc-900 px-1 py-0 text-white">browser_screenshot</span> to assert DOM.</p>
+              </div>
+              <div class="absolute bottom-2 right-2 rounded-md border border-zinc-200 bg-white px-2 py-1 font-mono text-[10px] text-zinc-600 shadow">iframe · proxied via /api/browser · 800×400</div>
+            </div>
+            <div class="flex items-center justify-between border-t border-white/[0.06] bg-white/[0.02] px-2 py-1 font-mono text-[10px] text-zinc-600">
+              <span>Open in new tab</span><span>harness → browser_*</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- right footer -->
+        <div class="flex items-center justify-between border-t border-white/[0.06] bg-[#0a0a0f] px-2 py-1.5 font-mono text-[10px] text-zinc-600">
+          <span>lokma v0.1.0 · Fastify 5</span>
+          <span class="flex items-center gap-1"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> healthy</span>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Bottom bar: slash/@/palette hints (24 §6) -->
+    <footer class="flex h-7 shrink-0 items-center justify-between border-t border-white/[0.06] bg-[#0a0a0f] px-3 font-mono text-[11px] text-zinc-600">
+      <span class="hidden items-center gap-3 md:flex">
+        <span><span class="rounded bg-white/10 px-1 py-0 text-zinc-300">/</span> slash menu</span>
+        <span class="h-3 w-px bg-white/10"></span>
+        <span><span class="rounded bg-white/10 px-1 py-0 text-zinc-300">@</span> file mention</span>
+        <span class="h-3 w-px bg-white/10"></span>
+        <span><span class="rounded bg-white/10 px-1 py-0 text-zinc-300">Ctrl+K</span> palette</span>
+        <span class="h-3 w-px bg-white/10"></span>
+        <span><span class="rounded bg-white/10 px-1 py-0 text-zinc-300">Ctrl+B</span> bars</span>
+        <span class="h-3 w-px bg-white/10"></span>
+        <span>Drag session ⋮⋮ → Chat · Drag file → @file</span>
+      </span>
+      <span class="flex items-center gap-2">
+        <span class="hidden md:inline">Spec 1:1 · 20 pane-first · 22 provider/model/usage/session · 24 flexlayout + orchestration</span>
+        <span class="inline-flex items-center gap-1 rounded bg-[#6366f1]/15 px-1.5 py-0 text-[#a5b4fc]">omp #0a0a0f + #6366f1</span>
+      </span>
+      <span class="hidden items-center gap-1 lg:inline-flex">Double-click tab → maximize · Esc restore · View → Reset Layout</span>
+    </footer>
+  </div>
+
+  <!-- mobile overlay for small screens -->
+  <div class="pointer-events-none fixed inset-0 flex items-center justify-center bg-[#0a0a0f]/80 p-6 backdrop-blur-sm lg:hidden">
+    <div class="pointer-events-auto max-w-sm rounded-xl border border-white/10 bg-[#14141b] p-4 shadow-2xl">
+      <p class="text-[13px] font-semibold text-white">Best on desktop</p>
+      <p class="mt-1 text-[12px] leading-relaxed text-zinc-400">Spec V1 is a 260 · center · 340 IDE wireframe (24 §6). Open on ≥1024px to see Left Sessions/Projects, Center Chat+Code+Orchestration, Right Files/Terminal/Browser.</p>
+      <div class="mt-3 flex gap-2"><button onclick="this.closest('.fixed').style.display='none'" class="rounded-md bg-[#6366f1] px-3 py-1.5 text-[12px] font-semibold text-white">Continue anyway</button><button onclick="this.closest('.fixed').style.display='none'" class="rounded-md border border-white/10 px-3 py-1.5 text-[12px] text-zinc-300">Dismiss</button></div>
+    </div>
+  </div>
+
+<script>
+  // --- Model switcher ---
+  const modelBtn = document.getElementById('model-btn');
+  const modelDrop = document.getElementById('model-dropdown');
+  modelBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    modelDrop.classList.toggle('hidden');
+  });
+  document.addEventListener('click', () => modelDrop?.classList.add('hidden'));
+
+  // --- Session search filter (22 §4.2) ---
+  const search = document.getElementById('session-search');
+  const rows = [...document.querySelectorAll('[data-session-name]')];
+  search?.addEventListener('input', () => {
+    const q = search.value.toLowerCase();
+    rows.forEach(r => {
+      const name = r.getAttribute('data-session-name');
+      r.style.display = name.includes(q) ? '' : 'none';
+    });
+  });
+  // Ctrl+K focuses search
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault(); search?.focus();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'm') {
+      e.preventDefault(); modelDrop?.classList.toggle('hidden');
+    }
+    if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+      e.preventDefault(); document.getElementById('composer')?.focus();
+      document.getElementById('slash-menu')?.classList.remove('hidden');
+    }
+  });
+
+  // --- Composer slash / @ ---
+  const composer = document.getElementById('composer');
+  const slashMenu = document.getElementById('slash-menu');
+  composer?.addEventListener('input', () => {
+    const v = composer.value;
+    if (v.startsWith('/')) slashMenu.classList.remove('hidden');
+    else slashMenu.classList.add('hidden');
+    // auto-resize
+    composer.style.height = 'auto';
+    composer.style.height = Math.min(composer.scrollHeight, 96) + 'px';
+  });
+
+  // --- Drag session into session (24 §1.2) ---
+  const dropZone = document.getElementById('chat-drop-zone');
+  let dragCount = 0;
+  document.querySelectorAll('[draggable="true"]').forEach(el => {
+    el.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', el.getAttribute('data-session-name')||'session');
+      e.dataTransfer.effectAllowed = 'copy';
+      dropZone?.classList.remove('hidden');
+    });
+    el.addEventListener('dragend', () => dropZone?.classList.add('hidden'));
+  });
+  const chatSection = document.getElementById('chat-scroll');
+  chatSection?.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone?.classList.remove('hidden');
+  });
+  chatSection?.addEventListener('dragleave', () => {
+    // keep visible while dragging over
+  });
+  chatSection?.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone?.classList.add('hidden');
+    const name = e.dataTransfer.getData('text/plain');
+    // toast
+    const toast = document.createElement('div');
+    toast.className = 'fixed bottom-8 left-1/2 -translate-x-1/2 rounded-full border border-[#6366f1]/30 bg-[#14141b] px-4 py-2 text-[12px] font-medium text-white shadow-xl';
+    toast.textContent = 'Dropped "'+name+'" → Opened side-by-side (default) · pane/drop { source: session, target: chat }';
+    document.body.appendChild(toast);
+    setTimeout(()=> toast.remove(), 2200);
+  });
+  dropZone?.addEventListener('dragover', (e)=> e.preventDefault());
+  dropZone?.addEventListener('drop', (e)=>{
+    e.preventDefault();
+    dropZone.classList.add('hidden');
+    const name = e.dataTransfer.getData('text/plain');
+    const toast = document.createElement('div');
+    toast.className = 'fixed bottom-8 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-[#14141b] px-4 py-2 text-[12px] text-zinc-200 shadow-xl';
+    toast.innerHTML = 'Drop options: <b class="text-white">Open side-by-side</b> · Merge transcript · Fork into this session — chose: side-by-side for "'+name+'"';
+    document.body.appendChild(toast);
+    setTimeout(()=> toast.remove(), 2600);
+  });
+
+  // --- Mini cards toggle ---
+  document.getElementById('toggle-mini')?.addEventListener('click', (e)=>{
+    const cards = document.getElementById('mini-cards');
+    const btn = e.currentTarget;
+    cards.classList.toggle('hidden');
+    btn.textContent = cards.classList.contains('hidden') ? 'Show ▸' : 'Hide ▾';
+  });
+
+  // --- Mock WS streaming (20 §2 Real-time by default) ---
+  const STREAM_MD = `<p>Fix applied — singleflight dedup prevents the parallel <code class="rounded bg-white/10 px-1 py-0 font-mono text-white">refreshToken</code> race. Diff is hashline-anchored (-61% tokens).</p>
+  <div class="mt-2 overflow-hidden rounded-md border border-white/[0.06] bg-[#0a0a0f]">
+    <div class="border-b border-white/[0.06] bg-white/[0.03] px-2 py-1 font-mono text-[11px] text-zinc-400">src/auth.ts · unified diff</div>
+    <div class="p-2 font-mono text-[11px] leading-relaxed">
+      <div class="text-red-400">- const token = await refreshToken();</div>
+      <div class="text-emerald-400">+ if (!inflight) inflight = dedupedRefresh().finally(() =&gt; inflight = null);</div>
+      <div class="text-emerald-400">+ const token = await inflight;</div>
+    </div>
+  </div>
+  <p class="mt-2 text-[11px] text-zinc-500">Checkpoints: snapshot before Write/Edit · <span class="rounded bg-white/10 px-1 py-0 text-zinc-300">Rewind</span> available · Worktree ⎇ fix/auth</p>`;
+
+  const target = document.getElementById('stream-target');
+  const meta = document.getElementById('stream-meta');
+  const typing = document.getElementById('typing');
+  const actions = document.getElementById('stream-actions');
+  const tok = document.getElementById('tok');
+  const tokBar = document.getElementById('tok-bar');
+  const scroll = document.getElementById('chat-scroll');
+  let timer = null;
+  function stream() {
+    clearInterval(timer);
+    if (!target) return;
+    target.innerHTML = '';
+    typing?.classList.remove('hidden');
+    actions?.classList.add('hidden');
+    if (meta) meta.textContent = 'streaming…';
+    if (tok) tok.textContent = '0 tokens';
+    if (tokBar) tokBar.style.width = '0%';
+    let pos = 0;
+    const full = STREAM_MD;
+    const total = full.length;
+    timer = setInterval(()=>{
+      const chunk = 14 + Math.floor(Math.random()*18);
+      pos = Math.min(total, pos + chunk);
+      let slice = full.slice(0,pos);
+      const lastOpen = slice.lastIndexOf('<');
+      const lastClose = slice.lastIndexOf('>');
+      if (lastOpen > lastClose) {
+        const nc = full.indexOf('>', pos);
+        if (nc !== -1 && nc - pos < 80) pos = nc+1;
+        slice = full.slice(0,pos);
+      }
+      target.innerHTML = slice + '<span class="cursor-blink inline-block h-4 w-0.5 translate-y-0.5 bg-[#6366f1]"></span>';
+      const pct = Math.round(pos/total*100);
+      const toks = Math.round(pos/total*412);
+      if (tok) tok.textContent = toks + ' tokens';
+      if (tokBar) tokBar.style.width = pct + '%';
+      if (scroll) scroll.scrollTop = scroll.scrollHeight;
+      if (pos >= total) {
+        clearInterval(timer);
+        target.innerHTML = full;
+        typing?.classList.add('hidden');
+        actions?.classList.remove('hidden');
+        if (meta) meta.textContent = 'done · 412 tokens · 0.9s';
+        if (scroll) scroll.scrollTop = scroll.scrollHeight;
+      }
+    }, 36);
+  }
+  window.addEventListener('load', ()=> setTimeout(stream, 500));
+  document.getElementById('replay-btn')?.addEventListener('click', stream);
+  document.getElementById('send-btn')?.addEventListener('click', ()=>{
+    const el = document.getElementById('composer');
+    if (!el || !el.value.trim()) { stream(); return; }
+    const wrap = document.createElement('div');
+    wrap.className = 'flex gap-2.5';
+    wrap.innerHTML = '<img src="https://i.pravatar.cc/100?img=33" alt="user" class="mt-0.5 h-6 w-6 shrink-0 rounded-full border border-white/10" /><div class="min-w-0 flex-1"><div class="flex items-baseline gap-2"><span class="text-[12px] font-semibold text-white">You</span><span class="text-[11px] text-zinc-500">now</span></div><div class="mt-1 rounded-lg border border-white/[0.06] bg-white/[0.04] px-3 py-2.5"><p class="text-[13px] leading-relaxed text-zinc-200"></p></div></div>';
+    wrap.querySelector('p').textContent = el.value;
+    const container = scroll?.querySelector('.mx-auto');
+    const anchor = document.getElementById('typing')?.closest('.flex.gap-2\\.5');
+    if (container && anchor) container.insertBefore(wrap, anchor);
+    else container?.appendChild(wrap);
+    el.value = ''; slashMenu?.classList.add('hidden');
+    el.style.height = 'auto';
+    stream();
+  });
+  composer?.addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); document.getElementById('send-btn')?.click(); }
+  });
+
+  // session ... menu demo
+  document.querySelectorAll('.group\\/session button').forEach(b=>{
+    if (b.textContent.trim() === '…') {
+      b.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        document.getElementById('session-menu')?.classList.toggle('hidden');
+      });
+    }
+  });
+</script>
+</body>
+</html>

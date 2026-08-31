@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Spec V5 — Flex Split (drag & layout) — Lokma</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<script>tailwind.config={darkMode:'class',theme:{extend:{fontFamily:{sans:['Inter','ui-sans-serif','system-ui'],mono:['JetBrains Mono','monospace'],serif:['Instrument Serif','serif']},colors:{ink:'#262624',cream:'#FAF9F5',line:'#E8E4DE'},boxShadow:{card:'0 1px 2px rgba(0,0,0,0.06),0 8px 24px rgba(0,0,0,0.06)'}}}}</script>
+<style>
+*{font-feature-settings:"cv02","cv03","cv04","cv11"}::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:#d6d3cd;border-radius:999px}
+:root{--left-w:260px;--right-w:340px}
+.pane-dark{background:#0a0a0f;color:#e4e4e7;border-color:rgba(255,255,255,.08)}
+.splitter{position:relative;flex-shrink:0;background:transparent}
+.splitter.vertical{width:6px;cursor:col-resize}
+.splitter.vertical::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;transform:translateX(-50%);background:#E8E4DE;transition:all .15s}
+.splitter.vertical:hover::after,.splitter.vertical.dragging::after{background:#6366f1;width:2px}
+.splitter.horizontal{height:6px;cursor:row-resize}
+.splitter.horizontal::after{content:"";position:absolute;top:50%;left:0;right:0;height:1px;transform:translateY(-50%);background:#E8E4DE}
+.splitter.horizontal:hover::after{background:#6366f1;height:2px}
+.tab{user-select:none;transition:all .15s}
+.tab.dragging{opacity:.5;transform:rotate(1deg) scale(.97)}
+.drop-zone{transition:all .18s;border:2px dashed transparent;position:relative}
+.drop-zone.active{border-color:#6366f1;background:rgba(99,102,241,.06)}
+.drop-zone.active::before{content:attr(data-label);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#6366f1;color:#fff;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:5px 12px;border-radius:999px;white-space:nowrap;pointer-events:none;z-index:10}
+#drag-ghost{position:fixed;pointer-events:none;z-index:9999;transform:rotate(1.5deg);box-shadow:0 16px 40px rgba(0,0,0,.2);opacity:.96}
+.tabset-maximized{position:fixed!important;inset:56px 0 0 0!important;z-index:40!important;background:#fff!important}
+.border-collapsed{width:0!important;min-width:0!important;opacity:0;overflow:hidden;pointer-events:none}
+.border-collapsed + .splitter{display:none}
+</style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#FAF9F5] text-[#262624] antialiased selection:bg-[#6366f1]/20">
+<!-- Spec V5 — Flex Split (drag & layout) (1:1 docs) — Hybrid + flexlayout drag demo, 1:1 with 20/22/24 -->
+
+<!-- TOP STRIP — required header string -->
+<div class="sticky top-0 z-40">
+  <div class="w-full bg-[#0a0a0f] text-white border-b border-white/10">
+    <div class="max-w-[1920px] mx-auto px-4 h-9 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <span class="inline-flex items-center gap-2 font-semibold tracking-tight text-[13px] whitespace-nowrap"><span class="w-6 h-6 rounded-md bg-[#6366f1] grid place-items-center text-white text-[11px]">◈</span> Spec V5 — Flex Split (drag & layout) (1:1 docs)</span>
+        <span class="hidden md:inline-flex items-center gap-2 text-[11px] text-white/60"><span class="w-px h-3 bg-white/20"></span> Hybrid light/dark · flexlayout-react · draggable TabSets · 1:1 spec</span>
+        <span class="hidden lg:inline-flex items-center rounded-full bg-[#6366f1] text-white px-2 py-0.5 text-[10px] font-semibold tracking-widest uppercase">Hybrid Shell</span>
+      </div>
+      <div class="hidden sm:flex items-center gap-2 text-[11px] shrink-0">
+        <span class="px-2 py-1 rounded-full bg-white/10 border border-white/15 text-white/80">Tailwind CDN · no build</span>
+        <span class="px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/20 text-emerald-300 hidden lg:inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> 1:1 docs</span>
+      </div>
+    </div>
+  </div>
+  <!-- App header -->
+  <header class="h-[56px] bg-white/90 backdrop-blur-xl border-b border-[#E8E4DE] flex items-center gap-3 px-3 lg:px-4">
+    <button id="left-toggle" class="w-8 h-8 grid place-items-center rounded-md border border-[#E8E4DE] bg-white hover:bg-[#FAF9F5] text-[#6366f1]" title="Toggle Left (Ctrl+B)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></button>
+    <a href="#" class="flex items-center gap-2.5"><span class="w-7 h-7 rounded-md bg-[#262624] text-white grid place-items-center text-[13px] font-bold">◐</span><span class="font-serif text-[18px] hidden sm:block">lokma</span><span class="hidden sm:inline-flex px-1.5 py-0.5 rounded bg-[#FAF9F5] border border-[#E8E4DE] text-[10px] font-medium tracking-widest uppercase text-zinc-500">harness</span></a>
+    <span class="hidden lg:block w-px h-5 bg-[#E8E4DE]"></span>
+    <nav class="hidden lg:flex items-center gap-1.5 text-[13px]"><a href="#" class="px-2 py-1 rounded-md hover:bg-white border border-transparent hover:border-[#E8E4DE]">my-project</a><span class="text-zinc-400">›</span><a href="#" class="px-2 py-1 rounded-md bg-white border border-[#E8E4DE] shadow-sm font-medium inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Refactor auth</a><span class="hidden xl:inline-flex items-center rounded-full border border-[#E8E4DE] bg-[#FAF9F5] px-2 py-0.5 text-[11px] font-mono text-zinc-600">sess_8f3a9c1e</span></nav>
+    <div class="hidden md:flex flex-1 justify-center"><div class="inline-flex items-center gap-1 p-1 rounded-full bg-white border border-[#E8E4DE] shadow-sm"><button class="px-3 py-1 rounded-full bg-[#0a0a0f] text-white text-[12px] font-medium">claude-sonnet-4-5 ▾</button><button class="hidden lg:inline-flex px-2.5 py-1 rounded-full text-zinc-600 hover:bg-[#FAF9F5] text-[12px]">gpt-4o</button><span class="w-px h-4 bg-[#E8E4DE] mx-1 hidden lg:block"></span><span class="hidden lg:inline-flex items-center gap-1.5 pr-2 text-[12px] text-zinc-600"><span class="inline-flex items-center rounded-full bg-[#FEF3C7] border border-amber-200 text-amber-800 px-1.5 py-0.5 text-[11px] font-mono">⎇ feature/auth-hooks</span> · 12.3k · $0.04</span></div></div>
+    <div class="ml-auto flex items-center gap-1.5 shrink-0">
+      <div class="hidden sm:flex items-center gap-1 p-1 rounded-full bg-[#FAF9F5] border border-[#E8E4DE]"><span class="pl-2 pr-1 text-[11px] font-semibold tracking-widest uppercase text-zinc-500">Theme</span><button data-theme="hybrid" class="theme-btn px-2.5 py-1 rounded-full bg-[#0a0a0f] text-white text-[11px] font-medium">Hybrid</button><button data-theme="dark" class="theme-btn px-2.5 py-1 rounded-full text-zinc-600 hover:bg-white text-[11px] font-medium">Dark</button><button data-theme="light" class="theme-btn px-2.5 py-1 rounded-full text-zinc-600 hover:bg-white text-[11px] font-medium">Light</button></div>
+      <button id="right-toggle" class="w-8 h-8 grid place-items-center rounded-md border border-[#E8E4DE] bg-white hover:bg-[#FAF9F5] text-zinc-600" title="Toggle Right (Ctrl+Shift+B)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></button>
+      <div class="hidden lg:flex items-center gap-1 ml-1 pl-3 border-l border-[#E8E4DE]"><button class="w-8 h-8 grid place-items-center rounded-full bg-white border border-[#E8E4DE] hover:bg-[#FAF9F5] text-zinc-600">⌘K</button><img src="https://i.pravatar.cc/100?img=33" alt="user" class="w-8 h-8 rounded-full border border-[#E8E4DE] object-cover" /></div>
+    </div>
+  </header>
+  <!-- hint bar -->
+  <div class="bg-[#FEF9EC] border-b border-[#FDE68A]/50 px-3 lg:px-4 py-2 flex flex-wrap items-center gap-2 text-[12px]">
+    <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#0a0a0f] text-white font-medium"><span class="w-1.5 h-1.5 rounded-full bg-[#6366f1] animate-pulse"></span> Flexlayout demo — hybrid</span>
+    <span class="hidden sm:inline text-zinc-600">Drag any tab header · Drag splitter to resize · Double-click tab bar to maximize ·</span>
+    <span class="inline-flex items-center gap-1.5 font-mono text-[11px] bg-white border border-[#E8E4DE] rounded-full px-2 py-1"><kbd class="px-1 py-0.5 rounded bg-[#FAF9F5] border border-[#E8E4DE]">Ctrl</kbd>+<kbd class="px-1 py-0.5 rounded bg-[#FAF9F5] border border-[#E8E4DE]">B</kbd> left</span>
+    <span class="inline-flex items-center gap-1.5 font-mono text-[11px] bg-white border border-[#E8E4DE] rounded-full px-2 py-1"><kbd class="px-1 py-0.5 rounded bg-[#FAF9F5] border border-[#E8E4DE]">Ctrl</kbd>+<kbd class="px-1 py-0.5 rounded bg-[#FAF9F5] border border-[#E8E4DE]">Shift</kbd>+<kbd class="px-1 py-0.5 rounded bg-[#FAF9F5] border border-[#E8E4DE]">B</kbd> right</span>
+    <span class="ml-auto hidden md:inline-flex items-center gap-1.5 text-[11px] text-zinc-500">persisted: <code class="px-1 py-0.5 rounded bg-white border border-[#E8E4DE]">localStorage: lokma:layout:v1</code></span>
+  </div>
+</div>
+
+<!-- ========== FLEX ROOT ========== -->
+<div id="flex-root" class="flex flex-1 min-h-0 max-w-[1920px] w-full mx-auto" style="height:calc(100vh - 56px - 9px - 36px - 33px)">
+
+  <!-- LEFT BORDER (collapsible, 260px) -->
+  <aside id="left-border" class="pane-dark flex flex-col shrink-0 border-r transition-all duration-200" style="width:var(--left-w);min-width:var(--left-w)">
+    <div class="flex items-center gap-0 border-b border-white/10 bg-[#0f0f12] h-[36px] px-1 shrink-0 overflow-x-auto" style="scrollbar-width:none">
+      <button data-left-tab="sessions" class="left-tab active flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1a1a1f] text-white text-[12px] font-medium border border-white/10 whitespace-nowrap"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg> Sessions <span class="ml-1 px-1 py-0.5 rounded bg-[#6366f1] text-white text-[10px] font-bold">12</span></button>
+      <button data-left-tab="projects" class="left-tab flex items-center gap-1.5 px-3 py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5 text-[12px] font-medium whitespace-nowrap"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v6l9 4 9-4V7"/></svg> Projects</button>
+      <button data-left-tab="chats" class="left-tab flex items-center gap-1.5 px-3 py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5 text-[12px] font-medium whitespace-nowrap"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 11.5a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Chats</button>
+      <button class="ml-auto w-6 h-6 grid place-items-center rounded-md hover:bg-white/10 text-zinc-500 shrink-0" onclick="toggleLeft()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 6l-6 6 6 6"/></svg></button>
+    </div>
+    <!-- Sessions -->
+    <div id="pane-sessions" class="left-pane flex-1 flex flex-col min-h-0">
+      <div class="p-2.5 space-y-2 border-b border-white/5 shrink-0">
+        <div class="relative"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="1.7" class="absolute left-2.5 top-1/2 -translate-y-1/2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input placeholder="Search sessions… (Ctrl+K)" class="w-full h-8 pl-8 pr-3 rounded-md bg-white/[0.06] border border-white/10 text-[13px] placeholder:text-zinc-500 focus:outline-none focus:border-[#6366f1]/50 text-white" /></div>
+        <button class="w-full h-8 inline-flex items-center justify-center gap-1.5 rounded-md bg-[#6366f1] text-white text-[13px] font-medium hover:bg-[#5558e6]"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> New Session <span class="ml-1 font-mono text-[11px] opacity-70">Ctrl+N</span></button>
+        <div class="flex items-center gap-1.5"><button class="px-2.5 py-1 rounded-full bg-white text-[#0a0a0f] text-[11px] font-medium">All</button><button class="px-2.5 py-1 rounded-full bg-white/10 text-zinc-400 text-[11px]">Today</button><label class="ml-auto flex items-center gap-1.5 text-[11px] text-zinc-400"><input type="checkbox" class="rounded" /> Group by project</label></div>
+      </div>
+      <div class="flex-1 overflow-y-auto px-2 py-2 space-y-3">
+        <div><div class="px-1 py-1 flex items-center gap-1.5 text-[11px] font-semibold tracking-widest uppercase text-zinc-500"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg> Today</div>
+          <div class="space-y-1.5 mt-1">
+            <div draggable="true" data-session-id="sess_8f3a9c1e" class="session-row group relative rounded-lg border border-[#6366f1]/30 bg-[#6366f1]/10 p-2.5 cursor-grab hover:bg-[#6366f1]/15"><div class="absolute inset-y-2 left-0 w-[2px] rounded-full bg-[#6366f1]"></div><div class="flex items-start gap-2"><span class="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span><div class="min-w-0 flex-1"><div class="flex items-center gap-1.5"><p class="truncate text-[13px] font-medium text-white">Refactor auth</p><span class="hidden sm:inline-flex px-1.5 py-0 rounded bg-white/15 text-white text-[10px] font-mono">● running</span></div><p class="font-mono text-[11px] text-[#a5b4fc]">sess_8f3a · claude-sonnet-4-5</p><p class="text-[12px] leading-snug text-zinc-400 line-clamp-1 mt-0.5">Move JWT to preHandler hook…</p></div><span class="opacity-0 group-hover:opacity-100 text-zinc-500 shrink-0">⋮⋮</span></div><div class="mt-2 flex items-center gap-2 text-[11px] text-zinc-500"><span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> 2m ago</span><span class="h-1 w-1 rounded-full bg-white/20"></span><span class="font-mono">1,248 tok · $0.04</span><button class="ml-auto w-5 h-5 grid place-items-center rounded hover:bg-white/10">⋯</button></div></div>
+            <div draggable="true" data-session-id="sess_b71e4f9a" class="session-row group rounded-lg border border-white/5 bg-white/[0.03] p-2.5 cursor-grab hover:bg-white/[0.06]"><div class="flex items-start gap-2"><span class="mt-1 w-1.5 h-1.5 rounded-full bg-zinc-500 shrink-0"></span><div class="min-w-0 flex-1"><p class="truncate text-[13px] font-medium text-zinc-200">Add rate limit 60/min</p><p class="font-mono text-[11px] text-zinc-500">sess_b71e · gpt-4o</p></div><span class="opacity-0 group-hover:opacity-100 text-zinc-500">⋮⋮</span></div><div class="mt-1.5 flex items-center gap-2 text-[11px] text-zinc-500"><span>Idle</span><span class="h-1 w-1 rounded-full bg-white/20"></span><span class="font-mono">842 tok</span><span class="ml-auto">⋯</span></div></div>
+            <div draggable="true" data-session-id="sess_e4a8d12c" class="session-row group rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5 cursor-grab hover:bg-amber-500/10"><div class="flex items-start gap-2"><span class="mt-1 w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span><div class="min-w-0 flex-1"><p class="truncate text-[13px] font-medium text-zinc-200">Deploy pipeline — staging</p><p class="font-mono text-[11px] text-zinc-500">sess_e4a8 · deepseek-chat</p></div><span class="opacity-0 group-hover:opacity-100 text-zinc-500">⋮⋮</span></div><div class="mt-1.5 flex items-center gap-2 text-[11px] text-zinc-500"><span class="text-amber-400">Queued</span><span class="h-1 w-1 rounded-full bg-white/20"></span><span class="font-mono">2.1k tok</span></div></div>
+          </div>
+        </div>
+        <div><div class="px-1 py-1 flex items-center gap-1.5 text-[11px] font-semibold tracking-widest uppercase text-zinc-500"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg> Yesterday</div>
+          <div class="space-y-1 mt-1">
+            <div draggable="true" data-session-id="sess_9c0f2e7b" class="session-row group rounded-lg border border-red-500/15 bg-red-500/5 p-2.5 cursor-grab hover:bg-red-500/10"><div class="flex items-start gap-2"><span class="mt-1 w-1.5 h-1.5 rounded-full bg-red-400 shrink-0"></span><div class="min-w-0 flex-1"><p class="truncate text-[13px] font-medium text-zinc-300">Data ingest — cron failure</p><p class="font-mono text-[11px] text-zinc-500">sess_9c0f · ollama:qwen2.5</p></div><span class="opacity-0 group-hover:opacity-100 text-zinc-500">⋮⋮</span></div><p class="text-[12px] text-zinc-500 mt-1">Upstream 502 — retrying in 14s</p></div>
+            <div draggable="true" data-session-id="sess_3d5b1a2f" class="session-row group rounded-lg border border-white/5 bg-white/[0.02] p-2.5 cursor-grab hover:bg-white/[0.06]"><p class="truncate text-[13px] font-medium text-zinc-300">Docs — harness spec sync</p><p class="font-mono text-[11px] text-zinc-500">sess_3d5b · claude-sonnet-4-5</p><div class="flex items-center gap-2 text-[11px] text-zinc-600 mt-1"><span>18:42</span><span class="font-mono">3.4k tok</span></div></div>
+          </div>
+        </div>
+        <div class="rounded-lg border border-dashed border-[#6366f1]/30 bg-[#6366f1]/5 p-2.5 text-center"><p class="text-[11px] font-medium text-[#a5b4fc]">↕ Drag any session row onto center Chat</p><p class="text-[11px] text-zinc-500">drop choices: Open side-by-side · Merge transcript · Fork</p></div>
+      </div>
+      <div class="border-t border-white/5 p-2.5 shrink-0"><div class="rounded-lg bg-white/[0.04] border border-white/5 p-2.5"><div class="flex items-center justify-between text-[11px]"><span class="font-semibold tracking-widest uppercase text-zinc-500">Storage</span><span class="font-mono text-zinc-400">68%</span></div><div class="mt-1.5 h-1.5 rounded-full bg-white/10 overflow-hidden"><div class="h-full w-[68%] rounded-full bg-[#6366f1]"></div></div><p class="text-[11px] text-zinc-500 mt-1">12 sessions · 4.2 MB · ~/.lokma/</p></div></div>
+    </div>
+    <div id="pane-projects" class="left-pane hidden flex-1 flex-col min-h-0"><div class="p-2.5 border-b border-white/5 flex items-center justify-between"><span class="text-[11px] font-semibold tracking-widest uppercase text-zinc-400">Projects</span><button class="px-2.5 py-1 rounded-md bg-white text-[#0a0a0f] text-[12px] font-medium">+ Add project</button></div><div class="flex-1 overflow-y-auto p-2 space-y-1"><div class="rounded-lg border border-[#6366f1]/30 bg-[#6366f1]/10 p-3"><div class="flex items-start justify-between gap-2"><div><p class="text-[13px] font-medium text-white">my-project</p><p class="font-mono text-[11px] text-zinc-400">~/code/my-project</p></div><span class="px-1.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 text-[11px] font-mono">main</span></div><div class="mt-2 flex items-center gap-2 text-[11px] text-zinc-500"><span>5 sessions</span><span class="h-1 w-1 rounded-full bg-white/20"></span><span>updated 2m ago</span></div></div><div class="rounded-lg border border-white/5 bg-white/[0.03] p-3 hover:bg-white/[0.06] cursor-pointer"><p class="text-[13px] font-medium text-zinc-300">lokma-web</p><p class="font-mono text-[11px] text-zinc-500">~/code/lokma/packages/lokma-web</p><div class="mt-2 flex items-center gap-1.5"><span class="px-1.5 py-0.5 rounded-full bg-white/10 text-zinc-400 text-[11px] font-mono">⎇ feature/panes</span><span class="text-[11px] text-zinc-500">3 sessions</span></div></div><div class="rounded-lg border border-white/5 bg-white/[0.03] p-3 hover:bg-white/[0.06] cursor-pointer"><p class="text-[13px] font-medium text-zinc-300">blog</p><p class="font-mono text-[11px] text-zinc-500">~/code/blog</p><div class="mt-1 text-[11px] text-zinc-500">1 session</div></div><div class="rounded-lg border border-dashed border-white/15 p-3 text-center hover:bg-white/[0.04] cursor-pointer"><p class="text-[13px] font-medium text-zinc-400">+ Add project</p><p class="text-[11px] text-zinc-500">path + autocomplete from recent cwd</p></div></div></div>
+    <div id="pane-chats" class="left-pane hidden flex-1 flex-col min-h-0"><div class="p-3 border-b border-white/5 space-y-3"><div class="flex items-center justify-between"><span class="text-[11px] font-semibold tracking-widest uppercase text-zinc-400">Chats</span><label class="flex items-center gap-2 text-[11px] text-zinc-300">Show chats tab <span class="relative inline-flex h-5 w-9 items-center rounded-full bg-[#6366f1] p-0.5"><span class="h-4 w-4 rounded-full bg-white shadow translate-x-4"></span></span></label></div><p class="text-[11px] leading-relaxed text-zinc-500">Lightweight threads (no harness session yet). Toggle in <code class="px-1 py-0.5 rounded bg-white/10 font-mono">Settings → Appearance</code> (default off for MVP).</p></div><div class="flex-1 overflow-y-auto p-2 space-y-1"><div class="rounded-lg border border-white/5 bg-white/[0.03] p-2.5"><p class="text-[13px] font-medium text-zinc-200">Quick: explain flexlayout model</p><p class="text-[11px] text-zinc-500">2 msgs · 5 min ago</p></div><div class="rounded-lg border border-white/5 bg-white/[0.03] p-2.5"><p class="text-[13px] font-medium text-zinc-200">Draft PR description</p><p class="text-[11px] text-zinc-500">1 msg · yesterday</p></div><div class="rounded-lg border border-dashed border-white/10 p-3 text-center"><p class="text-[12px] text-zinc-500">Chats separate from Sessions — enable to keep scratch threads.</p></div></div></div>
+  </aside>
+
+  <div class="splitter vertical" data-splitter="left" title="Drag to resize — View → Reset Layout"></div>
+
+  <!-- CENTER — TabSets -->
+  <div id="center" class="flex flex-1 min-w-0 bg-[#FAF9F5] flex-col">
+    <!-- Center tab bar — draggable TabSets -->
+    <div id="center-tab-bar" class="h-[36px] flex items-center gap-1 px-1 border-b border-[#E8E4DE] bg-white shrink-0 overflow-x-auto" ondblclick="maximizeCenter()">
+      <div class="flex items-center gap-1 min-w-0">
+        <div draggable="true" data-tab="chat" class="tab active group flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-md bg-[#0a0a0f] text-white border border-[#0a0a0f] text-[12px] font-medium cursor-grab shrink-0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Chat — Refactor auth <span class="ml-1 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><button class="ml-1 w-5 h-5 grid place-items-center rounded hover:bg-white/15">×</button><span class="opacity-60 ml-0.5">⋮⋮</span></div>
+        <div draggable="true" data-tab="code" class="tab flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white border border-[#E8E4DE] text-zinc-700 text-[12px] font-medium hover:bg-[#FAF9F5] cursor-grab shrink-0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg> Code — auth.ts <span class="px-1 py-0 rounded bg-amber-100 border border-amber-200 text-amber-800 text-[10px] font-mono">M</span><button class="w-5 h-5 grid place-items-center rounded hover:bg-black/5">×</button></div>
+        <div draggable="true" data-tab="git" class="tab flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white border border-[#E8E4DE] text-zinc-600 text-[12px] font-medium hover:bg-[#FAF9F5] cursor-grab shrink-0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M12 3v9"/></svg> Git <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span></div>
+        <div draggable="true" data-tab="orchestration" class="tab flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white border border-[#E8E4DE] text-zinc-600 text-[12px] font-medium hover:bg-[#FAF9F5] cursor-grab shrink-0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="3"/><path d="M8 14a4 4 0 0 1 8 0"/></svg> Orchestration <span class="px-1 py-0 rounded-full bg-amber-500 text-white text-[10px]">3</span></div>
+        <div draggable="true" data-tab="usage" class="tab flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white border border-[#E8E4DE] text-zinc-600 text-[12px] font-medium hover:bg-[#FAF9F5] cursor-grab shrink-0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-8"/></svg> Usage</div>
+      </div>
+      <div class="ml-auto hidden lg:flex items-center gap-1 shrink-0 pl-2 border-l border-[#E8E4DE]"><span class="text-[11px] text-zinc-500 hidden xl:inline">Drag Chat tab → Files zone to split</span><button onclick="maximizeCenter()" class="w-7 h-7 grid place-items-center rounded-md hover:bg-[#FAF9F5] border border-transparent hover:border-[#E8E4DE] text-zinc-500" title="Maximize — double-click tab bar">⛶</button><button class="w-7 h-7 grid place-items-center rounded-md hover:bg-[#FAF9F5] text-zinc-500">⋯</button></div>
+    </div>
+
+    <!-- Center row: Chat (flex:1) + Code (flex:1) -->
+    <div class="flex flex-1 min-h-0">
+      <!-- TabSet A — Chat (drop zone for session) -->
+      <section id="tabset-chat" class="tabset flex flex-1 min-w-0 flex-col bg-white relative drop-zone" data-drop-label="Drop session → Open side-by-side">
+        <div class="h-9 flex items-center justify-between px-3 border-b border-[#E8E4DE] bg-[#FDFCFB] shrink-0"><div class="flex items-center gap-2 min-w-0"><span class="w-6 h-6 rounded-md bg-[#6366f1] text-white grid place-items-center text-[11px]">◈</span><span class="text-[13px] font-semibold truncate">Refactor auth</span><span class="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px]"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> streaming</span><span class="hidden md:inline-flex px-1.5 py-0.5 rounded bg-white border border-[#E8E4DE] font-mono text-[11px] text-zinc-500">⎇ feature/auth-hooks</span></div><div class="flex items-center gap-1 shrink-0"><span class="hidden lg:inline text-[11px] font-mono text-zinc-500">12.3k · $0.04 · 34%</span><button class="w-7 h-7 grid place-items-center rounded-md hover:bg-white border border-transparent hover:border-[#E8E4DE] text-zinc-500">⋯</button></div></div>
+        <div class="flex-1 overflow-y-auto p-3 lg:p-4 space-y-4">
+          <div class="flex justify-center"><span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FAF9F5] border border-[#E8E4DE] text-[11px] text-zinc-600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg> Session resumed · CLAUDE.md + LOKMA.md · 3.2k/200k</span></div>
+          <div class="rounded-lg border border-amber-200 bg-amber-50 p-2.5 flex items-start gap-2.5"><span class="w-6 h-6 rounded-full bg-amber-500 text-white grid place-items-center shrink-0 text-[11px]">!</span><div class="flex-1 min-w-0"><p class="text-[12px] font-semibold text-amber-900">Permission — Bash: npm test</p><p class="text-[12px] text-amber-800">Allow <code class="px-1 py-0.5 rounded bg-white border border-amber-200 font-mono text-[11px]">npm test -- --watch</code> ?</p><div class="mt-2 flex gap-1.5"><button class="px-2.5 py-1 rounded-full bg-[#0a0a0f] text-white text-[12px] font-medium">Allow</button><button class="px-2.5 py-1 rounded-full bg-white border border-amber-200 text-amber-900 text-[12px]">Deny</button><button class="px-2.5 py-1 rounded-full bg-white border border-amber-200 text-zinc-600 text-[12px]">Always allow</button><span class="ml-auto hidden sm:inline text-[11px] text-amber-700 self-center">Shift+Tab</span></div></div></div>
+          <div class="flex gap-2.5"><img src="https://i.pravatar.cc/100?img=33" class="w-7 h-7 rounded-full shrink-0 mt-0.5" alt="a"/><div class="flex-1 min-w-0"><div class="flex items-baseline gap-2"><span class="text-[13px] font-semibold">You</span><span class="text-[11px] text-zinc-500">14:32</span><span class="px-1 py-0 rounded bg-[#FAF9F5] border border-[#E8E4DE] font-mono text-[10px]">/model</span></div><div class="mt-1.5 rounded-xl bg-[#FAF9F5] border border-[#E8E4DE] px-3 py-2.5"><p class="text-[13.5px] leading-relaxed">Move JWT verification into a Fastify <code class="px-1 py-0.5 rounded bg-white border border-[#E8E4DE] font-mono text-[12px]">preHandler</code> hook — every route opts in with <code class="px-1 py-0.5 rounded bg-white border border-[#E8E4DE] font-mono text-[12px]">config.auth</code>.</p><div class="mt-2 flex flex-wrap gap-1.5"><span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white border border-[#E8E4DE] text-[12px] font-mono"><span class="w-1.5 h-1.5 rounded-full bg-[#6366f1]"></span> @src/auth.ts</span><span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white border border-[#E8E4DE] text-[12px]">Fastify 5</span><span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[12px]">✓ checkpoint</span></div></div></div></div>
+          <div class="flex gap-2.5"><div class="w-7 h-7 rounded-full bg-[#0a0a0f] text-white grid place-items-center shrink-0 mt-0.5 text-[11px]">◐</div><div class="flex-1 min-w-0"><div class="flex items-baseline gap-2"><span class="text-[13px] font-semibold">Lokma</span><span class="px-1.5 py-0 rounded bg-[#0a0a0f] text-white text-[10px]">claude-sonnet-4-5</span><span class="text-[11px] text-zinc-500">streaming · 42 tok/s</span></div><div class="mt-1.5 rounded-lg border border-[#E8E4DE] bg-white overflow-hidden"><div class="flex items-center justify-between px-3 h-8 bg-[#FDFCFB] border-b border-[#E8E4DE]"><div class="flex items-center gap-2"><span class="w-5 h-5 rounded bg-white border border-[#E8E4DE] grid place-items-center text-zinc-600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span><span class="font-mono text-[12px] font-medium">Read</span><span class="px-1.5 py-0 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px]">done</span></div><span class="font-mono text-[11px] text-zinc-500">src/auth.ts</span></div><div class="p-3"><div class="rounded-md border border-[#E8E4DE] overflow-hidden"><div class="flex items-center gap-2 px-2.5 h-7 bg-[#FAF9F5] border-b border-[#E8E4DE] text-[11px] text-zinc-600"><span class="w-2 h-2 rounded-full bg-zinc-300"></span><span class="w-2 h-2 rounded-full bg-zinc-300"></span><span class="w-2 h-2 rounded-full bg-zinc-300"></span><span class="ml-2 font-mono">src/auth.ts — preview → Code pane</span></div><pre class="p-3 text-[12px] leading-6 font-mono overflow-x-auto"><code><span class="text-zinc-400">// addHook — opt-in per route</span>
+<span class="text-[#9A6B4A]">app.addHook</span>(<span class="text-[#6A8A4A]">'preHandler'</span>, <span class="text-[#9A6B4A]">async</span> (req, reply) =&gt; {
+  <span class="text-[#9A6B4A]">if</span> (!req.routeOptions.config?.auth) <span class="text-[#9A6B4A]">return</span>
+  <span class="text-[#9A6B4A]">const</span> tok = req.headers.authorization?.replace(<span class="text-[#6A8A4A]">'Bearer '</span>,<span class="text-[#6A8A4A]">''</span>)
+  <span class="text-[#9A6B4A]">if</span> (!tok) <span class="text-[#9A6B4A]">return</span> reply.code(<span class="text-[#B05A3A]">401</span>).send({error:<span class="text-[#6A8A4A]">'missing token'</span>})
+  req.user = <span class="text-[#9A6B4A]">await</span> verifyJwt(tok)
+})</code></pre></div>
+                  <!-- AskUserQuestion -->
+                  <div class="mt-3 rounded-lg border border-[#6366f1]/20 bg-[#6366f1]/5 p-2.5"><p class="text-[12px] font-semibold text-[#312e81]">AskUserQuestion — Choose rate-limit strategy</p><div class="mt-2 grid gap-1.5"><label class="flex items-center gap-2 px-2.5 py-2 rounded-md bg-white border border-[#E8E4DE] text-[13px] hover:border-[#6366f1]/30 cursor-pointer"><input type="radio" name="q1" checked /> In-memory Map (single instance)</label><label class="flex items-center gap-2 px-2.5 py-2 rounded-md bg-white border border-[#E8E4DE] text-[13px] hover:border-[#6366f1]/30 cursor-pointer"><input type="radio" name="q1" /> Redis (shared, multi-instance)</label><label class="flex items-center gap-2 px-2.5 py-2 rounded-md bg-white border border-[#E8E4DE] text-[13px] hover:border-[#6366f1]/30 cursor-pointer"><input type="radio" name="q1" /> Fastify @fastify/rate-limit plugin</label></div></div>
+                  <!-- slash / @ -->
+                  <div class="mt-3 flex flex-wrap gap-1.5"><span class="px-2 py-1 rounded-full bg-[#0a0a0f] text-white text-[11px] font-mono">/clear</span><span class="px-2 py-1 rounded-full bg-white border border-[#E8E4DE] text-[11px]">/model</span><span class="px-2 py-1 rounded-full bg-white border border-[#E8E4DE] text-[11px]">@file</span><span class="px-2 py-1 rounded-full bg-white border border-[#E8E4DE] text-[11px]">Rewind ↩</span></div>
+                </div></div>
+                <div class="mt-2 flex items-center gap-2 text-[11px] text-zinc-500"><span class="font-mono">342 tok</span><span class="h-1 w-1 rounded-full bg-zinc-300"></span><div class="flex-1 h-1 max-w-[160px] rounded-full bg-zinc-200 overflow-hidden"><div class="h-full w-[34%] bg-[#6366f1]"></div></div><span>~$0.002</span></div>
+              </div></div>
+          <div class="flex gap-2.5"><div class="w-7 h-7 rounded-full bg-white border border-[#E8E4DE] grid place-items-center shrink-0 mt-1"><span class="w-2 h-2 rounded-full bg-[#6366f1] animate-pulse"></span></div><div class="flex-1 min-w-0"><div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-[#E8E4DE] text-[12px] text-zinc-600 shadow-sm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="animate-spin"><circle cx="12" cy="12" r="9" stroke="#E8E4DE" stroke-width="1.7"/><path d="M12 3a9 9 0 0 1 9 9" stroke="#6366f1" stroke-width="1.7" stroke-linecap="round"/></svg> Thinking — checking Fastify rate-limit patterns…</div></div></div>
+        </div>
+        <!-- composer — slash + @ + permission -->
+        <div class="border-t border-[#E8E4DE] p-2.5 bg-[#FDFCFB] shrink-0">
+          <div class="rounded-xl border border-[#E8E4DE] bg-white p-2 shadow-sm">
+            <div class="flex items-end gap-2"><button class="w-8 h-8 grid place-items-center rounded-lg border border-[#E8E4DE] bg-[#FAF9F5] text-zinc-600">+</button><div class="flex-1 relative"><textarea id="composer" rows="1" placeholder="Message Lokma…  / for commands · @ to mention file · drag file here" class="w-full resize-none bg-transparent px-2 py-2 text-[13.5px] placeholder:text-zinc-400 focus:outline-none min-h-[36px]"></textarea></div><button class="h-8 px-3.5 rounded-lg bg-[#6366f1] text-white text-[13px] font-semibold inline-flex items-center gap-1.5">Send <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg></button></div>
+            <div class="mt-2 flex items-center gap-2 text-[11px] text-zinc-500"><span class="hidden sm:inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> WS /ws/sess_8f3a</span><span class="hidden sm:block w-px h-3 bg-[#E8E4DE]"></span><span class="font-mono">↵ send · ⇧↵ new line</span><span class="ml-auto inline-flex items-center gap-1"><span class="px-1.5 py-0.5 rounded bg-[#FAF9F5] border border-[#E8E4DE]">/</span> slash · <span class="px-1.5 py-0.5 rounded bg-[#FAF9F5] border border-[#E8E4DE]">@</span> file</span></div>
+          </div>
+          <div class="mt-1.5 flex items-center gap-1.5 text-[11px] text-zinc-500 justify-center">Lokma can make mistakes · <a href="#" class="underline decoration-zinc-300">Review patch before apply</a> · context 34% · rewind via <span class="px-1 py-0 rounded bg-white border border-[#E8E4DE] font-mono">Checkpoints</span></div>
+        </div>
+      </section>
+
+      <div class="splitter vertical" data-splitter="center" title="Drag to resize TabSets"></div>
+
+      <!-- TabSet B — Code / Git / Orchestration / Usage -->
+      <section id="tabset-code" class="tabset flex flex-1 min-w-0 flex-col bg-white border-l border-[#E8E4DE] relative">
+        <!-- inner tabs -->
+        <div class="h-9 flex items-center gap-1 px-2 border-b border-[#E8E4DE] bg-[#FAF9F5] shrink-0 overflow-x-auto" style="scrollbar-width:none">
+          <button data-code-tab="code" class="code-tab active px-2.5 py-1 rounded-md bg-white border border-[#E8E4DE] shadow-sm text-[12px] font-medium">Code</button>
+          <button data-code-tab="git" class="code-tab px-2.5 py-1 rounded-md hover:bg-white border border-transparent hover:border-[#E8E4DE] text-[12px]">Git</button>
+          <button data-code-tab="orchestration" class="code-tab px-2.5 py-1 rounded-md hover:bg-white border border-transparent hover:border-[#E8E4DE] text-[12px]">Orchestration</button>
+          <button data-code-tab="usage" class="code-tab px-2.5 py-1 rounded-md hover:bg-white border border-transparent hover:border-[#E8E4DE] text-[12px]">Usage</button>
+          <button class="ml-auto w-6 h-6 grid place-items-center rounded hover:bg-white text-zinc-500" onclick="maximizeTabset('code')" title="Pop-out maximize — double-click">⛶</button>
+        </div>
+
+        <!-- Code pane -->
+        <div id="code-pane" class="code-panel flex-1 flex flex-col min-h-0">
+          <div class="flex items-center justify-between px-3 h-8 border-b border-[#E8E4DE] bg-white shrink-0"><div class="flex items-center gap-2 text-[12px]"><span class="w-2 h-2 rounded-full bg-emerald-500"></span><span class="font-mono">src/auth.ts</span><span class="px-1 py-0 rounded bg-amber-100 border border-amber-200 text-amber-800 text-[10px]">M</span><span class="text-zinc-500">— Monaco preview (read-only, Open in editor to write)</span></div><button class="px-2 py-0.5 rounded-md bg-[#0a0a0f] text-white text-[11px]">Open in editor</button></div>
+          <div class="flex-1 overflow-auto bg-[#FAF9F5] p-0">
+            <div class="m-3 rounded-lg border border-[#E8E4DE] bg-white overflow-hidden shadow-sm">
+              <div class="flex items-center justify-between px-3 h-8 bg-[#FDFCFB] border-b border-[#E8E4DE]"><span class="font-mono text-[12px]">Diff — hashline style</span><div class="flex items-center gap-1"><button class="px-2 py-0.5 rounded bg-white border border-[#E8E4DE] text-[11px]">Split</button><button class="px-2 py-0.5 rounded bg-white border border-[#E8E4DE] text-[11px]">Unified</button></div></div>
+              <div class="grid grid-cols-2 divide-x divide-[#E8E4DE] text-[12px] font-mono leading-6">
+                <div class="p-3"><div class="text-zinc-400 mb-1">— before (hash: a1b2c3)</div><div class="text-[#B05A3A]">- const token = req.headers.authorization</div><div class="text-[#B05A3A]">- const user = await verify(token)</div><div class="text-zinc-500">  if (!user) return reply.code(401)</div></div>
+                <div class="p-3"><div class="text-emerald-600 mb-1">+ after (hash: d4e5f6)</div><div class="text-[#1A7F3A]">+ // req.user injected by preHandler</div><div class="text-zinc-700">  if (!req.user) return reply.code(401)</div><div class="text-zinc-500">  // no per-route verify</div></div>
+              </div>
+              <div class="px-3 py-2 bg-[#FDFCFB] border-t border-[#E8E4DE] flex items-center gap-2 text-[11px] text-zinc-600"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Checkpoint available — <button class="px-1.5 py-0.5 rounded bg-white border border-[#E8E4DE] text-[11px]">Rewind</button> <span class="ml-auto">Worktree: <code class="px-1 py-0.5 rounded bg-white border font-mono">⎇ feature/auth-hooks</code></span></div>
+            </div>
+            <div class="mx-3 mb-3 rounded-lg border border-[#E8E4DE] bg-white p-2.5 flex items-center gap-2 text-[12px]"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg> Search results (Grep) — <span class="font-mono bg-[#FAF9F5] border border-[#E8E4DE] px-1 rounded">verifyJwt</span> · 4 hits <span class="ml-auto text-[11px] text-zinc-500">Enter to open</span></div>
+          </div>
+        </div>
+
+        <!-- Git pane -->
+        <div id="git-pane" class="code-panel hidden flex-1 flex-col min-h-0 p-3 gap-3 overflow-y-auto">
+          <div class="rounded-lg border border-[#E8E4DE] bg-white p-3"><div class="flex items-center justify-between"><span class="text-[12px] font-semibold">Git</span><span class="px-2 py-0.5 rounded-full bg-white border border-[#E8E4DE] text-[11px] font-mono">main → feature/auth-hooks</span></div><div class="mt-2 flex gap-1.5 flex-wrap"><span class="px-2 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px]">● 2 changed</span><span class="px-2 py-1 rounded-full bg-white border border-[#E8E4DE] text-[11px]">src/auth.ts M</span><span class="px-2 py-1 rounded-full bg-white border border-[#E8E4DE] text-[11px]">tests/auth.test.ts A</span></div><div class="mt-3 grid grid-cols-2 gap-2"><button class="h-8 rounded-md bg-[#0a0a0f] text-white text-[12px] font-medium">Commit</button><button class="h-8 rounded-md bg-white border border-[#E8E4DE] text-[12px]">Create PR (@lokma)</button></div><p class="text-[11px] text-zinc-500 mt-2">Branch diff · commit log · @lokma PR config — same <code class="px-1 py-0.5 rounded bg-[#FAF9F5] border">gh</code> flow as CLI</p></div>
+          <div class="rounded-lg border border-[#E8E4DE] bg-[#FAF9F5] p-2.5 font-mono text-[11px] leading-5 overflow-x-auto"><div class="text-zinc-500"># git status</div><div class="text-[#B05A3A]">M src/auth.ts</div><div class="text-[#1A7F3A]">A tests/auth.test.ts</div><div class="mt-2 text-zinc-500"># git log --oneline -3</div><div>a1b2c3 feat: auth preHandler hook</div><div>d4e5f6 test: add rate limit cases</div></div>
+        </div>
+
+        <!-- Orchestration pane -->
+        <div id="orchestration-pane" class="code-panel hidden flex-1 flex-col min-h-0">
+          <div class="px-3 py-2 border-b border-[#E8E4DE] bg-[#FDFCFB] flex items-center justify-between"><span class="text-[12px] font-semibold">Orchestration — Agent Hub (Alt+A)</span><span class="px-2 py-0.5 rounded-full bg-amber-100 border border-amber-200 text-amber-800 text-[11px]">3/5 done</span></div>
+          <div class="flex-1 overflow-y-auto p-3 space-y-2">
+            <div class="h-1.5 rounded-full bg-[#E8E4DE] overflow-hidden"><div class="h-full w-[60%] bg-[#6366f1]"></div></div>
+            <div class="rounded-lg border border-[#E8E4DE] bg-white p-2.5"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span><span class="text-[12px] font-medium">● agent-1: find files</span><span class="ml-auto text-[11px] font-mono text-zinc-500">1.2s</span></div><p class="text-[11px] text-zinc-500 mt-1">Glob src/**/*.ts · 24 files</p></div>
+            <div class="rounded-lg border border-[#E8E4DE] bg-white p-2.5"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-500"></span><span class="text-[12px] font-medium">✓ agent-2: read auth</span><span class="ml-auto text-[11px] font-mono text-zinc-500">0.8s</span></div><div class="mt-1.5 rounded bg-[#FAF9F5] border border-[#E8E4DE] p-2 font-mono text-[11px]">Read src/auth.ts · 89 lines</div></div>
+            <div class="rounded-lg border border-amber-200 bg-amber-50 p-2.5"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span><span class="text-[12px] font-medium">● agent-3: edit tests</span><span class="ml-auto text-[11px] font-mono text-zinc-500">2.1s</span></div><p class="text-[11px] text-zinc-600 mt-1">Writing tests/auth.test.ts — subagent transcript nested</p></div>
+            <div class="flex gap-1.5"><button class="flex-1 h-7 rounded-md border border-[#E8E4DE] bg-white text-[11px]">Cancel all</button><button class="flex-1 h-7 rounded-md bg-[#0a0a0f] text-white text-[11px]">View logs</button></div>
+            <p class="text-[11px] text-zinc-500 text-center">WS events: <code class="px-1 py-0.5 rounded bg-[#FAF9F5] border font-mono">agent/start</code> <code class="px-1 py-0.5 rounded bg-[#FAF9F5] border font-mono">agent/delta</code> <code class="px-1 py-0.5 rounded bg-[#FAF9F5] border font-mono">agent/end</code></p>
+          </div>
+        </div>
+
+        <!-- Usage pane -->
+        <div id="usage-pane" class="code-panel hidden flex-1 flex-col min-h-0 overflow-y-auto p-3 gap-3">
+          <div class="grid grid-cols-2 gap-2"><div class="rounded-lg border border-[#E8E4DE] bg-white p-2.5"><div class="text-[11px] tracking-widest uppercase text-zinc-500 font-medium">Tokens (7d)</div><div class="text-[18px] font-semibold">1.4M</div><div class="text-[11px] text-emerald-600">+12% vs last week</div></div><div class="rounded-lg border border-[#E8E4DE] bg-white p-2.5"><div class="text-[11px] tracking-widest uppercase text-zinc-500 font-medium">Cost (7d)</div><div class="text-[18px] font-semibold">$42.80</div><div class="text-[11px] text-zinc-500">avg $3.56 / session</div></div></div>
+          <div class="rounded-lg border border-[#E8E4DE] bg-white p-3"><div class="flex items-center justify-between"><span class="text-[11px] font-semibold">Tokens / day — stacked by model</span><div class="flex gap-1"><button class="px-1.5 py-0.5 rounded bg-[#0a0a0f] text-white text-[11px]">7d</button><button class="px-1.5 py-0.5 rounded bg-white border border-[#E8E4DE] text-[11px]">30d</button><button class="px-1.5 py-0.5 rounded bg-white border border-[#E8E4DE] text-[11px]">90d</button></div></div><div class="mt-3 flex items-end gap-1 h-16"><span class="flex-1 rounded-sm bg-[#6366f1]" style="height:45%"></span><span class="flex-1 rounded-sm bg-emerald-500" style="height:70%"></span><span class="flex-1 rounded-sm bg-[#6366f1]" style="height:55%"></span><span class="flex-1 rounded-sm bg-amber-500" style="height:90%"></span><span class="flex-1 rounded-sm bg-[#6366f1]" style="height:65%"></span><span class="flex-1 rounded-sm bg-zinc-300" style="height:40%"></span><span class="flex-1 rounded-sm bg-[#6366f1]" style="height:75%"></span></div><div class="flex gap-2 mt-2 text-[11px]"><span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-[#6366f1]"></span> sonnet-4-5</span><span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> gpt-4o</span><span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span> deepseek</span></div></div>
+          <div class="rounded-lg border border-[#E8E4DE] bg-white overflow-hidden"><div class="px-3 py-2 border-b border-[#E8E4DE] bg-[#FDFCFB] flex items-center justify-between"><span class="text-[11px] font-semibold">Recent sessions</span><button class="px-2 py-0.5 rounded bg-white border border-[#E8E4DE] text-[11px]">Export CSV</button></div><div class="divide-y divide-[#E8E4DE] text-[12px]"><div class="px-3 py-2 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-500"></span><span class="flex-1 font-medium">Refactor auth</span><span class="font-mono text-zinc-500">sonnet-4-5</span><span class="font-mono">12.3k</span><span class="font-mono text-zinc-500">$0.04</span></div><div class="px-3 py-2 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-zinc-400"></span><span class="flex-1">Add rate limit</span><span class="font-mono text-zinc-500">gpt-4o</span><span class="font-mono">842</span><span class="font-mono text-zinc-500">$0.01</span></div><div class="px-3 py-2 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-amber-400"></span><span class="flex-1">Deploy pipeline</span><span class="font-mono text-zinc-500">deepseek</span><span class="font-mono">2.1k</span><span class="font-mono text-zinc-500">$0.02</span></div></div></div>
+          <p class="text-[11px] text-zinc-500 text-center">GET /api/usage/summary?range=7d · Pricing from <code class="px-1 py-0.5 rounded bg-white border font-mono">models.pricing</code> snapshot</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- bottom: orchestration mini when chat+code visible -->
+    <div id="bottom-strip" class="h-[96px] border-t border-[#E8E4DE] bg-white flex flex-col shrink-0">
+      <div class="h-7 flex items-center justify-between px-3 border-b border-[#E8E4DE] bg-[#FDFCFB]"><div class="flex items-center gap-2 text-[11px] font-semibold tracking-widest uppercase text-zinc-500"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="3"/><path d="M8 14a4 4 0 0 1 8 0"/></svg> Orchestration — 3 agents</div><div class="flex items-center gap-1"><span class="px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px]">3/5 done</span><button class="w-6 h-6 grid place-items-center rounded hover:bg-white border border-transparent hover:border-[#E8E4DE] text-zinc-500" title="Pop-out maximize — double-click">⛶</button></div></div>
+      <div class="flex-1 grid grid-cols-3 divide-x divide-[#E8E4DE] overflow-hidden">
+        <div class="px-3 py-2 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span><div><p class="text-[12px] font-medium">● agent-1: find files</p><p class="text-[11px] font-mono text-zinc-500">1.2s · Glob</p></div></div>
+        <div class="px-3 py-2 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-500"></span><div><p class="text-[12px] font-medium">✓ agent-2: read auth</p><p class="text-[11px] font-mono text-zinc-500">0.8s · Read</p></div></div>
+        <div class="px-3 py-2 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span><div><p class="text-[12px] font-medium">● agent-3: edit tests</p><p class="text-[11px] font-mono text-zinc-500">2.1s · Edit</p></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="splitter vertical" data-splitter="right" title="Drag to resize — View → Reset Layout"></div>
+
+  <!-- RIGHT BORDER (collapsible, 340px) — Files / Terminal / Browser -->
+  <aside id="right-border" class="flex flex-col shrink-0 border-l bg-white transition-all duration-200" style="width:var(--right-w);min-width:var(--right-w)">
+    <div class="flex items-center gap-0 border-b border-[#E8E4DE] bg-[#FDFCFB] h-[36px] px-1 shrink-0 overflow-x-auto" style="scrollbar-width:none">
+      <button data-right-tab="files" class="right-tab active flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white border border-[#E8E4DE] shadow-sm text-[12px] font-medium whitespace-nowrap"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg> Files</button>
+      <button data-right-tab="terminal" class="right-tab flex items-center gap-1.5 px-3 py-1.5 rounded-md text-zinc-600 hover:bg-white hover:border hover:border-[#E8E4DE] border border-transparent text-[12px] whitespace-nowrap"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 17l6-6-6-6"/><path d="M12 17h8"/></svg> Terminal</button>
+      <button data-right-tab="browser" class="right-tab flex items-center gap-1.5 px-3 py-1.5 rounded-md text-zinc-600 hover:bg-white hover:border hover:border-[#E8E4DE] border border-transparent text-[12px] whitespace-nowrap"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/><path d="M12 8v8"/></svg> Browser</button>
+      <button data-right-tab="providers" class="right-tab flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-zinc-500 hover:bg-white text-[12px] whitespace-nowrap">Providers</button>
+      <button class="ml-auto w-6 h-6 grid place-items-center rounded-md hover:bg-white border border-transparent hover:border-[#E8E4DE] text-zinc-500 shrink-0" onclick="toggleRight()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 6l6 6-6 6"/></svg></button>
+    </div>
+
+    <!-- Files — receives Chat tab drop -->
+    <div id="pane-files" class="right-pane flex-1 flex flex-col min-h-0 drop-zone" data-drop-label="Drop Chat tab here — split center">
+      <div class="px-3 py-2 border-b border-[#E8E4DE] bg-[#FDFCFB] flex items-center gap-2 shrink-0"><div class="flex items-center gap-1.5 text-[11px] font-semibold tracking-widest uppercase text-zinc-500"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M12 12v8"/></svg> File Tree</div><span class="ml-auto font-mono text-[11px] text-zinc-500">⌘P</span><button class="w-6 h-6 grid place-items-center rounded hover:bg-white border border-transparent hover:border-[#E8E4DE] text-zinc-500">⋯</button></div>
+      <div class="px-2 py-2 border-b border-[#E8E4DE] shrink-0"><div class="flex items-center gap-2"><span class="text-[11px] font-mono text-zinc-500">cwd:</span><span class="px-1.5 py-0.5 rounded bg-white border border-[#E8E4DE] font-mono text-[11px]">~/code/my-project</span><button class="ml-auto text-[11px] text-[#6366f1]">Reveal</button></div><div class="mt-2 flex items-center gap-1 text-[11px]"><span class="px-1.5 py-0.5 rounded-full bg-[#FAF9F5] border border-[#E8E4DE]">M src/auth.ts</span><span class="px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">A tests/…</span><span class="px-1.5 py-0.5 rounded-full bg-white border border-[#E8E4DE]">? .env</span></div></div>
+      <div class="flex-1 overflow-y-auto p-2 font-mono text-[12px] leading-6">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-[#FAF9F5] cursor-pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="1.7"><path d="M6 9l6 6 6-6"/></svg><span class="w-3 h-3 rounded bg-amber-100 border border-amber-200 grid place-items-center text-[8px]">▾</span><span>src/</span><span class="ml-auto text-[10px] text-zinc-400">git: M</span></div>
+          <div class="ml-4 space-y-0.5">
+            <div draggable="true" data-file="src/auth.ts" class="file-row flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-[#6366f1]/10 border border-[#6366f1]/20 cursor-grab"><span class="w-2 h-2 rounded-full bg-amber-500" title="Modified"></span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg><span class="font-medium text-[#312e81]">auth.ts</span><span class="ml-auto text-[10px] px-1 py-0 rounded bg-amber-100 border border-amber-200">M</span><span class="text-zinc-400">⋮⋮</span></div>
+            <div draggable="true" data-file="src/auth.test.ts" class="file-row flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-[#FAF9F5] cursor-grab"><span class="w-2 h-2 rounded-full bg-emerald-500" title="Added"></span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg><span>auth.test.ts</span><span class="ml-auto text-[10px] px-1 py-0 rounded bg-emerald-50 border border-emerald-200 text-emerald-700">A</span></div>
+            <div draggable="true" data-file="src/middleware/rateLimit.ts" class="file-row flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-[#FAF9F5] cursor-grab"><span class="w-2 h-2 rounded-full bg-zinc-300"></span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg><span>rateLimit.ts</span></div>
+          </div>
+          <div class="flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-[#FAF9F5] cursor-pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="1.7"><path d="M9 6l6 6-6 6"/></svg><span class="w-3 h-3 rounded bg-zinc-100 border grid place-items-center text-[8px]">▸</span><span>tests/</span></div>
+          <div class="flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-[#FAF9F5] cursor-pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="1.7"><path d="M9 6l6 6-6 6"/></svg><span>packages/</span></div>
+          <div class="flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-[#FAF9F5] cursor-pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg><span class="text-zinc-500">LOKMA.md</span></div>
+          <div class="flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-[#FAF9F5] cursor-pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg><span class="text-zinc-500">themes/omp.json</span></div>
+        </div>
+        <div class="mt-3 rounded-lg border border-dashed border-[#6366f1]/30 bg-[#6366f1]/5 p-2 text-center"><p class="text-[11px] font-medium text-[#6366f1]">Drag file → chat inserts <code class="px-1 py-0.5 rounded bg-white border font-mono">@src/auth.ts</code></p><p class="text-[11px] text-zinc-500">Click → opens in Code pane · Right-click: Copy path · Reveal in Finder</p></div>
+        <p class="text-[11px] text-zinc-500 mt-2 px-1">Icons by extension (lucide) · git status overlay M/A/D/? · <code class="px-1 py-0.5 rounded bg-white border font-mono">GET /api/files?cwd=…</code></p>
+      </div>
+    </div>
+
+    <!-- Terminal -->
+    <div id="pane-terminal" class="right-pane hidden flex-1 flex-col min-h-0">
+      <div class="px-3 py-2 border-b border-[#E8E4DE] bg-[#FDFCFB] flex items-center gap-2"><span class="text-[11px] font-semibold tracking-widest uppercase text-zinc-500">Terminal — xterm.js</span><span class="ml-auto flex items-center gap-1"><button class="px-1.5 py-0.5 rounded bg-white border border-[#E8E4DE] text-[11px]">Clear</button><button class="px-1.5 py-0.5 rounded bg-white border border-[#E8E4DE] text-[11px]">Copy</button><label class="inline-flex items-center gap-1 text-[11px]"><input type="checkbox" checked /> Follow</label></span></div>
+      <div class="flex items-center gap-1 px-2 h-7 border-b border-[#E8E4DE] bg-[#FAF9F5] text-[11px]"><button class="px-2 py-0.5 rounded bg-white border border-[#E8E4DE]">bash:1</button><button class="px-2 py-0.5 rounded hover:bg-white border border-transparent hover:border-[#E8E4DE]">bash:2</button><button class="ml-auto px-2 py-0.5 rounded bg-[#0a0a0f] text-white">Open dedicated</button></div>
+      <div class="flex-1 bg-[#0a0a0f] text-[#e4e4e7] p-3 font-mono text-[12px] leading-5 overflow-auto"><div class="text-zinc-500">$ npm test</div><div class="text-emerald-400">✓ 12 tests passed</div><div class="text-zinc-400">  at src/auth.test.ts — 42ms</div><div class="text-zinc-500 mt-2">$ npm run build</div><div class="text-[#6366f1]">● building…</div><div class="text-zinc-500 mt-2"><span class="text-emerald-400">●</span> follow: auto-scroll on</div><div class="mt-2 text-[11px] text-zinc-500">WS: <code class="px-1 py-0.5 rounded bg-white/10">terminal/data</code> / <code class="px-1 py-0.5 rounded bg-white/10">terminal/exit {code}</code></div></div>
+      <div class="px-2 py-1.5 border-t border-[#E8E4DE] bg-[#FDFCFB] text-[11px] text-zinc-500">Live PTY — harness <code class="px-1 py-0.5 rounded bg-white border font-mono">Bash</code> tool stream per session · xterm-addon-fit</div>
+    </div>
+
+    <!-- Browser -->
+    <div id="pane-browser" class="right-pane hidden flex-1 flex-col min-h-0">
+      <div class="px-2 py-2 border-b border-[#E8E4DE] bg-[#FDFCFB] flex items-center gap-1.5"><button class="w-7 h-7 grid place-items-center rounded-md bg-white border border-[#E8E4DE]">←</button><button class="w-7 h-7 grid place-items-center rounded-md bg-white border border-[#E8E4DE]">→</button><button class="w-7 h-7 grid place-items-center rounded-md bg-white border border-[#E8E4DE]">↻</button><div class="flex-1 flex items-center gap-1 px-2 h-7 rounded-full bg-white border border-[#E8E4DE] text-[12px]"><span class="w-2 h-2 rounded-full bg-emerald-500"></span><span class="truncate">http://localhost:3000</span></div><button class="px-2 py-1 rounded-md bg-white border border-[#E8E4DE] text-[11px]">DevTools</button></div>
+      <div class="flex-1 bg-[#FAF9F5] p-2 overflow-auto"><div class="rounded-lg border border-[#E8E4DE] bg-white overflow-hidden shadow-sm"><div class="h-7 bg-[#FDFCFB] border-b border-[#E8E4DE] flex items-center gap-1 px-2"><span class="w-2.5 h-2.5 rounded-full bg-zinc-300"></span><span class="w-2.5 h-2.5 rounded-full bg-zinc-300"></span><span class="w-2.5 h-2.5 rounded-full bg-zinc-300"></span><span class="ml-2 text-[11px] font-mono text-zinc-500">localhost:3000 — preview</span><button class="ml-auto px-1.5 py-0.5 rounded bg-white border border-[#E8E4DE] text-[11px]">Open in new tab</button></div><div class="p-6 text-center"><div class="w-12 h-12 rounded-xl bg-[#6366f1] mx-auto grid place-items-center text-white">◈</div><p class="mt-3 text-[13px] font-medium">Harness-driven preview</p><p class="text-[12px] text-zinc-500 mt-1">Tools: <code class="px-1 py-0.5 rounded bg-[#FAF9F5] border font-mono">browser_navigate</code> <code class="px-1 py-0.5 rounded bg-[#FAF9F5] border font-mono">browser_click</code> <code class="px-1 py-0.5 rounded bg-[#FAF9F5] border font-mono">browser_screenshot</code></p><button class="mt-3 px-3 py-1.5 rounded-full bg-[#0a0a0f] text-white text-[12px]">Navigate to /login</button></div></div><p class="text-[11px] text-zinc-500 mt-2 px-1">iframe or proxied Playwright behind <code class="px-1 py-0.5 rounded bg-white border font-mono">/api/browser</code> · WS tool events drive actions</p></div>
+    </div>
+
+    <!-- Providers — hidden tab -->
+    <div id="pane-providers" class="right-pane hidden flex-1 flex-col min-h-0 overflow-y-auto p-2 space-y-2">
+      <div class="flex items-center justify-between"><span class="text-[11px] font-semibold tracking-widest uppercase text-zinc-500">Providers</span><button class="px-2 py-1 rounded-md bg-[#0a0a0f] text-white text-[11px]">+ Add Provider</button></div>
+      <div class="rounded-lg border border-[#E8E4DE] bg-white p-2.5 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-500"></span><div class="flex-1"><p class="text-[12px] font-medium">Anthropic</p><p class="text-[11px] text-zinc-500">3 models · 2 enabled</p></div><span class="w-5 h-5 grid place-items-center rounded hover:bg-[#FAF9F5] text-zinc-500">⋮⋮</span></div>
+      <div class="rounded-lg border border-[#E8E4DE] bg-white p-2.5 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-500"></span><div class="flex-1"><p class="text-[12px] font-medium">OpenAI</p><p class="text-[11px] text-zinc-500">4 models · 3 enabled</p></div><span class="w-2 h-2 rounded-full bg-zinc-300" title="drag to reorder priority"></span></div>
+      <div class="rounded-lg border border-red-200 bg-red-50 p-2.5 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-red-500"></span><div class="flex-1"><p class="text-[12px] font-medium">DeepSeek</p><p class="text-[11px] text-red-600">error — invalid key</p></div><button class="px-1.5 py-0.5 rounded bg-white border border-red-200 text-[11px]">Test</button></div>
+      <div class="rounded-lg border border-dashed border-[#E8E4DE] p-2.5 text-[11px] text-zinc-500">Dialog: ID · Name · Base URL · API Key (show/hide) · <b>Test Connection</b> → <code class="px-1 py-0.5 rounded bg-white border font-mono">POST /api/providers/:id/test</code> · Keys AES-256-GCM, <code class="font-mono">keySet</code> only</div>
+      <div class="rounded-lg border border-[#E8E4DE] bg-[#FAF9F5] p-2.5"><p class="text-[11px] font-semibold">Models catalog</p><div class="mt-1.5 border border-[#E8E4DE] rounded-md overflow-hidden bg-white text-[11px]"><div class="grid grid-cols-4 gap-2 px-2 py-1 bg-[#FDFCFB] border-b border-[#E8E4DE] font-medium"><span>☑ Model</span><span>Provider</span><span>Context</span><span>Enabled</span></div><div class="divide-y divide-[#E8E4DE]"><div class="grid grid-cols-4 gap-2 px-2 py-1"><span>☑ claude-sonnet-4-5</span><span class="px-1 py-0 rounded bg-[#6366f1] text-white text-[10px]">anthropic</span><span>200k</span><span class="text-emerald-600">●</span></div><div class="grid grid-cols-4 gap-2 px-2 py-1"><span>☐ claude-opus-4-5</span><span class="px-1 py-0 rounded bg-[#6366f1] text-white text-[10px]">anthropic</span><span>200k</span><span class="text-zinc-400">○</span></div><div class="grid grid-cols-4 gap-2 px-2 py-1"><span>☑ gpt-4o</span><span class="px-1 py-0 rounded bg-emerald-500 text-white text-[10px]">openai</span><span>128k</span><span class="text-emerald-600">●</span></div></div></div><p class="text-[11px] text-zinc-500 mt-1">Fallback routing — drag to reorder chain, <code class="px-1 py-0.5 rounded bg-white border font-mono">fallbacks.json</code></p></div>
+    </div>
+
+    <!-- collapsed hint -->
+    <div class="mt-auto p-2 border-t border-[#E8E4DE] bg-[#FDFCFB] text-[11px] text-zinc-500 hidden lg:block">Right collapsible — <kbd class="px-1 py-0.5 rounded bg-white border font-mono">Ctrl+Shift+B</kbd> · Save/restore via <code class="px-1 py-0.5 rounded bg-white border font-mono">lokma --dump-layout</code></div>
+  </aside>
+</div>
+
+<!-- ========== SESSION DROP MENU (floating) ========== -->
+<div id="session-drop-menu" class="hidden fixed z-50 rounded-xl border border-[#E8E4DE] bg-white shadow-card overflow-hidden" style="min-width:280px">
+  <div class="px-3 py-2 bg-[#FDFCFB] border-b border-[#E8E4DE] flex items-center gap-2"><span class="w-6 h-6 rounded-md bg-[#6366f1] text-white grid place-items-center text-[11px]">⇄</span><div><p class="text-[12px] font-semibold">Drop session</p><p class="text-[11px] text-zinc-500 font-mono">pane/drop { source:{type:"session",id}, target:{paneId,sessionId} }</p></div><button onclick="hideDropMenu()" class="ml-auto w-6 h-6 grid place-items-center rounded hover:bg-white border border-transparent hover:border-[#E8E4DE]">×</button></div>
+  <div class="p-1.5 space-y-1">
+    <button class="w-full text-left px-3 py-2 rounded-lg hover:bg-[#FAF9F5] border border-transparent hover:border-[#E8E4DE] flex items-center gap-2"><span class="w-7 h-7 rounded-md bg-white border border-[#E8E4DE] grid place-items-center">◫</span><div class="flex-1"><p class="text-[13px] font-medium">Open side-by-side</p><p class="text-[11px] text-zinc-500">Split center as new TabSet — default</p></div><span class="text-[11px] px-1.5 py-0.5 rounded bg-[#0a0a0f] text-white">↵</span></button>
+    <button class="w-full text-left px-3 py-2 rounded-lg hover:bg-[#FAF9F5] border border-transparent hover:border-[#E8E4DE] flex items-center gap-2"><span class="w-7 h-7 rounded-md bg-white border border-[#E8E4DE] grid place-items-center">⧉</span><div class="flex-1"><p class="text-[13px] font-medium">Merge transcript</p><p class="text-[11px] text-zinc-500">Append messages into current session</p></div></button>
+    <button class="w-full text-left px-3 py-2 rounded-lg hover:bg-[#FAF9F5] border border-transparent hover:border-[#E8E4DE] flex items-center gap-2"><span class="w-7 h-7 rounded-md bg-white border border-[#E8E4DE] grid place-items-center">⎇</span><div class="flex-1"><p class="text-[13px] font-medium">Fork into this session</p><p class="text-[11px] text-zinc-500">Copy transcript → new ID (experiment branch)</p></div></button>
+  </div>
+  <div class="px-3 py-2 bg-[#FEF9EC] border-t border-[#FDE68A]/50 text-[11px] text-amber-800">Event: <code class="px-1 py-0.5 rounded bg-white border font-mono">pane/drop</code> — handler chooses split/merge/fork</div>
+</div>
+
+<!-- ========== MAXIMIZE OVERLAY ========== -->
+<div id="maximize-overlay" class="hidden fixed inset-0 z-40 bg-[#FAF9F5] flex-col">
+  <div class="h-[36px] flex items-center justify-between px-3 border-b border-[#E8E4DE] bg-white"><div class="flex items-center gap-2"><span class="w-6 h-6 rounded-md bg-[#0a0a0f] text-white grid place-items-center text-[11px]">◈</span><span class="text-[13px] font-semibold">Chat — Refactor auth (maximized)</span><span class="px-1.5 py-0.5 rounded-full bg-amber-100 border border-amber-200 text-amber-800 text-[11px]">Pop-out — Esc to restore</span></div><button onclick="restoreCenter()" class="px-3 py-1 rounded-full bg-[#0a0a0f] text-white text-[12px]">Restore (Esc)</button></div>
+  <div class="flex-1 p-6 flex items-center justify-center text-center"><div class="max-w-md"><p class="font-serif text-[20px]">Maximized TabSet</p><p class="text-[13px] text-zinc-600 mt-1">Double-click tab header to maximize — <code class="px-1 py-0.5 rounded bg-white border font-mono">Esc</code> to restore. Layout persisted to <code class="px-1 py-0.5 rounded bg-white border font-mono">localStorage: lokma:layout:v1</code> + <code class="px-1 py-0.5 rounded bg-white border font-mono">~/.lokma/layout.json</code>.</p><button onclick="restoreCenter()" class="mt-4 px-4 py-2 rounded-full bg-[#6366f1] text-white text-[13px] font-medium">Restore layout</button></div></div>
+</div>
+
+<!-- ========== FOOTER — spec compliance & layout model ========== -->
+<footer class="border-t border-[#E8E4DE] bg-white">
+  <div class="max-w-[1920px] mx-auto px-4 py-4 grid lg:grid-cols-3 gap-4">
+    <div class="rounded-lg border border-[#E8E4DE] bg-[#FAF9F5] p-3">
+      <p class="text-[11px] font-semibold tracking-widest uppercase text-zinc-500">1:1 Spec — Panes (all present)</p>
+      <div class="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+        <span class="px-2 py-1 rounded-full bg-white border border-[#E8E4DE]">✓ Sessions (Today/Yesterday, ⋮⋮ drag)</span>
+        <span class="px-2 py-1 rounded-full bg-white border border-[#E8E4DE]">✓ Projects (cwd, branch pill)</span>
+        <span class="px-2 py-1 rounded-full bg-white border border-[#E8E4DE]">✓ Chats toggle</span>
+        <span class="px-2 py-1 rounded-full bg-white border border-[#E8E4DE]">✓ Files (arborist + git overlay + @file)</span>
+        <span class="px-2 py-1 rounded-full bg-white border border-[#E8E4DE]">✓ Terminal (xterm + PTY)</span>
+        <span class="px-2 py-1 rounded-full bg-white border border-[#E8E4DE]">✓ Browser (iframe)</span>
+        <span class="px-2 py-1 rounded-full bg-white border border-[#E8E4DE]">✓ Code (Monaco diff)</span>
+        <span class="px-2 py-1 rounded-full bg-white border border-[#E8E4DE]">✓ Git</span>
+        <span class="px-2 py-1 rounded-full bg-[#6366f1] text-white">✓ Orchestration</span>
+        <span class="px-2 py-1 rounded-full bg-[#6366f1] text-white">✓ Usage (KPI+chart+table)</span>
+        <span class="px-2 py-1 rounded-full bg-white border border-[#E8E4DE]">✓ Providers & Models (cards + catalog)</span>
+      </div>
+      <p class="text-[11px] text-zinc-500 mt-2">Single loop <code class="px-1 py-0.5 rounded bg-white border font-mono">lokma-core query()</code> — CLI & Web share same loop/tools/sessions</p>
+    </div>
+    <div class="rounded-lg border border-[#E8E4DE] bg-white p-3">
+      <p class="text-[11px] font-semibold tracking-widest uppercase text-zinc-500">Flexlayout model (persisted)</p>
+      <pre class="mt-2 p-2.5 rounded-md bg-[#0a0a0f] text-[#e4e4e7] font-mono text-[11px] leading-4 overflow-x-auto"><code>Root (row)
+├── Border LEFT (260px, collapsible, Ctrl+B)
+│   ├── TabSet "Sessions"  — sessions list
+│   ├── TabSet "Projects"  — project picker
+│   └── TabSet "Chats"     — recent threads
+├── Center (row, flex:1, draggable TabSets)
+│   ├── TabSet A  Chat — Refactor auth
+│   └── TabSet B  Code / Git / Orchestration / Usage
+└── Border RIGHT (340px, collapsible, Ctrl+Shift+B)
+    ├── TabSet "Files"     — file tree
+    ├── TabSet "Terminal"  — xterm logs
+    └── TabSet "Browser"   — harness preview</code></pre>
+      <p class="text-[11px] text-zinc-500 mt-1">IJsonModel → <code class="px-1 py-0.5 rounded bg-[#FAF9F5] border font-mono">localStorage: lokma:layout:v1</code> · Zustand <code class="font-mono">usePaneStore {model, activeSessionId, openTabs}</code></p>
+    </div>
+    <div class="rounded-lg border border-[#E8E4DE] bg-[#FAF9F5] p-3">
+      <p class="text-[11px] font-semibold tracking-widest uppercase text-zinc-500">Theming — OMP/claude/midnight/paper</p>
+      <div class="mt-2 grid grid-cols-2 gap-1.5">
+        <div class="rounded-md bg-[#0a0a0f] text-white p-2 border border-white/10"><p class="text-[11px] font-medium">omp — near-black + indigo</p><p class="font-mono text-[10px] text-zinc-400">#0a0a0f · #6366f1</p></div>
+        <div class="rounded-md bg-[#FAF9F5] text-[#262624] p-2 border border-[#E8E4DE]"><p class="text-[11px] font-medium">claude — cream/terracotta</p><p class="font-mono text-[10px] text-zinc-500">#FAF9F5 · #C96442</p></div>
+        <div class="rounded-md bg-[#0f172a] text-slate-100 p-2 border border-slate-700"><p class="text-[11px] font-medium">midnight — navy/cyan</p><p class="font-mono text-[10px] text-slate-400">#0f172a · #06b6d4</p></div>
+        <div class="rounded-md bg-white text-[#262624] p-2 border border-[#E8E4DE]"><p class="text-[11px] font-medium">paper — white/neutral</p><p class="font-mono text-[10px] text-zinc-500">#ffffff · #52525b</p></div>
+      </div>
+      <p class="text-[11px] text-zinc-500 mt-2"><code class="px-1 py-0.5 rounded bg-white border font-mono">lokma theme set omp</code> · tokens → CSS vars · View → Reset Layout</p>
+    </div>
+  </div>
+  <div class="max-w-[1920px] mx-auto px-4 pb-4 flex flex-wrap gap-2 text-[11px] text-zinc-500"><span>© 2026 Lokma</span><span class="w-px h-3 bg-[#E8E4DE] self-center"></span><a href="#" class="hover:text-zinc-700">Docs: 20-overview · 22-features · 24-pane-system</a><span class="ml-auto">Hybrid shell — Left/Right dark · Center light · All panes draggable — Spec V5 flex split</span></div>
+</footer>
+
+<!-- drag ghost -->
+<div id="drag-ghost" class="hidden rounded-lg border border-[#E8E4DE] bg-white px-3 py-2 text-[12px] font-medium shadow-card"></div>
+
+<script>
+// ----- collapse -----
+function toggleLeft(){const el=document.getElementById('left-border');el.classList.toggle('border-collapsed');if(el.classList.contains('border-collapsed')){el.style.width='0px';}else{el.style.width='var(--left-w)';}}
+function toggleRight(){const el=document.getElementById('right-border');el.classList.toggle('border-collapsed');if(el.classList.contains('border-collapsed')){el.style.width='0px';}else{el.style.width='var(--right-w)';}}
+document.getElementById('left-toggle').addEventListener('click',toggleLeft);
+document.getElementById('right-toggle').addEventListener('click',toggleRight);
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='b' && !e.shiftKey){e.preventDefault();toggleLeft();}
+  if((e.ctrlKey||e.metaKey) && e.shiftKey && e.key.toLowerCase()==='b'){e.preventDefault();toggleRight();}
+  if(e.key==='Escape'){restoreCenter();hideDropMenu();}
+});
+
+// ----- left tabs -----
+document.querySelectorAll('.left-tab').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.left-tab').forEach(x=>x.classList.remove('active','bg-[#1a1a1f]','text-white','border','border-white/10'));
+  document.querySelectorAll('.left-tab').forEach(x=>x.classList.add('text-zinc-400'));
+  b.classList.add('active','bg-[#1a1a1f]','text-white','border','border-white/10');b.classList.remove('text-zinc-400');
+  const t=b.dataset.leftTab;
+  document.querySelectorAll('.left-pane').forEach(p=>p.classList.add('hidden'));
+  document.querySelectorAll('.left-pane').forEach(p=>p.classList.remove('flex'));
+  const pane=document.getElementById('pane-'+t);pane.classList.remove('hidden');pane.classList.add('flex');
+}));
+
+// ----- right tabs -----
+document.querySelectorAll('.right-tab').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.right-tab').forEach(x=>x.classList.remove('active','bg-white','border','border-[#E8E4DE]','shadow-sm'));
+  b.classList.add('active','bg-white','border','border-[#E8E4DE]','shadow-sm');
+  const t=b.dataset.rightTab;
+  document.querySelectorAll('.right-pane').forEach(p=>p.classList.add('hidden'));
+  document.querySelectorAll('.right-pane').forEach(p=>p.classList.remove('flex'));
+  const pane=document.getElementById('pane-'+t);pane.classList.remove('hidden');pane.classList.add('flex');
+}));
+
+// ----- code inner tabs -----
+document.querySelectorAll('.code-tab').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.code-tab').forEach(x=>x.classList.remove('active','bg-white','border','border-[#E8E4DE]','shadow-sm'));
+  b.classList.add('active','bg-white','border','border-[#E8E4DE]','shadow-sm');
+  const t=b.dataset.codeTab;
+  document.querySelectorAll('.code-panel').forEach(p=>p.classList.add('hidden'));
+  document.querySelectorAll('.code-panel').forEach(p=>p.classList.remove('flex'));
+  const pane=document.getElementById(t+'-pane');if(pane){pane.classList.remove('hidden');pane.classList.add('flex');}
+}));
+
+// ----- maximize -----
+function maximizeCenter(){document.getElementById('maximize-overlay').classList.remove('hidden');document.getElementById('maximize-overlay').classList.add('flex');}
+function maximizeTabset(id){maximizeCenter();}
+function restoreCenter(){document.getElementById('maximize-overlay').classList.add('hidden');document.getElementById('maximize-overlay').classList.remove('flex');}
+
+// ----- theme hybrid -----
+document.querySelectorAll('.theme-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.theme-btn').forEach(x=>{x.className='theme-btn px-2.5 py-1 rounded-full text-zinc-600 hover:bg-white text-[11px] font-medium';});
+  b.className='theme-btn px-2.5 py-1 rounded-full bg-[#0a0a0f] text-white text-[11px] font-medium';
+  const t=b.dataset.theme;
+  const left=document.getElementById('left-border');
+  const center=document.getElementById('center');
+  if(t==='dark'){document.documentElement.classList.add('dark');document.body.className='min-h-screen flex flex-col bg-[#0a0a0f] text-white antialiased selection:bg-[#6366f1]/30';}
+  else if(t==='light'){document.documentElement.classList.remove('dark');document.body.className='min-h-screen flex flex-col bg-[#FAF9F5] text-[#262624] antialiased selection:bg-[#C96442]/20';left.className='flex flex-col shrink-0 border-r bg-white transition-all duration-200';center.className='flex flex-1 min-w-0 bg-[#FAF9F5] flex-col';}
+  else{ // hybrid
+    document.documentElement.classList.remove('dark');document.body.className='min-h-screen flex flex-col bg-[#FAF9F5] text-[#262624] antialiased selection:bg-[#6366f1]/20';left.className='pane-dark flex flex-col shrink-0 border-r transition-all duration-200';center.className='flex flex-1 min-w-0 bg-[#FAF9F5] flex-col';
+    left.style.width='var(--left-w)';left.style.minWidth='var(--left-w)';
+  }
+  // persist hint
+  try{localStorage.setItem('lokma:theme',t);}catch(e){}
+}));
+
+// ----- drag: session rows -> center drop menu -----
+let draggedSession=null;
+document.querySelectorAll('.session-row').forEach(row=>{
+  row.addEventListener('dragstart',e=>{
+    draggedSession=row.dataset.sessionId;
+    row.style.opacity='0.5';
+    e.dataTransfer.effectAllowed='copy';
+    e.dataTransfer.setData('text/plain', draggedSession);
+    const ghost=document.getElementById('drag-ghost');ghost.textContent='⇄ '+draggedSession+' → drop on Chat';ghost.classList.remove('hidden');
+  });
+  row.addEventListener('dragend',()=>{row.style.opacity='';document.getElementById('drag-ghost').classList.add('hidden');draggedSession=null;});
+});
+const chatDrop=document.getElementById('tabset-chat');
+chatDrop.addEventListener('dragover',e=>{if(draggedSession){e.preventDefault();chatDrop.classList.add('active');}});
+chatDrop.addEventListener('dragleave',()=>chatDrop.classList.remove('active'));
+chatDrop.addEventListener('drop',e=>{
+  e.preventDefault();chatDrop.classList.remove('active');
+  if(draggedSession){
+    const menu=document.getElementById('session-drop-menu');
+    menu.style.left=(e.clientX+12)+'px';menu.style.top=(e.clientY+12)+'px';
+    // clamp
+    const r=menu.getBoundingClientRect();
+    if(r.right>window.innerWidth) menu.style.left=(window.innerWidth - r.width - 12)+'px';
+    if(r.bottom>window.innerHeight) menu.style.top=(window.innerHeight - r.height - 12)+'px';
+    menu.classList.remove('hidden');
+    // toast
+    showToast('Session '+draggedSession+' → drop choices shown');
+  }
+});
+function hideDropMenu(){document.getElementById('session-drop-menu').classList.add('hidden');}
+document.getElementById('session-drop-menu').querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>{
+  hideDropMenu();
+  const label=btn.querySelector('p').textContent;
+  showToast('✓ '+label+' — flexlayout: new split created');
+}));
+
+// ----- drag: tabs -> drop zones (Chat tab to Files zone) -----
+let draggedTab=null;
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('dragstart',e=>{
+    draggedTab=tab.dataset.tab;
+    tab.classList.add('dragging');
+    e.dataTransfer.effectAllowed='move';
+    const ghost=document.getElementById('drag-ghost');ghost.textContent='Tab: '+tab.textContent.trim().slice(0,28);ghost.classList.remove('hidden');
+  });
+  tab.addEventListener('dragend',()=>{tab.classList.remove('dragging');document.getElementById('drag-ghost').classList.add('hidden');draggedTab=null;document.querySelectorAll('.drop-zone').forEach(z=>z.classList.remove('active'));});
+});
+document.querySelectorAll('.drop-zone').forEach(zone=>{
+  zone.addEventListener('dragover',e=>{if(draggedTab){e.preventDefault();zone.classList.add('active');}});
+  zone.addEventListener('dragleave',()=>zone.classList.remove('active'));
+  zone.addEventListener('drop',e=>{
+    e.preventDefault();zone.classList.remove('active');
+    if(draggedTab){
+      showToast('Tab "'+draggedTab+'" → dropped to '+zone.id+' — flexlayout TabSet moved');
+      // visual: flash
+      zone.style.transition='background 200ms';zone.style.background='rgba(99,102,241,0.08)';
+      setTimeout(()=>zone.style.background='',500);
+    }
+  });
+});
+// ghost follow mouse
+document.addEventListener('dragover',e=>{
+  const g=document.getElementById('drag-ghost');
+  if(!g.classList.contains('hidden')){g.style.left=(e.clientX+14)+'px';g.style.top=(e.clientY+14)+'px';}
+});
+
+// ----- file drag -> composer @mention -----
+let draggedFile=null;
+document.querySelectorAll('.file-row').forEach(row=>{
+  row.addEventListener('dragstart',e=>{draggedFile=row.dataset.file;e.dataTransfer.setData('text/plain', draggedFile);});
+  row.addEventListener('dragend',()=>draggedFile=null);
+});
+const composer=document.getElementById('composer');
+composer.addEventListener('dragover',e=>{e.preventDefault();composer.classList.add('ring-1','ring-[#6366f1]');});
+composer.addEventListener('dragleave',()=>composer.classList.remove('ring-1','ring-[#6366f1]'));
+composer.addEventListener('drop',e=>{
+  e.preventDefault();composer.classList.remove('ring-1','ring-[#6366f1]');
+  const file=draggedFile || e.dataTransfer.getData('text/plain');
+  if(file){composer.value=(composer.value+' @'+file+' ').trimStart();composer.focus();showToast('Inserted @'+file+' — harness will include file in context');}
+});
+document.querySelectorAll('.file-row').forEach(row=>row.addEventListener('click',()=>{
+  document.querySelectorAll('.code-tab').forEach(x=>x.classList.remove('active','bg-white','border','shadow-sm'));
+  document.querySelector('[data-code-tab="code"]').classList.add('active','bg-white','border','border-[#E8E4DE]','shadow-sm');
+  document.querySelectorAll('.code-panel').forEach(p=>{p.classList.add('hidden');p.classList.remove('flex');});
+  document.getElementById('code-pane').classList.remove('hidden');document.getElementById('code-pane').classList.add('flex');
+  showToast('Opened '+row.dataset.file+' in Code pane');
+}));
+
+// ----- splitter resize -----
+document.querySelectorAll('.splitter').forEach(splitter=>{
+  let startX, startW, target;
+  splitter.addEventListener('pointerdown',e=>{
+    splitter.setPointerCapture(e.pointerId);
+    splitter.classList.add('dragging');
+    startX=e.clientX;
+    if(splitter.dataset.splitter==='left'){target=document.getElementById('left-border');startW=target.getBoundingClientRect().width;}
+    else if(splitter.dataset.splitter==='right'){target=document.getElementById('right-border');startW=target.getBoundingClientRect().width;}
+    else if(splitter.dataset.splitter==='center'){target=document.getElementById('tabset-chat');startW=target.getBoundingClientRect().width;}
+    const move=ev=>{
+      const dx=ev.clientX - startX;
+      if(splitter.dataset.splitter==='left'){let w=Math.max(180,Math.min(420,startW+dx));target.style.width=w+'px';target.style.minWidth=w+'px';}
+      else if(splitter.dataset.splitter==='right'){let w=Math.max(260,Math.min(520,startW - dx));target.style.width=w+'px';target.style.minWidth=w+'px';}
+      else if(splitter.dataset.splitter==='center'){let w=Math.max(320,startW+dx);target.style.flex='0 0 '+w+'px';}
+    };
+    const up=()=>{
+      splitter.classList.remove('dragging');
+      splitter.releasePointerCapture(e.pointerId);
+      window.removeEventListener('pointermove',move);
+      window.removeEventListener('pointerup',up);
+      showToast('Splitter resized — layout will persist to localStorage: lokma:layout:v1');
+      try{localStorage.setItem('lokma:layout:v1', JSON.stringify({left:document.getElementById('left-border').style.width,right:document.getElementById('right-border').style.width,ts:Date.now()}));}catch(e){}
+    };
+    window.addEventListener('pointermove',move);
+    window.addEventListener('pointerup',up);
+  });
+});
+
+// ----- toast -----
+function showToast(msg){
+  let t=document.getElementById('_toast');
+  if(!t){t=document.createElement('div');t.id='_toast';t.className='fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-3 py-2 rounded-full bg-[#0a0a0f] text-white text-[12px] font-medium shadow-card border border-white/10 flex items-center gap-2';document.body.appendChild(t);}
+  t.textContent='● '+msg; t.style.opacity='1'; t.style.transform='translate(-50%,0)';
+  clearTimeout(t._timer); t._timer=setTimeout(()=>{t.style.opacity='0';},2600);
+}
+
+// ----- persist hint on load -----
+try{
+  const saved=localStorage.getItem('lokma:layout:v1');
+  if(saved){console.log('lokma:layout:v1',JSON.parse(saved));}
+}catch(e){}
+
+// ----- double-click maximize hint -----
+document.getElementById('center-tab-bar').addEventListener('dblclick',maximizeCenter);
+</script>
+</body>
+</html>

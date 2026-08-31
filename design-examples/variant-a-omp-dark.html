@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Variant A — OMP Dark (shadcn new-york)</title>
+<!-- Tailwind CDN — standalone preview, no build -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+          mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+        },
+        colors: {
+          border: 'hsl(var(--border))',
+          input: 'hsl(var(--input))',
+          ring: 'hsl(var(--ring))',
+          background: 'hsl(var(--background))',
+          foreground: 'hsl(var(--foreground))',
+          primary: { DEFAULT: 'hsl(var(--primary))', foreground: 'hsl(var(--primary-foreground))' },
+          secondary: { DEFAULT: 'hsl(var(--secondary))', foreground: 'hsl(var(--secondary-foreground))' },
+          muted: { DEFAULT: 'hsl(var(--muted))', foreground: 'hsl(var(--muted-foreground))' },
+          accent: { DEFAULT: 'hsl(var(--accent))', foreground: 'hsl(var(--accent-foreground))' },
+          card: { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' },
+        },
+        borderRadius: { lg: 'var(--radius)', md: 'calc(var(--radius) - 2px)', sm: 'calc(var(--radius) - 4px)' },
+      }
+    }
+  }
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  /* shadcn new-york — dark theme tokens */
+  :root, .dark {
+    --background: 240 10% 3.9%; /* #0a0a0f */
+    --foreground: 0 0% 98%;
+    --card: 240 6% 10%; /* #1a1a1f overlay, but base is #0a0a0f via body */
+    --card-foreground: 0 0% 98%;
+    --popover: 240 6% 10%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 239 84% 67%; /* #6366f1 */
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 64%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 239 84% 67%;
+    --radius: 0.5rem; /* shadcn new-york: rounded-lg = 0.5rem */
+  }
+  * { border-color: hsl(var(--border)); }
+  body {
+    background-color: #0a0a0f;
+    color: hsl(var(--foreground));
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* subtle grid — shadcn new-york subtle background */
+  .grid-bg {
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .grid-fade {
+    background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(99,102,241,0.15), transparent 60%),
+                radial-gradient(ellipse 60% 40% at 90% 90%, rgba(99,102,241,0.07), transparent 50%);
+  }
+  /* scrollbar — dark minimal */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.3); }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  /* shadcn focus ring utility */
+  .focus-ring:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring)); }
+
+  /* streaming cursor */
+  @keyframes blink { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
+  .cursor-blink { animation: blink 1s step-end infinite; }
+  @keyframes pulse-dot { 0%, 100% { opacity: 0.3 } 50% { opacity: 1 } }
+  .dot-pulse { animation: pulse-dot 1.2s ease-in-out infinite; }
+  .dot-pulse:nth-child(2) { animation-delay: 0.2s; }
+  .dot-pulse:nth-child(3) { animation-delay: 0.4s; }
+</style>
+</head>
+<body class="dark min-h-screen bg-[#0a0a0f] text-zinc-100 selection:bg-[#6366f1]/30 selection:text-white">
+  <!-- subtle grid + fade overlay -->
+  <div class="fixed inset-0 grid-bg pointer-events-none"></div>
+  <div class="fixed inset-0 grid-fade pointer-events-none"></div>
+
+  <div class="relative flex min-h-screen flex-col">
+    <!-- ================= HEADER ================= -->
+    <!-- shadcn header: sticky, border-b, backdrop-blur -->
+    <header class="sticky top-0 z-40 flex h-[56px] shrink-0 items-center justify-between border-b border-white/[0.06] bg-[#0a0a0f]/80 px-4 backdrop-blur-xl md:px-6">
+      <div class="flex items-center gap-4">
+        <!-- logo mark -->
+        <div class="flex items-center gap-3">
+          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-[#6366f1] text-white shadow-lg shadow-[#6366f1]/20">
+            <!-- lokma / harness mark -->
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9Z"/><path d="M12 7v6l4 2"/></svg>
+          </div>
+          <div>
+            <h1 class="text-[13px] font-semibold tracking-tight text-white">Variant A — OMP Dark <span class="font-normal text-zinc-500">(shadcn new-york)</span></h1>
+            <p class="hidden text-[11px] leading-none text-zinc-500 md:block">Lokma Harness · App Shell · Explorer + Chat + Inspector</p>
+          </div>
+        </div>
+        <div class="hidden h-6 w-px bg-white/10 md:block"></div>
+        <div class="hidden items-center gap-1.5 md:flex">
+          <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-zinc-400">
+            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow shadow-emerald-500/40"></span> WS connected
+          </span>
+          <span class="inline-flex items-center rounded-full bg-[#6366f1] px-2 py-1 text-[11px] font-semibold text-white">Phase 0</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1.5">
+        <!-- header actions — shadcn Button ghost / secondary -->
+        <button class="hidden h-8 items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-3 text-[13px] font-medium text-zinc-300 hover:bg-white/[0.08] focus-ring md:inline-flex">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> New session
+        </button>
+        <button class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-white focus-ring">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        </button>
+        <button class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-white focus-ring">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z"/><path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/><path d="M12 8v1"/></svg>
+        </button>
+        <div class="ml-1 hidden h-8 w-px bg-white/10 md:block"></div>
+        <div class="hidden items-center gap-2 pl-1 md:flex">
+          <img src="https://i.pravatar.cc/100?img=32" alt="user" class="h-7 w-7 rounded-full border border-white/10 object-cover" />
+          <div class="hidden lg:block">
+            <p class="text-[12px] font-medium leading-none text-white">lokma</p>
+            <p class="font-mono text-[10px] leading-none text-zinc-500">sess_8f3a…</p>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ================= APP SHELL ================= -->
+    <div class="flex flex-1 overflow-hidden">
+      <!-- ===== LEFT: Explorer (Sessions) ===== -->
+      <aside class="hidden w-[300px] shrink-0 flex-col border-r border-white/[0.06] bg-[#0a0a0f]/60 backdrop-blur-sm lg:flex">
+        <!-- explorer header -->
+        <div class="flex h-[44px] items-center justify-between border-b border-white/[0.06] px-3">
+          <div class="flex items-center gap-2">
+            <span class="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Explorer</span>
+            <span class="inline-flex h-4 items-center rounded bg-white/10 px-1.5 font-mono text-[10px] font-medium text-zinc-300">12</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <button class="inline-flex h-6 w-6 items-center justify-center rounded-md text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200 focus-ring">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <button class="inline-flex h-6 w-6 items-center justify-center rounded-md text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200 focus-ring">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+            </button>
+            <button class="inline-flex h-6 w-6 items-center justify-center rounded-md text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200 focus-ring">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- search input — shadcn Input -->
+        <div class="p-3">
+          <div class="relative">
+            <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+            <input placeholder="Search sessions…  (⌘K)" class="flex h-8 w-full rounded-md border border-white/10 bg-white/[0.04] pl-8 pr-3 text-[13px] text-white placeholder:text-zinc-500 focus:border-[#6366f1]/50 focus:outline-none focus:ring-1 focus:ring-[#6366f1]/50" />
+          </div>
+          <div class="mt-2 flex items-center gap-1.5">
+            <button class="inline-flex items-center rounded-full bg-[#6366f1] px-2.5 py-1 text-[11px] font-medium text-white">All</button>
+            <button class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-zinc-400 hover:text-zinc-200">Running</button>
+            <button class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-zinc-400 hover:text-zinc-200">Starred</button>
+          </div>
+        </div>
+
+        <!-- session groups -->
+        <div class="flex-1 overflow-y-auto px-2 pb-3">
+          <!-- group label -->
+          <div class="sticky top-0 z-10 -mx-2 bg-[#0a0a0f]/80 px-3 py-1.5 backdrop-blur-sm">
+            <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg> Today
+            </p>
+          </div>
+
+          <!-- session item — active -->
+          <div class="group relative mb-1.5 rounded-lg border border-[#6366f1]/30 bg-[#6366f1]/[0.08] p-3 shadow-sm">
+            <div class="absolute inset-y-2 left-0 w-[2px] rounded-full bg-[#6366f1]"></div>
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-[13px] font-medium leading-none text-white">Market research agent</p>
+                <p class="mt-1 font-mono text-[11px] font-medium leading-none tracking-tight text-[#818cf8]">sess_8f3a9c1e-2b4d</p>
+                <p class="mt-1.5 line-clamp-2 text-[12px] leading-snug text-zinc-400">Analyze competitor pricing — streaming tokens…</p>
+              </div>
+              <span class="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-400">
+                <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400"></span> Live
+              </span>
+            </div>
+            <div class="mt-2.5 flex items-center justify-between">
+              <span class="inline-flex items-center gap-1 text-[11px] text-zinc-500">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> 2m ago
+              </span>
+              <span class="font-mono text-[11px] text-zinc-500">1,248 tok</span>
+            </div>
+            <!-- progress bar — streaming -->
+            <div class="mt-2 h-1 overflow-hidden rounded-full bg-white/10">
+              <div class="h-full w-[68%] rounded-full bg-[#6366f1]"></div>
+            </div>
+          </div>
+
+          <!-- session item -->
+          <div class="mb-1 rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 hover:bg-white/[0.04]">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-[13px] font-medium leading-none text-zinc-200">Code review — PR #482</p>
+                <p class="mt-1 font-mono text-[11px] font-medium leading-none tracking-tight text-zinc-500">sess_b71e4f9a-c382</p>
+              </div>
+              <span class="inline-flex shrink-0 items-center rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Idle</span>
+            </div>
+            <p class="mt-1.5 line-clamp-1 text-[12px] leading-snug text-zinc-500">Review feedback on auth middleware…</p>
+            <div class="mt-2 flex items-center gap-2 text-[11px] text-zinc-500">
+              <span>18m ago</span><span class="h-1 w-1 rounded-full bg-white/20"></span><span class="font-mono">842 tok</span>
+            </div>
+          </div>
+
+          <div class="mb-1 rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 hover:bg-white/[0.04]">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-[13px] font-medium leading-none text-zinc-200">Deploy pipeline — staging</p>
+                <p class="mt-1 font-mono text-[11px] font-medium leading-none tracking-tight text-zinc-500">sess_e4a8d12c-91af</p>
+              </div>
+              <span class="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-400">
+                <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span> Queued
+              </span>
+            </div>
+            <p class="mt-1.5 line-clamp-1 text-[12px] leading-snug text-zinc-500">Fastify 5 migration — build pending…</p>
+            <div class="mt-2 flex items-center gap-2 text-[11px] text-zinc-500">
+              <span>42m ago</span><span class="h-1 w-1 rounded-full bg-white/20"></span><span class="font-mono">2.1k tok</span>
+            </div>
+          </div>
+
+          <div class="mb-3 rounded-lg border border-red-500/20 bg-red-500/[0.06] p-3">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-[13px] font-medium leading-none text-zinc-200">Data ingest — cron failure</p>
+                <p class="mt-1 font-mono text-[11px] font-medium leading-none tracking-tight text-zinc-500">sess_9c0f2e7b-44d1</p>
+              </div>
+              <span class="inline-flex shrink-0 items-center rounded-full border border-red-500/20 bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-400">Error</span>
+            </div>
+            <p class="mt-1.5 text-[12px] leading-snug text-zinc-500">Upstream 502 — retrying in 14s</p>
+            <div class="mt-2 flex items-center gap-2 text-[11px] text-zinc-500">
+              <span>1h ago</span><span class="h-1 w-1 rounded-full bg-white/20"></span><span class="font-mono">412 tok</span>
+            </div>
+          </div>
+
+          <!-- group: Yesterday -->
+          <div class="sticky top-0 z-10 -mx-2 bg-[#0a0a0f]/80 px-3 py-1.5 backdrop-blur-sm">
+            <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg> Yesterday
+            </p>
+          </div>
+          <div class="space-y-1">
+            <div class="rounded-lg border border-white/[0.04] bg-transparent p-3 hover:bg-white/[0.03]">
+              <p class="truncate text-[13px] font-medium text-zinc-300">Docs — harness spec sync</p>
+              <p class="mt-1 font-mono text-[11px] tracking-tight text-zinc-500">sess_3d5b1a2f-70e8</p>
+              <div class="mt-1 flex items-center gap-2 text-[11px] text-zinc-600"><span>Yesterday 18:42</span><span class="font-mono">3.4k tok</span></div>
+            </div>
+            <div class="rounded-lg border border-white/[0.04] bg-transparent p-3 hover:bg-white/[0.03]">
+              <p class="truncate text-[13px] font-medium text-zinc-300">Onboarding flow — QA</p>
+              <p class="mt-1 font-mono text-[11px] tracking-tight text-zinc-500">sess_a1c9e0d4-5f2b</p>
+              <div class="mt-1 flex items-center gap-2 text-[11px] text-zinc-600"><span>Yesterday 14:10</span><span class="font-mono">976 tok</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- explorer footer — shadcn Card -->
+        <div class="border-t border-white/[0.06] p-3">
+          <div class="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3">
+            <div class="flex items-center justify-between">
+              <p class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Storage</p>
+              <span class="font-mono text-[11px] text-zinc-400">68%</span>
+            </div>
+            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div class="h-full w-[68%] rounded-full bg-[#6366f1]"></div>
+            </div>
+            <p class="mt-1.5 text-[11px] text-zinc-500">12 sessions · 4.2 MB context</p>
+          </div>
+        </div>
+      </aside>
+
+      <!-- ===== CENTER: Chat (mock WS streaming) ===== -->
+      <main class="flex min-w-0 flex-1 flex-col bg-[#0a0a0f]">
+        <!-- chat header — shadcn style -->
+        <div class="flex h-[44px] shrink-0 items-center justify-between border-b border-white/[0.06] bg-white/[0.02] px-4 backdrop-blur-sm">
+          <div class="flex min-w-0 items-center gap-3">
+            <div class="flex h-7 w-7 items-center justify-center rounded-md bg-[#6366f1] text-white">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-1.9.5 4.48 4.48 0 0 0 2-2.5 8.5 8.5 0 0 1-2.7 1 4.5 4.5 0 0 0-7.7 4.1 12.8 12.8 0 0 1-9.3-4.7s-4 9 5 13a9 9 0 0 1-5.5 1.9c5 3 13 1.7 13-5v-.6a6 6 0 0 0 3-3.5 8.3 8.3 0 0 1-2.4.7z"/></svg>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <p class="truncate text-[13px] font-semibold text-white">Market research agent</p>
+                <span class="hidden items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400 md:inline-flex">
+                  <span class="h-1 w-1 animate-pulse rounded-full bg-emerald-400"></span> streaming
+                </span>
+                <span class="hidden font-mono text-[11px] text-zinc-500 md:inline">· sess_8f3a9c1e</span>
+              </div>
+              <p class="hidden text-[11px] leading-none text-zinc-500 md:block">Mock WS · 42 ms latency · gpt-4o · 8k context</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-1">
+            <button class="inline-flex h-7 items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] px-2 text-[12px] font-medium text-zinc-300 hover:bg-white/[0.08] focus-ring">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg> Export
+            </button>
+            <button class="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200 focus-ring">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- messages scroll area -->
+        <div id="chat-scroll" class="flex-1 overflow-y-auto px-4 py-6 md:px-6">
+          <div class="mx-auto flex max-w-[720px] flex-col gap-5">
+            <!-- system notice — shadcn Badge + Card subtle -->
+            <div class="flex justify-center">
+              <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-medium text-zinc-400">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg> Session resumed · Context 3.2k / 8k tokens
+              </span>
+            </div>
+
+            <!-- user message — shadcn Card (secondary) -->
+            <div class="flex gap-3">
+              <img src="https://i.pravatar.cc/100?img=32" alt="user" class="mt-0.5 h-7 w-7 shrink-0 rounded-full border border-white/10" />
+              <div class="min-w-0 flex-1">
+                <div class="flex items-baseline gap-2">
+                  <span class="text-[13px] font-semibold text-white">You</span>
+                  <span class="text-[11px] text-zinc-500">09:42:11</span>
+                  <span class="inline-flex rounded bg-white/10 px-1 py-0 font-mono text-[10px] text-zinc-400">user</span>
+                </div>
+                <div class="mt-1.5 rounded-lg border border-white/[0.06] bg-white/[0.04] px-3.5 py-2.5">
+                  <p class="text-[13.5px] leading-relaxed text-zinc-200">Analyze competitor pricing for the <span class="font-medium text-white">Lokma harness</span> — focus on inference cost, self-hosted vs managed, and bulk discount models. Give me a table + 3 takeaways I can share with design.</p>
+                  <div class="mt-2 flex flex-wrap gap-1.5">
+                    <span class="inline-flex items-center rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-[11px] text-zinc-400">pricing-research.md</span>
+                    <span class="inline-flex items-center rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-[11px] text-zinc-400">competitors.csv</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- assistant — tool call Card -->
+            <div class="flex gap-3">
+              <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#6366f1] text-white shadow shadow-[#6366f1]/20">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8V4H8"/><rect x="8" y="12" width="8" height="8" rx="2"/><path d="M16 8v4h4"/></svg>
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-baseline gap-2">
+                  <span class="text-[13px] font-semibold text-white">Lokma</span>
+                  <span class="inline-flex items-center gap-1 rounded-full bg-[#6366f1]/15 px-1.5 py-0.5 text-[10px] font-semibold text-[#a5b4fc]">GPT-4o</span>
+                  <span class="text-[11px] text-zinc-500">streaming · 42 tok/s</span>
+                </div>
+                <!-- tool card — shadcn Card -->
+                <div class="mt-2 overflow-hidden rounded-lg border border-white/[0.06] bg-[#14141b]">
+                  <div class="flex items-center justify-between border-b border-white/[0.06] bg-white/[0.03] px-3 py-2">
+                    <div class="flex items-center gap-2">
+                      <span class="inline-flex h-5 w-5 items-center justify-center rounded bg-white/10 text-zinc-400">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M10 13H8"/><path d="M16 13h-2"/><path d="M10 17H8"/><path d="M16 17h-2"/></svg>
+                      </span>
+                      <span class="font-mono text-[12px] font-medium text-zinc-300">web_search</span>
+                      <span class="inline-flex rounded-full bg-emerald-500/15 px-1.5 py-0 text-[10px] font-medium text-emerald-400">done · 1.2s</span>
+                    </div>
+                    <span class="font-mono text-[11px] text-zinc-500">3 results</span>
+                  </div>
+                  <div class="space-y-2 p-3">
+                    <div class="flex gap-2 rounded-md border border-white/[0.06] bg-white/[0.03] px-2.5 py-2">
+                      <span class="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#6366f1]"></span>
+                      <div class="min-w-0">
+                        <p class="text-[12px] font-medium leading-none text-zinc-200">OpenAI / Anthropic pricing — Oct 2025</p>
+                        <p class="mt-1 font-mono text-[11px] text-zinc-500">api.openai.com/pricing · token-based, bulk 20% at 10M/mo</p>
+                      </div>
+                    </div>
+                    <div class="flex gap-2 rounded-md border border-white/[0.06] bg-white/[0.03] px-2.5 py-2 opacity-80">
+                      <span class="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-600"></span>
+                      <div class="min-w-0">
+                        <p class="text-[12px] font-medium leading-none text-zinc-300">Together.ai vs Anyscale — self-hosted GPU</p>
+                        <p class="mt-1 font-mono text-[11px] text-zinc-500">together.ai/pricing · $0.60/1M tokens (Llama 3.1 70B)</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- assistant streaming message — shadcn Card -->
+            <div class="flex gap-3">
+              <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#6366f1] text-white shadow shadow-[#6366f1]/20">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8V4H8"/><rect x="8" y="12" width="8" height="8" rx="2"/><path d="M16 8v4h4"/></svg>
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-baseline gap-2">
+                  <span class="text-[13px] font-semibold text-white">Lokma</span>
+                  <span class="text-[11px] text-zinc-500" id="stream-meta">streaming…</span>
+                </div>
+                <div class="mt-1.5 rounded-lg border border-white/[0.06] bg-[#14141b] px-3.5 py-3">
+                  <!-- streaming text container -->
+                  <div id="stream-target" class="prose prose-invert max-w-none text-[13.5px] leading-relaxed text-zinc-200">
+                    <!-- injected by JS -->
+                  </div>
+                  <!-- typing indicator -->
+                  <div id="typing-indicator" class="mt-3 flex items-center gap-2 border-t border-white/[0.06] pt-3">
+                    <div class="flex items-center gap-1">
+                      <span class="dot-pulse h-1.5 w-1.5 rounded-full bg-[#6366f1]"></span>
+                      <span class="dot-pulse h-1.5 w-1.5 rounded-full bg-[#6366f1]"></span>
+                      <span class="dot-pulse h-1.5 w-1.5 rounded-full bg-[#6366f1]"></span>
+                    </div>
+                    <span class="text-[11px] font-medium text-zinc-500">Generating — mock WS streaming (press Replay to restart)</span>
+                  </div>
+                  <!-- post-stream actions — shadcn Button ghost -->
+                  <div id="stream-actions" class="hidden mt-3 flex flex-wrap gap-1.5 border-t border-white/[0.06] pt-3">
+                    <button class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[12px] font-medium text-zinc-300 hover:bg-white/[0.08]"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 14c1.5-1.6 1.5-4 0-5.5l-1-1a3.9 3.9 0 0 0-5.5 0l-1 1"/><path d="M5 10c-1.5 1.6-1.5 4 0 5.5l1 1a3.9 3.9 0 0 0 5.5 0l1-1"/></svg> Copy</button>
+                    <button class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[12px] font-medium text-zinc-300 hover:bg-white/[0.08]"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg> Insert to canvas</button>
+                    <button class="inline-flex items-center gap-1 rounded-md bg-[#6366f1] px-2.5 py-1 text-[12px] font-medium text-white hover:bg-[#5558e6]">Share takeaways →</button>
+                  </div>
+                </div>
+                <!-- token bar -->
+                <div class="mt-2 flex items-center gap-2 text-[11px] text-zinc-500">
+                  <span id="token-count" class="font-mono">0 tokens</span>
+                  <span class="h-1 w-1 rounded-full bg-white/20"></span>
+                  <div class="flex-1 h-1 max-w-[160px] overflow-hidden rounded-full bg-white/10">
+                    <div id="token-bar" class="h-full rounded-full bg-[#6366f1] transition-all duration-150" style="width: 0%"></div>
+                  </div>
+                  <span class="hidden md:inline">~$0.002</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- suggestion chips — shadcn Badge / Button outline -->
+            <div class="ml-10 flex flex-wrap gap-1.5">
+              <button class="inline-flex items-center rounded-full border border-[#6366f1]/30 bg-[#6366f1]/10 px-3 py-1 text-[12px] font-medium text-[#a5b4fc] hover:bg-[#6366f1]/15">Expand to full report</button>
+              <button class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[12px] font-medium text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-200">Compare self-hosted costs</button>
+              <button class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[12px] font-medium text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-200">Add to doc</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- composer — shadcn Input + Button -->
+        <div class="shrink-0 border-t border-white/[0.06] bg-[#0f0f13]/80 p-3 backdrop-blur-xl md:p-4">
+          <div class="mx-auto max-w-[720px]">
+            <!-- composer card — shadcn Card -->
+            <div class="rounded-xl border border-white/[0.08] bg-[#1a1a1f] p-2 shadow-xl shadow-black/20">
+              <div class="flex items-end gap-2">
+                <button class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-white">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+                </button>
+                <div class="relative flex-1">
+                  <textarea id="composer" rows="1" placeholder="Message Lokma…  (mock WS — streaming is simulated)" class="max-h-[120px] min-h-[36px] w-full resize-none rounded-lg border-0 bg-transparent px-2 py-2 text-[13.5px] leading-relaxed text-white placeholder:text-zinc-500 focus:outline-none"></textarea>
+                  <div class="pointer-events-none absolute bottom-0 right-0 hidden items-center gap-1 pb-1 pr-1 md:flex">
+                    <span class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">⌘</span>
+                    <span class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">↵</span>
+                  </div>
+                </div>
+                <div class="flex shrink-0 items-center gap-1.5">
+                  <button class="hidden h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-300 md:inline-flex">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z"/><path d="M19 10a7 7 0 0 1-14 0"/><path d="M12 19v4"/><path d="M8 23h8"/></svg>
+                  </button>
+                  <button id="send-btn" class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#6366f1] px-3.5 text-[13px] font-semibold text-white shadow shadow-[#6366f1]/20 hover:bg-[#5558e6] focus-ring">
+                    Send
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="mt-2 flex items-center justify-between border-t border-white/[0.06] pt-2">
+                <div class="flex items-center gap-2 text-[11px] text-zinc-500">
+                  <span class="hidden items-center gap-1 md:inline-flex"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> Fastify 5 · WS /v1/stream</span>
+                  <span class="hidden h-3 w-px bg-white/10 md:block"></span>
+                  <span class="font-mono">Enter to send · Shift+Enter new line</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <button id="replay-btn" class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-medium text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-200">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.7 1 6.3 2.7"/><path d="M21 3v7h-7"/></svg> Replay stream
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p class="mt-2 text-center text-[11px] text-zinc-600">Preview only — no backend. Streaming is mocked via JS. Tailwind CDN + shadcn new-york tokens.</p>
+          </div>
+        </div>
+      </main>
+
+      <!-- ===== RIGHT: Inspector ===== -->
+      <aside class="hidden w-[340px] shrink-0 flex-col border-l border-white/[0.06] bg-[#0f0f13]/60 backdrop-blur-sm xl:flex">
+        <!-- inspector header -->
+        <div class="flex h-[44px] items-center justify-between border-b border-white/[0.06] px-4">
+          <div class="flex items-center gap-2">
+            <span class="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Inspector</span>
+            <span class="inline-flex h-4 items-center rounded bg-[#6366f1]/15 px-1.5 text-[10px] font-semibold text-[#a5b4fc]">LIVE</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <button class="inline-flex h-6 w-6 items-center justify-center rounded-md text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>
+            </button>
+            <button class="inline-flex h-6 w-6 items-center justify-center rounded-md text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto">
+          <!-- session meta — shadcn Card -->
+          <div class="p-4">
+            <div class="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="text-[12px] font-semibold text-white">sess_8f3a9c1e-2b4d</p>
+                  <p class="mt-0.5 font-mono text-[11px] text-zinc-500">harness@lokma · us-east-1</p>
+                </div>
+                <span class="inline-flex shrink-0 items-center rounded-full bg-[#6366f1] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Active</span>
+              </div>
+              <div class="mt-3 grid grid-cols-3 gap-2">
+                <div class="rounded-md border border-white/[0.06] bg-[#0a0a0f] px-2.5 py-2">
+                  <p class="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Latency</p>
+                  <p class="mt-1 font-mono text-[13px] font-semibold text-white">42<span class="text-[11px] font-normal text-zinc-500"> ms</span></p>
+                </div>
+                <div class="rounded-md border border-white/[0.06] bg-[#0a0a0f] px-2.5 py-2">
+                  <p class="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Tokens</p>
+                  <p class="mt-1 font-mono text-[13px] font-semibold text-white">1.2k</p>
+                </div>
+                <div class="rounded-md border border-white/[0.06] bg-[#0a0a0f] px-2.5 py-2">
+                  <p class="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Cost</p>
+                  <p class="mt-1 font-mono text-[13px] font-semibold text-white">$0.02</p>
+                </div>
+              </div>
+              <div class="mt-3 flex gap-1.5">
+                <button class="inline-flex flex-1 items-center justify-center rounded-md bg-[#6366f1] px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-[#5558e6]">Fork session</button>
+                <button class="inline-flex items-center justify-center rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[12px] font-medium text-zinc-300 hover:bg-white/[0.08]">Pause</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- tabs -->
+          <div class="border-b border-white/[0.06] px-2">
+            <div class="flex gap-1">
+              <button class="border-b-2 border-[#6366f1] px-3 py-2 text-[12px] font-semibold text-white">Context</button>
+              <button class="border-b-2 border-transparent px-3 py-2 text-[12px] font-medium text-zinc-500 hover:text-zinc-300">Tools</button>
+              <button class="border-b-2 border-transparent px-3 py-2 text-[12px] font-medium text-zinc-500 hover:text-zinc-300">Logs</button>
+              <button class="border-b-2 border-transparent px-3 py-2 text-[12px] font-medium text-zinc-500 hover:text-zinc-300">Vars</button>
+            </div>
+          </div>
+
+          <!-- context cards -->
+          <div class="space-y-3 p-4">
+            <!-- streaming status — shadcn Card with primary accent -->
+            <div class="rounded-lg border border-[#6366f1]/20 bg-[#6366f1]/[0.06] p-3">
+              <div class="flex items-center justify-between">
+                <p class="text-[11px] font-semibold uppercase tracking-widest text-[#a5b4fc]">Stream</p>
+                <span class="inline-flex items-center gap-1 rounded-full bg-[#6366f1] px-2 py-0.5 text-[10px] font-bold text-white"><span class="h-1 w-1 animate-pulse rounded-full bg-white"></span> OPEN</span>
+              </div>
+              <div class="mt-2 space-y-2 font-mono text-[11px]">
+                <div class="flex justify-between"><span class="text-zinc-500">Endpoint</span><span class="text-zinc-200">/v1/stream</span></div>
+                <div class="flex justify-between"><span class="text-zinc-500">Protocol</span><span class="text-zinc-200">WS · JSONL</span></div>
+                <div class="flex justify-between"><span class="text-zinc-500">Backpressure</span><span class="text-emerald-400">healthy</span></div>
+              </div>
+              <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div class="h-full w-[72%] rounded-full bg-[#6366f1]"></div>
+              </div>
+              <p class="mt-1.5 font-mono text-[11px] text-zinc-500">72% context window · auto-compact at 85%</p>
+            </div>
+
+            <!-- attached context — shadcn Card -->
+            <div class="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3">
+              <div class="flex items-center justify-between">
+                <p class="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Attached context</p>
+                <button class="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400 hover:text-white">+ Add</button>
+              </div>
+              <div class="mt-2 space-y-1.5">
+                <div class="flex items-center justify-between rounded-md border border-white/[0.06] bg-[#0a0a0f] px-2.5 py-2">
+                  <div class="flex items-center gap-2">
+                    <span class="inline-flex h-6 w-6 items-center justify-center rounded bg-[#6366f1]/15 text-[#818cf8]"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+                    <div><p class="text-[12px] font-medium text-zinc-200">pricing-research.md</p><p class="font-mono text-[11px] text-zinc-500">1.4k tok · pinned</p></div>
+                  </div>
+                  <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                </div>
+                <div class="flex items-center justify-between rounded-md border border-white/[0.06] bg-[#0a0a0f] px-2.5 py-2">
+                  <div class="flex items-center gap-2">
+                    <span class="inline-flex h-6 w-6 items-center justify-center rounded bg-white/10 text-zinc-400"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3h18v18H3z"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></span>
+                    <div><p class="text-[12px] font-medium text-zinc-200">competitors.csv</p><p class="font-mono text-[11px] text-zinc-500">0.8k tok</p></div>
+                  </div>
+                  <span class="h-1.5 w-1.5 rounded-full bg-zinc-600"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- variables — shadcn Card with mono -->
+            <div class="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3">
+              <p class="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Session vars</p>
+              <div class="mt-2 space-y-1 font-mono text-[11px]">
+                <div class="flex justify-between rounded bg-[#0a0a0f] px-2 py-1.5"><span class="text-zinc-500">model</span><span class="text-[#a5b4fc]">gpt-4o</span></div>
+                <div class="flex justify-between rounded bg-[#0a0a0f] px-2 py-1.5"><span class="text-zinc-500">temperature</span><span class="text-zinc-200">0.7</span></div>
+                <div class="flex justify-between rounded bg-[#0a0a0f] px-2 py-1.5"><span class="text-zinc-500">max_tokens</span><span class="text-zinc-200">4096</span></div>
+                <div class="flex justify-between rounded bg-[#0a0a0f] px-2 py-1.5"><span class="text-zinc-500">stream</span><span class="text-emerald-400">true</span></div>
+              </div>
+            </div>
+
+            <!-- quick actions — shadcn Button variants -->
+            <div class="grid grid-cols-2 gap-1.5">
+              <button class="inline-flex items-center justify-center rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-[12px] font-medium text-zinc-300 hover:bg-white/[0.08]">Copy ID</button>
+              <button class="inline-flex items-center justify-center rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-[12px] font-medium text-red-400 hover:bg-red-500/15">Terminate</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- inspector footer -->
+        <div class="border-t border-white/[0.06] p-3">
+          <div class="flex items-center justify-between text-[11px]">
+            <span class="font-mono text-zinc-500">lokma v0.1.0 · Fastify 5</span>
+            <span class="inline-flex items-center gap-1 text-zinc-500"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> healthy</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- mobile bottom tabs (visible < lg) -->
+    <div class="flex items-center justify-around border-t border-white/[0.06] bg-[#0a0a0f] px-2 py-2 lg:hidden">
+      <button class="flex flex-col items-center gap-0.5 rounded-md px-4 py-1 text-[#6366f1]">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+        <span class="text-[10px] font-medium">Explorer</span>
+      </button>
+      <button class="flex flex-col items-center gap-0.5 rounded-md bg-[#6366f1]/15 px-4 py-1 text-white">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span class="text-[10px] font-medium">Chat</span>
+      </button>
+      <button class="flex flex-col items-center gap-0.5 rounded-md px-4 py-1 text-zinc-500">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+        <span class="text-[10px] font-medium">Inspector</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= MOCK WS STREAMING SCRIPT ================= -->
+  <script>
+    // Full markdown-ish response that will be streamed token-by-token
+    const STREAM_HTML = `
+      <p>Here’s a concise pricing snapshot for <span class="font-semibold text-white">Lokma harness</span> competitors — with a table you can drop into Figma/Slides:</p>
+      <div class="mt-3 overflow-hidden rounded-lg border border-white/[0.08] bg-[#0a0a0f]">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-[12.5px]">
+            <thead class="border-b border-white/[0.08] bg-white/[0.04] text-[11px] uppercase tracking-widest text-zinc-400">
+              <tr><th class="px-3 py-2 font-semibold">Provider</th><th class="px-3 py-2 font-semibold">Model class</th><th class="px-3 py-2 font-semibold">Price / 1M tok</th><th class="px-3 py-2 font-semibold">Bulk / self-host</th></tr>
+            </thead>
+            <tbody class="divide-y divide-white/[0.06] font-mono text-[12px]">
+              <tr class="bg-[#6366f1]/[0.06]"><td class="px-3 py-2 font-medium text-white">OpenAI (GPT-4o)</td><td class="px-3 py-2 text-zinc-400">frontier</td><td class="px-3 py-2 text-white">$5.00 in / $15 out</td><td class="px-3 py-2 text-zinc-400">–20% at 10M/mo</td></tr>
+              <tr><td class="px-3 py-2 text-zinc-200">Anthropic (Claude 3.5)</td><td class="px-3 py-2 text-zinc-400">frontier</td><td class="px-3 py-2 text-white">$3.00 / $15</td><td class="px-3 py-2 text-zinc-400">–18% committed</td></tr>
+              <tr><td class="px-3 py-2 text-zinc-200">Together.ai</td><td class="px-3 py-2 text-zinc-400">Llama 3.1 70B</td><td class="px-3 py-2 text-white">$0.88</td><td class="px-3 py-2 text-emerald-400">$0.60 reserved</td></tr>
+              <tr><td class="px-3 py-2 text-zinc-200">Self-host (A100)</td><td class="px-3 py-2 text-zinc-400">open</td><td class="px-3 py-2 text-white">~$0.45*</td><td class="px-3 py-2 text-zinc-400">*at 60% util.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="border-t border-white/[0.06] bg-white/[0.02] px-3 py-1.5 font-mono text-[11px] text-zinc-500">* Self-host assumes 1× A100 80GB, 1.2k tok/s sustained. Sources: provider pricing pages + together.ai calculator.</p>
+      </div>
+      <div class="mt-3 rounded-lg border border-[#6366f1]/20 bg-[#6366f1]/[0.08] p-3">
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-[#a5b4fc]">3 takeaways for design</p>
+        <ol class="mt-2 list-decimal space-y-1 pl-5 text-[13px] leading-relaxed text-zinc-200">
+          <li><span class="font-semibold text-white">Inference dominates cost</span> — managed frontier is 8–12× self-hosted open models. Offer a “bring your own key” toggle.</li>
+          <li><span class="font-semibold text-white">Bulk discounts are table stakes</span> — 18–20% at 10M tok/mo. Mirror it with prepaid credits in the billing UI.</li>
+          <li><span class="font-semibold text-white">Latency vs price tradeoff</span> — self-host wins on unit cost but needs 60%+ utilization. Surface a utilization gauge in the Inspector (like the bar above).</li>
+        </ol>
+      </div>
+      <p class="mt-3 text-[12px] text-zinc-500">Want this as a <span class="rounded bg-white/10 px-1 py-0.5 font-mono text-zinc-300">.md</span> or <span class="rounded bg-white/10 px-1 py-0.5 font-mono text-zinc-300">.csv</span>? Say “export” and I’ll stream the file.</p>
+    `;
+
+    const target = document.getElementById('stream-target');
+    const meta = document.getElementById('stream-meta');
+    const typing = document.getElementById('typing-indicator');
+    const actions = document.getElementById('stream-actions');
+    const tokenCount = document.getElementById('token-count');
+    const tokenBar = document.getElementById('token-bar');
+    const scroll = document.getElementById('chat-scroll');
+    let timer = null;
+    let idx = 0;
+
+    function stream() {
+      // reset
+      clearInterval(timer);
+      idx = 0;
+      target.innerHTML = '';
+      if (typing) typing.classList.remove('hidden');
+      if (actions) actions.classList.add('hidden');
+      if (meta) meta.textContent = 'streaming…';
+      if (tokenCount) tokenCount.textContent = '0 tokens';
+      if (tokenBar) tokenBar.style.width = '0%';
+
+      // create a temp container to type into char-by-char with HTML awareness
+      const temp = document.createElement('div');
+      temp.innerHTML = STREAM_HTML;
+      const text = temp.innerHTML; // we stream raw HTML char by char for effect
+      // Instead, tokenize by characters but preserve tags: simple approach — reveal outerHTML progressively
+      // We'll just type the HTML string progressively into target.innerHTML
+      const full = STREAM_HTML;
+      let pos = 0;
+      const total = full.length;
+
+      timer = setInterval(() => {
+        // type 18–42 chars per tick for variable WS cadence
+        const chunk = 14 + Math.floor(Math.random() * 18);
+        pos = Math.min(total, pos + chunk);
+        // avoid breaking inside a tag: if we cut inside <...>, extend to closing >
+        let slice = full.slice(0, pos);
+        const lastOpen = slice.lastIndexOf('<');
+        const lastClose = slice.lastIndexOf('>');
+        if (lastOpen > lastClose) {
+          const nextClose = full.indexOf('>', pos);
+          if (nextClose !== -1 && nextClose - pos < 80) pos = nextClose + 1;
+          slice = full.slice(0, pos);
+        }
+        // add blinking cursor
+        target.innerHTML = slice + '<span class="cursor-blink inline-block h-4 w-0.5 translate-y-0.5 bg-[#6366f1]"></span>';
+
+        const pct = Math.round((pos / total) * 100);
+        const toks = Math.round((pos / total) * 612);
+        if (tokenCount) tokenCount.textContent = toks + ' tokens';
+        if (tokenBar) tokenBar.style.width = pct + '%';
+        if (meta) meta.textContent = 'streaming · ' + (18 + Math.floor(Math.random()*18)) + ' tok/s';
+        if (scroll) scroll.scrollTop = scroll.scrollHeight;
+
+        if (pos >= total) {
+          clearInterval(timer);
+          target.innerHTML = full; // final without cursor
+          if (typing) typing.classList.add('hidden');
+          if (actions) actions.classList.remove('hidden');
+          if (meta) meta.textContent = 'done · 612 tokens · 1.8s';
+          if (scroll) scroll.scrollTop = scroll.scrollHeight;
+        }
+      }, 38);
+    }
+
+    // auto-start after paint
+    window.addEventListener('load', () => setTimeout(stream, 600));
+    document.getElementById('replay-btn')?.addEventListener('click', stream);
+    document.getElementById('send-btn')?.addEventListener('click', () => {
+      const el = document.getElementById('composer');
+      if (!el || !el.value.trim()) { stream(); return; }
+      // append user bubble then replay
+      const wrap = document.createElement('div');
+      wrap.className = 'flex gap-3';
+      wrap.innerHTML = '<img src="https://i.pravatar.cc/100?img=32" alt="user" class="mt-0.5 h-7 w-7 shrink-0 rounded-full border border-white/10" /><div class="min-w-0 flex-1"><div class="flex items-baseline gap-2"><span class="text-[13px] font-semibold text-white">You</span><span class="text-[11px] text-zinc-500">now</span></div><div class="mt-1.5 rounded-lg border border-white/[0.06] bg-white/[0.04] px-3.5 py-2.5"><p class="text-[13.5px] leading-relaxed text-zinc-200"></p></div></div>';
+      wrap.querySelector('p').textContent = el.value;
+      const container = document.querySelector('#chat-scroll .mx-auto');
+      if (container) {
+        const anchor = document.getElementById('typing-indicator')?.closest('.flex.gap-3');
+        if (anchor) container.insertBefore(wrap, anchor);
+        else container.appendChild(wrap);
+      }
+      el.value = '';
+      stream();
+    });
+    document.getElementById('composer')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); document.getElementById('send-btn')?.click(); }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Spec V4 — Paper Dashboard (1:1 docs) — Lokma</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Inter','ui-sans-serif','system-ui','-apple-system','sans-serif'],
+        serif: ['Instrument Serif','Georgia','serif'],
+        mono: ['JetBrains Mono','ui-monospace','SFMono-Regular','monospace'],
+      },
+      colors: {
+        paper: '#FFFCF8',
+        'paper-2': '#FDF8F0',
+        ink: '#1E1B17',
+        muted: '#78716C',
+        line: '#EDE6D6',
+        'line-strong': '#E7DDCB',
+        terracotta: '#C96442',
+        'terracotta-hover': '#B85736',
+        stone: '#57534E',
+        amber: '#B45309',
+        sage: '#6B7F59',
+      },
+      borderRadius: { '2xl': '16px' },
+      boxShadow: {
+        card: '0 1px 2px rgba(41,37,33,0.06), 0 4px 16px rgba(41,37,33,0.05)',
+        'card-hover': '0 2px 8px rgba(41,37,33,0.08), 0 8px 24px rgba(41,37,33,0.07)',
+      }
+    }
+  }
+}
+</script>
+<style>
+  :root { color-scheme: light; }
+  body { background: #FFFCF8; color: #1E1B17; }
+  /* warm paper texture — subtle */
+  body::before {
+    content: "";
+    position: fixed; inset: 0; pointer-events: none; opacity: 0.30;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: #E7DDCB; border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #D9CABD; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  * { scrollbar-width: thin; scrollbar-color: #E7DDCB transparent; }
+  /* focus ring warm */
+  .ring-warm:focus { outline: none; box-shadow: 0 0 0 2px rgba(201,100,66,0.18); border-color: rgba(201,100,66,0.35) !important; }
+</style>
+</head>
+<body class="font-sans antialiased min-h-screen flex flex-col selection:bg-[#C96442]/15 selection:text-[#1E1B17]">
+
+<!-- ============================================================
+     Spec Variant 4 — Paper Dashboard
+     Theme: Paper #FFFCF8 · warm line #EDE6D6 · ink #1E1B17
+     Layout: dashboard-first — KPIs + stacked AreaChart + table
+             then pane system: Left Sessions/Projects | Center Chat+Code | Right Files/Terminal/Browser
+     Spec coverage: 20 overview + 22 provider/model/usage/session + 24 pane/orchestration/theming
+     Standalone: Tailwind CDN, no build, English comments
+     ============================================================ -->
+
+<!-- Spec banner — required header string -->
+<div class="w-full bg-[#1E1B17] text-[#FFFCF8] relative z-50">
+  <div class="max-w-[1600px] mx-auto px-4 sm:px-6 h-8 flex items-center justify-between gap-3 text-[12.5px]">
+    <div class="flex items-center gap-3 min-w-0">
+      <span class="inline-flex items-center gap-2 font-medium tracking-tight shrink-0">
+        <span class="w-1.5 h-1.5 rounded-full bg-[#C96442] animate-pulse"></span>
+        Spec V4 — Paper Dashboard (1:1 docs)
+      </span>
+      <span class="hidden lg:inline-flex items-center gap-2 text-white/55 font-normal">
+        <span class="w-px h-3 bg-white/15"></span>
+        Paper #FFFCF8 · warm line · dashboard-first · flexlayout
+      </span>
+    </div>
+    <div class="hidden md:flex items-center gap-2 text-[11px] shrink-0">
+      <span class="px-2 py-1 rounded-full bg-white/10 border border-white/10">1:1 spec-compliant</span>
+      <span class="px-2 py-1 rounded-full bg-white/10 border border-white/10">Tailwind CDN · no build</span>
+      <span class="px-2 py-1 rounded-full bg-[#C96442] text-white font-medium">Paper theme</span>
+    </div>
+  </div>
+</div>
+
+<!-- Top Nav — pane-first app shell -->
+<header class="sticky top-0 z-40 bg-[#FFFCF8]/85 backdrop-blur-xl border-b border-line">
+  <div class="max-w-[1600px] mx-auto px-4 sm:px-6 h-[56px] flex items-center gap-3 sm:gap-4">
+    <!-- brand + breadcrumb -->
+    <div class="flex items-center gap-3 min-w-0">
+      <a href="#" class="flex items-center gap-2.5 shrink-0">
+        <span class="w-8 h-8 rounded-lg bg-[#1E1B17] text-[#FFFCF8] grid place-items-center text-[14px] font-bold tracking-tight">◐</span>
+        <span class="font-serif text-[20px] tracking-tight leading-none hidden sm:block">lokma</span>
+        <span class="hidden sm:inline-flex px-1.5 py-0.5 rounded bg-white border border-line text-[10px] font-semibold tracking-widest uppercase text-stone-500">harness</span>
+      </a>
+      <span class="hidden lg:block w-px h-5 bg-line"></span>
+      <nav class="hidden lg:flex items-center gap-1 text-[13px]">
+        <a href="#" class="px-2 py-1 rounded-md hover:bg-white border border-transparent hover:border-line transition">Workspace</a>
+        <span class="text-stone-300">/</span>
+        <a href="#" class="px-2 py-1 rounded-md bg-white border border-line shadow-sm font-medium">my-project</a>
+        <span class="hidden xl:inline-flex ml-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-medium">● Live</span>
+      </nav>
+      <!-- worktree pill — per 22 §4.2 + 24 §1 -->
+      <span class="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white border border-line text-[11px] font-mono text-stone-600">
+        ⎇ <span class="font-medium">feat/auth-hook</span>
+      </span>
+    </div>
+
+    <!-- center: model switcher — session header per 22 §2.2 -->
+    <div class="hidden md:flex flex-1 justify-center">
+      <div class="inline-flex items-center gap-1 p-1 rounded-full bg-white border border-line shadow-sm text-[12.5px]">
+        <button class="px-3 py-1 rounded-full bg-[#1E1B17] text-white font-medium">claude-sonnet-4.5</button>
+        <button class="px-2.5 py-1 rounded-full hover:bg-[#FFFCF8] text-stone-600">gpt-4o</button>
+        <button class="px-2.5 py-1 rounded-full hover:bg-[#FFFCF8] text-stone-600">deepseek-chat</button>
+        <span class="w-px h-4 bg-line mx-1"></span>
+        <span class="pr-2 text-[11px] text-stone-500 font-mono">200k · $3/$15</span>
+        <span class="w-6 h-6 grid place-items-center rounded-full hover:bg-[#FFFCF8] text-stone-400"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+      </div>
+    </div>
+
+    <!-- right actions -->
+    <div class="ml-auto flex items-center gap-1.5 shrink-0">
+      <div class="hidden lg:flex items-center gap-2 pl-2 pr-2 h-8 rounded-full bg-white border border-line shadow-sm">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" class="text-stone-400"><circle cx="7" cy="7" r="4" stroke="currentColor" stroke-width="1.2"/><path d="M10 10l2.5 2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <input placeholder="Search sessions, files…" class="bg-transparent text-[13px] placeholder:text-stone-400 outline-none w-[160px] xl:w-[190px]" />
+        <span class="hidden xl:inline-flex px-1.5 py-0.5 rounded bg-[#FFFCF8] border border-line text-[10px] font-mono text-stone-500">⌘K</span>
+      </div>
+      <button class="hidden sm:inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-white border border-line text-[13px] font-medium hover:bg-stone-50 transition">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg> New session
+      </button>
+      <button class="w-8 h-8 grid place-items-center rounded-full bg-white border border-line hover:bg-stone-50 text-stone-600" aria-label="Command palette"><span class="text-[11px] font-mono">⌘</span></button>
+      <div class="w-px h-5 bg-line hidden sm:block"></div>
+      <div class="flex items-center gap-2 pl-1">
+        <img src="https://i.pravatar.cc/100?img=33" alt="Aylin" class="w-7 h-7 rounded-full object-cover border border-line" />
+        <div class="hidden lg:block text-left leading-none">
+          <div class="text-[13px] font-medium">Aylin</div>
+          <div class="text-[11px] text-stone-500">12.3k · $0.04</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================
+     DASHBOARD-FIRST SECTION
+     KPI row (Total tokens 7d / Total cost / Avg/session / Top model)
+     + stacked AreaChart by model with 7/30/90d toggle
+     + Recent sessions table (session|model|tokens|cost|date)
+     Spec ref: 22 §3 Usage dashboard
+     ============================================================ -->
+<main class="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 pb-10">
+
+  <!-- dashboard header -->
+  <div class="pt-6 pb-4 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <div class="flex items-center gap-2 mb-1.5">
+        <h1 class="font-serif text-[26px] sm:text-[28px] leading-none tracking-tight text-ink">Usage dashboard</h1>
+        <span class="hidden sm:inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white border border-line text-[11px] font-medium shadow-sm">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Live · SSE stream
+        </span>
+      </div>
+      <p class="text-[13px] leading-5 text-stone-500 max-w-[60ch]">All token & cost aggregates per 22 §3 — stacked by model, filterable 7/30/90d. Click any session row to load its chat pane.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="hidden sm:inline text-[12px] text-stone-500">Range:</span>
+      <div id="rangeToggle" class="inline-flex p-1 rounded-full bg-white border border-line shadow-sm text-[12.5px]">
+        <button data-range="7d" class="range-btn px-3 py-1 rounded-full bg-[#1E1B17] text-white font-medium transition">7d</button>
+        <button data-range="30d" class="range-btn px-3 py-1 rounded-full text-stone-600 hover:bg-[#FFFCF8] transition">30d</button>
+        <button data-range="90d" class="range-btn px-3 py-1 rounded-full text-stone-600 hover:bg-[#FFFCF8] transition">90d</button>
+      </div>
+      <button class="inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-white border border-line text-[13px] font-medium hover:bg-stone-50 shadow-sm">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3v5l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.2"/></svg> Export CSV
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI row — 22 §3.2 KPI cards -->
+  <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+    <!-- Total tokens 7d -->
+    <div class="rounded-xl bg-white border border-line shadow-card p-4 sm:p-5 relative overflow-hidden group hover:shadow-card-hover hover:border-line-strong transition">
+      <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#C96442]/25 to-transparent"></div>
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <div class="text-[11px] font-semibold tracking-widest uppercase text-stone-400">Total tokens · 7d</div>
+          <div id="kpiTokens" class="mt-1.5 text-[26px] font-semibold tracking-tight leading-none">1.42M</div>
+          <div class="mt-1 flex items-center gap-1.5 text-[12px]">
+            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium"><svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M8 3l5 5-5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" transform="rotate(-90 8 8)"/></svg> 12%</span>
+            <span class="text-stone-500">vs prior 7d</span>
+          </div>
+        </div>
+        <div class="w-9 h-9 rounded-xl bg-[#FDF0E6] border border-[#F2D5C2] grid place-items-center text-[#C96442] shrink-0">
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M8 3v10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.0"/><path d="M3 3v10h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 11l2.5-3 2 2 3.5-5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+      <div class="mt-4 flex items-end gap-[3px] h-7" aria-hidden="true">
+        <span class="flex-1 rounded-sm bg-[#EDE6D6]" style="height:38%"></span>
+        <span class="flex-1 rounded-sm bg-[#EDE6D6]" style="height:55%"></span>
+        <span class="flex-1 rounded-sm bg-[#EDE6D6]" style="height:42%"></span>
+        <span class="flex-1 rounded-sm bg-[#EDE6D6]" style="height:70%"></span>
+        <span class="flex-1 rounded-sm bg-[#C96442]" style="height:88%"></span>
+        <span class="flex-1 rounded-sm bg-[#EDE6D6]" style="height:62%"></span>
+        <span class="flex-1 rounded-sm bg-[#EDE6D6]" style="height:48%"></span>
+      </div>
+      <div class="mt-2 text-[11px] text-stone-400 font-mono">prompt 0.92M · completion 0.50M</div>
+    </div>
+
+    <!-- Total cost -->
+    <div class="rounded-xl bg-white border border-line shadow-card p-4 sm:p-5 relative overflow-hidden hover:shadow-card-hover hover:border-line-strong transition">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <div class="text-[11px] font-semibold tracking-widest uppercase text-stone-400">Total cost · 7d</div>
+          <div id="kpiCost" class="mt-1.5 flex items-baseline gap-2">
+            <span class="text-[26px] font-semibold tracking-tight leading-none">$18.42</span>
+            <span class="text-[11px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-medium">budget 37%</span>
+          </div>
+          <div class="mt-2">
+            <div class="flex items-center justify-between text-[11px] mb-1"><span class="text-stone-500">$0</span><span class="font-mono text-stone-600">$18.42 / $50</span></div>
+            <div class="h-1.5 rounded-full bg-[#FDF0E6] border border-[#F2D5C2] overflow-hidden"><div class="h-full bg-[#C96442] rounded-full" style="width: 37%"></div></div>
+          </div>
+        </div>
+        <div class="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 grid place-items-center text-emerald-700 shrink-0">
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M8 3.5V12M10.5 5H8a2 2 0 000 4h.5a2 2 0 010 4H6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.2" opacity="0.2"/></svg>
+        </div>
+      </div>
+      <div class="mt-3 text-[11px] text-stone-400">Blended input $3 / output $15 per 1M (snapshot pricing)</div>
+    </div>
+
+    <!-- Avg / session -->
+    <div class="rounded-xl bg-white border border-line shadow-card p-4 sm:p-5 hover:shadow-card-hover hover:border-line-strong transition">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <div class="text-[11px] font-semibold tracking-widest uppercase text-stone-400">Avg / session</div>
+          <div id="kpiAvg" class="mt-1.5 text-[26px] font-semibold tracking-tight leading-none">47.3k</div>
+          <div class="text-[12px] text-stone-500 mt-1"><span class="font-mono text-stone-700">$0.61</span> · 18 sessions · 7d</div>
+        </div>
+        <div class="w-9 h-9 rounded-xl bg-stone-50 border border-line grid place-items-center text-stone-600 shrink-0">
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><rect x="3" y="4" width="10" height="8" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M6 7h4M6 9h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        </div>
+      </div>
+      <div class="mt-4 flex items-center gap-1.5 text-[11px]">
+        <span class="w-2 h-2 rounded-full bg-[#C96442]"></span><span class="text-stone-600">p50 38k</span>
+        <span class="w-2 h-2 rounded-full bg-stone-300 ml-2"></span><span class="text-stone-500">p95 92k</span>
+        <span class="ml-auto font-mono text-stone-400">median cost $0.54</span>
+      </div>
+    </div>
+
+    <!-- Top model -->
+    <div class="rounded-xl bg-[#1E1B17] text-[#FFFCF8] border border-[#2A2622] shadow-card p-4 sm:p-5 relative overflow-hidden">
+      <div class="absolute -right-8 -top-8 w-24 h-24 rounded-full bg-[#C96442]/15 blur-2xl"></div>
+      <div class="text-[11px] font-semibold tracking-widest uppercase text-white/55">Top model · 7d</div>
+      <div class="mt-2 flex items-baseline gap-2 flex-wrap">
+        <span class="text-[18px] font-semibold tracking-tight leading-none">claude-sonnet-4.5</span>
+        <span class="px-2 py-0.5 rounded-full bg-white/10 border border-white/15 text-[11px] font-medium">Anthropic</span>
+      </div>
+      <div class="mt-3 flex items-center gap-3 text-[12px]">
+        <span class="px-2.5 py-1 rounded-full bg-[#C96442] text-white font-medium">62% of tokens</span>
+        <span class="text-white/60">0.88M · $11.42</span>
+      </div>
+      <div class="mt-4 flex items-center gap-1.5 text-[11px] text-white/60">
+        <span class="w-2 h-2 rounded-full bg-[#C96442]"></span> sonnet
+        <span class="w-2 h-2 rounded-full bg-[#8A9A8C] ml-2"></span> gpt-4o 24%
+        <span class="w-2 h-2 rounded-full bg-[#D9B08C] ml-2"></span> deepseek 14%
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart + Table row -->
+  <div class="mt-4 grid grid-cols-12 gap-4 items-start">
+    <!-- AreaChart — stacked by model — 7/30/90d -->
+    <section class="col-span-12 xl:col-span-7 rounded-xl bg-white border border-line shadow-card overflow-hidden">
+      <div class="px-4 sm:px-5 h-[52px] flex items-center justify-between gap-3 border-b border-line bg-[#FFFCF8]">
+        <div class="flex items-center gap-2">
+          <h2 class="text-[13px] font-semibold tracking-tight">Tokens / day — stacked by model</h2>
+          <span class="hidden sm:inline-flex px-2 py-1 rounded-full bg-[#FDF8F0] border border-line text-[11px] font-mono text-stone-600">recharts AreaChart</span>
+        </div>
+        <div class="flex items-center gap-2 text-[11px]">
+          <span class="hidden sm:inline-flex items-center gap-1.5 text-stone-500"><span class="w-2 h-2 rounded-full bg-[#C96442]"></span> sonnet</span>
+          <span class="hidden sm:inline-flex items-center gap-1.5 text-stone-500"><span class="w-2 h-2 rounded-full bg-[#57534E]"></span> gpt-4o</span>
+          <span class="hidden sm:inline-flex items-center gap-1.5 text-stone-500"><span class="w-2 h-2 rounded-full bg-[#D97706]"></span> deepseek</span>
+          <span class="w-px h-4 bg-line hidden sm:block"></span>
+          <span id="chartRangeLabel" class="font-mono text-stone-600">7d</span>
+        </div>
+      </div>
+
+      <!-- chart canvas -->
+      <div class="p-4 sm:p-5">
+        <!-- Y axis labels + SVG -->
+        <div class="relative">
+          <div class="flex">
+            <!-- y labels -->
+            <div class="hidden sm:flex flex-col justify-between text-[11px] font-mono text-stone-400 pr-3 py-2 h-[220px] shrink-0 text-right w-[44px]">
+              <span>80k</span><span>60k</span><span>40k</span><span>20k</span><span>0</span>
+            </div>
+            <div class="flex-1 relative bg-[#FFFCF8] rounded-lg border border-line overflow-hidden">
+              <!-- grid lines -->
+              <div class="absolute inset-0 pointer-events-none">
+                <div class="absolute inset-x-0 top-[20%] border-t border-dashed border-line"></div>
+                <div class="absolute inset-x-0 top-[40%] border-t border-dashed border-line"></div>
+                <div class="absolute inset-x-0 top-[60%] border-t border-dashed border-line"></div>
+                <div class="absolute inset-x-0 top-[80%] border-t border-dashed border-line"></div>
+              </div>
+              <svg id="areaChart" viewBox="0 0 640 220" class="w-full h-[220px] block" preserveAspectRatio="none" role="img" aria-label="Stacked tokens per day">
+                <!-- defs for gradients -->
+                <defs>
+                  <linearGradient id="g-sonnet" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#C96442" stop-opacity="0.28"/><stop offset="100%" stop-color="#C96442" stop-opacity="0"/>
+                  </linearGradient>
+                  <linearGradient id="g-gpt" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#57534E" stop-opacity="0.22"/><stop offset="100%" stop-color="#57534E" stop-opacity="0"/>
+                  </linearGradient>
+                  <linearGradient id="g-deep" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#D97706" stop-opacity="0.20"/><stop offset="100%" stop-color="#D97706" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <!-- paths injected by JS -->
+              </svg>
+              <!-- tooltip (static demo) -->
+              <div class="absolute left-[62%] top-[32%] -translate-x-1/2 hidden sm:flex flex-col items-center gap-1 pointer-events-none">
+                <div class="px-2.5 py-1.5 rounded-lg bg-[#1E1B17] text-white text-[11px] font-medium shadow-lg border border-[#2A2622]">
+                  <div class="font-mono">Aug 28 · 68.4k</div>
+                  <div class="text-white/70 text-[11px]">sonnet 41k · gpt 16k · deepseek 11k</div>
+                </div>
+                <span class="w-px h-3 bg-[#1E1B17]"></span>
+                <span class="w-2 h-2 rounded-full bg-[#1E1B17] border-2 border-white shadow"></span>
+              </div>
+            </div>
+          </div>
+          <!-- x labels -->
+          <div id="xLabels" class="flex justify-between mt-2 text-[11px] font-mono text-stone-400 sm:ml-[44px] px-1"></div>
+        </div>
+
+        <div class="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-stone-500">
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FFFCF8] border border-line"><span class="w-1.5 h-1.5 rounded-full bg-[#C96442]"></span> claude-sonnet-4.5 · Anthropic · 200k</span>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-line">gpt-4o · OpenAI · 128k</span>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-line">deepseek-chat · 64k</span>
+          <span class="ml-auto hidden sm:inline text-stone-400">Stacked AreaChart · pricing snapshot</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Recent sessions table -->
+    <section class="col-span-12 xl:col-span-5 rounded-xl bg-white border border-line shadow-card overflow-hidden flex flex-col">
+      <div class="px-4 sm:px-5 h-[52px] flex items-center justify-between gap-3 border-b border-line bg-[#FFFCF8] shrink-0">
+        <div class="flex items-center gap-2">
+          <h2 class="text-[13px] font-semibold">Recent sessions</h2>
+          <span class="px-1.5 py-0.5 rounded-full bg-[#1E1B17] text-white text-[11px] font-medium">18</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button class="hidden sm:inline-flex items-center gap-1 px-2.5 h-7 rounded-full bg-white border border-line text-[12px] font-medium hover:bg-[#FFFCF8]">View all →</button>
+          <button class="w-7 h-7 grid place-items-center rounded-full bg-white border border-line hover:bg-[#FFFCF8] text-stone-500"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+      </div>
+      <!-- table -->
+      <div class="overflow-auto">
+        <table class="w-full text-left border-collapse">
+          <thead class="sticky top-0 bg-[#FFFCF8] border-b border-line text-[11px] tracking-widest uppercase text-stone-500">
+            <tr>
+              <th class="px-4 py-2.5 font-semibold">Session</th>
+              <th class="px-2 py-2.5 font-semibold">Model</th>
+              <th class="px-2 py-2.5 font-semibold text-right">Tokens</th>
+              <th class="px-2 py-2.5 font-semibold text-right">Cost</th>
+              <th class="px-4 py-2.5 font-semibold">Date</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-line/60 text-[13px]">
+            <tr class="hover:bg-[#FFFCF8] transition cursor-pointer group">
+              <td class="px-4 py-3"><div class="font-medium leading-tight group-hover:text-[#C96442]">Refactor auth middleware</div><div class="text-[11px] font-mono text-stone-400">#a3f9 · running</div></td>
+              <td class="px-2 py-3"><span class="inline-flex items-center px-2 py-1 rounded-full bg-[#FDF0E6] border border-[#F2D5C2] text-[#9A4A2E] text-[11px] font-medium">sonnet</span></td>
+              <td class="px-2 py-3 text-right font-mono text-[12.5px]">12.3k</td>
+              <td class="px-2 py-3 text-right font-mono text-[12.5px]">$0.42</td>
+              <td class="px-4 py-3 text-stone-500 text-[12.5px] whitespace-nowrap">Today 14:31</td>
+            </tr>
+            <tr class="hover:bg-[#FFFCF8] transition cursor-pointer group">
+              <td class="px-4 py-3"><div class="font-medium leading-tight">Pricing page redesign</div><div class="text-[11px] font-mono text-stone-400">#7c21 · idle</div></td>
+              <td class="px-2 py-3"><span class="inline-flex items-center px-2 py-1 rounded-full bg-stone-100 border border-stone-200 text-stone-700 text-[11px] font-medium">gpt-4o</span></td>
+              <td class="px-2 py-3 text-right font-mono text-[12.5px]">8.1k</td>
+              <td class="px-2 py-3 text-right font-mono text-[12.5px]">$0.19</td>
+              <td class="px-4 py-3 text-stone-500 text-[12.5px]">Today 11:02</td>
+            </tr>
+            <tr class="hover:bg-[#FFFCF8] transition cursor-pointer group">
+              <td class="px-4 py-3"><div class="font-medium leading-tight">Drizzle schema audit</div><div class="text-[11px] font-mono text-stone-400">#4fe8 · idle</div></td>
+              <td class="px-2 py-3"><span class="inline-flex items-center px-2 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium">deepseek</span></td>
+              <td class="px-2 py-3 text-right font-mono text-[12.5px]">23.4k</td>
+              <td class="px-2 py-3 text-right font-mono text-[12.5px]">$0.31</td>
+              <td class="px-4 py-3 text-stone-500 text-[12.5px]">Yesterday</td>
+            </tr>
+            <tr class="hover:bg-[#FFFCF8] transition cursor-pointer group">
+              <td class="px-4 py-3"><div class="font-medium leading-tight">Webhooks API spec</div><div class="text-[11px] font-mono text-stone-400">#b10a · idle</div></td>
+              <td class="px-2 py-3"><span class="inline-flex items-center px-2 py-1 rounded-full bg-[#FDF0E6] border border-[#F2D5C2] text-[#9A4A2E] text-[11px] font-medium">sonnet</span></td>
+              <td class="px-2 py-3 text-right font-mono text-[12.5px]">19.0k</td>
+              <td class="px-2 py-3 text-right font-mono text-[12.5px]">$0.58</td>
+              <td class="px-4 py-3 text-stone-500 text-[12.5px]">Aug 29</td>
+            </tr>
+            <tr class="hover:bg-[#FFFCF8] transition cursor-pointer group">
+              <td class="px-4 py-3"><div class="font-medium leading-tight">Onboarding flow copy</div><div class="text-[11px] font-mono text-stone-400">#29df · error</div></td>
+              <td class="px-2 py-3"><span class="inline-flex items-center px-2 py-1 rounded-full bg-white border border-line text-stone-600 text-[11px]">opus</span></td>
+              <td class="px-2 py-3 text-right font-mono text-[12.5px]">5.2k</td>
+              <td class="px-2 py-3 text-right font-mono text-[12.5px]">$0.11</td>
+              <td class="px-4 py-3 text-stone-500 text-[12.5px]">Aug 28</td>
+            </tr>
+            <tr class="hover:bg-[#FFFCF8] transition cursor-pointer group">
+              <td class="px-4 py-3"><div class="font-medium leading-tight">Lokma deploy pipeline</div><div class="text-[11px] font-mono text-stone-400">#e4a1 · idle</div></td>
+              <td class="px-2 py-3"><span class="inline-flex items-center px-2 py-1 rounded-full bg-[#FDF0E6] border border-[#F2D5C2] text-[#9A4A2E] text-[11px] font-medium">sonnet</span></td>
+              <td class="px-2 py-3 text-right font-mono text-[12.5px]">31.8k</td>
+              <td class="px-2 py-3 text-right font-mono text-[12.5px]">$0.97</td>
+              <td class="px-4 py-3 text-stone-500 text-[12.5px]">Aug 27</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="px-4 py-3 border-t border-line bg-[#FFFCF8] flex items-center justify-between text-[11px]">
+        <span class="text-stone-500 font-mono">GET /api/usage/sessions?range=7d</span>
+        <span class="hidden sm:inline text-stone-400">Click row → load in <span class="font-medium text-stone-600">Chat pane</span></span>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============================================================
+       PANE SYSTEM — flexlayout model (24 §1)
+       Left: Sessions + Projects (Border LEFT 260px, draggable)
+       Center: Chat + Code
+       Right: Files (arborist) · Terminal (xterm) · Browser (iframe)
+       ============================================================ -->
+  <div class="mt-6 flex items-center gap-2">
+    <h2 class="font-serif text-[18px] tracking-tight">Workspace</h2>
+    <span class="px-2 py-1 rounded-full bg-white border border-line text-[11px] text-stone-600 shadow-sm">flexlayout — pane-first</span>
+    <span class="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-stone-500"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> WS /ws/:sessionId · token streaming</span>
+    <div class="ml-auto hidden lg:flex items-center gap-1.5 text-[11px]">
+      <button class="px-2.5 py-1 rounded-full bg-white border border-line hover:bg-[#FFFCF8]">Reset layout</button>
+      <span class="px-2.5 py-1 rounded-full bg-[#1E1B17] text-white">Drag tabs to reorder</span>
+    </div>
+  </div>
+
+  <div class="mt-3 grid grid-cols-12 gap-4 items-start">
+    <!-- LEFT — Sessions + Projects -->
+    <div class="col-span-12 lg:col-span-3 space-y-4">
+      <!-- Sessions pane -->
+      <section class="rounded-xl bg-white border border-line shadow-card overflow-hidden">
+        <div class="px-3.5 h-10 flex items-center justify-between border-b border-line bg-[#FFFCF8]">
+          <div class="flex items-center gap-2">
+            <h3 class="text-[13px] font-semibold">Sessions</h3>
+            <span class="px-1.5 py-0.5 rounded-full bg-[#1E1B17] text-white text-[11px] font-medium">18</span>
+            <span class="hidden xl:inline-flex w-px h-3 bg-line"></span>
+            <span class="hidden xl:inline text-[11px] text-stone-400">Drag ⋮⋮ to chat</span>
+          </div>
+          <button class="w-7 h-7 grid place-items-center rounded-full bg-[#1E1B17] text-white hover:bg-black"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
+        </div>
+        <div class="p-3">
+          <div class="relative">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400"><circle cx="7" cy="7" r="4" stroke="currentColor" stroke-width="1.2"/><path d="M10 10l2.5 2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            <input placeholder="Filter by name / prompt…  (Ctrl+K)" class="w-full h-8 pl-8 pr-3 rounded-lg bg-[#FFFCF8] border border-line text-[13px] placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-[#C96442]/15 focus:border-[#C96442]/30" />
+          </div>
+          <div class="mt-2 inline-flex p-1 rounded-full bg-[#FFFCF8] border border-line text-[11px]">
+            <button class="px-2.5 py-1 rounded-full bg-white border border-line shadow-sm font-medium">Today</button>
+            <button class="px-2.5 py-1 rounded-full text-stone-500 hover:text-stone-700">By project</button>
+          </div>
+        </div>
+        <div class="px-2 pb-3 space-y-3 max-h-[420px] overflow-auto">
+          <!-- Today group -->
+          <div>
+            <div class="px-2 py-1.5 text-[11px] font-semibold tracking-widest uppercase text-stone-400 sticky top-0 bg-white">Today</div>
+            <div class="space-y-1.5">
+              <!-- active -->
+              <div draggable="true" class="group flex items-center gap-2.5 p-2.5 rounded-lg bg-[#1E1B17] text-white border border-[#2A2622] shadow-sm cursor-grab active:cursor-grabbing">
+                <span class="text-stone-500 group-hover:text-stone-300 cursor-grab">⋮⋮</span>
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+                <div class="min-w-0 flex-1">
+                  <div class="text-[13px] font-medium leading-tight truncate">Refactor auth middleware</div>
+                  <div class="text-[11px] text-white/60 flex items-center gap-1.5"><span class="px-1.5 py-0.5 rounded bg-white/10 border border-white/10 text-[10px]">sonnet</span> 12.3k · 14:31</div>
+                </div>
+                <span class="text-white/40 group-hover:text-white/80">⋯</span>
+              </div>
+              <div draggable="true" class="flex items-center gap-2.5 p-2.5 rounded-lg hover:bg-[#FFFCF8] border border-transparent hover:border-line transition cursor-grab bg-white">
+                <span class="text-stone-300">⋮⋮</span>
+                <span class="w-2 h-2 rounded-full bg-stone-300 shrink-0"></span>
+                <div class="min-w-0 flex-1">
+                  <div class="text-[13px] font-medium leading-tight truncate text-stone-800">Pricing page redesign</div>
+                  <div class="text-[11px] text-stone-500">gpt-4o · 11:02 · 8.1k</div>
+                </div>
+                <button class="w-6 h-6 grid place-items-center rounded-md hover:bg-white border border-transparent hover:border-line text-stone-400">⋯</button>
+              </div>
+              <div draggable="true" class="flex items-center gap-2.5 p-2.5 rounded-lg hover:bg-[#FFFCF8] border border-transparent hover:border-line transition cursor-grab bg-white">
+                <span class="text-stone-300">⋮⋮</span>
+                <span class="w-2 h-2 rounded-full bg-stone-300"></span>
+                <div class="min-w-0 flex-1">
+                  <div class="text-[13px] leading-tight truncate text-stone-700">Fix flaky e2e — login</div>
+                  <div class="text-[11px] text-stone-500">sonnet · 09:42 · 4.2k</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="px-2 py-1.5 text-[11px] font-semibold tracking-widest uppercase text-stone-400">Yesterday</div>
+            <div class="space-y-1">
+              <div class="flex items-center gap-2.5 p-2 rounded-lg hover:bg-[#FFFCF8] border border-transparent hover:border-line bg-white">
+                <span class="text-stone-300 text-[12px]">⋮⋮</span>
+                <span class="w-2 h-2 rounded-full bg-stone-300"></span>
+                <div class="min-w-0 flex-1"><div class="text-[13px] truncate">Drizzle schema audit</div><div class="text-[11px] text-stone-500">deepseek · 23.4k</div></div>
+              </div>
+              <div class="flex items-center gap-2.5 p-2 rounded-lg hover:bg-[#FFFCF8] border border-transparent hover:border-line bg-white opacity-75">
+                <span class="text-stone-300 text-[12px]">⋮⋮</span>
+                <span class="w-2 h-2 rounded-full bg-red-400"></span>
+                <div class="min-w-0 flex-1"><div class="text-[13px] truncate">Onboarding flow copy</div><div class="text-[11px] text-stone-500">opus · 5.2k · error</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="pt-2 flex items-center gap-2 text-[11px] text-stone-500 border-t border-dashed border-line">
+            <span class="w-2 h-2 rounded-full bg-stone-300"></span> Drag a row onto Chat to <span class="font-medium text-stone-700">open side-by-side</span>
+          </div>
+        </div>
+        <div class="px-3 py-2.5 border-t border-line bg-[#FFFCF8] flex items-center justify-between text-[11px]">
+          <span class="text-stone-500"><span class="font-medium text-stone-700">18</span> sessions · <span class="text-emerald-600">1 running</span></span>
+          <a href="#" class="font-medium text-[#C96442] hover:underline">Export JSONL →</a>
+        </div>
+      </section>
+
+      <!-- Projects pane -->
+      <section class="rounded-xl bg-white border border-line shadow-card overflow-hidden">
+        <div class="px-3.5 h-10 flex items-center justify-between border-b border-line bg-[#FFFCF8]">
+          <h3 class="text-[13px] font-semibold">Projects</h3>
+          <button class="px-2.5 h-7 rounded-full bg-white border border-line text-[12px] font-medium hover:bg-[#FFFCF8]">+ Add project</button>
+        </div>
+        <div class="divide-y divide-line/60">
+          <a href="#" class="flex items-center gap-3 px-3.5 py-3 hover:bg-[#FFFCF8] transition bg-[#FDF8F0]/50 border-l-2 border-[#C96442]">
+            <span class="w-8 h-8 rounded-lg bg-[#1E1B17] text-white grid place-items-center text-[12px] font-bold">⌁</span>
+            <div class="min-w-0 flex-1">
+              <div class="text-[13px] font-medium leading-none">lokma-web</div>
+              <div class="text-[11px] font-mono text-stone-500 truncate">~/dev/lokma · 12 sessions</div>
+            </div>
+            <span class="shrink-0 px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-mono">main</span>
+          </a>
+          <a href="#" class="flex items-center gap-3 px-3.5 py-3 hover:bg-[#FFFCF8] transition">
+            <span class="w-8 h-8 rounded-lg bg-white border border-line grid place-items-center text-[12px]">⬢</span>
+            <div class="min-w-0 flex-1">
+              <div class="text-[13px] font-medium">lokma-core</div>
+              <div class="text-[11px] font-mono text-stone-500">~/dev/lokma-core · 6 sessions</div>
+            </div>
+            <span class="px-2 py-1 rounded-full bg-white border border-line text-[11px] font-mono text-stone-500">main</span>
+          </a>
+          <a href="#" class="flex items-center gap-3 px-3.5 py-3 hover:bg-[#FFFCF8] transition">
+            <span class="w-8 h-8 rounded-lg bg-white border border-line grid place-items-center text-[12px]">◍</span>
+            <div class="min-w-0 flex-1">
+              <div class="text-[13px] font-medium">notes.fermag.com.tr</div>
+              <div class="text-[11px] font-mono text-stone-500">~/dev/notes · 4 sessions</div>
+            </div>
+          </a>
+        </div>
+        <div class="px-3 py-2.5 bg-[#FFFCF8] border-t border-line text-[11px] text-stone-500">
+          Click project → filters Sessions. <span class="font-mono">GET /api/sessions?projectId=…</span>
+        </div>
+      </section>
+    </div>
+
+    <!-- CENTER — Chat + Code -->
+    <div class="col-span-12 lg:col-span-6 space-y-4">
+      <!-- Chat pane -->
+      <section class="rounded-xl bg-white border border-line shadow-card overflow-hidden flex flex-col">
+        <div class="px-3.5 h-11 flex items-center justify-between border-b border-line bg-[#FFFCF8] shrink-0">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <h3 class="text-[13px] font-semibold">Chat</h3>
+            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white border border-line text-[11px] font-medium">Refactor auth middleware</span>
+            <span class="hidden xl:inline-flex px-2 py-1 rounded-full bg-[#1E1B17] text-white text-[11px] font-mono">#a3f9</span>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <span class="hidden sm:inline-flex items-center gap-1 text-[11px] text-stone-500"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> streaming</span>
+            <button class="w-7 h-7 grid place-items-center rounded-md hover:bg-white border border-transparent hover:border-line text-stone-500" title="Fork"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M7 3H4a1 1 0 00-1 1v3M9 13h3a1 1 0 001-1V9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M5 8h6M8 5v6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></button>
+            <button class="w-7 h-7 grid place-items-center rounded-md hover:bg-white border border-transparent hover:border-line text-stone-500">⋯</button>
+          </div>
+        </div>
+
+        <!-- permission banner — Shift+Tab per 20/22 -->
+        <div class="mx-3 mt-3 p-2.5 rounded-lg bg-amber-50 border border-amber-200 flex items-center gap-2.5">
+          <span class="w-7 h-7 rounded-full bg-amber-500 text-white grid place-items-center shrink-0">⚑</span>
+          <div class="min-w-0 flex-1">
+            <div class="text-[12.5px] font-medium leading-tight">Permission — <span class="font-mono">Edit src/auth.ts</span></div>
+            <div class="text-[11px] text-stone-600">Press <kbd class="px-1 py-0.5 rounded bg-white border border-amber-200 font-mono text-[10px]">Shift+Tab</kbd> to toggle auto/manual/plan · or choose below</div>
+          </div>
+          <div class="hidden sm:flex items-center gap-1.5 shrink-0">
+            <button class="px-3 py-1.5 rounded-full bg-[#1E1B17] text-white text-[12.5px] font-medium">Allow</button>
+            <button class="px-3 py-1.5 rounded-full bg-white border border-amber-200 text-[12.5px] font-medium">Deny</button>
+            <button class="px-2.5 py-1.5 rounded-full bg-white border border-line text-[11px]">Always</button>
+          </div>
+        </div>
+
+        <!-- messages -->
+        <div class="flex-1 overflow-auto p-4 space-y-5 bg-[#FFFCF8]/50 max-h-[420px]">
+          <!-- system -->
+          <div class="flex justify-center"><span class="px-3 py-1 rounded-full bg-white border border-line text-[11px] text-stone-500 shadow-sm">System: LOKMA.md attached · Worktree ⎇ feat/auth-hook · /model claude-sonnet-4.5</span></div>
+
+          <!-- user -->
+          <div class="flex gap-3">
+            <img src="https://i.pravatar.cc/100?img=33" class="w-7 h-7 rounded-full shrink-0 mt-0.5 border border-line" alt="" />
+            <div class="flex-1 min-w-0">
+              <div class="flex items-baseline gap-2"><span class="text-[13px] font-semibold">You</span><span class="text-[11px] text-stone-400">14:31</span></div>
+              <div class="mt-1.5 p-3.5 rounded-2xl rounded-tl-sm bg-white border border-line shadow-sm">
+                <p class="text-[14px] leading-6">Move JWT verification into a Fastify <code class="px-1.5 py-0.5 rounded bg-[#FFFCF8] border border-line font-mono text-[12px]">preHandler</code> hook. Opt-in per route via <code class="px-1.5 py-0.5 rounded bg-[#FFFCF8] border border-line font-mono text-[12px]">config.auth</code>. Keep it typed, no extra deps. File is <span class="px-1.5 py-0.5 rounded bg-[#FDF0E6] border border-[#F2D5C2] font-mono text-[12px] text-[#9A4A2E]">@src/auth.ts</span></p>
+                <div class="mt-2 flex flex-wrap gap-1.5 text-[11px]"><span class="px-2 py-1 rounded-full bg-[#FFFCF8] border border-line">lokma-web</span><span class="px-2 py-1 rounded-full bg-white border border-line font-mono">Fastify 5</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- assistant with tool -->
+          <div class="flex gap-3">
+            <div class="w-7 h-7 rounded-full bg-[#1E1B17] text-white grid place-items-center shrink-0 mt-0.5 text-[12px]">◐</div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-baseline gap-2"><span class="text-[13px] font-semibold">Lokma</span><span class="text-[11px] px-1.5 py-0.5 rounded bg-white border border-line">claude-sonnet-4.5</span><span class="text-[11px] text-stone-400">14:31 · 1.2s</span></div>
+              <div class="mt-1.5 rounded-2xl rounded-tl-sm bg-white border border-line p-3.5 shadow-sm">
+                <p class="text-[14px] leading-6 text-stone-700">Clean pattern — one hook, one decorator. Here's the patch. Uses <code class="px-1 py-0.5 rounded bg-[#FFFCF8] border border-line font-mono text-[12px]">fastify-plugin</code> + your <code class="px-1 py-0.5 rounded bg-[#FFFCF8] border border-line font-mono text-[12px]">verifyJwt</code>.</p>
+                <!-- tool renderer — Read then Edit diff per 22 -->
+                <div class="mt-3 rounded-lg border border-line overflow-hidden">
+                  <div class="px-3 h-8 flex items-center justify-between bg-[#FFFCF8] border-b border-line">
+                    <div class="flex items-center gap-2 text-[12px]"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span><span class="font-mono">Read src/auth.ts</span><span class="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px]">tool</span></div>
+                    <span class="text-[11px] font-mono text-stone-500">42 lines</span>
+                  </div>
+                  <div class="px-3 py-2 bg-[#1E1B17] text-[#EDE6D6] font-mono text-[11.5px] leading-5 overflow-x-auto"><span class="text-stone-500">1</span>  import fp from 'fastify-plugin'<br/><span class="text-stone-500">2</span>  <span class="text-[#D9B08C]">export default</span> fp(<span class="text-[#E9B44C]">async</span> (app) =&gt; { … })</div>
+                </div>
+                <!-- AskUserQuestion — per 22 §4.2 -->
+                <div class="mt-3 p-3 rounded-lg bg-[#FDF8F0] border border-[#F2D5C2]">
+                  <div class="text-[12px] font-semibold">AskUserQuestion — confirm approach</div>
+                  <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button class="px-3 py-2 rounded-lg bg-white border border-line text-left hover:border-[#C96442]/30 hover:bg-white transition"><div class="text-[13px] font-medium">Keep hook-only</div><div class="text-[11px] text-stone-500">No extra deps, opt-in per route</div></button>
+                    <button class="px-3 py-2 rounded-lg bg-white border border-line text-left hover:border-[#C96442]/30"><div class="text-[13px] font-medium">Add rate-limit</div><div class="text-[11px] text-stone-500">60/min per user in same hook</div></button>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-1.5 flex items-center gap-1">
+                <button class="h-6 px-2 rounded-full bg-white border border-line text-[11px] hover:bg-[#FFFCF8]">Helpful</button>
+                <button class="h-6 w-6 grid place-items-center rounded-full bg-white border border-line hover:bg-[#FFFCF8] text-stone-500">♡</button>
+                <span class="ml-auto text-[11px] font-mono text-stone-400">342 tokens</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- slash menu — per 20/22 -->
+          <div class="flex gap-3">
+            <div class="w-7 h-7 rounded-full bg-white border border-line grid place-items-center shrink-0 text-stone-400">/</div>
+            <div class="flex-1 min-w-0">
+              <div class="rounded-xl bg-white border border-line shadow-card overflow-hidden">
+                <div class="px-3 py-2 text-[11px] font-semibold tracking-widest uppercase text-stone-400 border-b border-line bg-[#FFFCF8]">Slash commands — type <span class="font-mono normal-case tracking-normal">/</span> in composer</div>
+                <div class="divide-y divide-line/60 text-[13px]">
+                  <div class="flex items-center justify-between px-3 py-2 hover:bg-[#FFFCF8]"><span><span class="font-mono text-[#C96442]">/clear</span> <span class="text-stone-500">— clear transcript</span></span><span class="text-[11px] text-stone-400">⇧⌘L</span></div>
+                  <div class="flex items-center justify-between px-3 py-2 hover:bg-[#FFFCF8] bg-[#FDF8F0]/60"><span><span class="font-mono text-[#C96442]">/model</span> <span class="text-stone-500">— switch model</span></span><span class="text-[11px] px-1.5 py-0.5 rounded bg-white border border-line font-mono">Ctrl+M</span></div>
+                  <div class="flex items-center justify-between px-3 py-2 hover:bg-[#FFFCF8]"><span><span class="font-mono text-[#C96442]">@file</span> <span class="text-stone-500">— mention file (drag from Files pane)</span></span><span class="text-[11px] text-stone-400">@</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- composer -->
+        <div class="p-3 border-t border-line bg-white shrink-0">
+          <div class="rounded-xl border border-line bg-[#FFFCF8] focus-within:border-[#C96442]/35 focus-within:ring-2 focus-within:ring-[#C96442]/12 transition">
+            <textarea rows="2" placeholder="Ask Lokma — try “/model” or “@src/auth.ts” or “add 60/min rate limit”" class="w-full bg-transparent px-3.5 py-2.5 text-[14px] placeholder:text-stone-400 outline-none resize-none"></textarea>
+            <div class="flex items-center justify-between px-2 pb-2">
+              <div class="flex items-center gap-1">
+                <span class="hidden sm:inline-flex px-2 py-1 rounded-full bg-white border border-line text-[11px] font-mono text-stone-500">tokens 12.3k · $0.04 · 6% ctx</span>
+                <span class="inline-flex px-2 py-1 rounded-full bg-white border border-line text-[11px] text-stone-500">Auto-apply off</span>
+              </div>
+              <button class="inline-flex items-center gap-1.5 pl-3 pr-2 h-8 rounded-full bg-[#C96442] text-white text-[13px] font-medium hover:bg-[#B85736] shadow-sm">Send <span class="w-6 h-6 rounded-full bg-white/15 grid place-items-center">↑</span></button>
+            </div>
+          </div>
+          <div class="mt-1.5 flex items-center justify-between text-[11px] text-stone-400">
+            <span><kbd class="px-1 py-0.5 rounded bg-white border border-line font-mono text-[10px]">↵</kbd> send · <kbd class="px-1 py-0.5 rounded bg-white border border-line font-mono text-[10px]">⇧↵</kbd> new line</span>
+            <span class="hidden sm:inline">WS: text_delta · tool_start · tool_result · permission</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Code pane — Monaco preview + diff + checkpoint -->
+      <section class="rounded-xl bg-white border border-line shadow-card overflow-hidden">
+        <div class="px-3.5 h-10 flex items-center justify-between border-b border-line bg-[#FFFCF8]">
+          <div class="flex items-center gap-2">
+            <h3 class="text-[13px] font-semibold">Code</h3>
+            <span class="hidden sm:inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white border border-line text-[11px] font-mono">src/auth.ts</span>
+            <span class="px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px]">preview</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button class="hidden sm:inline-flex items-center gap-1 px-2.5 h-7 rounded-full bg-white border border-line text-[12px] hover:bg-[#FFFCF8]"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Rewind</button>
+            <button class="px-2.5 h-7 rounded-full bg-[#1E1B17] text-white text-[12px] font-medium">Open in editor</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 xl:grid-cols-[1.35fr_0.85fr] gap-0">
+          <!-- code preview -->
+          <div class="border-b xl:border-b-0 xl:border-r border-line">
+            <div class="flex items-center justify-between px-3 h-8 bg-[#FFFCF8] border-b border-line text-[11px] font-mono text-stone-500">
+              <span>plugins/auth.ts — diff preview (hashline style)</span>
+              <span class="hidden sm:inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> checkpoint saved</span>
+            </div>
+            <pre class="p-3 text-[12px] leading-5 font-mono overflow-x-auto bg-white"><code><span class="text-stone-400">// checkout — checkpoint before edit</span>
+<span class="bg-red-50 text-red-700 -mx-3 px-3 block border-l-2 border-red-300">- const x = 1</span>
+<span class="bg-emerald-50 text-emerald-800 -mx-3 px-3 block border-l-2 border-emerald-400">+ const x = 2 // + rateLimit map per user</span>
+<span class="text-stone-700">  app.addHook('preHandler', async (req, reply) =&gt; {</span>
+<span class="text-stone-700">    if (!req.routeOptions.config?.auth) return</span>
+<span class="text-stone-700">    req.user = await verifyJwt(token)</span>
+<span class="text-stone-500">    // ↳ Rewind button restores snapshot from ~/.lokma/checkpoints/</span></code></pre>
+            <div class="px-3 py-2 bg-[#FDF8F0] border-t border-line flex items-center gap-2 text-[11px] text-stone-600">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> No new deps · typed · runs only when <code class="px-1 py-0.5 rounded bg-white border border-line font-mono text-[10px]">config.auth</code> set
+              <button class="ml-auto px-2.5 py-1 rounded-full bg-[#1E1B17] text-white text-[11px] font-medium">Apply patch</button>
+            </div>
+          </div>
+          <!-- orchestration mini tree — per 24 §4 -->
+          <div class="bg-[#FFFCF8]">
+            <div class="px-3 h-8 flex items-center justify-between border-b border-line bg-white">
+              <span class="text-[11px] font-semibold tracking-widest uppercase text-stone-500">Orchestration</span>
+              <span class="px-2 py-1 rounded-full bg-white border border-line text-[11px] font-mono">3 agents</span>
+            </div>
+            <div class="p-3 space-y-2">
+              <div class="flex items-center gap-2 text-[12.5px]">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="font-medium">agent-1: find files</span>
+                <span class="ml-auto font-mono text-[11px] text-stone-500">1.2s</span>
+              </div>
+              <div class="h-1.5 rounded-full bg-white border border-line overflow-hidden"><div class="h-full w-[68%] bg-emerald-500"></div></div>
+              <div class="flex items-center gap-2 text-[12.5px]">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>agent-2: read auth</span>
+                <span class="ml-auto text-emerald-700 text-[11px]">✓ 0.8s</span>
+              </div>
+              <div class="flex items-center gap-2 text-[12.5px]">
+                <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                <span>agent-3: edit tests</span>
+                <span class="ml-auto font-mono text-[11px] text-stone-500">2.1s</span>
+              </div>
+              <div class="mt-2 p-2 rounded-lg bg-white border border-line text-[11px] leading-4 text-stone-600">
+                <div class="font-medium text-stone-800">Alt+A → Agent Hub</div>
+                <div>Task fan-out → isolated worktrees · WS <code class="font-mono">agent/start · delta · end</code></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- RIGHT — Files / Terminal / Browser -->
+    <div class="col-span-12 lg:col-span-3 space-y-4">
+      <!-- tab bar -->
+      <div class="inline-flex p-1 rounded-full bg-white border border-line shadow-sm text-[12.5px]">
+        <button data-righttab="files" class="right-tab px-3 py-1.5 rounded-full bg-[#1E1B17] text-white font-medium">Files</button>
+        <button data-righttab="terminal" class="right-tab px-3 py-1.5 rounded-full text-stone-600 hover:bg-[#FFFCF8]">Terminal</button>
+        <button data-righttab="browser" class="right-tab px-3 py-1.5 rounded-full text-stone-600 hover:bg-[#FFFCF8]">Browser</button>
+      </div>
+
+      <!-- Files pane — react-arborist + git overlay per 24 §3.1 -->
+      <section id="pane-files" class="right-pane rounded-xl bg-white border border-line shadow-card overflow-hidden">
+        <div class="px-3.5 h-10 flex items-center justify-between border-b border-line bg-[#FFFCF8]">
+          <h3 class="text-[13px] font-semibold">Files</h3>
+          <div class="flex items-center gap-1">
+            <span class="hidden sm:inline text-[11px] font-mono text-stone-500">⌘P quick-open</span>
+            <button class="w-7 h-7 grid place-items-center rounded-md hover:bg-white border border-transparent hover:border-line text-stone-500"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+          </div>
+        </div>
+        <div class="p-2">
+          <div class="flex items-center gap-2 px-2 py-2 text-[11px] font-semibold tracking-widest uppercase text-stone-400">
+            <span>Explorer</span>
+            <span class="ml-auto font-mono normal-case tracking-normal text-stone-500">cwd: ~/dev/lokma</span>
+          </div>
+          <!-- tree -->
+          <div class="font-mono text-[12.5px] leading-6">
+            <div class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-[#FFFCF8] cursor-pointer">
+              <span class="text-stone-400">▾</span><span class="text-amber-600">▸</span> <span class="font-medium">src/</span><span class="ml-auto w-2 h-2 rounded-full bg-emerald-500" title="git M"></span>
+            </div>
+            <div class="ml-4 space-y-0.5">
+              <div class="flex items-center gap-2 px-2 py-1 rounded bg-[#FDF8F0] border border-[#F2D5C2] cursor-pointer">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span><span class="text-[#1E1B17]">auth.ts</span><span class="ml-auto text-[11px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">M</span>
+              </div>
+              <div class="flex items-center gap-2 px-2 py-1 rounded hover:bg-[#FFFCF8] cursor-pointer">
+                <span class="w-2 h-2 rounded-full bg-blue-400"></span> auth.test.ts <span class="ml-auto text-[11px] text-stone-400">A</span>
+              </div>
+              <div class="flex items-center gap-2 px-2 py-1 rounded hover:bg-[#FFFCF8] cursor-pointer opacity-75">
+                <span class="w-2 h-2 rounded-full bg-stone-300"></span> jwt.ts
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-[#FFFCF8] cursor-pointer"><span class="text-stone-400">▸</span><span>tests/</span><span class="ml-auto w-2 h-2 rounded-full bg-stone-300"></span></div>
+            <div class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-[#FFFCF8] cursor-pointer"><span class="text-stone-400">▾</span> Docs/<span class="ml-auto text-[11px] text-stone-400">42 files</span></div>
+          </div>
+          <div class="mt-3 p-2.5 rounded-lg bg-[#FDF8F0] border border-dashed border-[#E7DDCB] text-[11px] leading-4 text-stone-600">
+            <span class="font-medium text-stone-800">Drag file → chat</span> to insert <code class="px-1 py-0.5 rounded bg-white border border-line font-mono">@path</code> mention · Right-click: Copy path / Reveal<br/>
+            <span class="font-mono text-stone-500">GET /api/files?cwd=… &amp; /api/files/read</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Terminal pane — xterm per 24 §3.2 -->
+      <section id="pane-terminal" class="right-pane hidden rounded-xl bg-[#1E1B17] border border-[#2A2622] shadow-card overflow-hidden">
+        <div class="px-3.5 h-10 flex items-center justify-between border-b border-[#2A2622] bg-[#24211E]">
+          <div class="flex items-center gap-2">
+            <h3 class="text-[13px] font-semibold text-[#FFFCF8]">Terminal</h3>
+            <span class="px-1.5 py-0.5 rounded bg-white/10 border border-white/10 text-[11px] font-mono text-white/70">bash:1</span>
+            <span class="px-1.5 py-0.5 rounded bg-white/10 border border-white/10 text-[11px] font-mono text-white/70">bash:2</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <button class="px-2 h-6 rounded-full bg-white text-[#1E1B17] text-[11px] font-medium">Follow</button>
+            <button class="w-6 h-6 grid place-items-center rounded-md hover:bg-white/10 text-white/60">⎘</button>
+          </div>
+        </div>
+        <div class="p-3 font-mono text-[11.5px] leading-5 text-[#EDE6D6] overflow-auto">
+          <div class="text-white/50">$ npm test <span class="ml-2 px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px]">PTY</span></div>
+          <div class="text-emerald-300">✓ 12 tests passed <span class="text-white/40">· 1.2s</span></div>
+          <div class="text-white/70">$ git status <span class="text-white/40">— porch · M src/auth.ts</span></div>
+          <div class="mt-2 flex items-center gap-2 text-[11px] text-white/50"><span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> live · <code class="px-1 py-0.5 rounded bg-white/10 border border-white/10">terminal/data</code> WS · <span>exit 0</span></div>
+        </div>
+        <div class="px-3 py-2 border-t border-[#2A2622] bg-[#24211E] flex items-center gap-2">
+          <button class="px-2.5 py-1 rounded-full bg-white text-[#1E1B17] text-[11px] font-medium">Clear</button>
+          <button class="px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-white text-[11px]">Copy</button>
+          <span class="ml-auto text-[11px] font-mono text-white/50">xterm.js + fit addon</span>
+        </div>
+      </section>
+
+      <!-- Browser pane — iframe per 24 §3.3 -->
+      <section id="pane-browser" class="right-pane hidden rounded-xl bg-white border border-line shadow-card overflow-hidden">
+        <div class="px-3.5 h-10 flex items-center justify-between border-b border-line bg-[#FFFCF8]">
+          <h3 class="text-[13px] font-semibold">Browser</h3>
+          <span class="px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-medium">harness-driven</span>
+        </div>
+        <div class="p-2">
+          <div class="flex items-center gap-1.5 p-1 rounded-full bg-[#FFFCF8] border border-line">
+            <button class="w-7 h-7 grid place-items-center rounded-full hover:bg-white border border-transparent hover:border-line text-stone-600">‹</button>
+            <button class="w-7 h-7 grid place-items-center rounded-full hover:bg-white border border-transparent hover:border-line text-stone-600">›</button>
+            <button class="w-7 h-7 grid place-items-center rounded-full hover:bg-white border border-transparent hover:border-line text-stone-600">↻</button>
+            <div class="flex-1 flex items-center gap-2 px-3 h-7 rounded-full bg-white border border-line font-mono text-[12px] text-stone-600 truncate">
+              <span class="w-2 h-2 rounded-full bg-emerald-500"></span> http://localhost:3000
+            </div>
+            <button class="px-2.5 h-7 rounded-full bg-[#1E1B17] text-white text-[11px] font-medium">Open tab</button>
+          </div>
+          <div class="mt-2 rounded-lg border border-line overflow-hidden bg-[#FFFCF8] h-[160px] grid place-items-center relative">
+            <div class="absolute inset-0 opacity-[0.04]" style="background-image: linear-gradient(#1E1B17 1px, transparent 1px), linear-gradient(90deg, #1E1B17 1px, transparent 1px); background-size: 20px 20px;"></div>
+            <div class="relative bg-white border border-line rounded-lg shadow-sm p-4 w-[70%] text-center">
+              <div class="text-[13px] font-semibold">Preview</div>
+              <div class="text-[11px] text-stone-500">harness tools: browser_navigate · click · screenshot · eval</div>
+              <div class="mt-2 inline-flex px-2.5 py-1 rounded-full bg-[#1E1B17] text-white text-[11px]">Take screenshot</div>
+            </div>
+          </div>
+          <div class="mt-2 text-[11px] font-mono text-stone-500">POST /api/browser/open · WS drives iframe · <span class="text-stone-700">DevTools later</span></div>
+        </div>
+      </section>
+
+      <!-- tip -->
+      <div class="rounded-xl bg-[#FDF8F0] border border-[#F2D5C2] p-3 text-[11px] leading-4 text-stone-600">
+        <span class="font-semibold text-stone-800">Tip:</span> All panes are draggable via <span class="font-mono">flexlayout-react</span> — try dragging Sessions ⋮⋮ onto Chat. <code class="px-1 py-0.5 rounded bg-white border border-line font-mono">localStorage: lokma:layout:v1</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       PROVIDERS + MODELS — per 22 §1 & §2
+       Provider reorder drag handle + fallback chain, Model catalog with Allow All/Disable All
+       ============================================================ -->
+  <div class="mt-6 grid grid-cols-12 gap-4 items-start">
+    <!-- Providers -->
+    <section class="col-span-12 xl:col-span-5 rounded-xl bg-white border border-line shadow-card overflow-hidden">
+      <div class="px-4 sm:px-5 h-[52px] flex items-center justify-between border-b border-line bg-[#FFFCF8]">
+        <div class="flex items-center gap-2">
+          <h2 class="text-[13px] font-semibold">Providers</h2>
+          <span class="px-2 py-1 rounded-full bg-white border border-line text-[11px] font-medium">6 configured</span>
+          <span class="hidden sm:inline-flex px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px]">4 ok · 1 error · 1 unconfigured</span>
+        </div>
+        <button class="px-3 h-8 rounded-full bg-[#1E1B17] text-white text-[12.5px] font-medium">+ Add Provider</button>
+      </div>
+
+      <div class="p-3 sm:p-4 space-y-2.5" id="providerList">
+        <!-- provider cards — draggable, priority order matters for fallback -->
+        <div draggable="true" class="provider-card group flex items-center gap-3 p-3 rounded-xl bg-[#FFFCF8] border border-line hover:border-line-strong hover:shadow-sm transition cursor-grab active:cursor-grabbing">
+          <span class="text-stone-300 group-hover:text-stone-500 cursor-grab select-none">⋮⋮</span>
+          <span class="w-8 h-8 rounded-lg bg-[#1E1B17] text-white grid place-items-center text-[12px] font-bold">A</span>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2"><span class="text-[13px] font-semibold leading-none">Anthropic</span><span class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.15)]"></span><span class="text-[11px] text-emerald-700 font-medium">ok</span><span class="ml-auto text-[11px] font-mono text-stone-500">#1 · primary</span></div>
+            <div class="text-[11px] text-stone-500"><span class="font-mono">anthropic</span> · 3 models · 2 enabled · keySet: yes</div>
+          </div>
+          <button class="hidden sm:inline-flex px-2.5 py-1 rounded-full bg-white border border-line text-[11px] font-medium hover:bg-[#FFFCF8]">Test</button>
+        </div>
+
+        <div draggable="true" class="provider-card flex items-center gap-3 p-3 rounded-xl bg-white border border-line hover:border-line-strong hover:bg-[#FFFCF8] transition cursor-grab">
+          <span class="text-stone-300">⋮⋮</span>
+          <span class="w-8 h-8 rounded-lg bg-emerald-600 text-white grid place-items-center text-[12px] font-bold">O</span>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2"><span class="text-[13px] font-semibold">OpenAI</span><span class="w-2 h-2 rounded-full bg-emerald-500"></span><span class="text-[11px] text-emerald-700 font-medium">ok</span><span class="ml-auto text-[11px] font-mono text-stone-500">#2</span></div>
+            <div class="text-[11px] text-stone-500">openai · 4 models · 2 enabled</div>
+          </div>
+          <button class="px-2.5 py-1 rounded-full bg-white border border-line text-[11px] font-medium">Test</button>
+        </div>
+
+        <div draggable="true" class="provider-card flex items-center gap-3 p-3 rounded-xl bg-white border border-line hover:border-line-strong hover:bg-[#FFFCF8] transition cursor-grab">
+          <span class="text-stone-300">⋮⋮</span>
+          <span class="w-8 h-8 rounded-lg bg-[#0EA5E9] text-white grid place-items-center text-[11px] font-bold">D</span>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2"><span class="text-[13px] font-semibold">DeepSeek</span><span class="w-2 h-2 rounded-full bg-emerald-500"></span><span class="text-[11px] text-emerald-700 font-medium">ok</span><span class="ml-auto text-[11px] font-mono text-stone-500">#3</span></div>
+            <div class="text-[11px] text-stone-500">deepseek · 2 models · 2 enabled</div>
+          </div>
+        </div>
+
+        <div draggable="true" class="provider-card flex items-center gap-3 p-3 rounded-xl bg-white border border-line opacity-90">
+          <span class="text-stone-300">⋮⋮</span>
+          <span class="w-8 h-8 rounded-lg bg-white border border-line grid place-items-center text-[12px]">◍</span>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2"><span class="text-[13px] font-semibold">Ollama</span><span class="w-2 h-2 rounded-full bg-stone-300"></span><span class="text-[11px] text-stone-500">unconfigured</span><span class="ml-auto text-[11px] font-mono text-stone-400">local</span></div>
+            <div class="text-[11px] text-stone-500">ollama · localhost · qwen2.5 · llama3.3</div>
+          </div>
+        </div>
+
+        <div draggable="true" class="provider-card flex items-center gap-3 p-3 rounded-xl bg-white border border-red-200">
+          <span class="text-stone-300">⋮⋮</span>
+          <span class="w-8 h-8 rounded-lg bg-[#7C3AED] text-white grid place-items-center text-[11px] font-bold">G</span>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2"><span class="text-[13px] font-semibold">Google</span><span class="w-2 h-2 rounded-full bg-red-500"></span><span class="text-[11px] text-red-600">error</span><span class="ml-auto text-[11px] font-mono text-stone-500">#5</span></div>
+            <div class="text-[11px] text-red-600">401 — invalid API key (tooltip)</div>
+          </div>
+          <button class="px-2.5 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 text-[11px] font-medium">Fix</button>
+        </div>
+      </div>
+
+      <!-- fallback chain — drag to reorder per 22 §2.2 -->
+      <div class="mx-3 sm:mx-4 mb-4 p-3 rounded-xl bg-[#FDF8F0] border border-[#F2D5C2]">
+        <div class="flex items-center justify-between gap-2">
+          <div class="text-[11px] font-semibold tracking-widest uppercase text-stone-500">Fallback chain</div>
+          <label class="inline-flex items-center gap-1.5 text-[11px] font-medium"><input type="checkbox" checked class="rounded border-stone-300 text-[#C96442] focus:ring-[#C96442]/20" /> Enabled — on 429/500 try next</label>
+        </div>
+        <div class="mt-2 flex items-center gap-2 flex-wrap" id="fallbackChain">
+          <span draggable="true" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-line shadow-sm text-[12px] font-medium cursor-grab"><span class="text-stone-300">⋮</span> anthropic:sonnet <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span></span>
+          <span class="text-stone-300">→</span>
+          <span draggable="true" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-line shadow-sm text-[12px] font-medium cursor-grab"><span class="text-stone-300">⋮</span> openai:gpt-4o</span>
+          <span class="text-stone-300">→</span>
+          <span draggable="true" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-line shadow-sm text-[12px] font-medium cursor-grab"><span class="text-stone-300">⋮</span> deepseek:chat</span>
+          <span class="ml-auto text-[11px] text-stone-500 font-mono hidden sm:inline">drag to reorder · fallbacks.json</span>
+        </div>
+        <div class="mt-2 text-[11px] text-stone-500">Example: <span class="font-mono">claude-sonnet-4-5 → gpt-4o</span> if Anthropic 429. Drag handle reorders priority.</div>
+      </div>
+
+      <div class="px-4 py-2.5 border-t border-line bg-[#FFFCF8] text-[11px] font-mono text-stone-500">
+        API: GET /api/providers · POST /api/providers/:id/test → { ok, models }
+      </div>
+    </section>
+
+    <!-- Model catalog -->
+    <section class="col-span-12 xl:col-span-7 rounded-xl bg-white border border-line shadow-card overflow-hidden flex flex-col">
+      <div class="px-4 sm:px-5 h-[52px] flex items-center justify-between border-b border-line bg-[#FFFCF8] gap-3">
+        <div class="flex items-center gap-2">
+          <h2 class="text-[13px] font-semibold">Model catalog</h2>
+          <span class="hidden sm:inline-flex px-2 py-1 rounded-full bg-white border border-line text-[11px] font-mono">GET /api/models</span>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button id="allowAll" class="px-3 h-7 rounded-full bg-[#1E1B17] text-white text-[12px] font-medium">Allow All</button>
+          <button id="disableAll" class="px-3 h-7 rounded-full bg-white border border-line text-[12px] font-medium hover:bg-[#FFFCF8]">Disable All</button>
+        </div>
+      </div>
+
+      <!-- toolbar: search + provider filter -->
+      <div class="px-4 py-3 flex flex-wrap items-center gap-2 border-b border-line bg-white">
+        <div class="relative flex-1 min-w-[180px]">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400"><circle cx="7" cy="7" r="4" stroke="currentColor" stroke-width="1.2"/><path d="M10 10l2.5 2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          <input id="modelSearch" placeholder="Filter by id / provider…" class="w-full h-8 pl-8 pr-3 rounded-lg bg-[#FFFCF8] border border-line text-[13px] placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-[#C96442]/12 focus:border-[#C96442]/25" />
+        </div>
+        <div class="flex items-center gap-1.5 text-[11px] flex-wrap">
+          <span class="hidden sm:inline text-stone-500">Provider:</span>
+          <button class="provider-pill px-2.5 py-1 rounded-full bg-[#1E1B17] text-white font-medium" data-filter="all">All</button>
+          <button class="provider-pill px-2.5 py-1 rounded-full bg-white border border-line hover:bg-[#FFFCF8]" data-filter="anthropic">anthropic</button>
+          <button class="provider-pill px-2.5 py-1 rounded-full bg-white border border-line hover:bg-[#FFFCF8]" data-filter="openai">openai</button>
+          <button class="provider-pill px-2.5 py-1 rounded-full bg-white border border-line hover:bg-[#FFFCF8]" data-filter="deepseek">deepseek</button>
+        </div>
+        <span class="ml-auto hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FDF8F0] border border-[#F2D5C2] text-[11px] text-stone-600"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> only enabled show in switcher</span>
+      </div>
+
+      <!-- table -->
+      <div class="overflow-auto">
+        <table class="w-full text-left border-collapse">
+          <thead class="sticky top-0 bg-[#FFFCF8] border-b border-line text-[11px] tracking-widest uppercase text-stone-500">
+            <tr>
+              <th class="px-3 py-2.5 w-8"><input type="checkbox" id="checkAll" checked class="rounded border-stone-300 text-[#C96442] focus:ring-[#C96442]/20" /></th>
+              <th class="px-2 py-2.5">Model</th>
+              <th class="px-2 py-2.5">Provider</th>
+              <th class="px-2 py-2.5 text-right">Context</th>
+              <th class="px-2 py-2.5 text-right">Pricing</th>
+              <th class="px-3 py-2.5 text-center">Enabled</th>
+            </tr>
+          </thead>
+          <tbody id="modelBody" class="divide-y divide-line/60 text-[13px]">
+            <!-- rows injected via JS for filter, but static fallback -->
+            <tr data-provider="anthropic" class="hover:bg-[#FFFCF8] transition">
+              <td class="px-3 py-2.5"><input type="checkbox" checked class="model-check rounded border-stone-300 text-[#C96442]" /></td>
+              <td class="px-2 py-2.5"><span class="font-mono text-[12.5px] font-medium">claude-sonnet-4-5</span><div class="text-[11px] text-stone-500">Claude Sonnet 4.5</div></td>
+              <td class="px-2 py-2.5"><span class="inline-flex px-2 py-1 rounded-full bg-[#FDF0E6] border border-[#F2D5C2] text-[#9A4A2E] text-[11px] font-medium">anthropic</span></td>
+              <td class="px-2 py-2.5 text-right font-mono text-[12px]">200k</td>
+              <td class="px-2 py-2.5 text-right font-mono text-[11px] text-stone-500">$3 / $15</td>
+              <td class="px-3 py-2.5 text-center"><span class="inline-flex w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.15)]"></span></td>
+            </tr>
+            <tr data-provider="anthropic" class="hover:bg-[#FFFCF8] transition">
+              <td class="px-3 py-2.5"><input type="checkbox" class="model-check rounded border-stone-300 text-[#C96442]" /></td>
+              <td class="px-2 py-2.5"><span class="font-mono text-[12.5px]">claude-opus-4-5</span><div class="text-[11px] text-stone-500">Claude Opus 4.5</div></td>
+              <td class="px-2 py-2.5"><span class="inline-flex px-2 py-1 rounded-full bg-[#FDF0E6] border border-[#F2D5C2] text-[#9A4A2E] text-[11px] font-medium">anthropic</span></td>
+              <td class="px-2 py-2.5 text-right font-mono text-[12px]">200k</td>
+              <td class="px-2 py-2.5 text-right font-mono text-[11px] text-stone-500">$15 / $75</td>
+              <td class="px-3 py-2.5 text-center"><span class="inline-flex w-2 h-2 rounded-full bg-stone-300"></span></td>
+            </tr>
+            <tr data-provider="openai" class="hover:bg-[#FFFCF8] transition">
+              <td class="px-3 py-2.5"><input type="checkbox" checked class="model-check rounded border-stone-300 text-[#C96442]" /></td>
+              <td class="px-2 py-2.5"><span class="font-mono text-[12.5px] font-medium">gpt-4o</span><div class="text-[11px] text-stone-500">GPT-4o</div></td>
+              <td class="px-2 py-2.5"><span class="inline-flex px-2 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-medium">openai</span></td>
+              <td class="px-2 py-2.5 text-right font-mono text-[12px]">128k</td>
+              <td class="px-2 py-2.5 text-right font-mono text-[11px] text-stone-500">$2.5 / $10</td>
+              <td class="px-3 py-2.5 text-center"><span class="inline-flex w-2 h-2 rounded-full bg-emerald-500"></span></td>
+            </tr>
+            <tr data-provider="openai" class="hover:bg-[#FFFCF8] transition">
+              <td class="px-3 py-2.5"><input type="checkbox" checked class="model-check rounded border-stone-300 text-[#C96442]" /></td>
+              <td class="px-2 py-2.5"><span class="font-mono text-[12.5px]">gpt-4o-mini</span></td>
+              <td class="px-2 py-2.5"><span class="inline-flex px-2 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-medium">openai</span></td>
+              <td class="px-2 py-2.5 text-right font-mono text-[12px]">128k</td>
+              <td class="px-2 py-2.5 text-right font-mono text-[11px] text-stone-500">$0.15 / $0.60</td>
+              <td class="px-3 py-2.5 text-center"><span class="inline-flex w-2 h-2 rounded-full bg-emerald-500"></span></td>
+            </tr>
+            <tr data-provider="deepseek" class="hover:bg-[#FFFCF8] transition">
+              <td class="px-3 py-2.5"><input type="checkbox" checked class="model-check rounded border-stone-300 text-[#C96442]" /></td>
+              <td class="px-2 py-2.5"><span class="font-mono text-[12.5px] font-medium">deepseek-chat</span></td>
+              <td class="px-2 py-2.5"><span class="inline-flex px-2 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium">deepseek</span></td>
+              <td class="px-2 py-2.5 text-right font-mono text-[12px]">64k</td>
+              <td class="px-2 py-2.5 text-right font-mono text-[11px] text-stone-500">$0.27 / $1.10</td>
+              <td class="px-3 py-2.5 text-center"><span class="inline-flex w-2 h-2 rounded-full bg-emerald-500"></span></td>
+            </tr>
+            <tr data-provider="deepseek" class="hover:bg-[#FFFCF8] transition">
+              <td class="px-3 py-2.5"><input type="checkbox" checked class="model-check rounded border-stone-300 text-[#C96442]" /></td>
+              <td class="px-2 py-2.5"><span class="font-mono text-[12.5px]">deepseek-reasoner</span></td>
+              <td class="px-2 py-2.5"><span class="inline-flex px-2 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-[11px] font-medium">deepseek</span></td>
+              <td class="px-2 py-2.5 text-right font-mono text-[12px]">64k</td>
+              <td class="px-2 py-2.5 text-right font-mono text-[11px] text-stone-500">$0.55 / $2.19</td>
+              <td class="px-3 py-2.5 text-center"><span class="inline-flex w-2 h-2 rounded-full bg-emerald-500"></span></td>
+            </tr>
+            <tr data-provider="google" class="hover:bg-[#FFFCF8] transition">
+              <td class="px-3 py-2.5"><input type="checkbox" class="model-check rounded border-stone-300 text-[#C96442]" /></td>
+              <td class="px-2 py-2.5"><span class="font-mono text-[12.5px]">gemini-2.0-flash</span></td>
+              <td class="px-2 py-2.5"><span class="inline-flex px-2 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-medium">google</span></td>
+              <td class="px-2 py-2.5 text-right font-mono text-[12px]">1M</td>
+              <td class="px-2 py-2.5 text-right font-mono text-[11px] text-stone-500">$0.10 / $0.40</td>
+              <td class="px-3 py-2.5 text-center"><span class="inline-flex w-2 h-2 rounded-full bg-stone-300"></span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="px-4 py-2.5 border-t border-line bg-[#FFFCF8] flex flex-wrap items-center gap-2 text-[11px] text-stone-500">
+        <span class="font-mono">PATCH /api/models/:id · POST /api/models/bulk</span>
+        <span class="hidden sm:inline w-px h-3 bg-line"></span>
+        <span>Per-provider <span class="font-medium text-stone-700">Allow All / Disable All</span> toggles whole provider</span>
+        <span class="ml-auto inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> 5 enabled · <span class="w-2 h-2 rounded-full bg-stone-300"></span> 2 disabled</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- Checklist — remaining spec surface (permissions, hooks, skills, MCP, git, memory, subagents, checkpoints) -->
+  <section class="mt-6 rounded-xl bg-white border border-line shadow-card overflow-hidden">
+    <div class="px-4 sm:px-5 h-11 flex items-center justify-between border-b border-line bg-[#FFFCF8]">
+      <h2 class="text-[13px] font-semibold">Full harness coverage — remaining spec (22 §5 & 24)</h2>
+      <span class="hidden sm:inline-flex px-2.5 py-1 rounded-full bg-[#1E1B17] text-white text-[11px] font-medium">No “lite” mode · full parity</span>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-px bg-line">
+      <div class="bg-white p-4">
+        <div class="text-[11px] font-semibold tracking-widest uppercase text-stone-400">Permissions</div>
+        <div class="mt-1 text-[12.5px] font-medium">allow / deny / ask</div>
+        <div class="text-[11px] text-stone-500">Settings → Permissions + banner · <code class="font-mono">auto</code> classifier</div>
+      </div>
+      <div class="bg-white p-4">
+        <div class="text-[11px] font-semibold tracking-widest uppercase text-stone-400">Hooks</div>
+        <div class="mt-1 text-[12.5px] font-medium">PostToolUse etc.</div>
+        <div class="text-[11px] text-stone-500">Settings → Hooks table: event → matcher → command</div>
+      </div>
+      <div class="bg-white p-4">
+        <div class="text-[11px] font-semibold tracking-widest uppercase text-stone-400">Skills</div>
+        <div class="mt-1 text-[12.5px] font-medium">/ + Skills</div>
+        <div class="text-[11px] text-stone-500">Command palette + Settings → Skills (markdown slash)</div>
+      </div>
+      <div class="bg-white p-4">
+        <div class="text-[11px] font-semibold tracking-widest uppercase text-stone-400">MCP</div>
+        <div class="mt-1 text-[12.5px] font-medium">4 transports</div>
+        <div class="text-[11px] text-stone-500">Settings → MCP · add / test / enable · .mcp.json</div>
+      </div>
+      <div class="bg-white p-4">
+        <div class="text-[11px] font-semibold tracking-widest uppercase text-stone-400">Git</div>
+        <div class="mt-1 text-[12.5px] font-medium">branch · diff · PR</div>
+        <div class="text-[11px] text-stone-500">Git panel + diff review · <code class="font-mono">@lokma</code> config</div>
+      </div>
+      <div class="bg-white p-4">
+        <div class="text-[11px] font-semibold tracking-widest uppercase text-stone-400">Memory</div>
+        <div class="mt-1 text-[12.5px] font-medium">LOKMA.md</div>
+        <div class="text-[11px] text-stone-500">Project Settings editor · 200 lines / 25KB viewer</div>
+      </div>
+      <div class="bg-white p-4">
+        <div class="text-[11px] font-semibold tracking-widest uppercase text-stone-400">Subagents</div>
+        <div class="mt-1 text-[12.5px] font-medium">Orchestration view</div>
+        <div class="text-[11px] text-stone-500">Agent tool tree · Alt+A Hub — see Code pane</div>
+      </div>
+      <div class="bg-white p-4">
+        <div class="text-[11px] font-semibold tracking-widest uppercase text-stone-400">Checkpoints</div>
+        <div class="mt-1 text-[12.5px] font-medium">Snapshot + Rewind</div>
+        <div class="text-[11px] text-stone-500">Per Write/Edit · Rewind button · Worktree ⎇ pill</div>
+      </div>
+    </div>
+    <div class="px-4 py-3 bg-[#FFFCF8] border-t border-line flex flex-wrap items-center gap-2 text-[11px] text-stone-500">
+      <span>Theming: <code class="font-mono">themes/*.json → CSS vars</code> · <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white border border-line font-medium text-stone-700">paper · claude · omp · midnight</span></span>
+      <span class="hidden sm:inline w-px h-3 bg-line"></span>
+      <span><code class="font-mono">lokma theme set paper</code> · persists localStorage + ~/.lokma/config.json</span>
+      <span class="ml-auto font-mono">Docs: 20 · 22 · 24</span>
+    </div>
+  </section>
+
+  <!-- footer bar -->
+  <div class="mt-6 rounded-full bg-[#1E1B17] text-white/80 px-4 py-2.5 flex flex-wrap items-center gap-3 text-[11px]">
+    <span class="inline-flex items-center gap-1.5 font-medium text-white"><span class="w-1.5 h-1.5 rounded-full bg-[#C96442]"></span> / slash menu</span>
+    <span class="hidden sm:inline text-white/25">·</span>
+    <span><span class="font-mono text-white">@</span> file mention (drag from Files)</span>
+    <span class="hidden sm:inline text-white/25">·</span>
+    <span><kbd class="px-1 py-0.5 rounded bg-white/10 border border-white/15 font-mono text-[10px]">Ctrl+K</kbd> palette</span>
+    <span class="hidden sm:inline text-white/25">·</span>
+    <span><kbd class="px-1 py-0.5 rounded bg-white/10 border border-white/15 font-mono text-[10px]">Ctrl+B</kbd> collapse bars</span>
+    <span class="hidden sm:inline text-white/25">·</span>
+    <span><kbd class="px-1 py-0.5 rounded bg-white/10 border border-white/15 font-mono text-[10px]">Shift+Tab</kbd> permission</span>
+    <span class="ml-auto font-mono text-white/50">Spec V4 — Paper Dashboard — single source: 20 · 22 · 24</span>
+  </div>
+
+  <div class="mt-4 text-center text-[11px] text-stone-400">
+    © 2026 Lokma — Paper theme · warm line #EDE6D6 · Paper #FFFCF8 — Dashboard-first, pane system intact — Tailwind CDN, no build
+  </div>
+</main>
+
+<script>
+// ============================================================
+// Dashboard interactions — vanilla JS, no framework
+// ============================================================
+
+// ---- Stacked AreaChart (recharts-style) ----
+const chartData = {
+  '7d': {
+    labels: ['Aug 25','26','27','28','29','30','31'],
+    // tokens per day per model (stacked)
+    sonnet: [18, 22, 28, 41, 35, 32, 26],
+    gpt:    [ 8, 10, 12, 16, 14, 18, 11],
+    deep:   [ 5,  7,  9, 11, 13,  9,  7],
+  },
+  '30d': {
+    labels: ['Aug 02','07','12','17','22','27','31'],
+    sonnet: [12, 18, 24, 30, 38, 42, 26],
+    gpt:    [ 6,  9, 11, 14, 16, 18, 11],
+    deep:   [ 4,  5,  7, 10, 12, 11,  7],
+  },
+  '90d': {
+    labels: ['Jun 02','Jun 22','Jul 12','Aug 01','Aug 21','Aug 31'],
+    sonnet: [8, 14, 20, 28, 36, 26],
+    gpt:    [4,  7, 10, 12, 15, 11],
+    deep:   [3,  5,  6,  8, 10,  7],
+  }
+};
+
+// KPI values per range
+const kpiData = {
+  '7d': { tokens: '1.42M', cost: '$18.42', avg: '47.3k' },
+  '30d': { tokens: '5.18M', cost: '$67.33', avg: '52.1k' },
+  '90d': { tokens: '12.9M', cost: '$162.04', avg: '49.8k' },
+};
+
+function renderChart(range) {
+  const svg = document.getElementById('areaChart');
+  const labelsEl = document.getElementById('xLabels');
+  const data = chartData[range];
+  const n = data.labels.length;
+  const W = 640, H = 220, padL = 0, padR = 0;
+  // max stacked
+  const totals = data.labels.map((_, i) => data.sonnet[i] + data.gpt[i] + data.deep[i]);
+  const max = Math.max(...totals) * 1.15;
+  // helpers
+  const x = i => padL + (i / (n - 1)) * (W - padL - padR);
+  const y = v => H - (v / max) * (H - 16) - 4;
+
+  function areaPath(valuesBottom, valuesTop) {
+    // valuesBottom = baseline, valuesTop = top of layer
+    let d = '';
+    // top line left→right
+    for (let i = 0; i < n; i++) {
+      const xi = x(i), yi = y(valuesTop[i]);
+      d += (i === 0 ? 'M' : ' L') + xi.toFixed(1) + ' ' + yi.toFixed(1);
+      // smooth with cubic? keep linear for simplicity then bezier relax
+    }
+    // bottom line right→left
+    for (let i = n - 1; i >= 0; i--) {
+      const xi = x(i), yi = y(valuesBottom[i]);
+      d += ' L' + xi.toFixed(1) + ' ' + yi.toFixed(1);
+    }
+    d += ' Z';
+    // smooth: convert L to C via simple smoothing
+    return d;
+  }
+
+  // compute stacked
+  const deepTop = data.deep.slice();
+  const gptBottom = deepTop.slice();
+  const gptTop = data.labels.map((_, i) => data.deep[i] + data.gpt[i]);
+  const sonnetBottom = gptTop.slice();
+  const sonnetTop = data.labels.map((_, i) => data.deep[i] + data.gpt[i] + data.sonnet[i]);
+
+  // clear
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  // re-add defs
+  const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+  defs.innerHTML = `
+    <linearGradient id="g-sonnet" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C96442" stop-opacity="0.28"/><stop offset="100%" stop-color="#C96442" stop-opacity="0"/></linearGradient>
+    <linearGradient id="g-gpt" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#57534E" stop-opacity="0.22"/><stop offset="100%" stop-color="#57534E" stop-opacity="0"/></linearGradient>
+    <linearGradient id="g-deep" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#D97706" stop-opacity="0.20"/><stop offset="100%" stop-color="#D97706" stop-opacity="0"/></linearGradient>
+  `;
+  svg.appendChild(defs);
+
+  // deepseek layer
+  const pDeep = document.createElementNS('http://www.w3.org/2000/svg','path');
+  pDeep.setAttribute('d', areaPath(Array(n).fill(0), deepTop));
+  pDeep.setAttribute('fill', 'url(#g-deep)');
+  pDeep.setAttribute('stroke', '#D97706');
+  pDeep.setAttribute('stroke-width', '1.4');
+  pDeep.setAttribute('stroke-linejoin', 'round');
+  svg.appendChild(pDeep);
+
+  // gpt layer
+  const pGpt = document.createElementNS('http://www.w3.org/2000/svg','path');
+  pGpt.setAttribute('d', areaPath(gptBottom, gptTop));
+  pGpt.setAttribute('fill', 'url(#g-gpt)');
+  pGpt.setAttribute('stroke', '#57534E');
+  pGpt.setAttribute('stroke-width', '1.4');
+  pGpt.setAttribute('stroke-linejoin', 'round');
+  svg.appendChild(pGpt);
+
+  // sonnet layer
+  const pSonnet = document.createElementNS('http://www.w3.org/2000/svg','path');
+  pSonnet.setAttribute('d', areaPath(sonnetBottom, sonnetTop));
+  pSonnet.setAttribute('fill', 'url(#g-sonnet)');
+  pSonnet.setAttribute('stroke', '#C96442');
+  pSonnet.setAttribute('stroke-width', '1.6');
+  pSonnet.setAttribute('stroke-linejoin', 'round');
+  svg.appendChild(pSonnet);
+
+  // dots on sonnet top
+  for (let i = 0; i < n; i++) {
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx', x(i).toFixed(1));
+    c.setAttribute('cy', y(sonnetTop[i]).toFixed(1));
+    c.setAttribute('r', '3');
+    c.setAttribute('fill', '#C96442');
+    c.setAttribute('stroke', 'white');
+    c.setAttribute('stroke-width', '1.5');
+    svg.appendChild(c);
+  }
+
+  // x labels
+  labelsEl.innerHTML = data.labels.map(l => `<span>${l}</span>`).join('');
+}
+
+// init
+renderChart('7d');
+
+// range toggle
+document.querySelectorAll('.range-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.range-btn').forEach(b => {
+      b.className = 'range-btn px-3 py-1 rounded-full text-stone-600 hover:bg-[#FFFCF8] transition';
+    });
+    btn.className = 'range-btn px-3 py-1 rounded-full bg-[#1E1B17] text-white font-medium transition';
+    const r = btn.dataset.range;
+    document.getElementById('chartRangeLabel').textContent = r;
+    renderChart(r);
+    // update KPIs
+    const k = kpiData[r];
+    if (k) {
+      document.getElementById('kpiTokens').textContent = k.tokens;
+      document.getElementById('kpiCost').firstElementChild.textContent = k.cost;
+      document.getElementById('kpiAvg').textContent = k.avg;
+    }
+  });
+});
+
+// ---- Right pane tabs ----
+document.querySelectorAll('.right-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.right-tab').forEach(b => {
+      b.className = 'right-tab px-3 py-1.5 rounded-full text-stone-600 hover:bg-[#FFFCF8]';
+    });
+    btn.className = 'right-tab px-3 py-1.5 rounded-full bg-[#1E1B17] text-white font-medium';
+    const tab = btn.dataset.righttab;
+    document.querySelectorAll('.right-pane').forEach(p => p.classList.add('hidden'));
+    document.getElementById('pane-' + tab).classList.remove('hidden');
+  });
+});
+
+// ---- Model catalog: search + provider filter + Allow All/Disable All ----
+const modelBody = document.getElementById('modelBody');
+const modelSearch = document.getElementById('modelSearch');
+let activeProvider = 'all';
+
+function filterModels() {
+  const q = (modelSearch.value || '').toLowerCase().trim();
+  document.querySelectorAll('#modelBody tr').forEach(tr => {
+    const provider = tr.dataset.provider;
+    const text = tr.textContent.toLowerCase();
+    const matchQ = !q || text.includes(q);
+    const matchP = activeProvider === 'all' || provider === activeProvider;
+    tr.style.display = (matchQ && matchP) ? '' : 'none';
+  });
+}
+modelSearch.addEventListener('input', filterModels);
+document.querySelectorAll('.provider-pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    document.querySelectorAll('.provider-pill').forEach(p => p.className = 'provider-pill px-2.5 py-1 rounded-full bg-white border border-line hover:bg-[#FFFCF8]');
+    pill.className = 'provider-pill px-2.5 py-1 rounded-full bg-[#1E1B17] text-white font-medium';
+    activeProvider = pill.dataset.filter;
+    filterModels();
+  });
+});
+document.getElementById('checkAll').addEventListener('change', e => {
+  document.querySelectorAll('.model-check').forEach(c => c.checked = e.target.checked);
+});
+document.getElementById('allowAll').addEventListener('click', () => {
+  document.querySelectorAll('#modelBody tr').forEach(tr => {
+    if (tr.style.display !== 'none') tr.querySelector('.model-check').checked = true;
+  });
+  document.getElementById('checkAll').checked = true;
+});
+document.getElementById('disableAll').addEventListener('click', () => {
+  document.querySelectorAll('#modelBody tr').forEach(tr => {
+    if (tr.style.display !== 'none') tr.querySelector('.model-check').checked = false;
+  });
+  document.getElementById('checkAll').checked = false;
+});
+
+// ---- Provider drag reorder (visual only) ----
+let dragSrc = null;
+document.querySelectorAll('.provider-card').forEach(card => {
+  card.addEventListener('dragstart', e => {
+    dragSrc = card;
+    e.dataTransfer.effectAllowed = 'move';
+    card.style.opacity = '0.5';
+  });
+  card.addEventListener('dragend', () => {
+    card.style.opacity = '';
+    dragSrc = null;
+  });
+  card.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+  card.addEventListener('drop', e => {
+    e.preventDefault();
+    if (dragSrc && dragSrc !== card) {
+      const list = document.getElementById('providerList');
+      const cards = Array.from(list.children);
+      const srcIdx = cards.indexOf(dragSrc);
+      const tgtIdx = cards.indexOf(card);
+      if (srcIdx < tgtIdx) card.after(dragSrc); else card.before(dragSrc);
+    }
+  });
+});
+
+// fallback chain drag
+let fbDragSrc = null;
+document.querySelectorAll('#fallbackChain [draggable="true"]').forEach(el => {
+  el.addEventListener('dragstart', e => {
+    fbDragSrc = el;
+    e.dataTransfer.effectAllowed = 'move';
+    el.style.opacity = '0.5';
+  });
+  el.addEventListener('dragend', () => { el.style.opacity = ''; fbDragSrc = null; });
+  el.addEventListener('dragover', e => { e.preventDefault(); });
+  el.addEventListener('drop', e => {
+    e.preventDefault();
+    if (fbDragSrc && fbDragSrc !== el) {
+      const chain = document.getElementById('fallbackChain');
+      // Find positions ignoring arrows
+      const items = Array.from(chain.children).filter(c => c.getAttribute('draggable') === 'true');
+      const srcIdx = items.indexOf(fbDragSrc);
+      const tgtIdx = items.indexOf(el);
+      if (srcIdx < tgtIdx) el.after(fbDragSrc); else el.before(fbDragSrc);
+    }
+  });
+});
+
+// Sessions drag feedback
+document.querySelectorAll('[draggable="true"]').forEach(el => {
+  el.addEventListener('dragstart', () => {
+    // could set drag image
+  });
+});
+</script>
+</body>
+</html>

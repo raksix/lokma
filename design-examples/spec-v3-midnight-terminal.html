@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spec V3 — Midnight Terminal (1:1 docs)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+tailwind.config={
+  darkMode:'class',
+  theme:{
+    extend:{
+      fontFamily:{ sans:['Inter','ui-sans-serif','system-ui','sans-serif'], mono:['JetBrains Mono','ui-monospace','monospace'] },
+      colors:{
+        midnight:{ bg:'#020617', panel:'#0f172a', panel2:'#111c34', card:'#162032', border:'#1e293b', border2:'#23324d', muted:'#64748b', cyan:'#06b6d4', cyan2:'#22d3ee' }
+      }
+    }
+  }
+}
+</script>
+<style>
+  :root{color-scheme:dark}
+  *{font-family:Inter,ui-sans-serif,system-ui,sans-serif}
+  .font-mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+  ::-webkit-scrollbar{width:6px;height:6px}
+  ::-webkit-scrollbar-thumb{background:#1e293b;border-radius:999px}
+  ::-webkit-scrollbar-thumb:hover{background:#334155}
+  ::-webkit-scrollbar-track{background:transparent}
+  /* terminal scanline */
+  .scanline{background:repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(6,182,214,0.03) 2px, rgba(6,182,214,0.03) 3px)}
+  @keyframes pulseGlow{0%,100%{box-shadow:0 0 0 0 rgba(6,182,214,0.4)}50%{box-shadow:0 0 0 6px rgba(6,182,214,0)}}
+  @keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+  .blink{animation:blink 1s step-end infinite}
+  /* diff hashline */
+  .hashline{border-left:3px solid #06b6d4}
+</style>
+</head>
+<body class="min-h-screen bg-[#020617] text-slate-200 antialiased selection:bg-cyan-500/30 selection:text-white overflow-hidden flex flex-col">
+<!-- =========================================================
+  Spec V3 — Midnight Terminal (1:1 docs)
+  Theme: Midnight #020617 bg + slate + cyan #06b6d4
+  Spec source: 20 overview + 22 providers/models/sessions/usage + 24 pane system + orchestration
+  Layout: flexlayout-inspired pane system — draggable tabsets, resizable splitters
+  Mode: terminal-heavy IDE — xterm, Monaco diff, browser iframe, orchestration fan-out
+========================================================= -->
+
+<!-- TOP BAR — App Shell + token/cost + context % (22 §3 + §4 + 20 §4) -->
+<header class="h-[44px] shrink-0 flex items-center gap-3 px-3 border-b border-[#1e293b] bg-[#0f172a]/90 backdrop-blur-xl sticky top-0 z-50">
+  <!-- brand -->
+  <div class="flex items-center gap-2.5 shrink-0">
+    <div class="h-7 w-7 rounded-md bg-[#06b6d4] grid place-items-center text-[#020617] font-bold text-[12px] tracking-tight">◈</div>
+    <span class="text-[13px] font-semibold tracking-tight text-white">LOKMA</span>
+    <span class="hidden md:inline-flex items-center rounded-full border border-[#1e293b] bg-[#162032] px-2 py-0.5 text-[10px] font-medium tracking-widest uppercase text-slate-400">Spec V3 — Midnight Terminal (1:1 docs)</span>
+    <span class="hidden xl:inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-medium text-emerald-400"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span> harness: connected</span>
+  </div>
+  <!-- breadcrumb: Lokma ▸ my-project ▸ session -->
+  <div class="hidden lg:flex items-center gap-1.5 text-[12px] ml-2">
+    <span class="text-slate-500">Lokma</span><span class="text-slate-600">▸</span>
+    <span class="inline-flex items-center gap-1 rounded-md border border-[#1e293b] bg-[#162032] px-2 py-1 text-slate-300">my-project <span class="text-slate-500 font-mono text-[10px]">~/code/my-project</span></span>
+    <span class="text-slate-600">▸</span>
+    <span class="text-white font-medium">Refactor auth</span>
+    <span class="inline-flex items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-medium text-cyan-300"><span class="h-1.5 w-1.5 rounded-full bg-cyan-400"></span> running</span>
+  </div>
+  <!-- model switcher + token/cost + context % -->
+  <div class="ml-auto flex items-center gap-2">
+    <!-- model switcher (22 §2.2) -->
+    <button class="hidden sm:inline-flex items-center gap-2 rounded-lg border border-[#1e293b] bg-[#162032] px-2.5 py-1.5 text-[12px] font-medium text-slate-200 hover:border-[#23324d]">
+      <span class="h-2 w-2 rounded-full bg-violet-400"></span> claude-sonnet-4-5
+      <span class="text-[11px] text-slate-500 font-mono">200k</span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <!-- token/cost badge (22 §3.2) -->
+    <div class="hidden md:flex items-center gap-2 rounded-lg border border-[#1e293b] bg-[#162032] px-2.5 py-1.5">
+      <span class="text-[11px] font-mono text-slate-300">12.3k</span><span class="text-slate-600">·</span><span class="text-[11px] font-mono text-emerald-300">$0.04</span>
+      <span class="h-3 w-px bg-[#1e293b]"></span>
+      <span class="text-[11px] text-slate-500">tokens</span>
+    </div>
+    <!-- context % bar (22 §4.2 footer) -->
+    <div class="hidden lg:flex items-center gap-2">
+      <span class="text-[11px] font-mono text-slate-500">context</span>
+      <div class="w-[88px] h-1.5 rounded-full bg-[#1e293b] overflow-hidden">
+        <div class="h-full rounded-full bg-gradient-to-r from-cyan-500 to-cyan-400" style="width:42%"></div>
+      </div>
+      <span class="text-[11px] font-mono text-cyan-300">42%</span>
+    </div>
+    <!-- command palette hint -->
+    <button class="hidden xl:inline-flex items-center gap-1.5 rounded-lg border border-[#1e293b] bg-[#0f172a] px-2 py-1.5 text-[11px] font-mono text-slate-500">⌘K</button>
+    <button class="h-7 w-7 grid place-items-center rounded-md border border-[#1e293b] bg-[#162032] text-slate-400 hover:text-white"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
+  </div>
+</header>
+
+<!-- GLOBAL TOOLBAR: permission mode + worktree + checkpoints hint -->
+<div class="h-[32px] shrink-0 flex items-center gap-2 px-3 border-b border-[#1e293b] bg-[#020617] text-[11px]">
+  <span class="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 font-medium text-amber-300">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    permission: ask
+    <span class="hidden sm:inline text-amber-400/70">· Shift+Tab</span>
+  </span>
+  <span class="inline-flex items-center gap-1 rounded-full border border-[#1e293b] bg-[#0f172a] px-2 py-1 font-mono text-slate-400">⎇ main</span>
+  <span class="inline-flex items-center gap-1 rounded-full bg-cyan-500 text-[#020617] px-2 py-1 font-semibold">worktree: task-auth-3 <span class="opacity-70">·</span> Exit</span>
+  <span class="hidden md:inline-flex items-center gap-1 text-slate-500"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> checkpoints: 4 · <button class="underline decoration-dotted hover:text-slate-300">Rewind</button></span>
+  <span class="ml-auto hidden md:inline-flex items-center gap-1.5 text-slate-500 font-mono">/ slash · @ file · Ctrl+P quick open</span>
+</div>
+
+<!-- FLEXLAYOUT SHELL -->
+<div class="flex flex-1 overflow-hidden min-h-0">
+  <!-- ============ LEFT BORDER (collapsible, 260px) — Sessions / Projects / Chats ============ -->
+  <div class="hidden lg:flex w-[280px] shrink-0 flex-col border-r border-[#1e293b] bg-[#0f172a] min-h-0">
+    <!-- Left tabset header: draggable tabs (24 §1.1) -->
+    <div class="h-[36px] shrink-0 flex items-center gap-1 px-2 border-b border-[#1e293b] bg-[#0f172a]">
+      <button class="flex items-center gap-1.5 rounded-md bg-[#06b6d4] text-[#020617] px-2.5 py-1 text-[11px] font-semibold">◈ Sessions</button>
+      <button class="flex items-center gap-1.5 rounded-md hover:bg-[#162032] px-2.5 py-1 text-[11px] font-medium text-slate-400">◇ Projects</button>
+      <button class="flex items-center gap-1.5 rounded-md hover:bg-[#162032] px-2.5 py-1 text-[11px] font-medium text-slate-400">⬙ Chats</button>
+      <span class="ml-auto flex items-center gap-1">
+        <button class="h-6 w-6 grid place-items-center rounded-md hover:bg-[#162032] text-slate-500" title="Reorder (drag handle)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg></button>
+        <button class="h-6 w-6 grid place-items-center rounded-md hover:bg-[#162032] text-slate-500"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3 14 10"/><path d="M3 21l7-7"/></svg></button>
+      </span>
+    </div>
+
+    <!-- Sessions Pane (24 §2.1 + 22 §4.2): virtualized, grouped, search, drag -->
+    <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <!-- sticky + New Session -->
+      <div class="p-2.5 space-y-2 shrink-0">
+        <button class="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#06b6d4] hover:bg-[#0891b2] text-[#020617] px-3 py-2 text-[13px] font-semibold">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> New Session
+          <span class="ml-auto text-[11px] font-mono opacity-60">Ctrl+N</span>
+        </button>
+        <!-- search (Ctrl+K focuses) (24 §2.1) -->
+        <div class="relative">
+          <svg class="absolute left-2.5 top-1/2 -translate-y-1/2" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-3.5-3.5"/></svg>
+          <input placeholder="Filter sessions…  (Ctrl+K)" class="w-full h-8 rounded-lg border border-[#1e293b] bg-[#020617] pl-8 pr-2 text-[13px] placeholder:text-slate-500 outline-none focus:border-cyan-500/40">
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button class="inline-flex items-center rounded-full bg-[#06b6d4] text-[#020617] px-2.5 py-1 text-[11px] font-semibold">All</button>
+          <button class="inline-flex items-center rounded-full border border-[#1e293b] bg-transparent px-2.5 py-1 text-[11px] font-medium text-slate-400 hover:text-slate-200">Running</button>
+          <button class="inline-flex items-center rounded-full border border-[#1e293b] bg-transparent px-2.5 py-1 text-[11px] font-medium text-slate-400 hover:text-slate-200">By project</button>
+        </div>
+      </div>
+
+      <!-- virtualized list (react-virtuoso) -->
+      <div class="flex-1 overflow-auto px-2 pb-2 space-y-3">
+        <!-- Today group -->
+        <div>
+          <div class="sticky top-0 z-10 -mx-2 bg-[#0f172a]/90 backdrop-blur px-3 py-1.5 flex items-center gap-1.5">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+            <span class="text-[11px] font-semibold tracking-widest uppercase text-slate-500">Today</span>
+            <span class="ml-auto text-[10px] font-mono text-slate-600">virtualized · virtuoso</span>
+          </div>
+          <div class="space-y-1.5 mt-1">
+            <!-- active row (highlighted) -->
+            <div class="group relative rounded-lg border border-cyan-500/30 bg-cyan-500/[0.08] p-3 cursor-pointer">
+              <div class="absolute left-0 inset-y-2 w-[2px] rounded-full bg-[#06b6d4]"></div>
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1.5">
+                    <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+                    <p class="truncate text-[13px] font-medium text-white">Refactor auth — hashline + tests</p>
+                    <span class="hidden xl:inline-flex opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 cursor-grab" title="Drag handle ⋮⋮ — drag to Chat drop zone">⋮⋮</span>
+                  </div>
+                  <p class="mt-1 font-mono text-[11px] text-cyan-300">sess_a3f9 · claude-sonnet-4-5</p>
+                  <p class="mt-1 line-clamp-1 text-[12px] text-slate-400">Streaming tool: Edit src/auth.ts (hashline)…</p>
+                </div>
+                <button class="h-6 w-6 grid place-items-center rounded-md hover:bg-white/10 text-slate-400 shrink-0">…</button>
+              </div>
+              <div class="mt-2 flex items-center gap-2">
+                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400"><span class="h-1 w-1 rounded-full bg-emerald-400"></span> running</span>
+                <span class="text-[11px] font-mono text-slate-500">2m · 12.3k tok · $0.04</span>
+                <span class="ml-auto inline-flex items-center rounded-full border border-[#1e293b] bg-[#020617] px-1.5 py-0.5 text-[10px] font-mono text-slate-400">⎇ task-auth-3</span>
+              </div>
+              <div class="mt-2 h-1 rounded-full bg-[#1e293b] overflow-hidden"><div class="h-full bg-[#06b6d4]" style="width:68%"></div></div>
+              <!-- drag hint -->
+              <div class="mt-1.5 hidden group-hover:flex items-center gap-1 text-[10px] font-mono text-slate-500">↔ drag row → Chat to open side-by-side / fork / merge</div>
+            </div>
+
+            <div class="rounded-lg border border-[#1e293b] bg-[#162032]/60 p-3 hover:border-[#23324d] cursor-pointer">
+              <div class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-slate-500"></span><p class="truncate text-[13px] font-medium text-slate-200">Add rate-limit middleware</p><span class="ml-auto text-slate-500">⋮⋮</span></div>
+              <p class="mt-1 font-mono text-[11px] text-slate-500">sess_7b2c · gpt-4o · idle</p>
+              <div class="mt-2 flex items-center gap-2 text-[11px] font-mono text-slate-500"><span>18m</span><span class="h-1 w-1 rounded-full bg-slate-600"></span><span>842 tok</span><span class="ml-auto inline-flex rounded-full border border-[#1e293b] bg-[#020617] px-1.5 py-0.5 text-[10px]">● idle</span></div>
+            </div>
+
+            <div class="rounded-lg border border-amber-500/20 bg-amber-500/[0.06] p-3 hover:bg-amber-500/[0.08] cursor-pointer">
+              <div class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span><p class="truncate text-[13px] font-medium text-slate-200">Deploy pipeline — staging</p><span class="ml-auto text-slate-500">⋮⋮</span></div>
+              <p class="mt-1 font-mono text-[11px] text-amber-300/80">sess_e4a8 · deepseek-chat · queued</p>
+              <div class="mt-1 flex items-center gap-2 text-[11px] text-slate-500"><span>42m</span><span class="h-1 w-1 rounded-full bg-slate-600"></span><span>2.1k tok</span><span class="ml-auto rounded-full bg-amber-500/15 border border-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400">queued</span></div>
+            </div>
+
+            <div class="rounded-lg border border-red-500/20 bg-red-500/[0.06] p-3">
+              <div class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-red-400"></span><p class="truncate text-[13px] font-medium text-slate-200">Data ingest — cron 502</p><span class="ml-auto text-slate-500">⋮⋮</span></div>
+              <p class="mt-1 text-[12px] text-slate-500">Upstream 502 — retrying in 14s</p>
+              <div class="mt-2 flex items-center gap-2 text-[11px] font-mono text-slate-500"><span>1h</span><span class="h-1 w-1 rounded-full bg-slate-600"></span><span>412 tok</span><span class="ml-auto rounded-full bg-red-500/15 border border-red-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-red-400">error</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="sticky top-0 z-10 -mx-2 bg-[#0f172a]/90 backdrop-blur px-3 py-1.5 flex items-center gap-1.5">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+            <span class="text-[11px] font-semibold tracking-widest uppercase text-slate-500">Yesterday</span>
+          </div>
+          <div class="space-y-1 mt-1">
+            <div class="rounded-lg border border-[#1e293b]/60 bg-transparent p-2.5 hover:bg-[#162032]/40 cursor-pointer">
+              <p class="truncate text-[13px] font-medium text-slate-300">Docs — harness spec sync</p>
+              <p class="mt-1 font-mono text-[11px] text-slate-500">sess_3d5b · opus-4-5 · 3.4k tok</p>
+              <div class="mt-1 flex items-center gap-2 text-[11px] text-slate-600"><span>Yesterday 18:42</span><span class="ml-auto rounded-full border border-[#1e293b] px-1.5 py-0.5 text-[10px]">○ done</span></div>
+            </div>
+            <div class="rounded-lg border border-[#1e293b]/60 bg-transparent p-2.5 hover:bg-[#162032]/40 cursor-pointer">
+              <p class="truncate text-[13px] font-medium text-slate-300">Onboarding flow — QA</p>
+              <p class="mt-1 font-mono text-[11px] text-slate-500">sess_a1c9 · gpt-4o-mini · 976 tok</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Projects pane (24 §2.2) collapsed preview + toggle -->
+        <div class="rounded-lg border border-[#1e293b] bg-[#020617] overflow-hidden">
+          <button id="projects-toggle" class="w-full flex items-center justify-between px-3 py-2.5 hover:bg-[#162032]/60 text-left">
+            <span class="flex items-center gap-2 text-[11px] font-semibold tracking-widest uppercase text-slate-400">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2z"/></svg>
+              Projects
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span class="rounded-full bg-[#1e293b] px-1.5 py-0.5 text-[11px] font-mono text-slate-400">3</span>
+              <svg id="projects-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" class="transition-transform"><path d="m6 9 6 6 6-6"/></svg>
+            </span>
+          </button>
+          <div id="projects-panel" class="px-2 pb-2 space-y-1 border-t border-[#1e293b]">
+            <div class="pt-2 space-y-1">
+              <div class="flex items-center gap-2 rounded-md bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-2">
+                <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
+                <div class="min-w-0 flex-1">
+                  <p class="text-[13px] font-medium text-white leading-none">my-project</p>
+                  <p class="font-mono text-[11px] text-slate-500 truncate">~/code/my-project · 8 sessions</p>
+                </div>
+                <span class="rounded-full border border-[#1e293b] bg-[#020617] px-1.5 py-0.5 text-[10px] font-mono text-slate-400">⎇ main</span>
+              </div>
+              <div class="flex items-center gap-2 rounded-md hover:bg-[#162032] px-2.5 py-2 cursor-pointer">
+                <span class="h-2 w-2 rounded-full bg-slate-600"></span>
+                <div class="min-w-0 flex-1">
+                  <p class="text-[13px] font-medium text-slate-300 leading-none">lokma-docs</p>
+                  <p class="font-mono text-[11px] text-slate-500">~/code/lokma · 12 sessions</p>
+                </div>
+                <span class="rounded-full border border-[#1e293b] bg-[#020617] px-1.5 py-0.5 text-[10px] font-mono text-slate-500">⎇ docs/web</span>
+              </div>
+              <div class="flex items-center gap-2 rounded-md hover:bg-[#162032] px-2.5 py-2 cursor-pointer">
+                <span class="h-2 w-2 rounded-full bg-slate-600"></span>
+                <div class="min-w-0"><p class="text-[13px] font-medium text-slate-300 leading-none">blog</p><p class="font-mono text-[11px] text-slate-500">~/code/blog · 3 sessions</p></div>
+              </div>
+              <button class="w-full mt-1 inline-flex items-center justify-center gap-1.5 rounded-md border border-dashed border-[#1e293b] bg-transparent px-2 py-1.5 text-[12px] font-medium text-slate-400 hover:border-[#23324d] hover:text-slate-200">+ Add project <span class="font-mono text-[10px] text-slate-600">~/path</span></button>
+              <p class="text-[11px] text-slate-600 px-1">Click project → filters Sessions. Drag Projects tab to reorder with Sessions/Chats (persisted).</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- collapse handle -->
+      <div class="h-6 shrink-0 flex items-center justify-center border-t border-[#1e293b] bg-[#020617]">
+        <button class="text-[11px] font-mono text-slate-600 hover:text-slate-400">Ctrl+B to collapse · drag ⋮⋮ to reorder</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- splitter -->
+  <div class="hidden lg:block w-[1px] shrink-0 bg-[#1e293b] hover:bg-cyan-500/30 cursor-col-resize" title="Drag to resize"></div>
+
+  <!-- ============ CENTER COLUMN — Chat + Code (Monaco diff hashline) + Terminal + Orchestration ============ -->
+  <div class="flex-1 min-w-0 flex flex-col min-h-0 bg-[#020617]">
+    <!-- Center tabset bar (flexlayout: TabSet A/B): Chat | Code | Terminal | Orchestration -->
+    <div class="h-[36px] shrink-0 flex items-center gap-1 px-2 border-b border-[#1e293b] bg-[#0f172a]">
+      <div class="flex items-center gap-1">
+        <button data-tab="chat" class="center-tab active inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium bg-[#06b6d4] text-[#020617]">💬 Chat <span class="hidden sm:inline font-mono text-[10px] opacity-70">sess_a3f9</span></button>
+        <button data-tab="code" class="center-tab inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium text-slate-400 hover:bg-[#162032] hover:text-slate-200">⬢ Code <span class="hidden sm:inline font-mono text-[10px] text-slate-500">auth.ts</span></button>
+        <button data-tab="terminal" class="center-tab inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium text-slate-400 hover:bg-[#162032] hover:text-slate-200">▸ Terminal <span class="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-cyan-500 text-[#020617] px-1 text-[10px] font-bold">2</span></button>
+        <button data-tab="orchestration" class="center-tab inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium text-slate-400 hover:bg-[#162032] hover:text-slate-200">◈ Orchestration <span class="hidden sm:inline text-[10px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/20 rounded-full px-1.5 py-0.5">3/5</span></button>
+      </div>
+      <div class="ml-auto flex items-center gap-1">
+        <span class="hidden md:inline-flex items-center gap-1 rounded-full border border-[#1e293b] bg-[#020617] px-2 py-1 text-[11px] font-mono text-slate-500">flexlayout · drag tab to split</span>
+        <button class="h-6 w-6 grid place-items-center rounded-md hover:bg-[#162032] text-slate-500" title="Maximize (double-click tab)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3 14 10"/><path d="M3 21l7-7"/></svg></button>
+      </div>
+    </div>
+
+    <!-- Center content: stacked panes, visibility toggled -->
+    <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <!-- CHAT PANE (24 §1.1: <ChatPane sessionId> — streaming, slash/@/permission/rewind) -->
+      <section id="pane-chat" class="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <!-- chat breadcrumb + permission banner -->
+        <div class="shrink-0 border-b border-[#1e293b] bg-[#0f172a]/60">
+          <div class="flex items-center gap-2 px-3 py-2">
+            <span class="text-[11px] font-mono text-slate-500">WS /ws/sess_a3f9</span>
+            <span class="h-3 w-px bg-[#1e293b]"></span>
+            <span class="text-[11px] text-slate-400"><span class="text-slate-500">streaming:</span> <span class="text-emerald-400">text_delta</span> · <span class="text-amber-400">tool_start</span> · <span class="text-cyan-400">tool_result</span></span>
+            <span class="ml-auto inline-flex items-center gap-1 rounded-full border border-[#1e293b] bg-[#162032] px-2 py-1 text-[11px] font-mono text-slate-400">context 42% · 84k/200k</span>
+          </div>
+          <!-- permission prompt (22 §5 checklist: Permissions) -->
+          <div class="mx-3 mb-2 rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2.5 flex items-start gap-3">
+            <span class="mt-0.5 h-7 w-7 grid place-items-center rounded-md bg-amber-500/15 border border-amber-500/20 text-amber-400 shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+            <div class="flex-1 min-w-0">
+              <p class="text-[13px] font-medium text-amber-200">Permission required — Edit <span class="font-mono">src/auth.ts</span></p>
+              <p class="text-[12px] text-slate-400 mt-0.5">Allow this edit? Scope: <span class="font-mono text-slate-300">src/auth.ts:42</span> · hashline anchored</p>
+              <div class="mt-2 flex flex-wrap gap-1.5">
+                <button class="inline-flex items-center rounded-md bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 text-[12px] font-semibold">Allow</button>
+                <button class="inline-flex items-center rounded-md border border-[#1e293b] bg-[#162032] hover:bg-[#1e293b] px-3 py-1.5 text-[12px] font-medium text-slate-300">Deny</button>
+                <button class="inline-flex items-center rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-[12px] font-medium text-amber-300">Always allow Edit in this session</button>
+                <span class="ml-auto text-[11px] font-mono text-slate-600 self-center">Shift+Tab to toggle plan mode</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- messages scroll -->
+        <div class="flex-1 overflow-auto px-3 md:px-4 py-4 space-y-4 bg-[#020617]">
+          <!-- user bubble -->
+          <div class="flex gap-2.5">
+            <img src="https://i.pravatar.cc/100?img=12" class="h-7 w-7 rounded-full border border-[#1e293b] shrink-0">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-baseline gap-2"><span class="text-[13px] font-semibold text-white">You</span><span class="text-[11px] font-mono text-slate-500">10:42 · /model claude-sonnet-4-5</span></div>
+              <div class="mt-1 rounded-xl rounded-tl-sm border border-[#1e293b] bg-[#0f172a] px-3.5 py-2.5">
+                <p class="text-[13px] leading-relaxed text-slate-200">Refactor <span class="font-mono text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 rounded px-1">@src/auth.ts</span> to use hashline edits, then <span class="font-mono text-violet-300">/commit</span> with tests. Use worktree <span class="font-mono text-slate-300">task-auth-3</span>.</p>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                  <span class="inline-flex items-center gap-1 rounded-md border border-[#1e293b] bg-[#020617] px-2 py-1 text-[11px] font-mono text-slate-400">↗ @src/auth.ts:1-120</span>
+                  <span class="inline-flex items-center rounded-md border border-[#1e293b] bg-[#020617] px-2 py-1 text-[11px] font-mono text-slate-400">⎇ task-auth-3</span>
+                </div>
+              </div>
+              <div class="mt-1 flex items-center gap-1 text-[11px] font-mono text-slate-600"><span>slash:</span> <span class="text-slate-400">/clear</span> <span class="text-slate-600">·</span> <span class="text-slate-400">/commit</span> <span class="text-slate-600">·</span> <span class="text-slate-400">/model</span> <span class="text-slate-600">·</span> <span class="text-cyan-400">@file mention</span></div>
+            </div>
+          </div>
+
+          <!-- AskUserQuestion (22 §4.2) -->
+          <div class="flex gap-2.5">
+            <div class="h-7 w-7 rounded-full bg-cyan-500 grid place-items-center text-[#020617] font-bold text-[11px] shrink-0">◈</div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-baseline gap-2"><span class="text-[13px] font-semibold text-white">Lokma</span><span class="inline-flex rounded-full bg-cyan-500/15 border border-cyan-500/20 px-1.5 py-0.5 text-[10px] font-medium text-cyan-300">claude-sonnet-4-5</span><span class="text-[11px] font-mono text-slate-500">10:42:11 · 1.2s</span></div>
+              <div class="mt-1 rounded-xl rounded-tl-sm border border-violet-500/20 bg-[#0f172a] px-3.5 py-3">
+                <p class="text-[12px] font-semibold tracking-widest uppercase text-violet-300">AskUserQuestion</p>
+                <p class="text-[13px] leading-relaxed text-slate-200 mt-1">Which hash strategy should I use for this refactor?</p>
+                <div class="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                  <button class="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-left hover:bg-cyan-500/15"><span class="text-[13px] font-medium text-white">content-hash</span><span class="block text-[11px] text-slate-400">recommended · dedup + anchor</span></button>
+                  <button class="rounded-lg border border-[#1e293b] bg-[#020617] px-3 py-2 text-left hover:border-[#23324d]"><span class="text-[13px] font-medium text-slate-200">line-hash</span><span class="block text-[11px] text-slate-500">fast · git-style</span></button>
+                  <button class="rounded-lg border border-[#1e293b] bg-[#020617] px-3 py-2 text-left hover:border-[#23324d]"><span class="text-[13px] font-medium text-slate-200">none</span><span class="block text-[11px] text-slate-500">plain overwrite</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- tool: Read with diff -->
+          <div class="flex gap-2.5">
+            <div class="h-7 w-7 rounded-full bg-[#1e293b] grid place-items-center text-slate-400 shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div>
+            <div class="flex-1 min-w-0">
+              <div class="rounded-lg border border-[#1e293b] bg-[#0f172a] overflow-hidden">
+                <div class="flex items-center justify-between px-3 py-2 border-b border-[#1e293b] bg-[#162032]/60">
+                  <span class="flex items-center gap-2 font-mono text-[12px] font-medium text-slate-300"><span class="h-2 w-2 rounded-full bg-cyan-400"></span> Read <span class="text-cyan-300">src/auth.ts</span></span>
+                  <span class="text-[11px] font-mono text-slate-500">42 ms · 120 lines</span>
+                </div>
+                <div class="p-3">
+                  <div class="rounded-md border border-[#1e293b] bg-[#020617] overflow-hidden">
+                    <div class="flex items-center gap-2 px-2.5 py-1.5 border-b border-[#1e293b] bg-[#0f172a] text-[11px] font-mono text-slate-500"><span>src/auth.ts</span><span class="ml-auto">hash: a3f9…e1c2</span></div>
+                    <pre class="p-2.5 text-[12px] leading-5 font-mono text-slate-300 overflow-auto"><span class="text-slate-600">1 │</span> <span class="text-violet-300">import</span> { verify } <span class="text-violet-300">from</span> <span class="text-emerald-300">"./crypto"</span>;
+<span class="text-slate-600">2 │</span> <span class="text-violet-300">export</span> <span class="text-violet-300">async function</span> <span class="text-cyan-300">auth</span>(req) {
+<span class="text-slate-600">3 │</span>   <span class="text-violet-300">const</span> token = req.headers.authorization;
+<span class="text-slate-600">4 │</span>   <span class="text-slate-500">// TODO: rate limit</span>
+<span class="text-slate-600">5 │</span> }</pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- tool: Edit (hashline) -->
+          <div class="flex gap-2.5">
+            <div class="h-7 w-7 rounded-full bg-amber-500/20 grid place-items-center text-amber-400 shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
+            <div class="flex-1 min-w-0">
+              <div class="rounded-lg border border-amber-500/20 bg-[#0f172a] overflow-hidden">
+                <div class="flex items-center justify-between px-3 py-2 border-b border-[#1e293b] bg-amber-500/[0.06]">
+                  <span class="flex items-center gap-2 font-mono text-[12px] font-medium text-amber-300"><span class="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span> Edit <span class="text-white">src/auth.ts</span> · hashline</span>
+                  <span class="text-[11px] font-mono text-slate-500">awaiting permission…</span>
+                </div>
+                <div class="p-3">
+                  <div class="rounded-md border border-[#1e293b] bg-[#020617] overflow-hidden hashline">
+                    <div class="px-2.5 py-1.5 text-[11px] font-mono text-slate-500 border-b border-[#1e293b] bg-[#0f172a] flex items-center gap-2"><span class="text-amber-400">●</span> anchored at <span class="text-slate-300">hash a3f9…</span> <span class="ml-auto">checkpoint → <button class="text-cyan-400 hover:underline">Rewind</button></span></div>
+                    <pre class="p-2.5 text-[12px] leading-5 font-mono overflow-auto"><span class="text-red-400">- // TODO: rate limit</span>
+<span class="text-emerald-400">+ if (!rateLimit(req.ip)) throw new RateLimitError();</span>
+<span class="text-slate-500">  // hashline anchored — survives compaction</span></pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- streaming assistant reply -->
+          <div class="flex gap-2.5">
+            <div class="h-7 w-7 rounded-full bg-cyan-500 grid place-items-center text-[#020617] font-bold text-[11px] shrink-0">◈</div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-baseline gap-2"><span class="text-[13px] font-semibold text-white">Lokma</span><span class="text-[11px] font-mono text-slate-500">streaming · 68 tok/s</span><span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span></div>
+              <div class="mt-1 rounded-xl rounded-tl-sm border border-[#1e293b] bg-[#0f172a] px-3.5 py-3">
+                <p class="text-[13px] leading-relaxed text-slate-200">Applied hashline edit. Tests still green — see <span class="font-mono text-cyan-300">Terminal › bash:1</span>. I’ll <span class="font-mono text-violet-300">/commit</span> after you approve.<span class="inline-block w-2 h-4 bg-cyan-400 ml-0.5 translate-y-0.5 blink"></span></p>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                  <span class="inline-flex items-center rounded-full border border-[#1e293b] bg-[#020617] px-2 py-1 text-[11px] font-mono text-slate-400">hashline: +61% token saving</span>
+                  <span class="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-300">✓ checkpoint saved</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- composer (slash + @) -->
+        <div class="shrink-0 border-t border-[#1e293b] bg-[#0f172a]/80 backdrop-blur p-3">
+          <div class="relative">
+            <!-- slash menu -->
+            <div id="slash-menu" class="hidden absolute bottom-full mb-2 left-0 right-0 rounded-xl border border-[#1e293b] bg-[#0f172a] shadow-xl overflow-hidden">
+              <div class="px-3 py-2 border-b border-[#1e293b] text-[11px] font-semibold tracking-widest uppercase text-slate-500">Slash commands</div>
+              <div class="p-1 grid grid-cols-2 gap-1 text-[12px]">
+                <button class="text-left rounded-md hover:bg-[#162032] px-2.5 py-2"><span class="font-mono text-cyan-300">/clear</span><span class="block text-[11px] text-slate-500">clear transcript</span></button>
+                <button class="text-left rounded-md hover:bg-[#162032] px-2.5 py-2"><span class="font-mono text-cyan-300">/model</span><span class="block text-[11px] text-slate-500">switch model</span></button>
+                <button class="text-left rounded-md hover:bg-[#162032] px-2.5 py-2"><span class="font-mono text-cyan-300">/commit</span><span class="block text-[11px] text-slate-500">commit with message</span></button>
+                <button class="text-left rounded-md hover:bg-[#162032] px-2.5 py-2"><span class="font-mono text-cyan-300">/rewind</span><span class="block text-[11px] text-slate-500">restore checkpoint</span></button>
+              </div>
+            </div>
+            <!-- @ file mention -->
+            <div id="at-menu" class="hidden absolute bottom-full mb-2 left-0 right-0 rounded-xl border border-[#1e293b] bg-[#0f172a] shadow-xl overflow-hidden">
+              <div class="px-3 py-2 border-b border-[#1e293b] text-[11px] font-semibold tracking-widest uppercase text-slate-500">Files — drag file from Files pane to insert @file</div>
+              <div class="p-1 text-[12px] font-mono">
+                <button class="w-full text-left rounded-md hover:bg-[#162032] px-2.5 py-1.5 text-slate-300">src/auth.ts</button>
+                <button class="w-full text-left rounded-md hover:bg-[#162032] px-2.5 py-1.5 text-slate-300">src/middleware/rateLimit.ts</button>
+                <button class="w-full text-left rounded-md hover:bg-[#162032] px-2.5 py-1.5 text-slate-300">tests/auth.test.ts</button>
+              </div>
+            </div>
+            <div class="rounded-xl border border-[#1e293b] bg-[#020617] focus-within:border-cyan-500/40 focus-within:ring-2 focus-within:ring-cyan-500/20">
+              <textarea id="composer" rows="2" placeholder="Message Lokma…  type / for commands, @ for files" class="w-full bg-transparent px-3.5 py-2.5 text-[13px] placeholder:text-slate-500 outline-none resize-none"></textarea>
+              <div class="flex items-center justify-between px-2 pb-2">
+                <div class="flex items-center gap-1.5">
+                  <button id="btn-slash" class="h-7 px-2 rounded-lg border border-[#1e293b] bg-[#0f172a] text-[11px] font-mono text-slate-400 hover:text-white">/</button>
+                  <button id="btn-at" class="h-7 px-2 rounded-lg border border-[#1e293b] bg-[#0f172a] text-[11px] font-mono text-slate-400 hover:text-white">@</button>
+                  <span class="hidden sm:inline text-[11px] font-mono text-slate-600">Enter to send · Shift+Enter new line</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <button class="h-7 w-7 grid place-items-center rounded-lg hover:bg-[#0f172a] text-slate-500"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10a7 7 0 0 1-14 0"/><path d="M12 19v4"/><path d="M8 23h8"/></svg></button>
+                  <button class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#06b6d4] hover:bg-[#0891b2] px-3.5 text-[13px] font-semibold text-[#020617]">Send <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9z"/></svg></button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="mt-2 text-center text-[11px] font-mono text-slate-600">Chat streams via <span class="text-slate-400">WS /ws/:sessionId</span> · tool renderers inline · permission banner above</p>
+        </div>
+      </section>
+
+      <!-- CODE PANE (Monaco diff hashline) — hidden by default -->
+      <section id="pane-code" class="hidden flex-1 min-h-0 flex flex-col overflow-hidden bg-[#020617]">
+        <div class="shrink-0 flex items-center gap-2 px-3 py-2 border-b border-[#1e293b] bg-[#0f172a]">
+          <span class="text-[11px] font-mono text-slate-500">Code — Monaco</span>
+          <span class="inline-flex items-center rounded-md border border-[#1e293b] bg-[#020617] px-2 py-1 text-[11px] font-mono text-slate-300">src/auth.ts</span>
+          <span class="inline-flex items-center rounded-full bg-amber-500/15 border border-amber-500/20 px-2 py-0.5 text-[11px] font-medium text-amber-300">diff · hashline anchored</span>
+          <span class="ml-auto flex items-center gap-1">
+            <button class="h-7 px-2 rounded-md border border-[#1e293b] bg-[#162032] text-[11px] font-medium text-slate-300 hover:bg-[#1e293b]">Open in editor</button>
+            <button class="h-7 px-2 rounded-md bg-[#06b6d4] text-[#020617] text-[11px] font-semibold">Apply</button>
+          </span>
+        </div>
+        <div class="flex-1 grid grid-cols-2 divide-x divide-[#1e293b] min-h-0">
+          <!-- left: before -->
+          <div class="flex flex-col min-h-0 bg-[#0b1224]">
+            <div class="h-7 flex items-center px-3 text-[11px] font-mono text-slate-500 border-b border-[#1e293b] bg-[#0f172a]">— before <span class="ml-auto">hash a3f9</span></div>
+            <pre class="flex-1 overflow-auto p-3 text-[12px] leading-5 font-mono text-slate-300"><span class="text-slate-600">  1 │</span> import { verify } from "./crypto";
+<span class="text-slate-600">  2 │</span> export async function auth(req) {
+<span class="text-slate-600">  3 │</span>   const token = req.headers.authorization;
+<span class="bg-red-500/10 text-red-300">  4 │   // TODO: rate limit</span>
+<span class="text-slate-600">  5 │</span>   return verify(token);
+<span class="text-slate-600">  6 │</span> }</pre>
+          </div>
+          <!-- right: after (hashline) -->
+          <div class="flex flex-col min-h-0 bg-[#0b1224] hashline">
+            <div class="h-7 flex items-center px-3 text-[11px] font-mono text-slate-500 border-b border-[#1e293b] bg-[#0f172a]"><span class="text-cyan-400">+</span> after <span class="ml-auto text-cyan-400">hashline anchored · compaction-safe</span></div>
+            <pre class="flex-1 overflow-auto p-3 text-[12px] leading-5 font-mono text-slate-300"><span class="text-slate-600">  1 │</span> import { verify } from "./crypto";
+<span class="text-slate-600">  2 │</span> export async function auth(req) {
+<span class="text-slate-600">  3 │</span>   const token = req.headers.authorization;
+<span class="bg-emerald-500/15 text-emerald-300">  4 │   if (!rateLimit(req.ip)) throw new RateLimitError();</span>
+<span class="text-slate-600">  5 │</span>   return verify(token);
+<span class="text-slate-600">  6 │</span> }</pre>
+          </div>
+        </div>
+        <div class="shrink-0 h-7 flex items-center gap-2 px-3 border-t border-[#1e293b] bg-[#0f172a] text-[11px] font-mono text-slate-500">
+          <span>Monaco diff · hashline saves ~61% tokens vs full rewrite</span>
+          <span class="ml-auto">read-only preview · “Open in editor” to make writable</span>
+        </div>
+      </section>
+
+      <!-- TERMINAL PANE — xterm + multiple tabs bash:1/bash:2 (24 §3.2) -->
+      <section id="pane-terminal" class="hidden flex-1 min-h-0 flex-col overflow-hidden bg-[#020617]">
+        <!-- terminal tabs -->
+        <div class="shrink-0 flex items-center gap-1 px-2 py-1.5 border-b border-[#1e293b] bg-[#0f172a]">
+          <button data-term="1" class="term-tab active inline-flex items-center gap-1.5 rounded-md bg-[#06b6d4] text-[#020617] px-2.5 py-1 text-[11px] font-mono font-semibold">bash:1 <span class="h-1.5 w-1.5 rounded-full bg-[#020617] animate-pulse"></span></button>
+          <button data-term="2" class="term-tab inline-flex items-center gap-1.5 rounded-md border border-[#1e293b] bg-[#162032] px-2.5 py-1 text-[11px] font-mono text-slate-300 hover:border-[#23324d]">bash:2 <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span></button>
+          <span class="ml-2 text-[11px] font-mono text-slate-500 hidden sm:inline">xterm.js + xterm-addon-fit · PTY per Bash tool</span>
+          <span class="ml-auto flex items-center gap-1">
+            <button class="h-6 px-2 rounded-md border border-[#1e293b] bg-[#162032] text-[11px] font-medium text-slate-400 hover:text-white">Clear</button>
+            <button class="h-6 px-2 rounded-md border border-[#1e293b] bg-[#162032] text-[11px] font-medium text-slate-400 hover:text-white">Copy</button>
+            <button class="h-6 px-2 rounded-md bg-[#1e293b] text-[11px] font-medium text-slate-300">Follow ✓</button>
+          </span>
+        </div>
+        <!-- xterm viewport bash:1 -->
+        <div id="term-1" class="flex-1 min-h-0 relative bg-[#020617] p-3 font-mono text-[12px] leading-5 overflow-auto scanline">
+          <div class="text-slate-500">$ npm test -- src/auth.test.ts</div>
+          <div class="text-slate-300"> PASS  src/auth.test.ts</div>
+          <div class="text-emerald-400">  ✓ auth › verifies valid token (12ms)</div>
+          <div class="text-emerald-400">  ✓ auth › throws on missing token (4ms)</div>
+          <div class="text-emerald-400">  ✓ auth › rate-limits after 5 attempts (8ms)</div>
+          <div class="text-slate-500">  ─────────────────────────────────</div>
+          <div class="text-slate-300">Tests: <span class="text-emerald-400">3 passed</span>, 3 total</div>
+          <div class="text-slate-500 mt-2">$ git diff --stat</div>
+          <div class="text-slate-300"> src/auth.ts | 2 +-</div>
+          <div class="text-slate-300"> 1 file changed, 1 insertion(+), 1 deletion(-)</div>
+          <div class="mt-2 flex items-center gap-1 text-slate-300"><span class="text-cyan-400">➜</span> <span class="text-slate-500">my-project</span> <span class="text-slate-600">on</span> <span class="text-violet-300">⎇ task-auth-3</span> <span class="inline-block w-2 h-4 bg-cyan-400 ml-1 blink"></span></div>
+          <div class="mt-3 rounded-md border border-[#1e293b] bg-[#0f172a] px-2.5 py-2 text-[11px] font-mono text-slate-500">WS event: <span class="text-cyan-300">{ type: "terminal/data", data: "\u001b[32m$ npm test\n..." }</span> · <span class="text-slate-400">terminal/exit code 0</span></div>
+        </div>
+        <!-- xterm viewport bash:2 (hidden) -->
+        <div id="term-2" class="hidden flex-1 min-h-0 relative bg-[#020617] p-3 font-mono text-[12px] leading-5 overflow-auto scanline">
+          <div class="text-slate-500">$ rg "TODO|FIXME" src/</div>
+          <div class="text-slate-300">src/auth.ts:4: // TODO: rate limit <span class="text-amber-400">← fixed in this session</span></div>
+          <div class="text-slate-500">src/api.ts:18: // FIXME: retry policy</div>
+          <div class="text-slate-500 mt-2">$ ls -la .worktrees/</div>
+          <div class="text-slate-300">drwxr-xr-x  task-auth-3  task-search-1  task-tests-2</div>
+          <div class="mt-2 flex items-center gap-1 text-slate-300"><span class="text-cyan-400">➜</span> <span class="text-slate-500">my-project</span> <span class="text-violet-300">⎇ task-auth-3</span> <span class="inline-block w-2 h-4 bg-cyan-400 ml-1 blink"></span></div>
+        </div>
+      </section>
+
+      <!-- ORCHESTRATION PANE — fan-out task-0..4 + progress 3/5 (24 §4) -->
+      <section id="pane-orchestration" class="hidden flex-1 min-h-0 flex-col overflow-hidden bg-[#020617]">
+        <div class="shrink-0 flex items-center gap-2 px-3 py-2 border-b border-[#1e293b] bg-[#0f172a]">
+          <span class="text-[11px] font-semibold tracking-widest uppercase text-slate-400">Orchestration</span>
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/20 px-2 py-0.5 text-[11px] font-medium text-amber-300"><span class="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse"></span> 3/5 done</span>
+          <div class="ml-2 flex-1 max-w-[220px] h-1.5 rounded-full bg-[#1e293b] overflow-hidden hidden sm:block"><div class="h-full bg-gradient-to-r from-cyan-500 to-emerald-500" style="width:60%"></div></div>
+          <span class="ml-auto flex items-center gap-1">
+            <button class="h-7 px-2.5 rounded-md border border-red-500/20 bg-red-500/10 text-[11px] font-medium text-red-300 hover:bg-red-500/15">Cancel all</button>
+            <button class="h-7 px-2.5 rounded-md border border-[#1e293b] bg-[#162032] text-[11px] font-medium text-slate-300">View logs</button>
+          </span>
+        </div>
+        <!-- tree -->
+        <div class="flex-1 overflow-auto p-3 space-y-3">
+          <!-- root -->
+          <div class="rounded-lg border border-[#1e293b] bg-[#0f172a] p-3">
+            <div class="flex items-center gap-2">
+              <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="text-[13px] font-semibold text-white">root · Refactor auth</span>
+              <span class="ml-auto text-[11px] font-mono text-slate-500">sess_a3f9 · running · 4.2s</span>
+              <span class="rounded-full bg-[#1e293b] px-1.5 py-0.5 text-[10px] font-mono text-slate-400">Agent 0</span>
+            </div>
+            <p class="text-[12px] text-slate-500 mt-1">Fans into 5 isolated worktrees (typed result, schema-validated). Click agent → expand transcript.</p>
+          </div>
+          <!-- fan-out 5 tasks -->
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
+            <!-- task-0 done -->
+            <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] p-2.5">
+              <div class="flex items-center gap-1.5"><span class="h-5 w-5 grid place-items-center rounded-full bg-emerald-500 text-white text-[11px]">✓</span><span class="text-[12px] font-semibold text-white">task-0</span><span class="ml-auto text-[10px] font-mono text-emerald-400">done</span></div>
+              <p class="text-[11px] font-mono text-slate-400 mt-1">find files</p>
+              <p class="text-[11px] text-slate-500">0.8s · Read</p>
+              <div class="mt-2 h-1 rounded-full bg-[#1e293b] overflow-hidden"><div class="h-full bg-emerald-500" style="width:100%"></div></div>
+              <button class="mt-2 w-full rounded-md border border-[#1e293b] bg-[#020617] px-2 py-1 text-[11px] font-medium text-slate-400 hover:text-white">View transcript</button>
+            </div>
+            <!-- task-1 done -->
+            <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] p-2.5">
+              <div class="flex items-center gap-1.5"><span class="h-5 w-5 grid place-items-center rounded-full bg-emerald-500 text-white text-[11px]">✓</span><span class="text-[12px] font-semibold text-white">task-1</span><span class="ml-auto text-[10px] font-mono text-emerald-400">done</span></div>
+              <p class="text-[11px] font-mono text-slate-400 mt-1">read auth</p>
+              <p class="text-[11px] text-slate-500">1.1s · Read</p>
+              <div class="mt-2 h-1 rounded-full bg-[#1e293b] overflow-hidden"><div class="h-full bg-emerald-500" style="width:100%"></div></div>
+              <button class="mt-2 w-full rounded-md border border-[#1e293b] bg-[#020617] px-2 py-1 text-[11px] font-medium text-slate-400 hover:text-white">View transcript</button>
+            </div>
+            <!-- task-2 running -->
+            <div class="rounded-lg border border-cyan-500/30 bg-cyan-500/[0.06] p-2.5 ring-1 ring-cyan-500/20">
+              <div class="flex items-center gap-1.5"><span class="h-5 w-5 grid place-items-center rounded-full bg-cyan-500 text-[#020617] text-[11px] animate-pulse">●</span><span class="text-[12px] font-semibold text-white">task-2</span><span class="ml-auto text-[10px] font-mono text-cyan-400">running</span></div>
+              <p class="text-[11px] font-mono text-slate-400 mt-1">edit tests</p>
+              <p class="text-[11px] text-slate-500">2.1s · Edit</p>
+              <div class="mt-2 h-1 rounded-full bg-[#1e293b] overflow-hidden"><div class="h-full bg-cyan-500 animate-pulse" style="width:62%"></div></div>
+              <div class="mt-2 flex gap-1"><button class="flex-1 rounded-md bg-[#06b6d4] text-[#020617] px-2 py-1 text-[11px] font-semibold">Logs</button><button class="rounded-md border border-red-500/20 bg-red-500/10 px-2 py-1 text-[11px] font-medium text-red-300">Cancel</button></div>
+            </div>
+            <!-- task-3 running -->
+            <div class="rounded-lg border border-cyan-500/30 bg-cyan-500/[0.06] p-2.5">
+              <div class="flex items-center gap-1.5"><span class="h-5 w-5 grid place-items-center rounded-full bg-cyan-500 text-[#020617] text-[11px] animate-pulse">●</span><span class="text-[12px] font-semibold text-white">task-3</span><span class="ml-auto text-[10px] font-mono text-cyan-400">running</span></div>
+              <p class="text-[11px] font-mono text-slate-400 mt-1">rate-limit</p>
+              <p class="text-[11px] text-slate-500">1.8s · Bash</p>
+              <div class="mt-2 h-1 rounded-full bg-[#1e293b] overflow-hidden"><div class="h-full bg-cyan-500" style="width:45%"></div></div>
+              <div class="mt-2 flex gap-1"><button class="flex-1 rounded-md border border-[#1e293b] bg-[#020617] px-2 py-1 text-[11px] font-medium text-slate-400">Logs</button><button class="rounded-md border border-red-500/20 bg-red-500/10 px-2 py-1 text-[11px] font-medium text-red-300">Cancel</button></div>
+            </div>
+            <!-- task-4 error -->
+            <div class="rounded-lg border border-red-500/20 bg-red-500/[0.06] p-2.5">
+              <div class="flex items-center gap-1.5"><span class="h-5 w-5 grid place-items-center rounded-full bg-red-500 text-white text-[11px]">✗</span><span class="text-[12px] font-semibold text-white">task-4</span><span class="ml-auto text-[10px] font-mono text-red-400">error</span></div>
+              <p class="text-[11px] font-mono text-slate-400 mt-1">commit PR</p>
+              <p class="text-[11px] text-red-400">0.4s · Bash 502</p>
+              <div class="mt-2 h-1 rounded-full bg-[#1e293b] overflow-hidden"><div class="h-full bg-red-500" style="width:100%"></div></div>
+              <div class="mt-2 flex gap-1"><button class="flex-1 rounded-md border border-[#1e293b] bg-[#020617] px-2 py-1 text-[11px] font-medium text-slate-400">Retry</button><button class="rounded-md border border-[#1e293b] bg-[#020617] px-2 py-1 text-[11px] font-medium text-slate-400">Logs</button></div>
+            </div>
+          </div>
+          <!-- subagent transcripts expand -->
+          <div class="rounded-lg border border-[#1e293b] bg-[#0f172a] overflow-hidden">
+            <div class="flex items-center gap-2 px-3 py-2 border-b border-[#1e293b] bg-[#162032]/60">
+              <span class="text-[11px] font-semibold tracking-widest uppercase text-slate-400">Subagent transcript — task-2 (expanded)</span>
+              <span class="ml-auto text-[11px] font-mono text-slate-500">WS: agent/delta → agent/end</span>
+            </div>
+            <div class="p-3 font-mono text-[11px] leading-5 text-slate-300 space-y-1">
+              <div><span class="text-slate-500">[task-2]</span> <span class="text-cyan-400">Edit</span> tests/auth.test.ts — anchored hash b7e1…</div>
+              <div><span class="text-slate-500">[task-2]</span> <span class="text-emerald-400">✓</span> wrote 18 lines · checkpoint saved</div>
+              <div><span class="text-slate-500">[task-2]</span> <span class="text-slate-400">Bash</span> npm test — 3 passed</div>
+            </div>
+          </div>
+          <p class="text-[11px] font-mono text-slate-600">Data: <span class="text-slate-400">AgentNode { id, parentId, task, status: running|done|error, tool, startedAt, endedAt, transcript }</span> · events: agent/start, agent/delta, agent/end over WS /ws/:sessionId</p>
+        </div>
+      </section>
+
+      <!-- bottom hint: draggable -->
+      <div class="h-6 shrink-0 hidden lg:flex items-center justify-center border-t border-[#1e293b] bg-[#0f172a] text-[11px] font-mono text-slate-600">Drag any center tab to split · double-click to maximize · Esc to restore · splitter is draggable</div>
+    </div>
+  </div>
+
+  <!-- splitter -->
+  <div class="hidden lg:block w-[1px] shrink-0 bg-[#1e293b] hover:bg-cyan-500/30 cursor-col-resize"></div>
+
+  <!-- ============ RIGHT BORDER (340px) — Files + Browser + Usage ============ -->
+  <div class="hidden lg:flex w-[360px] shrink-0 flex-col border-l border-[#1e293b] bg-[#0f172a] min-h-0">
+    <!-- Right tabset header -->
+    <div class="h-[36px] shrink-0 flex items-center gap-1 px-2 border-b border-[#1e293b] bg-[#0f172a]">
+      <button data-right="files" class="right-tab active inline-flex items-center gap-1 rounded-md bg-[#06b6d4] text-[#020617] px-2.5 py-1 text-[11px] font-semibold">⬡ Files</button>
+      <button data-right="browser" class="right-tab inline-flex items-center gap-1 rounded-md hover:bg-[#162032] px-2.5 py-1 text-[11px] font-medium text-slate-400">◧ Browser</button>
+      <button data-right="usage" class="right-tab inline-flex items-center gap-1 rounded-md hover:bg-[#162032] px-2.5 py-1 text-[11px] font-medium text-slate-400">◈ Usage</button>
+      <button data-right="git" class="right-tab inline-flex items-center gap-1 rounded-md hover:bg-[#162032] px-2.5 py-1 text-[11px] font-medium text-slate-400">⎇ Git</button>
+      <button data-right="mcp" class="right-tab inline-flex items-center gap-1 rounded-md hover:bg-[#162032] px-2.5 py-1 text-[11px] font-medium text-slate-400">⬢ MCP</button>
+      <span class="ml-auto h-6 w-6 grid place-items-center rounded-md hover:bg-[#162032] text-slate-500"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3 14 10"/><path d="M3 21l7-7"/></svg></span>
+    </div>
+
+    <!-- FILES PANE (24 §3.1: arborist + git overlay + drag @file) -->
+    <section id="right-files" class="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <div class="shrink-0 p-2.5 border-b border-[#1e293b] space-y-2">
+        <div class="flex items-center gap-2">
+          <span class="text-[11px] font-semibold tracking-widest uppercase text-slate-400">File Browser</span>
+          <span class="ml-auto inline-flex items-center rounded-full border border-[#1e293b] bg-[#020617] px-1.5 py-0.5 text-[10px] font-mono text-slate-500">cwd: ~/code/my-project</span>
+        </div>
+        <div class="relative">
+          <svg class="absolute left-2.5 top-1/2 -translate-y-1/2" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-3.5-3.5"/></svg>
+          <input placeholder="Search files…  (Ctrl+P)" class="w-full h-7 rounded-lg border border-[#1e293b] bg-[#020617] pl-7 pr-2 text-[12px] placeholder:text-slate-600 outline-none focus:border-cyan-500/30">
+        </div>
+        <p class="text-[11px] font-mono text-slate-600">react-arborist · virtualized · drag file → Chat to insert <span class="text-cyan-400">@file</span></p>
+      </div>
+      <div class="flex-1 overflow-auto p-2 font-mono text-[12px] leading-5">
+        <!-- tree -->
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5 px-1.5 py-1 rounded-md hover:bg-[#162032] cursor-pointer text-slate-300"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg> <span class="text-amber-300">src/</span> <span class="ml-auto h-1.5 w-1.5 rounded-full bg-emerald-400"></span></div>
+          <div class="ml-4 space-y-0.5 border-l border-[#1e293b] pl-2">
+            <div class="flex items-center gap-1.5 px-1.5 py-1 rounded-md bg-cyan-500/10 border border-cyan-500/20 cursor-grab text-cyan-200" draggable="true" title="Drag to Chat → @src/auth.ts">
+              <span class="text-slate-500">├─</span> auth.ts <span class="ml-auto inline-flex items-center gap-1"><span class="h-1.5 w-1.5 rounded-full bg-amber-400" title="git: modified"></span><span class="text-[10px] font-mono text-amber-400">M</span></span>
+            </div>
+            <div class="flex items-center gap-1.5 px-1.5 py-1 rounded-md hover:bg-[#162032] cursor-grab text-slate-400" draggable="true"><span class="text-slate-600">├─</span> auth.test.ts <span class="ml-auto text-[10px] text-slate-500">＋ drag</span></div>
+            <div class="flex items-center gap-1.5 px-1.5 py-1 rounded-md hover:bg-[#162032] cursor-pointer text-slate-400"><span class="text-slate-600">├─</span> middleware/ <span class="text-slate-600">▸</span></div>
+            <div class="ml-4 flex items-center gap-1.5 px-1.5 py-1 rounded-md hover:bg-[#162032] text-slate-400"><span class="text-slate-600">└─</span> rateLimit.ts <span class="ml-auto h-1.5 w-1.5 rounded-full bg-emerald-400"></span></div>
+            <div class="flex items-center gap-1.5 px-1.5 py-1 rounded-md hover:bg-[#162032] text-slate-400"><span class="text-slate-600">├─</span> api.ts <span class="ml-auto h-1.5 w-1.5 rounded-full bg-slate-600"></span></div>
+          </div>
+          <div class="flex items-center gap-1.5 px-1.5 py-1 rounded-md hover:bg-[#162032] cursor-pointer text-slate-300"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg> tests/ <span class="ml-auto text-[10px] font-mono text-slate-500">4 files</span></div>
+          <div class="flex items-center gap-1.5 px-1.5 py-1 rounded-md hover:bg-[#162032] cursor-pointer text-slate-400"><span class="text-slate-600">─</span> package.json <span class="ml-auto h-1.5 w-1.5 rounded-full bg-slate-600"></span></div>
+          <div class="flex items-center gap-1.5 px-1.5 py-1 rounded-md hover:bg-[#162032] cursor-pointer text-slate-400"><span class="text-slate-600">─</span> .gitignore</div>
+        </div>
+        <div class="mt-3 rounded-lg border border-[#1e293b] bg-[#020617] p-2.5">
+          <p class="text-[11px] font-semibold tracking-widest uppercase text-slate-500">Git overlay</p>
+          <div class="mt-1.5 flex flex-wrap gap-1.5 text-[11px] font-mono">
+            <span class="inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/20 px-2 py-0.5 text-amber-300">M auth.ts</span>
+            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/20 px-2 py-0.5 text-emerald-300">A rateLimit.ts</span>
+            <span class="inline-flex items-center gap-1 rounded-full bg-slate-700 px-2 py-0.5 text-slate-400">? .env.local</span>
+          </div>
+          <p class="text-[11px] text-slate-600 mt-2">Click file → Code pane (Monaco preview). Right-click → Copy path / Reveal / Open terminal here.</p>
+        </div>
+        <div class="mt-3 rounded-lg border border-cyan-500/20 bg-cyan-500/[0.06] p-2.5">
+          <p class="text-[11px] font-medium text-cyan-300">↗ Drag & drop</p>
+          <p class="text-[11px] text-slate-400 mt-1">Drag any file row onto the Chat composer → inserts <span class="font-mono text-cyan-300">@&lt;path&gt;</span> (harness includes file in context).</p>
+        </div>
+        <div class="mt-3 text-[11px] font-mono text-slate-600">API: <span class="text-slate-400">GET /api/files?cwd=…&path=.</span> · <span class="text-slate-400">GET /api/files/read?cwd=…&path=…</span></div>
+      </div>
+      <!-- Files footer: quick open -->
+      <div class="shrink-0 p-2 border-t border-[#1e293b] bg-[#020617]">
+        <button class="w-full rounded-md border border-[#1e293b] bg-[#0f172a] px-2.5 py-1.5 text-[11px] font-mono text-slate-400 hover:border-[#23324d]">Ctrl+P quick open…</button>
+      </div>
+    </section>
+
+    <!-- BROWSER PANE (24 §3.3: iframe + harness tools) -->
+    <section id="right-browser" class="hidden flex-1 min-h-0 flex-col overflow-hidden">
+      <div class="shrink-0 p-2.5 border-b border-[#1e293b] space-y-2">
+        <div class="flex items-center gap-1.5">
+          <span class="text-[11px] font-semibold tracking-widest uppercase text-slate-400">Browser Preview</span>
+          <span class="ml-auto inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> live</span>
+        </div>
+        <!-- address bar -->
+        <div class="flex items-center gap-1">
+          <button class="h-7 w-7 grid place-items-center rounded-md border border-[#1e293b] bg-[#162032] text-slate-400 hover:text-white"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg></button>
+          <button class="h-7 w-7 grid place-items-center rounded-md border border-[#1e293b] bg-[#162032] text-slate-400 hover:text-white"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>
+          <button class="h-7 w-7 grid place-items-center rounded-md border border-[#1e293b] bg-[#162032] text-slate-400 hover:text-white"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9"/><path d="M21 3v5h-5"/></svg></button>
+          <div class="flex-1 flex items-center gap-1.5 rounded-lg border border-[#1e293b] bg-[#020617] px-2.5 py-1.5">
+            <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+            <input value="http://localhost:3000" class="flex-1 bg-transparent text-[11px] font-mono text-slate-300 outline-none">
+          </div>
+          <button class="h-7 px-2 rounded-md border border-[#1e293b] bg-[#162032] text-[11px] font-medium text-slate-400">DevTools</button>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button class="h-6 px-2 rounded-md border border-[#1e293b] bg-[#020617] text-[11px] font-mono text-slate-400">browser_navigate</button>
+          <button class="h-6 px-2 rounded-md border border-[#1e293b] bg-[#020617] text-[11px] font-mono text-slate-400">browser_click</button>
+          <button class="h-6 px-2 rounded-md bg-cyan-500 text-[#020617] text-[11px] font-mono font-semibold">screenshot</button>
+        </div>
+      </div>
+      <!-- iframe preview -->
+      <div class="flex-1 min-h-0 bg-[#020617] p-2">
+        <div class="h-full rounded-lg border border-[#1e293b] bg-white overflow-hidden flex flex-col">
+          <div class="h-6 flex items-center gap-1 px-2 bg-[#f1f5f9] border-b border-slate-200">
+            <span class="h-2.5 w-2.5 rounded-full bg-red-400"></span><span class="h-2.5 w-2.5 rounded-full bg-amber-400"></span><span class="h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
+            <span class="ml-2 text-[11px] font-mono text-slate-600">localhost:3000 — my-project</span>
+            <span class="ml-auto text-[10px] font-mono text-slate-500">harness-driven</span>
+          </div>
+          <div class="flex-1 bg-white p-4 overflow-auto">
+            <div class="max-w-[280px] mx-auto">
+              <div class="h-6 w-24 rounded bg-slate-900"></div>
+              <div class="mt-3 h-3 w-full rounded bg-slate-200"></div>
+              <div class="mt-2 h-3 w-3/4 rounded bg-slate-200"></div>
+              <div class="mt-4 rounded-lg border border-slate-200 p-3">
+                <div class="h-3 w-1/2 rounded bg-slate-900"></div>
+                <div class="mt-2 flex gap-2"><span class="h-6 w-16 rounded-md bg-cyan-500"></span><span class="h-6 w-16 rounded-md border border-slate-300 bg-white"></span></div>
+              </div>
+              <div class="mt-3 flex items-center gap-1.5 text-[11px] font-mono text-slate-500"><span class="h-2 w-2 rounded-full bg-emerald-400"></span> harness verified fix — screenshot asserted</div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-2 flex items-center gap-2 text-[11px] font-mono text-slate-600"><span>Tools:</span> <span class="text-slate-400">browser_eval</span> <span class="text-slate-600">·</span> <span class="text-slate-400">browser_screenshot</span> <span class="ml-auto text-slate-500">API: POST /api/browser/open</span></div>
+      </div>
+    </section>
+
+    <!-- USAGE PANE (22 §3) -->
+    <section id="right-usage" class="hidden flex-1 min-h-0 flex-col overflow-hidden">
+      <div class="shrink-0 p-3 border-b border-[#1e293b]">
+        <div class="flex items-center gap-2"><span class="text-[11px] font-semibold tracking-widest uppercase text-slate-400">Usage</span><span class="ml-auto text-[11px] font-mono text-slate-500">/usage · per session/model/day</span></div>
+        <!-- KPI cards -->
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <div class="rounded-lg border border-[#1e293b] bg-[#162032] p-2.5">
+            <div class="text-[10px] tracking-widest uppercase text-slate-500 font-medium">Total tokens (7d)</div>
+            <div class="text-[18px] font-semibold text-white mt-1">1.4M</div>
+            <div class="text-[11px] text-emerald-400">↗ +12%</div>
+          </div>
+          <div class="rounded-lg border border-[#1e293b] bg-[#162032] p-2.5">
+            <div class="text-[10px] tracking-widest uppercase text-slate-500 font-medium">Total cost (7d)</div>
+            <div class="text-[18px] font-semibold text-white mt-1">$42.80</div>
+            <div class="text-[11px] text-slate-500">avg $0.03 / session</div>
+          </div>
+          <div class="rounded-lg border border-[#1e293b] bg-[#162032] p-2.5">
+            <div class="text-[10px] tracking-widest uppercase text-slate-500 font-medium">Avg / session</div>
+            <div class="text-[16px] font-semibold text-white mt-1">18.2k</div>
+            <div class="text-[11px] text-slate-500">tokens</div>
+          </div>
+          <div class="rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-2.5">
+            <div class="text-[10px] tracking-widest uppercase text-cyan-300 font-medium">Top model</div>
+            <div class="text-[13px] font-semibold text-white mt-1">sonnet-4-5</div>
+            <div class="text-[11px] text-slate-400">62% of spend</div>
+          </div>
+        </div>
+      </div>
+      <div class="flex-1 overflow-auto p-3 space-y-3">
+        <!-- chart (recharts AreaChart — stacked by model) -->
+        <div class="rounded-lg border border-[#1e293b] bg-[#020617] p-3">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-medium text-slate-400">Tokens / day (stacked by model)</span>
+            <span class="flex items-center gap-1 text-[11px] font-mono">
+              <button class="px-1.5 py-0.5 rounded bg-[#06b6d4] text-[#020617] font-semibold">7d</button>
+              <button class="px-1.5 py-0.5 rounded border border-[#1e293b] text-slate-500">30d</button>
+              <button class="px-1.5 py-0.5 rounded border border-[#1e293b] text-slate-500">90d</button>
+            </span>
+          </div>
+          <div class="mt-3 h-[88px] flex items-end gap-[3px]">
+            <span class="flex-1 rounded-t bg-violet-500/60" style="height:42%"></span>
+            <span class="flex-1 rounded-t bg-violet-500/60" style="height:58%"></span>
+            <span class="flex-1 rounded-t bg-cyan-500" style="height:72%"><span class="block h-[40%] bg-violet-500/80 rounded-t"></span></span>
+            <span class="flex-1 rounded-t bg-cyan-500" style="height:88%"><span class="block h-[45%] bg-violet-500/80 rounded-t"></span></span>
+            <span class="flex-1 rounded-t bg-cyan-500" style="height:64%"><span class="block h-[38%] bg-violet-500/80 rounded-t"></span></span>
+            <span class="flex-1 rounded-t bg-cyan-500" style="height:92%"><span class="block h-[50%] bg-emerald-500/80 rounded-t"></span></span>
+            <span class="flex-1 rounded-t bg-cyan-500 ring-1 ring-cyan-400" style="height:100%"><span class="block h-[42%] bg-violet-500 rounded-t"></span></span>
+          </div>
+          <div class="mt-2 flex items-center gap-3 text-[11px] font-mono">
+            <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-cyan-400"></span> sonnet</span>
+            <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-violet-400"></span> opus</span>
+            <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-emerald-400"></span> gpt-4o</span>
+          </div>
+        </div>
+        <!-- recent sessions table -->
+        <div class="rounded-lg border border-[#1e293b] bg-[#020617] overflow-hidden">
+          <div class="px-3 py-2 border-b border-[#1e293b] flex items-center justify-between">
+            <span class="text-[11px] font-semibold tracking-widest uppercase text-slate-500">Recent sessions</span>
+            <button class="text-[11px] font-medium text-cyan-400 hover:text-cyan-300">Export CSV</button>
+          </div>
+          <div class="divide-y divide-[#1e293b] font-mono text-[11px]">
+            <div class="flex items-center gap-2 px-3 py-2 text-slate-500"><span class="w-[92px]">session</span><span class="w-[92px]">model</span><span class="ml-auto">tokens</span><span class="w-[64px] text-right">cost</span></div>
+            <div class="flex items-center gap-2 px-3 py-2 hover:bg-[#0f172a] cursor-pointer"><span class="w-[92px] text-white truncate">Refactor auth</span><span class="w-[92px] text-slate-400 truncate">sonnet-4-5</span><span class="ml-auto text-slate-300">12.3k</span><span class="w-[64px] text-right text-emerald-300">$0.04</span></div>
+            <div class="flex items-center gap-2 px-3 py-2 hover:bg-[#0f172a] cursor-pointer"><span class="w-[92px] text-slate-300 truncate">Rate limit</span><span class="w-[92px] text-slate-400 truncate">gpt-4o</span><span class="ml-auto text-slate-300">8.1k</span><span class="w-[64px] text-right text-emerald-300">$0.02</span></div>
+            <div class="flex items-center gap-2 px-3 py-2 hover:bg-[#0f172a] cursor-pointer"><span class="w-[92px] text-slate-300 truncate">Docs sync</span><span class="w-[92px] text-slate-400 truncate">opus-4-5</span><span class="ml-auto text-slate-300">3.4k</span><span class="w-[64px] text-right text-emerald-300">$0.08</span></div>
+          </div>
+          <div class="px-3 py-2 text-[11px] font-mono text-slate-600">API: <span class="text-slate-400">GET /api/usage/summary?range=7d</span> · <span class="text-slate-400">/sessions?range=7d</span> · <span class="text-slate-400">/export?format=csv</span></div>
+        </div>
+        <!-- session badge detail popover hint -->
+        <div class="rounded-lg border border-cyan-500/20 bg-cyan-500/[0.06] p-2.5">
+          <p class="text-[11px] font-medium text-cyan-300">Session badge → detail popover</p>
+          <p class="text-[11px] text-slate-400 mt-1">Click <span class="font-mono text-slate-300">12.3k · $0.04</span> in top bar → breakdown by turn (prompt/completion/cost per turn).</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- GIT PANE (22 §5 + 24 §1.1: Git panel — branch/diff/PR) -->
+    <section id="right-git" class="hidden flex-1 min-h-0 flex-col overflow-hidden">
+      <div class="shrink-0 p-3 border-b border-[#1e293b] space-y-2">
+        <div class="flex items-center gap-2"><span class="text-[11px] font-semibold tracking-widest uppercase text-slate-400">Git</span><span class="ml-auto inline-flex items-center gap-1 rounded-full bg-[#162032] border border-[#1e293b] px-2 py-1 text-[11px] font-mono text-slate-300">⎇ task-auth-3 <span class="text-slate-600">·</span> main → task-auth-3</span></div>
+        <div class="flex items-center gap-1.5">
+          <button class="h-7 px-2.5 rounded-md bg-[#06b6d4] text-[#020617] text-[11px] font-semibold">Commit</button>
+          <button class="h-7 px-2.5 rounded-md border border-[#1e293b] bg-[#162032] text-[11px] font-medium text-slate-300">Push</button>
+          <button class="h-7 px-2.5 rounded-md border border-[#1e293b] bg-[#162032] text-[11px] font-medium text-slate-300">PR</button>
+          <span class="ml-auto text-[11px] font-mono text-slate-500">gh flow</span>
+        </div>
+      </div>
+      <div class="flex-1 overflow-auto p-3 space-y-3">
+        <div class="rounded-lg border border-[#1e293b] bg-[#020617] p-2.5">
+          <p class="text-[11px] font-semibold tracking-widest uppercase text-slate-500">Branch</p>
+          <div class="mt-2 flex items-center gap-2 font-mono text-[12px]"><span class="text-slate-500">main</span><span class="text-slate-600">→</span><span class="text-cyan-300 font-medium">task-auth-3</span><span class="ml-auto rounded-full bg-emerald-500/15 border border-emerald-500/20 px-1.5 py-0.5 text-[10px] text-emerald-400">worktree</span></div>
+          <p class="text-[11px] text-slate-600 mt-1">Worktree isolated — parallel sessions without collision.</p>
+        </div>
+        <div class="rounded-lg border border-[#1e293b] bg-[#020617] overflow-hidden">
+          <div class="px-2.5 py-2 border-b border-[#1e293b] flex items-center justify-between"><span class="text-[11px] font-semibold tracking-widest uppercase text-slate-500">Diff</span><span class="text-[11px] font-mono text-slate-500">1 file · +1 −1</span></div>
+          <pre class="p-2.5 text-[11px] leading-5 font-mono overflow-auto"><span class="text-slate-500">diff --git a/src/auth.ts b/src/auth.ts</span>
+<span class="text-slate-500">@@ -1,5 +1,5 @@</span>
+ <span class="text-slate-400"> import { verify } from "./crypto";</span>
+<span class="text-red-400">-// TODO: rate limit</span>
+<span class="text-emerald-400">+if (!rateLimit(req.ip)) throw new RateLimitError();</span></pre>
+          <div class="px-2.5 py-2 border-t border-[#1e293b] flex items-center gap-1.5">
+            <button class="h-6 px-2 rounded-md bg-[#06b6d4] text-[#020617] text-[11px] font-semibold">Review diff</button>
+            <button class="h-6 px-2 rounded-md border border-[#1e293b] bg-[#162032] text-[11px] font-medium text-slate-300">Stage</button>
+          </div>
+        </div>
+        <div class="rounded-lg border border-violet-500/20 bg-violet-500/[0.06] p-2.5">
+          <p class="text-[11px] font-semibold tracking-widest uppercase text-violet-300">PR</p>
+          <p class="text-[12px] font-medium text-white mt-1">#482 — Refactor auth (hashline)</p>
+          <p class="text-[11px] text-slate-400 mt-1">base: main · checks: <span class="text-emerald-400">✓ 3/3</span> · review: <span class="text-amber-400">1 pending</span></p>
+          <button class="mt-2 w-full rounded-md border border-[#1e293b] bg-[#020617] px-2 py-1.5 text-[11px] font-medium text-slate-300 hover:border-[#23324d]">Open PR on GitHub →</button>
+        </div>
+        <div class="rounded-lg border border-[#1e293b] bg-[#020617] p-2.5">
+          <p class="text-[11px] font-semibold tracking-widest uppercase text-slate-500">@lokma config</p>
+          <p class="text-[11px] font-mono text-slate-400 mt-1">.github/lokma.yml · auto-review: on · label: harness</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- MCP MANAGER (22 §5 + 20 §3 — 4 transports) -->
+    <section id="right-mcp" class="hidden flex-1 min-h-0 flex-col overflow-hidden">
+      <div class="shrink-0 p-3 border-b border-[#1e293b] space-y-2">
+        <div class="flex items-center gap-2"><span class="text-[11px] font-semibold tracking-widest uppercase text-slate-400">MCP Manager</span><span class="ml-auto inline-flex items-center gap-1 rounded-full bg-cyan-500/15 border border-cyan-500/20 px-2 py-0.5 text-[11px] font-medium text-cyan-300">4 transports</span></div>
+        <p class="text-[11px] text-slate-500">Same <span class="font-mono text-slate-400">.mcp.json</span> as CLI · add/test/enable</p>
+        <button class="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#06b6d4] hover:bg-[#0891b2] text-[#020617] px-3 py-1.5 text-[12px] font-semibold">+ Add MCP server</button>
+        <div class="flex items-center gap-1 text-[11px] font-mono">
+          <span class="rounded-full border border-[#1e293b] bg-[#162032] px-2 py-1 text-slate-400">stdio</span>
+          <span class="rounded-full border border-[#1e293b] bg-[#162032] px-2 py-1 text-slate-400">sse</span>
+          <span class="rounded-full bg-cyan-500 text-[#020617] px-2 py-1 font-semibold">streamable-http</span>
+          <span class="rounded-full border border-[#1e293b] bg-[#162032] px-2 py-1 text-slate-400">websocket</span>
+        </div>
+      </div>
+      <div class="flex-1 overflow-auto p-2 space-y-2">
+        <!-- MCP cards -->
+        <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] p-2.5">
+          <div class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-emerald-400"></span><span class="text-[13px] font-medium text-white">filesystem</span><span class="ml-auto rounded-full bg-emerald-500/15 border border-emerald-500/20 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">ok</span></div>
+          <p class="text-[11px] font-mono text-slate-500 mt-1">stdio · npx @modelcontextprotocol/server-filesystem</p>
+          <div class="mt-1.5 flex items-center gap-1.5"><span class="text-[11px] text-slate-400">tools: 8</span><span class="h-1 w-1 rounded-full bg-slate-600"></span><span class="text-[11px] text-slate-500">enabled</span><span class="ml-auto flex items-center gap-1"><button class="h-6 px-2 rounded-md border border-[#1e293b] bg-[#020617] text-[11px] font-medium text-slate-300">Test</button><button class="h-6 px-2 rounded-md border border-[#1e293b] bg-[#020617] text-[11px] font-medium text-slate-300">Disable</button></span></div>
+        </div>
+        <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] p-2.5">
+          <div class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-emerald-400"></span><span class="text-[13px] font-medium text-white">github</span><span class="ml-auto rounded-full bg-emerald-500/15 border border-emerald-500/20 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">ok</span></div>
+          <p class="text-[11px] font-mono text-slate-500 mt-1">streamable-http · https://api.githubcopilot.com/mcp</p>
+          <div class="mt-1.5 flex items-center gap-1.5"><span class="text-[11px] text-slate-400">tools: 12</span><span class="ml-auto flex items-center gap-1"><button class="h-6 px-2 rounded-md border border-[#1e293b] bg-[#020617] text-[11px] font-medium text-slate-300">Test</button><button class="h-6 px-2 rounded-md border border-[#1e293b] bg-[#020617] text-[11px] font-medium text-slate-300">Disable</button></span></div>
+        </div>
+        <div class="rounded-lg border border-amber-500/20 bg-amber-500/[0.06] p-2.5">
+          <div class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span><span class="text-[13px] font-medium text-white">postgres</span><span class="ml-auto rounded-full bg-amber-500/15 border border-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">testing…</span></div>
+          <p class="text-[11px] font-mono text-slate-500 mt-1">sse · http://localhost:3001/sse</p>
+          <div class="mt-1.5 flex items-center gap-1.5"><span class="text-[11px] text-slate-400">tools: —</span><span class="ml-auto flex items-center gap-1"><button class="h-6 px-2 rounded-md bg-amber-500 text-[#020617] text-[11px] font-semibold">Test</button><button class="h-6 px-2 rounded-md border border-[#1e293b] bg-[#020617] text-[11px] font-medium text-slate-300">Edit</button></span></div>
+        </div>
+        <div class="rounded-lg border border-[#1e293b] bg-[#162032]/40 p-2.5 opacity-80">
+          <div class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-slate-500"></span><span class="text-[13px] font-medium text-slate-300">browser</span><span class="ml-auto rounded-full border border-[#1e293b] bg-[#020617] px-1.5 py-0.5 text-[10px] font-mono text-slate-500">disabled</span></div>
+          <p class="text-[11px] font-mono text-slate-500 mt-1">websocket · ws://localhost:9222</p>
+          <div class="mt-1.5 flex items-center gap-1.5"><button class="h-6 px-2 rounded-md border border-[#1e293b] bg-[#020617] text-[11px] font-medium text-slate-300">Enable</button><button class="h-6 px-2 rounded-md border border-[#1e293b] bg-[#020617] text-[11px] font-medium text-slate-300">Delete</button><span class="ml-auto text-[11px] text-slate-600">chromium</span></div>
+        </div>
+        <div class="rounded-lg border border-[#1e293b] bg-[#020617] p-2.5">
+          <p class="text-[11px] font-semibold tracking-widest uppercase text-slate-500">API</p>
+          <p class="text-[11px] font-mono text-slate-500 mt-1">GET /api/mcp · POST /api/mcp · POST /api/mcp/:id/test · PATCH /api/mcp/:id</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right footer: theming + layout -->
+    <div class="shrink-0 border-t border-[#1e293b] bg-[#020617] p-2 space-y-1.5">
+      <div class="flex items-center gap-1.5">
+        <span class="text-[11px] font-mono text-slate-500">Theme</span>
+        <span class="inline-flex items-center rounded-full bg-[#06b6d4] text-[#020617] px-2 py-0.5 text-[11px] font-semibold">midnight</span>
+        <span class="text-[11px] text-slate-600">·</span>
+        <span class="text-[11px] font-mono text-slate-500">omp</span>
+        <span class="text-[11px] font-mono text-slate-500">claude</span>
+        <span class="text-[11px] font-mono text-slate-500">paper</span>
+        <span class="ml-auto text-[10px] font-mono text-slate-600">lokma theme set midnight</span>
+      </div>
+      <div class="flex items-center gap-1 text-[11px] font-mono text-slate-600">
+        <span>Ctrl+B / Ctrl+Shift+B to collapse sidebars</span>
+        <span class="ml-auto">localStorage: lokma:layout:v1</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MOBILE: stacked fallback notice -->
+<div class="lg:hidden border-t border-[#1e293b] bg-[#0f172a] p-3 text-center">
+  <p class="text-[12px] font-medium text-slate-300">Pane system is responsive — on mobile, panes stack. On desktop (≥1024px), drag & resize.</p>
+  <p class="text-[11px] font-mono text-slate-500 mt-1">flexlayout model → persisted to localStorage + ~/.lokma/layout.json</p>
+</div>
+
+<!-- ================== MODALS / Overlays — Provider/Model parity (22 §1 + §2) ================== -->
+<!-- Provider/Model settings are reachable via Settings → Providers/Models; show a compact drawer demo -->
+<div id="settings-drawer" class="hidden fixed inset-0 z-[60] bg-[#020617]/70 backdrop-blur-sm">
+  <div class="absolute right-0 top-0 h-full w-[420px] max-w-[92vw] bg-[#0f172a] border-l border-[#1e293b] shadow-2xl flex flex-col">
+    <div class="h-[44px] flex items-center justify-between px-4 border-b border-[#1e293b]">
+      <span class="text-[13px] font-semibold text-white">Settings — Providers & Models</span>
+      <button id="close-settings" class="h-7 w-7 grid place-items-center rounded-md hover:bg-[#162032] text-slate-400">✕</button>
+    </div>
+    <div class="flex-1 overflow-auto p-4 space-y-4">
+      <!-- Providers (22 §1) -->
+      <div>
+        <h3 class="text-[11px] font-semibold tracking-widest uppercase text-slate-400">Providers (22 §1)</h3>
+        <div class="mt-2 space-y-2">
+          <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] p-3 flex items-center gap-2">
+            <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+            <span class="text-[13px] font-medium text-white">anthropic</span>
+            <span class="text-[11px] font-mono text-slate-500">5 models · 3 enabled</span>
+            <span class="ml-auto h-2 w-2 rounded-full bg-emerald-400" title="GET /v1/models ok"></span>
+          </div>
+          <div class="rounded-lg border border-[#1e293b] bg-[#162032]/40 p-3 flex items-center gap-2">
+            <span class="h-2 w-2 rounded-full bg-slate-500"></span>
+            <span class="text-[13px] font-medium text-slate-200">openai</span>
+            <span class="text-[11px] font-mono text-slate-500">4 models · 2 enabled</span>
+            <span class="ml-auto inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-400">● keySet: true</span>
+          </div>
+          <div class="rounded-lg border border-[#1e293b] bg-[#020617] p-2.5">
+            <p class="text-[11px] font-mono text-slate-500">POST /api/providers/:id/test → { ok, models, error } · drag handle to reorder fallback chain</p>
+            <div class="mt-2 flex gap-1.5">
+              <button class="h-7 px-2.5 rounded-md bg-[#06b6d4] text-[#020617] text-[11px] font-semibold">+ Add Provider</button>
+              <button class="h-7 px-2.5 rounded-md border border-[#1e293b] bg-[#162032] text-[11px] font-medium text-slate-300">Test Connection</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Models catalog (22 §2) -->
+      <div>
+        <h3 class="text-[11px] font-semibold tracking-widest uppercase text-slate-400">Model catalog (22 §2)</h3>
+        <div class="mt-2 rounded-lg border border-[#1e293b] bg-[#020617] overflow-hidden">
+          <div class="grid grid-cols-[28px_1fr_84px_64px_48px] gap-2 px-2 py-1.5 bg-[#0f172a] text-[11px] font-mono text-slate-500 border-b border-[#1e293b]"><span>☑</span><span>Model</span><span>Provider</span><span>Context</span><span>Enabled</span></div>
+          <div class="divide-y divide-[#1e293b] text-[12px] font-mono">
+            <div class="grid grid-cols-[28px_1fr_84px_64px_48px] gap-2 px-2 py-2 items-center"><span class="text-emerald-400">☑</span><span class="text-white">claude-sonnet-4-5</span><span><span class="rounded-full bg-violet-500/20 border border-violet-500/20 px-1.5 py-0.5 text-[10px] text-violet-300">anthropic</span></span><span class="text-slate-400">200k</span><span class="text-emerald-400">●</span></div>
+            <div class="grid grid-cols-[28px_1fr_84px_64px_48px] gap-2 px-2 py-2 items-center"><span class="text-slate-600">☐</span><span class="text-slate-400">claude-opus-4-5</span><span><span class="rounded-full bg-violet-500/20 border border-violet-500/20 px-1.5 py-0.5 text-[10px] text-violet-300">anthropic</span></span><span class="text-slate-400">200k</span><span class="text-slate-600">○</span></div>
+            <div class="grid grid-cols-[28px_1fr_84px_64px_48px] gap-2 px-2 py-2 items-center"><span class="text-emerald-400">☑</span><span class="text-white">gpt-4o</span><span><span class="rounded-full bg-emerald-500/20 border border-emerald-500/20 px-1.5 py-0.5 text-[10px] text-emerald-300">openai</span></span><span class="text-slate-400">128k</span><span class="text-emerald-400">●</span></div>
+            <div class="grid grid-cols-[28px_1fr_84px_64px_48px] gap-2 px-2 py-2 items-center"><span class="text-emerald-400">☑</span><span class="text-white">deepseek-chat</span><span><span class="rounded-full bg-sky-500/20 border border-sky-500/20 px-1.5 py-0.5 text-[10px] text-sky-300">deepseek</span></span><span class="text-slate-400">64k</span><span class="text-emerald-400">●</span></div>
+          </div>
+        </div>
+        <p class="text-[11px] font-mono text-slate-600 mt-1">GET /api/models · PATCH /api/models/:id · fallback routing: drag to reorder</p>
+      </div>
+      <!-- Other checklist -->
+      <div class="rounded-lg border border-[#1e293b] bg-[#020617] p-3">
+        <p class="text-[11px] font-semibold tracking-widest uppercase text-slate-500">Other parity (22 §5)</p>
+        <div class="mt-2 grid grid-cols-2 gap-1.5 text-[11px]">
+          <span class="rounded-md border border-[#1e293b] bg-[#0f172a] px-2 py-1.5 text-slate-300">✓ Permissions</span>
+          <span class="rounded-md border border-[#1e293b] bg-[#0f172a] px-2 py-1.5 text-slate-300">✓ Hooks</span>
+          <span class="rounded-md border border-[#1e293b] bg-[#0f172a] px-2 py-1.5 text-slate-300">✓ Skills / Slash</span>
+          <span class="rounded-md border border-[#1e293b] bg-[#0f172a] px-2 py-1.5 text-slate-300">✓ Plugins</span>
+          <span class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1.5 text-emerald-300">✓ MCP (4 transports)</span>
+          <span class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1.5 text-emerald-300">✓ Git (branch/diff/PR)</span>
+          <span class="rounded-md border border-[#1e293b] bg-[#0f172a] px-2 py-1.5 text-slate-300">Memory (LOKMA.md)</span>
+          <span class="rounded-md border border-[#1e293b] bg-[#0f172a] px-2 py-1.5 text-slate-300">Checkpoints / Worktrees</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Footer spec checklist -->
+<footer class="shrink-0 border-t border-[#1e293b] bg-[#020617] px-3 py-2 flex flex-wrap items-center gap-2 text-[11px] font-mono">
+  <span class="text-slate-500">1:1 spec check:</span>
+  <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-emerald-300">✓ Left: virtualized Sessions + Projects (drag ⋮⋮)</span>
+  <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-emerald-300">✓ Center: Chat (slash/@/permission/rewind) + Code Monaco hashline + Terminal bash:1/2 + Orchestration 3/5</span>
+  <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-emerald-300">✓ Right: Files (arborist+git+drag) + Browser (iframe) + Usage (KPI+chart+table)</span>
+  <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-emerald-300">✓ Top: token/cost + context %</span>
+  <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-emerald-300">✓ MCP 4 transports + Git (branch/diff/PR)</span>
+  <button id="open-settings" class="ml-auto inline-flex items-center rounded-full bg-[#06b6d4] text-[#020617] px-2.5 py-1 text-[11px] font-semibold">Open Provider/Model settings →</button>
+</footer>
+
+<script>
+// Center tabs: Chat / Code / Terminal / Orchestration (24 §1.2: drag tab to new zone, maximize)
+document.querySelectorAll('.center-tab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.center-tab').forEach(b=>{b.classList.remove('active','bg-[#06b6d4]','text-[#020617]'); b.classList.add('text-slate-400')});
+    btn.classList.add('active','bg-[#06b6d4]','text-[#020617]'); btn.classList.remove('text-slate-400');
+    const tab=btn.dataset.tab;
+    document.getElementById('pane-chat').classList.toggle('hidden', tab!=='chat');
+    document.getElementById('pane-chat').classList.toggle('flex', tab==='chat');
+    document.getElementById('pane-code').classList.toggle('hidden', tab!=='code');
+    document.getElementById('pane-code').classList.toggle('flex', tab==='code');
+    document.getElementById('pane-terminal').classList.toggle('hidden', tab!=='terminal');
+    document.getElementById('pane-terminal').classList.toggle('flex', tab==='terminal');
+    document.getElementById('pane-orchestration').classList.toggle('hidden', tab!=='orchestration');
+    document.getElementById('pane-orchestration').classList.toggle('flex', tab==='orchestration');
+  });
+});
+// Terminal tabs bash:1 / bash:2
+document.querySelectorAll('.term-tab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.term-tab').forEach(b=>{b.classList.remove('active','bg-[#06b6d4]','text-[#020617]'); b.classList.add('border','border-[#1e293b]','bg-[#162032]','text-slate-300')});
+    btn.classList.add('active','bg-[#06b6d4]','text-[#020617]'); btn.classList.remove('border','bg-[#162032]','text-slate-300');
+    const t=btn.dataset.term;
+    document.getElementById('term-1').classList.toggle('hidden', t!=='1');
+    document.getElementById('term-2').classList.toggle('hidden', t!=='2');
+  });
+});
+// Right tabs
+document.querySelectorAll('.right-tab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.right-tab').forEach(b=>{b.classList.remove('active','bg-[#06b6d4]','text-[#020617]'); b.classList.add('text-slate-400')});
+    btn.classList.add('active','bg-[#06b6d4]','text-[#020617]'); btn.classList.remove('text-slate-400');
+    const r=btn.dataset.right;
+    for(const id of ['files','browser','usage','git','mcp']){
+      const el=document.getElementById('right-'+id);
+      el.classList.toggle('hidden', r!==id);
+      el.classList.toggle('flex', r===id);
+    }
+  });
+});
+// Projects toggle
+document.getElementById('projects-toggle').addEventListener('click',()=>{
+  const p=document.getElementById('projects-panel');
+  const c=document.getElementById('projects-chevron');
+  const hidden=p.classList.contains('hidden');
+  p.classList.toggle('hidden', !hidden);
+  c.style.transform=hidden?'rotate(0deg)':'rotate(-90deg)';
+});
+// Slash / @ menus
+document.getElementById('btn-slash').addEventListener('click',()=>{document.getElementById('slash-menu').classList.toggle('hidden'); document.getElementById('at-menu').classList.add('hidden');});
+document.getElementById('btn-at').addEventListener('click',()=>{document.getElementById('at-menu').classList.toggle('hidden'); document.getElementById('slash-menu').classList.add('hidden');});
+document.getElementById('composer').addEventListener('keydown',(e)=>{
+  if(e.key==='/' && e.target.selectionStart===0){document.getElementById('slash-menu').classList.remove('hidden');}
+  if(e.key==='@'){document.getElementById('at-menu').classList.remove('hidden');}
+  if(e.key==='Escape'){document.getElementById('slash-menu').classList.add('hidden'); document.getElementById('at-menu').classList.add('hidden');}
+});
+// Settings drawer
+document.getElementById('open-settings').addEventListener('click',()=>document.getElementById('settings-drawer').classList.remove('hidden'));
+document.getElementById('close-settings').addEventListener('click',()=>document.getElementById('settings-drawer').classList.add('hidden'));
+document.getElementById('settings-drawer').addEventListener('click',(e)=>{if(e.target===e.currentTarget) e.currentTarget.classList.add('hidden')});
+// Drag demo: file → chat inserts @file
+document.querySelectorAll('[draggable="true"]').forEach(el=>{
+  el.addEventListener('dragstart',(e)=>{e.dataTransfer.setData('text/plain', el.textContent.trim().split(' ')[0]); el.style.opacity='0.5'});
+  el.addEventListener('dragend',(e)=>el.style.opacity='1');
+});
+const composer=document.getElementById('composer');
+composer.addEventListener('dragover',(e)=>{e.preventDefault(); composer.parentElement.classList.add('ring-2','ring-cyan-500/30')});
+composer.addEventListener('dragleave',()=>composer.parentElement.classList.remove('ring-2','ring-cyan-500/30'));
+composer.addEventListener('drop',(e)=>{
+  e.preventDefault(); composer.parentElement.classList.remove('ring-2','ring-cyan-500/30');
+  const text=e.dataTransfer.getData('text/plain')||'src/auth.ts';
+  const at='@'+text.trim();
+  const start=composer.selectionStart||composer.value.length;
+  composer.value=composer.value.slice(0,start)+at+composer.value.slice(start);
+  composer.focus();
+});
+// Session row drag → chat drop zone
+document.querySelectorAll('.group').forEach(row=>{
+  row.setAttribute('draggable','true');
+  row.addEventListener('dragstart',(e)=>{e.dataTransfer.setData('application/x-session','sess_a3f9'); row.style.opacity='0.6'});
+  row.addEventListener('dragend',()=>row.style.opacity='1');
+});
+document.getElementById('pane-chat').addEventListener('dragover',(e)=>{
+  if(e.dataTransfer.types.includes('application/x-session')){e.preventDefault(); e.currentTarget.classList.add('ring-2','ring-cyan-500/20')}
+});
+document.getElementById('pane-chat').addEventListener('dragleave',(e)=>e.currentTarget.classList.remove('ring-2','ring-cyan-500/20'));
+document.getElementById('pane-chat').addEventListener('drop',(e)=>{
+  if(e.dataTransfer.types.includes('application/x-session')){
+    e.preventDefault(); e.currentTarget.classList.remove('ring-2','ring-cyan-500/20');
+    // mock: show toast
+    const t=document.createElement('div');
+    t.className='fixed bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-[#06b6d4] text-[#020617] px-4 py-2 text-[13px] font-medium shadow-xl z-50';
+    t.textContent='Drop: Open side-by-side / Merge transcript / Fork into this session (default: split)';
+    document.body.appendChild(t); setTimeout(()=>t.remove(),2200);
+  }
+});
+</script>
+</body>
+</html>

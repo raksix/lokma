@@ -20,9 +20,11 @@
 - [ ] Monorepo: `packages/lokma-core` + `lokma-ai` + `lokma-shared` + `lokma-web` (`web/` + `server/`) + `themes/`
 - [ ] lokma-core: Context kernel, ToolRegistry, SessionStore (JSONL), Provider types
 - [ ] lokma-ai: Anthropic + OpenAI adapters, stream() abstraction
-- [ ] lokma-web/server: Fastify + WS, routes `/api/providers` `/api/models` `/api/sessions` `WS /ws/:sessionId`
+- [ ] **Config & credentials refactor** — `~/.lokma/config.json` + `~/.lokma/credentials.json` (AES-GCM, 0600) + `.lokma/settings.json` per project + env override, watcher + `config/changed` event, masked `GET /api/config`, `lokma config`/`auth`/`doctor` — see `26-CONFIG-and-CREDENTIALS.md`
+- [ ] lokma-web/server: Fastify + WS, routes `/api/config` `/api/providers` `/api/models` `/api/sessions` `WS /ws/:sessionId`
 - [ ] lokma-web/web: Next.js App Shell (header + left/right borders, Chat stub, mock WS)
 - [ ] PM2 + nginx (67) — same pattern as notes.fermag/sunumly
+- [ ] Auto-skills + memory + vault graph (see below — Phase 1/2 items, scaffold hooks in Phase 0)
 
 ## Phase 1 — Core Loop in Browser (1–2 weeks)
 - [ ] Wire `lokma-core` loop to WS (real `text_delta`/`tool_*`/`permission` events)

@@ -26,6 +26,7 @@ Other fixed choices (stack-independent):
 | Editor | Monaco (file preview/diff) | VS Code parity; Codemirror 6 alt |
 | Tree | react-arborist (virtualized, drag-drop) | Or custom ul + dnd-kit |
 | Charts | recharts | You already use it |
+| Config & secrets | Layered `~/.lokma/config.json` + provider `credentials.json` (encrypted, 0600) + `.lokma/settings.json` per project + env override — see `26-CONFIG-and-CREDENTIALS.md` | Mirrors Claude Code `~/.claude.json`/`settings.json` — keys in one encrypted file, masked over API, `lokma doctor` checks perms |
 | DB | drizzle-orm + SQLite (local) / Postgres (cloud) | Light, typed, migrations |
 | Plugin kernel | Lightweight Cordis-inspired (~300 lines) — no vendored Cordis fork | Same semantics, smaller surface — see `23-*` |
 | Themes | `themes/*.json` → CSS vars + Chalk tokens (4 MVP: claude/omp/midnight/paper) | Single token source for CLI+Web |
@@ -47,6 +48,7 @@ Other fixed choices (stack-independent):
 | 2026-08-31 | Plugin system: Cordis-inspired lightweight kernel | DeepSeek Harness research (74KB/1146 lines) — everything-is-a-plugin |
 | 2026-08-31 | Pane system: flexlayout-react (provisional) | Pending your pick from 21-* |
 | 2026-08-31 | Docs & code → English (chat Turkish) | Your request 2026-08-31 01:45 |
+| 2026-08-31 | Config hierarchy: `~/.lokma/config.json` + provider `credentials.json` (encrypted 0600) + `.lokma/settings.json` per project + env override — see `26-CONFIG-and-CREDENTIALS.md` | Your request: keys in config like `~/.claude/config.json`/`settings.json`, refactor spec'd |
 | 2026-08-31 | Web harness docs set (20-25) completed — 62KB synthesized + 195KB raw | 3 research subagents + DSH scrape |
 
 ---

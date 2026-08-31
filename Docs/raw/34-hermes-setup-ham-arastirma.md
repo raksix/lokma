@@ -772,7 +772,7 @@ From `hermes config --help` and `hermes config set --help` (live).
 
 ```bash
 hermes config get model
-# → {'default': 'muse-spark-1.2-contributor', 'provider': 'sex-go', ...}
+# → {'default': 'muse-spark-1.2-contributor', 'provider': 'opencode-go', ...}
 
 hermes config set model anthropic/claude-opus-4      # shorthand sets model.default
 hermes config set terminal.backend docker              # → config.yaml
@@ -797,7 +797,7 @@ Cited: https://hermes-agent.nousresearch.com/docs/user-guide/configuration#manag
 ```
 ◆ Paths          Config: /root/.hermes/config.yaml  Secrets: /root/.hermes/.env  Install: /usr/local/lib/hermes-agent
 ◆ API Keys       OpenRouter (not set)  Anthropic sk-6…ff6d  …
-◆ Model          {'default': 'muse-spark-1.2-contributor', 'provider': 'sex-go', 'base_url': 'https://opencode.ai/zen/go/v1', 'discover_models': True}
+◆ Model          {'default': 'muse-spark-1.2-contributor', 'provider': 'opencode-go', 'base_url': 'https://opencode.ai/zen/go/v1', 'discover_models': True}
 ◆ Display        Personality: none  Reasoning: off  Bell: off  tool_progress: all
 ◆ Terminal       Backend: local  Working dir: .  Timeout: 180s
 ◆ Compression    Enabled: yes  Threshold: 50%  Model: (auto)

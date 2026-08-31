@@ -423,7 +423,7 @@ Then `/model fav` or `hermes chat --model fav` resolves via `hermes_cli/model_sw
 
 For Bot Mode agents: the Advanced panel in `New Agent` offers a **model & provider pin** — any provider/model pair Hermes knows about, per Bot. Leave unset to inherit from the launch profile. This is precisely "anthropic for reviewer, openai for planner" per-agent selection the brief asks about.
 
-**Observed in this vault:** default profile pins `muse-spark-1.2-contributor` via provider `sex-go` (custom OpenAI-compatible base `https://opencode.ai/zen/go/v1`) with `aux_model: deepseek/deepseek-v4-flash` and `discover_models: true`, plus a large `providers.omniroute` override table (dozens of `auto/*`, `cmd/*`, `cw/*`, `lma/*`, `gweb/*`, `ds-web/*` aliases). Each Bot on this machine would inherit or override that independently.
+**Observed in this vault:** default profile pins `muse-spark-1.2-contributor` via provider `opencode-go` (custom OpenAI-compatible base `https://opencode.ai/zen/go/v1`) with `aux_model: deepseek/deepseek-v4-flash` and `discover_models: true`, plus a large `providers.omniroute` override table (dozens of `auto/*`, `cmd/*`, `cw/*`, `lma/*`, `gweb/*`, `ds-web/*` aliases). Each Bot on this machine would inherit or override that independently.
 
 ### 3.3 Fallback chain & credential pools
 
@@ -688,7 +688,7 @@ All URLs fetched 2026-08-31. Content is scraped as primary; local files & live C
 | S12 | **Honcho — Reasoning** | `https://honcho.dev/docs/v3/documentation/core-concepts/reasoning.md` | Formal logic framework, explicit/deductive/inductive/abductive layers, Neuromancer XR, balances & custom models |
 | S13 | **Honcho — Hermes + Honcho guide** | `https://honcho.dev/docs/v3/guides/integrations/hermes.md` | Dual-peer architecture, 5 Hermes tools, prompt-time injection, cross-session continuity, durable writeback |
 | S14 | **AgentSoul.market** / **persona-ai** | `https://agentsoul.market/en/` (via web_search) + `https://github.com/theophile-wallez/persona-ai` | Four-file soul bundles (soul/identity/user/agents.md), Enneagram forge, theme-scoped personas, "tone wrong never code wrong" invariant, install.sh multi-agent |
-| S15 | **Local vault observation** (secondary) | `~/.hermes/SOUL.md`, `~/.hermes/memories/MEMORY.md`, `~/.hermes/config.yaml`, `~/.hermes/skills/` | Ground-truth file presence, real SOUL content, observed provider/model pin (`sex-go`/`muse-spark-1.2-contributor`), skill inventory, memory entry style |
+| S15 | **Local vault observation** (secondary) | `~/.hermes/SOUL.md`, `~/.hermes/memories/MEMORY.md`, `~/.hermes/config.yaml`, `~/.hermes/skills/` | Ground-truth file presence, real SOUL content, observed provider/model pin (`opencode-go`/`muse-spark-1.2-contributor`), skill inventory, memory entry style |
 
 > Windowed content from S5/S11/S12 via `web_extract`; llms.txt indexes fetched via `curl -s https://…/llms.txt` / `https://honcho.dev/docs/llms.txt`.
 

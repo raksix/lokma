@@ -246,10 +246,10 @@ Hermes' provider model is **two-tier**: a top-level `model:` block for the *acti
 ```yaml
 model:
   default: muse-spark-1.2-contributor
-  provider: sex-go
+  provider: opencode-go
   aux_model: deepseek/deepseek-v4-flash
   base_url: https://opencode.ai/zen/go/v1
-  key_env: HERMES_CUSTOM_FREE_SEX_GO_API_KEY
+  key_env: HERMES_CUSTOM_FREE_OPENCODE_GO_API_KEY
   discover_models: true
 
 providers:
@@ -905,7 +905,7 @@ Each supports `hermes mcp install <name>` (prompt for creds → `${ENV_VAR}` sub
 
 ```
 Config: /root/.hermes/config.yaml   Secrets: /root/.hermes/.env   Install: /usr/local/lib/hermes-agent
-Model: { default: muse-spark-1.2-contributor, provider: sex-go, base_url: https://opencode.ai/zen/go/v1, key_env: HERMES_CUSTOM_FREE_SEX_GO_API_KEY }
+Model: { default: muse-spark-1.2-contributor, provider: opencode-go, base_url: https://opencode.ai/zen/go/v1, key_env: HERMES_CUSTOM_FREE_OPENCODE_GO_API_KEY }
 Providers omniroute: https://omniroute.fermag.com.tr/v1 (discover_models: true, 200+ models)
 Messaging: Telegram configured, Discord not configured
 mcp_servers: open-design (enabled), vision-mcp (enabled, VISION_MCP_MODEL=mimo-v2.5), image-picker (enabled), pencil (disabled)

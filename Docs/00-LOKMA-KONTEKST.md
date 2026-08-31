@@ -127,12 +127,12 @@
 - [ ] Lisans: MIT mi private mi?
 
 ## Son Durum
-- **Son güncelleme:** 2026-08-31 02:15 UTC
-- **Son işlem:** Ultra-detailed agent system — `30-AGENT-SYSTEM-personality-memory-orchestration-collision.md` (40KB, 15 sections, 23 extras) + 27-29 (skills+memory+vault) + expanded `03-YOL-HARITASI.md` (32KB, Phases 0–3 with agents in 1/1.5/2/2.5 + extras 3) + `25-WEB-ROADMAP.md` (14KB) + `02-TEKNIK-KARARLAR.md` (7 new rows) + `Docs/README.md` (37 files, ~140KB synth + ~900KB raw). 7 subagents total (3 hermes 463s + 4 agent 182s), 6012 lines raw synthesized. **Next commit:** `docs: agent system + roadmap ultra-detailed (30 + 27-29 + 03/25/02/README/00)` — push to `raksix/lokma`.
+- **Son güncelleme:** 2026-08-31 02:30 UTC
+- **Son işlem:** Mega synthesis — `31-ARCHIFY` (Archify 34.9k★ diagrams) + `32-SETUP` (optional browser/search/gateway) + `33-TESTING` (self-hosted TestSprite harness video+trace+Shannon) + `34-DESIGN` (Open Design 92.9k★ canvas 6 artifacts + DESIGN.md) + `35-BOTS` (Grok-bots-inspired bot.json + Gallery) — 5 files ~60KB + `02/03/25/README/00` sync — **Commit 1b578ec** (19 files, 10,782 lines) push `main→main` · 13 subagents (9 succeeded 5,708 lines, 4 stalled muse-spark max_iterations → inferred) · Vault synced `projeler/lokma-ana-kontekst.md` 144 lines · https://github.com/raksix/lokma
 - **Sıradaki adım:**
-  1. **You pick stack** (A/B/C/D from 21-*) → I scaffold Phase 0 monorepo (packages/lokma-core+ai+shared+web + themes + agents scaffolds + `.agentlocks`/worktrees/personas)
-  2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5)**
-  3. Phase 2: MCP+hooks+skills+plugins+git+terminal+browser + **memory deep+vault graph + agents parallel+safe+communication+orchestration + panes v2**
+  1. **You pick stack** (A/B/C/D from 21-*) → I scaffold Phase 0 monorepo (packages/lokma-core+ai+shared+web + themes + agents/archify/design/testing/bots/setup scaffolds + `.agentlocks`/worktrees/personas)
+  2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**
+  3. Phase 2: MCP+hooks+skills+plugins+git+terminal+browser + **memory deep+vault graph + agents parallel+safe+communication+orchestration + archify/design/testing/bots deep + panes v2**
   4. Phase 3: themes+sharing+cloud + **extras (marketplace, cron per agent, approvals, observability, handoff, browser per agent, adversarial review, … 23 ranked)** + mobile+perf+a11y
 
 ---

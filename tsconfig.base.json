@@ -1,0 +1,43 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": false,
+    "baseUrl": ".",
+    "paths": {
+      "@lokma/shared": [
+        "packages/lokma-shared/src"
+      ],
+      "@lokma/core": [
+        "packages/lokma-core/src"
+      ],
+      "@lokma/ai": [
+        "packages/lokma-ai/src"
+      ],
+      "@lokma/server": [
+        "packages/lokma-web/server/src"
+      ]
+    }
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".next",
+    ".turbo"
+  ]
+}

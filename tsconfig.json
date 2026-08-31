@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "packages/*/src/**/*",
+    "packages/lokma-web/*/src/**/*"
+  ],
+  "references": [
+    {
+      "path": "./packages/lokma-shared"
+    },
+    {
+      "path": "./packages/lokma-core"
+    },
+    {
+      "path": "./packages/lokma-ai"
+    },
+    {
+      "path": "./packages/lokma-web/server"
+    }
+  ]
+}

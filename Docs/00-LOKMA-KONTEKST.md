@@ -18,6 +18,10 @@
 5. Her şey memory.fermag.com.tr'ye de kaydedilsin (https://memory.fermag.com.tr)
 6. Türkçe konuş, commit'ler İngilizce
 7. **Doku & kod İngilizce:** From 2026-08-31 01:45 onwards, all Docs and code are in English (chat stays Turkish)
+8. **Component structure:** Create a reusable component for every UI/logic piece — no code duplication (DRY)
+9. **DRY functions:** Before writing a function, search if a similar one exists — reuse it
+10. **Clean code:** Small functions, single responsibility, meaningful names, early returns
+11. **English comments:** All code comments and JSDoc in English
 
 ## Proje Hakkında Ne Biliyoruz
 - **Lokma nedir:** Innovative agentic coding harness — **open-source, multi-provider, themeable** — CLI + Web share the same loop

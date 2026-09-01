@@ -34,6 +34,22 @@ export function Composer({ placeholder = "Ask Lokma to plan, code, or explain �
     if (taRef.current) taRef.current.style.height = "auto"
   }
 
+  React.useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.files
+      if (items && items.length) {
+        const arr = Array.from(items)
+        if (arr.some(f => f.size > 0)) {
+          setFiles(prev => [...prev, ...arr])
+          window.dispatchEvent(new CustomEvent("lokma-toast", { detail: `${arr.length} dosya yapıştırıldı` }))
+        }
+      }
+    }
+    const el = taRef.current
+    el?.addEventListener("paste", onPaste as unknown as EventListener)
+    return () => el?.removeEventListener("paste", onPaste as unknown as EventListener)
+  }, [])
+
   const toggleMic = () => {
     if (recording) {
       setRecording(false)

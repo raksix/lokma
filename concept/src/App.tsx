@@ -6,6 +6,9 @@ import { Pane, CodePaneContent } from "@/components/layout/Pane"
 import { BrowserPane } from "@/components/layout/BrowserPane"
 import { MobilePane } from "@/components/layout/MobilePane"
 import { SearchModal } from "@/components/layout/SearchModal"
+import { TerminalPane } from "@/components/layout/TerminalPane"
+import { OrchestrationPane } from "@/components/layout/OrchestrationPane"
+import { GitPane } from "@/components/layout/GitPane"
 import { Composer } from "@/components/layout/Composer"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -36,9 +39,34 @@ export default function App() {
     a: { x: 8, y: 8, w: 480, h: 520 },
     b: { x: 504, y: 8, w: 480, h: 520 },
   })
+  const [maximized, setMaximized] = useState<string | null>(null)
   const dragRef = useRef<{ startX: number; startW: number; side: "left" | "right" } | null>(null)
   const tileDragRef = useRef<{ startX: number; startW: number } | null>(null)
   const winDragRef = useRef<{ id: string; sx: number; sy: number; ox: number; oy: number } | null>(null)
+
+  useEffect(() => {
+    const saved = localStorage.getItem("lokma:layout:v1")
+    if (saved) {
+      try {
+        const j = JSON.parse(saved)
+        if (j.leftW) setLeftW(j.leftW)
+        if (j.rightW) setRightW(j.rightW)
+        if (j.tileLeftW) setTileLeftW(j.tileLeftW)
+        if (typeof j.tiling === "boolean") setTiling(j.tiling)
+        if (typeof j.windowed === "boolean") setWindowed(j.windowed)
+      } catch {}
+    }
+  }, [])
+
+  const saveLayout = () => {
+    localStorage.setItem("lokma:layout:v1", JSON.stringify({ leftW, rightW, tileLeftW, tiling, windowed, ts: Date.now() }))
+    window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Layout kaydedildi" }))
+  }
+  const resetLayout = () => {
+    localStorage.removeItem("lokma:layout:v1")
+    setLeftW(268); setRightW(300); setTileLeftW(520); setTiling(false); setWindowed(false); setMaximized(null)
+    window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Layout sıfırlandı" }))
+  }
 
   useEffect(() => {
     const h = (e: Event) => {
@@ -274,6 +302,21 @@ export default function App() {
                   </Button>
                   <Button variant="outline" size="sm" className="h-6 text-xs" onClick={() => setExtraPanes(p => [...p, { id: `pane-${Date.now()}`, title: `Pane ${p.length + 1}`, content: <div className="p-3">Yeni pane — sürükle, resize et, tab ekle</div> }])}>
                     + Pane
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => handleOpenTab("Terminal", <TerminalPane />)}>
+                    + Terminal
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => handleOpenTab("Orchestration", <OrchestrationPane />)}>
+                    + Agents
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => handleOpenTab("Git", <GitPane />)}>
+                    + Git
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs hidden sm:inline-flex" onClick={saveLayout}>
+                    Save
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs hidden sm:inline-flex" onClick={resetLayout}>
+                    Reset
                   </Button>
                   <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setTiling(false)}>
                     Tekil

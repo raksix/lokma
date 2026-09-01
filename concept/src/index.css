@@ -93,15 +93,31 @@ body::before {
 .dark ::-webkit-scrollbar-thumb { background: #2A2A2E; }
 .dark ::-webkit-scrollbar-thumb:hover { background: #3A3A3E; }
 
-/* pane transitions */
-.pane { transition: width 220ms cubic-bezier(.2,.8,.2,1), opacity 160ms ease, border-color 160ms ease; overflow: hidden; }
+/* pane transitions + hover polish */
+.pane { transition: width 220ms cubic-bezier(.2,.8,.2,1), opacity 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease; overflow: hidden; }
+.pane:hover { box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
 .pane.collapsed { width: 0 !important; opacity: 0; border-width: 0 !important; pointer-events: none; }
-.pane-divider { width: 1px; background: #E8E4DE; flex-shrink: 0; position: relative; cursor: col-resize; }
-.pane-divider::after { content:""; position:absolute; top:0; bottom:0; left:-4px; right:-4px; }
-.pane-divider:hover { background: #CFC9BF; }
+.pane-divider { width: 1px; background: #E8E4DE; flex-shrink: 0; position: relative; cursor: col-resize; transition: background 150ms, width 150ms; }
+.pane-divider::after { content:""; position:absolute; top:0; bottom:0; left:-6px; right:-6px; cursor: col-resize; }
+.pane-divider:hover { background: #CFC9BF; width: 2px; }
 .pane-divider.dragging { background: #C96442 !important; width: 2px; }
+.pane-divider.crosshair { cursor: crosshair; }
 body.resizing { user-select:none !important; cursor:col-resize !important; }
 body.resizing .pane { transition:none !important; }
+
+/* hover + cursor system */
+.hover-lift { transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease; cursor: pointer; }
+.hover-lift:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(38,38,36,0.08), 0 1px 3px rgba(38,38,36,0.06); }
+.card-hover { transition: all 150ms ease; cursor: pointer; }
+.card-hover:hover { border-color: #CFC9BF; box-shadow: 0 4px 16px rgba(38,38,36,0.08); transform: translateY(-1px); }
+.btn-hover { transition: all 150ms ease; }
+.btn-hover:hover { transform: translateY(-0.5px); }
+.drag-handle { cursor: grab; opacity: 0; transition: opacity 150ms; }
+.group:hover .drag-handle { opacity: 1; }
+.drag-handle:active { cursor: grabbing; }
+.crosshair { cursor: crosshair; }
+.cursor-grab { cursor: grab; }
+.cursor-grab:active { cursor: grabbing; }
 
 /* ——— Light is default, no overrides needed ——— */
 /* Dark overrides: target hardcoded light hexes only when .dark present */

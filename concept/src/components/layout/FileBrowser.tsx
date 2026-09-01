@@ -52,11 +52,14 @@ export function FileBrowser({ onOpenFile }: { onOpenFile: (name: string) => void
                     ]
                       .filter(f => !q || f.name.toLowerCase().includes(q.toLowerCase()))
                       .map(f => (
-                        <Button key={f.name} variant="ghost" size="sm" onClick={() => onOpenFile(f.name)} className={cn("w-full justify-start gap-2 px-1.5 h-6 text-xs font-normal border", f.active ? "bg-[#FDF0E6] border-[#F2D5C2] text-terracotta" : "border-transparent hover:bg-white dark:hover:bg-[#1E1E21]")}>
-                          <File className="w-3 h-3 shrink-0" />
-                          <span className="flex-1 truncate text-left">{f.name}</span>
-                          {f.badge && <span className="text-[10px]">{f.badge}</span>}
-                        </Button>
+                        <div key={f.name} draggable onDragStart={e => { e.dataTransfer.setData("text/plain", `@${f.name}`); }} className={cn("group flex items-center gap-1 rounded border px-1 cursor-grab active:cursor-grabbing hover:bg-white dark:hover:bg-[#1E1E21] transition", f.active ? "bg-[#FDF0E6] border-[#F2D5C2] text-terracotta" : "border-transparent hover:border-line")}>
+                          <span className="drag-handle text-zinc-300 text-[10px]">⋮⋮</span>
+                          <Button variant="ghost" size="sm" onClick={() => onOpenFile(f.name)} className="flex-1 justify-start gap-2 px-1 h-6 text-xs font-normal border-0 hover:bg-transparent">
+                            <File className="w-3 h-3 shrink-0" />
+                            <span className="flex-1 truncate text-left">{f.name}</span>
+                            {f.badge && <span className="text-[10px]">{f.badge}</span>}
+                          </Button>
+                        </div>
                       ))}
                   </div>
                 )}

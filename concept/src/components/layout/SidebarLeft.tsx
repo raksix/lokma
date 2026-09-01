@@ -52,11 +52,14 @@ export function SidebarLeft({ onOpenTab }: { onOpenTab: (title: string, content:
             ]
               .filter(s => filtered(s.title))
               .map(s => (
-                <Button key={s.title} variant="ghost" size="sm" onClick={() => onOpenTab(s.title, <div className="p-3 text-sm">Pinned: {s.title}</div>)} className={cn("w-full justify-start gap-2 px-2 h-7 text-xs font-normal border", s.active ? "bg-white border-line shadow-sm dark:bg-[#1E1E21]" : "border-transparent hover:bg-white dark:hover:bg-[#1E1E21]")}>
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-                  <span className="flex-1 truncate text-left font-medium">{s.title}</span>
-                  <span className="text-[11px] text-zinc-400">{s.time}</span>
-                </Button>
+                <div key={s.title} draggable onDragStart={e => { e.dataTransfer.setData("text/plain", s.title); (window as unknown as { _dragTitle?: string })._dragTitle = s.title }} className={cn("group flex items-center gap-1 rounded-md border px-1 cursor-grab active:cursor-grabbing hover:border-line hover:bg-white dark:hover:bg-[#1E1E21] transition", s.active ? "bg-white border-line shadow-sm dark:bg-[#1E1E21]" : "border-transparent")}>
+                  <span className="drag-handle text-zinc-300 text-[10px] px-0.5">⋮⋮</span>
+                  <Button variant="ghost" size="sm" onClick={() => onOpenTab(s.title, <div className="p-3 text-sm">Pinned: {s.title}</div>)} className="flex-1 justify-start gap-2 px-1 h-7 text-xs font-normal border-0 hover:bg-transparent">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                    <span className="flex-1 truncate text-left font-medium">{s.title}</span>
+                    <span className="text-[11px] text-zinc-400">{s.time}</span>
+                  </Button>
+                </div>
               ))}
           </div>
         </div>
@@ -81,19 +84,22 @@ export function SidebarLeft({ onOpenTab }: { onOpenTab: (title: string, content:
 function ProjectGroup({ title, count, open, onToggle, q, items, activeItem, onOpenTab }: { title: string; count: number; open: boolean; onToggle: () => void; q: string; items: string[]; activeItem?: string; onOpenTab: (t: string, c: React.ReactNode) => void }) {
   return (
     <div>
-      <Button variant="ghost" size="sm" onClick={onToggle} className="w-full justify-start gap-1.5 px-2 h-6 text-xs font-medium hover:bg-white dark:hover:bg-[#1E1E21]">
+      <Button variant="ghost" size="sm" onClick={onToggle} className="w-full justify-start gap-1.5 px-2 h-6 text-xs font-medium hover:bg-white dark:hover:bg-[#1E1E21] cursor-pointer">
         <span className={cn("w-3 h-3 grid place-items-center transition-transform text-[10px]", open ? "" : "-rotate-90")}>▾</span>
-        {title} <span className="ml-auto text-[11px] text-zinc-400 bg-muted px-1.5 py-0.5 rounded-full">{count}</span>
+        {title} <span className="ml-auto text-[11px] text-zinc-400 bg-muted px-1.5 py-0.5 rounded-full group-hover:bg-white">{count}</span>
       </Button>
       {open && (
         <div className="ml-2 pl-3 border-l border-line/40 space-y-0.5 mt-0.5">
           {items
             .filter(t => !q || t.toLowerCase().includes(q.toLowerCase()))
             .map(t => (
-              <Button key={t} variant="ghost" size="sm" onClick={() => onOpenTab(t, <div className="p-3 text-sm">Project {title} — {t}</div>)} className={cn("w-full justify-start gap-2 px-2 h-6 text-xs font-normal border border-transparent hover:bg-white dark:hover:bg-[#1E1E21]", t === activeItem && "bg-terracotta/5 border-terracotta/20 text-terracotta")}>
-                {t === activeItem && <span className="w-1.5 h-1.5 rounded-full bg-terracotta shrink-0" />}
-                <span className="truncate text-left">{t}</span>
-              </Button>
+              <div key={t} draggable onDragStart={e => { e.dataTransfer.setData("text/plain", t); (window as unknown as { _dragTitle?: string })._dragTitle = t }} className="group flex items-center gap-0 rounded border border-transparent hover:border-line hover:bg-white dark:hover:bg-[#1E1E21] cursor-grab active:cursor-grabbing px-0.5">
+                <span className="drag-handle text-zinc-300 text-[10px]">⋮⋮</span>
+                <Button variant="ghost" size="sm" onClick={() => onOpenTab(t, <div className="p-3 text-sm">Project {title} — {t}</div>)} className={cn("flex-1 justify-start gap-2 px-1 h-6 text-xs font-normal border-0 hover:bg-transparent", t === activeItem && "bg-terracotta/5 text-terracotta")}>
+                  {t === activeItem && <span className="w-1.5 h-1.5 rounded-full bg-terracotta shrink-0" />}
+                  <span className="truncate text-left">{t}</span>
+                </Button>
+              </div>
             ))}
         </div>
       )}

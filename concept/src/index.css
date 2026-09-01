@@ -119,6 +119,19 @@ body.resizing .pane { transition:none !important; }
 .cursor-grab { cursor: grab; }
 .cursor-grab:active { cursor: grabbing; }
 
+/* all-panels resizable handles */
+.pane-handle { position: absolute; z-index: 10; opacity: 0; transition: opacity 150ms, background 150ms; }
+.pane:hover .pane-handle { opacity: 1; }
+.pane-handle-e { top: 0; right: 0; bottom: 0; width: 6px; cursor: col-resize; }
+.pane-handle-e::after { content:""; position:absolute; top:50%; right:2px; width:2px; height:24px; background:#CFC9BF; border-radius:999px; transform: translateY(-50%); opacity:0; transition: opacity 150ms; }
+.pane-handle-e:hover::after { opacity:1; background:#C96442; }
+.pane-handle-s { left: 0; right: 0; bottom: 0; height: 6px; cursor: row-resize; }
+.pane-handle-s::after { content:""; position:absolute; left:50%; bottom:2px; width:24px; height:2px; background:#CFC9BF; border-radius:999px; transform: translateX(-50%); opacity:0; transition: opacity 150ms; }
+.pane-handle-s:hover::after { opacity:1; background:#C96442; }
+.pane-handle-se { right: 0; bottom: 0; width: 14px; height: 14px; cursor: se-resize; display:grid; place-items:center; color:#CFC9BF; font-size:10px; }
+.pane-handle-se:hover { color:#C96442; }
+.pane-drop-ring { outline: 2px solid #C96442; outline-offset: -2px; background: rgba(201,100,66,0.04); }
+
 /* ——— Light is default, no overrides needed ——— */
 /* Dark overrides: target hardcoded light hexes only when .dark present */
 .dark .bg-\[\#FAF9F5\],

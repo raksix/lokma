@@ -9,6 +9,9 @@ import { SearchModal } from "@/components/layout/SearchModal"
 import { TerminalPane } from "@/components/layout/TerminalPane"
 import { OrchestrationPane } from "@/components/layout/OrchestrationPane"
 import { GitPane } from "@/components/layout/GitPane"
+import { VaultPane } from "@/components/layout/VaultPane"
+import { ArchifyPane } from "@/components/layout/ArchifyPane"
+import { DesignStudioPane } from "@/components/layout/DesignStudioPane"
 import { Composer } from "@/components/layout/Composer"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -311,6 +314,15 @@ export default function App() {
                   </Button>
                   <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => handleOpenTab("Git", <GitPane />)}>
                     + Git
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => handleOpenTab("Vault", <VaultPane />)}>
+                    + Vault
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => handleOpenTab("Archify", <ArchifyPane />)}>
+                    + Archify
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => handleOpenTab("Design", <DesignStudioPane />)}>
+                    + Design
                   </Button>
                   <Button variant="ghost" size="sm" className="h-6 text-xs hidden sm:inline-flex" onClick={saveLayout}>
                     Save

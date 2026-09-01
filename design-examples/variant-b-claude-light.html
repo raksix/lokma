@@ -122,6 +122,19 @@
   #snap-overlay { position:absolute; inset:0; pointer-events:none; display:none; z-index:40; }
   #snap-overlay.active { display:block; }
   #snap-preview { position:absolute; background:rgba(201,100,66,0.12); border:2px solid rgba(201,100,66,0.4); border-radius:8px; transition: all 120ms ease; }
+  /* tiling resize handles — tüm paneller için */
+  .tiling-pane { position:relative; }
+  .tiling-resize-handle { position:absolute; z-index:12; background:transparent; }
+  .tiling-resize-handle.e { right:-4px; top:8px; bottom:8px; width:8px; cursor:ew-resize; }
+  .tiling-resize-handle.e::after { content:""; position:absolute; left:3px; top:50%; transform:translateY(-50%); width:2px; height:24px; background:#E8E4DE; border-radius:999px; opacity:0; transition:opacity 120ms; }
+  .tiling-pane:hover .tiling-resize-handle.e::after { opacity:1; }
+  .tiling-resize-handle.e.dragging::after { background:#C96442; opacity:1; }
+  .tiling-resize-handle.s { left:8px; right:8px; bottom:-4px; height:8px; cursor:ns-resize; }
+  .tiling-resize-handle.s::after { content:""; position:absolute; left:50%; top:3px; transform:translateX(-50%); width:24px; height:2px; background:#E8E4DE; border-radius:999px; opacity:0; transition:opacity 120ms; }
+  .tiling-pane:hover .tiling-resize-handle.s::after { opacity:1; }
+  .tiling-resize-handle.se { right:-4px; bottom:-4px; width:14px; height:14px; cursor:nwse-resize; }
+  html.dark .tiling-resize-handle.e::after, html.dark .tiling-resize-handle.s::after { background:#2A2A2E; }
+  #tiling-grid.windowed .tiling-resize-handle { display:none !important; }
 
   /* robust dark fallbacks via attribute selector */
   html.dark [class*="bg-[#FAF9F5]"] { background-color:#0F0F11 !important; }
@@ -1849,6 +1862,101 @@
       }
     });
   }
+
+  // --- Tüm paneller resize edilebilir (tiling + windowed) ---
+  (function(){
+    const grid = document.getElementById('tiling-grid');
+    if(!grid) return;
+    function addTilingHandles(pane){
+      if(pane.querySelector('.tiling-resize-handle.e')) return;
+      pane.style.position='relative';
+      const hE = document.createElement('div');
+      hE.className='tiling-resize-handle e';
+      hE.title='Sürükle genişlet';
+      const hS = document.createElement('div');
+      hS.className='tiling-resize-handle s';
+      hS.title='Aşağı çek';
+      const hSE = document.createElement('div');
+      hSE.className='tiling-resize-handle se';
+      hSE.title='Köşeden boyutlandır';
+      pane.appendChild(hE); pane.appendChild(hS); pane.appendChild(hSE);
+      // drag logic for tiling (flex) vs windowed (absolute)
+      [hE, hS, hSE].forEach(handle=>{
+        let startX=0, startY=0, startW=0, startH=0, isWin=false;
+        handle.addEventListener('mousedown', e=>{
+          e.preventDefault(); e.stopPropagation();
+          const isWindowed = grid.classList.contains('windowed');
+          isWin = isWindowed;
+          const rect = pane.getBoundingClientRect();
+          const gRect = grid.getBoundingClientRect();
+          startX=e.clientX; startY=e.clientY;
+          startW=rect.width; startH=rect.height;
+          handle.classList.add('dragging');
+          document.body.classList.add('resizing');
+          pane.classList.add('dragging-window');
+          // for tiling flex, we will set flex:0 0 <px>
+          function onMove(ev){
+            const dx = ev.clientX - startX;
+            const dy = ev.clientY - startY;
+            if(handle.classList.contains('e')){
+              let nw = startW + dx;
+              nw = Math.max(260, Math.min(800, nw));
+              if(isWin){
+                pane.style.width = nw+'px';
+              } else {
+                pane.style.flex = '0 0 ' + nw + 'px';
+                pane.style.width = nw+'px';
+              }
+            } else if(handle.classList.contains('s')){
+              let nh = startH + dy;
+              nh = Math.max(180, Math.min(900, nh));
+              if(isWin){
+                pane.style.height = nh+'px';
+              } else {
+                // for tiling flex column height is 100%, vertical resize not needed in row layout, but allow pane to set min-height via flex
+                pane.style.height = nh+'px';
+                pane.style.flex = '0 0 ' + (pane.style.width || startW+'px');
+              }
+            } else if(handle.classList.contains('se')){
+              let nw = startW + dx;
+              let nh = startH + dy;
+              nw = Math.max(260, Math.min(900, nw));
+              nh = Math.max(180, Math.min(900, nh));
+              if(isWin){
+                pane.style.width = nw+'px';
+                pane.style.height = nh+'px';
+              } else {
+                pane.style.flex = '0 0 ' + nw + 'px';
+                pane.style.width = nw+'px';
+                pane.style.height = nh+'px';
+              }
+            }
+          }
+          function onUp(){
+            handle.classList.remove('dragging');
+            document.body.classList.remove('resizing');
+            pane.classList.remove('dragging-window');
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+          }
+          window.addEventListener('mousemove', onMove);
+          window.addEventListener('mouseup', onUp);
+        });
+      });
+    }
+    // init for existing panes
+    grid.querySelectorAll('.tiling-pane').forEach(addTilingHandles);
+    // also for sidebar panes (left/right) add handles for direct resize (already have dividers, but add extra handles for consistency)
+    // left/right already have dividers, no need
+    // observe new panes
+    new MutationObserver(muts=>{
+      muts.forEach(m=> m.addedNodes.forEach(n=>{
+        if(n.nodeType===1 && n.classList.contains('tiling-pane')) addTilingHandles(n);
+        if(n.nodeType===1) n.querySelectorAll?.('.tiling-pane').forEach(addTilingHandles);
+      }));
+    }).observe(grid, {childList:true, subtree:true});
+    // also make window handles work in tiling mode (already added via windowed, but ensure all panes have window handles when windowed)
+  })();
 
   // --- Drag-to-pane: sitedeki her şey pane'e sürüklenebilir (FIX soldan sürükle) ---
   (function(){

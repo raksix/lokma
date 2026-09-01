@@ -746,13 +746,75 @@
                   <div class="text-[12.5px] font-semibold">Lokma — Claude 4 Sonnet</div>
                   <div class="text-[13px] leading-5 mt-1 text-white/90">Perfect — one hook, one decorator, zero magic. <span class="underline decoration-white/30">Apply patch</span></div>
                 </div>
-                <div class="text-[11px] text-zinc-400 text-center">— pane A · tab 1 — sürükle pane’e ekle, soldan yeni session tab olarak gelir —</div>
+                <div class="text-[11px] text-zinc-400 text-center">— pane A · tab 1 — soldan yeni session tab olarak gelir —</div>
               </div>
             </div>
             <div class="shrink-0 p-2 border-t border-line bg-white/90 backdrop-blur">
-              <div class="flex gap-1.5">
-                <input placeholder="Pane A — ask Lokma..." class="flex-1 h-7 px-2.5 rounded-md bg-white border border-line text-[13px] placeholder:text-zinc-400 focus:outline-none focus:border-terracotta/40" />
-                <button class="px-3 h-7 rounded-full bg-terracotta text-white text-[12px] font-medium">Send</button>
+              <div class="rounded-lg bg-white border border-line shadow-card overflow-hidden">
+                <div class="p-2">
+                  <textarea rows="1" placeholder="Ask Lokma to plan, code, or explain — try “add 60/min rate limit per user”" class="composer-input w-full resize-none bg-transparent text-[13px] leading-[1.5] placeholder:text-zinc-400 focus:outline-none min-h-[28px] py-1"></textarea>
+                  <div class="file-chips hidden flex flex-wrap gap-1 mt-1.5"></div>
+                  <div class="flex items-center gap-1 mt-1.5 flex-wrap relative">
+                    <button class="attach-btn w-7 h-7 grid place-items-center rounded-md bg-white border border-line hover:bg-muted text-zinc-600 transition shrink-0" title="Dosya / belge yükle" aria-label="Attach file">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5.5 8.2l4.2-4.2a1.8 1.8 0 112.5 2.5L6.8 12a2.8 2.8 0 01-4-4L7 3.8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <input type="file" multiple hidden accept=".pdf,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp,.doc,.docx" class="file-input" />
+                    <button class="mic-btn w-7 h-7 grid place-items-center rounded-md bg-white border border-line hover:bg-muted text-zinc-600 transition shrink-0" title="Mikrofon — sesle yaz" aria-label="Voice input">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="6" y="3" width="4" height="7" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 8.5a3.5 3.5 0 007 0M8 12v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                    </button>
+                    <span class="mic-status hidden text-[11px] text-red-600 font-medium animate-pulse">● Rec</span>
+                    <div class="w-px h-4 bg-line mx-0.5 hidden sm:block"></div>
+                    <div class="inline-flex p-0.5 rounded-full bg-muted border border-line shrink-0" role="tablist" aria-label="Mode">
+                      <button data-mode="steer" class="mode-btn px-2.5 py-1 rounded-full bg-[#262624] text-white text-[11px] font-medium leading-none">Steer</button>
+                      <button data-mode="queue" class="mode-btn px-2.5 py-1 rounded-full text-zinc-600 hover:bg-white text-[11px] font-medium leading-none">Queue</button>
+                    </div>
+                    <button class="model-trigger inline-flex items-center gap-1.5 pl-1.5 pr-2 h-6 rounded-full bg-[#1E1E20] border border-[#2A2A2E] text-white text-[11px] font-medium hover:bg-[#252529] transition shrink-0">
+                      <span class="w-4 h-4 rounded-full bg-white/10 grid place-items-center text-[9px]">◐</span>
+                      <span class="model-current max-w-[120px] sm:max-w-[140px] truncate">Muse Spark</span>
+                      <svg width="10" height="10" viewBox="0 0 16 16" fill="none" class="opacity-60 shrink-0"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <div class="model-dropdown hidden absolute bottom-[calc(100%+8px)] left-0 w-[340px] max-w-[92vw] z-50">
+                      <div class="rounded-xl bg-[#111113] border border-[#2A2A2E] shadow-[0_16px_48px_rgba(0,0,0,0.5),0_4px_16px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col max-h-[420px]">
+                        <div class="p-2 border-b border-white/[0.06]">
+                          <div class="relative">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500"><circle cx="7" cy="7" r="4.2" stroke="currentColor" stroke-width="1.3"/><path d="M10.2 10.2L13 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                            <input placeholder="Search models" class="model-search w-full h-8 pl-8 pr-3 rounded-lg bg-[#1E1E20] border border-white/10 text-[13px] text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/15 focus:bg-[#242428]" />
+                          </div>
+                        </div>
+                        <div class="model-list flex-1 overflow-y-auto model-dd py-1">
+                          <div class="px-2.5 pt-2 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">Anthropic</div>
+                          <button data-model-value="claude-4-sonnet" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white font-[450]">Claude 4 Sonnet</span><span class="text-[11px] text-zinc-500">High</span></button>
+                          <button data-model-value="claude-4-opus" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">Claude 4 Opus</span><span class="text-[11px] text-zinc-500">High</span></button>
+                          <div class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">AIHUBMIX</div>
+                          <button data-model-value="deepseek-v4-flash" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">Deepseek V4 Flash</span><span class="text-[11px] px-1.5 py-0.5 rounded bg-white/10 text-zinc-300">Free</span></button>
+                          <button data-model-value="mimo-v2.5" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">Mimo V2.5</span><span class="text-[11px] px-1.5 py-0.5 rounded bg-white/10 text-zinc-300">Free</span></button>
+                          <div class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">CMD-ROUTER-SE</div>
+                          <button data-model-value="muse-spark-1.2-contributor" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between bg-white/[0.08] text-[13px] border border-white/5"><span class="text-white font-medium flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-terracotta"></span> Muse Spark 1.2 Contributor</span><span class="text-[11px] text-zinc-400">High</span></button>
+                          <button data-model-value="big-pickle" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">Big Pickle Ultra</span><span class="text-[11px] text-zinc-500">Ultra</span></button>
+                          <div class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">BAI</div>
+                          <button data-model-value="nemotron-3-ultra" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.08] transition text-[13px] bg-white/[0.04]"><span class="text-white">Nemotron 3 Ultra</span><span class="text-[11px] text-zinc-500">Ultra</span></button>
+                          <button data-model-value="nemotron-3-nano" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">Nemotron 3 Nano</span><span class="text-[11px] text-zinc-500">Free</span></button>
+                          <div class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">OpenAI</div>
+                          <button data-model-value="gpt-5" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">GPT-5</span><span class="text-[11px] text-zinc-500">High</span></button>
+                          <button data-model-value="gpt-5-mini" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">GPT-5 Mini</span><span class="text-[11px] text-zinc-500">Free</span></button>
+                          <div class="h-1"></div>
+                        </div>
+                        <div class="border-t border-white/[0.06] p-1 bg-[#0F0F11]">
+                          <button class="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-white/[0.06] text-[13px] text-zinc-300 flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3a5 5 0 015 5M8 13a5 5 0 01-5-5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11 3l1 1-1 1M5 13l-1-1 1-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg> Refresh models</button>
+                          <button class="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-white/[0.06] text-[13px] text-zinc-300 flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M11.5 3.5l1 1-7 7H4v-1.5l7-7z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 4l1-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg> Edit models…</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="ml-auto flex items-center gap-1">
+                      <button class="send-btn inline-flex items-center gap-1 pl-3 pr-1.5 h-7 rounded-full bg-terracotta text-white text-[12.5px] font-medium hover:bg-terracotta-hover transition shadow-sm">
+                        Send
+                        <span class="w-5 h-5 rounded-full bg-white/15 grid place-items-center">
+                          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M5 8l3 3 4-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -786,9 +848,71 @@
               </div>
             </div>
             <div class="shrink-0 p-2 border-t border-line bg-white/90 backdrop-blur">
-              <div class="flex gap-1.5">
-                <input placeholder="Pane B — ask about code..." class="flex-1 h-7 px-2.5 rounded-md bg-white border border-line text-[13px] placeholder:text-zinc-400 focus:outline-none focus:border-terracotta/40" />
-                <button class="px-3 h-7 rounded-full bg-[#262624] text-white text-[12px] font-medium">Ask</button>
+              <div class="rounded-lg bg-white border border-line shadow-card overflow-hidden">
+                <div class="p-2">
+                  <textarea rows="1" placeholder="Ask Lokma to plan, code, or explain — try “add 60/min rate limit per user”" class="composer-input w-full resize-none bg-transparent text-[13px] leading-[1.5] placeholder:text-zinc-400 focus:outline-none min-h-[28px] py-1"></textarea>
+                  <div class="file-chips hidden flex flex-wrap gap-1 mt-1.5"></div>
+                  <div class="flex items-center gap-1 mt-1.5 flex-wrap relative">
+                    <button class="attach-btn w-7 h-7 grid place-items-center rounded-md bg-white border border-line hover:bg-muted text-zinc-600 transition shrink-0" title="Dosya / belge yükle" aria-label="Attach file">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5.5 8.2l4.2-4.2a1.8 1.8 0 112.5 2.5L6.8 12a2.8 2.8 0 01-4-4L7 3.8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <input type="file" multiple hidden accept=".pdf,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp,.doc,.docx" class="file-input" />
+                    <button class="mic-btn w-7 h-7 grid place-items-center rounded-md bg-white border border-line hover:bg-muted text-zinc-600 transition shrink-0" title="Mikrofon — sesle yaz" aria-label="Voice input">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="6" y="3" width="4" height="7" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 8.5a3.5 3.5 0 007 0M8 12v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                    </button>
+                    <span class="mic-status hidden text-[11px] text-red-600 font-medium animate-pulse">● Rec</span>
+                    <div class="w-px h-4 bg-line mx-0.5 hidden sm:block"></div>
+                    <div class="inline-flex p-0.5 rounded-full bg-muted border border-line shrink-0" role="tablist" aria-label="Mode">
+                      <button data-mode="steer" class="mode-btn px-2.5 py-1 rounded-full bg-[#262624] text-white text-[11px] font-medium leading-none">Steer</button>
+                      <button data-mode="queue" class="mode-btn px-2.5 py-1 rounded-full text-zinc-600 hover:bg-white text-[11px] font-medium leading-none">Queue</button>
+                    </div>
+                    <button class="model-trigger inline-flex items-center gap-1.5 pl-1.5 pr-2 h-6 rounded-full bg-[#1E1E20] border border-[#2A2A2E] text-white text-[11px] font-medium hover:bg-[#252529] transition shrink-0">
+                      <span class="w-4 h-4 rounded-full bg-white/10 grid place-items-center text-[9px]">◐</span>
+                      <span class="model-current max-w-[120px] sm:max-w-[140px] truncate">Muse Spark</span>
+                      <svg width="10" height="10" viewBox="0 0 16 16" fill="none" class="opacity-60 shrink-0"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <div class="model-dropdown hidden absolute bottom-[calc(100%+8px)] left-0 w-[340px] max-w-[92vw] z-50">
+                      <div class="rounded-xl bg-[#111113] border border-[#2A2A2E] shadow-[0_16px_48px_rgba(0,0,0,0.5),0_4px_16px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col max-h-[420px]">
+                        <div class="p-2 border-b border-white/[0.06]">
+                          <div class="relative">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500"><circle cx="7" cy="7" r="4.2" stroke="currentColor" stroke-width="1.3"/><path d="M10.2 10.2L13 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                            <input placeholder="Search models" class="model-search w-full h-8 pl-8 pr-3 rounded-lg bg-[#1E1E20] border border-white/10 text-[13px] text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/15 focus:bg-[#242428]" />
+                          </div>
+                        </div>
+                        <div class="model-list flex-1 overflow-y-auto model-dd py-1">
+                          <div class="px-2.5 pt-2 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">Anthropic</div>
+                          <button data-model-value="claude-4-sonnet" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white font-[450]">Claude 4 Sonnet</span><span class="text-[11px] text-zinc-500">High</span></button>
+                          <button data-model-value="claude-4-opus" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">Claude 4 Opus</span><span class="text-[11px] text-zinc-500">High</span></button>
+                          <div class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">AIHUBMIX</div>
+                          <button data-model-value="deepseek-v4-flash" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">Deepseek V4 Flash</span><span class="text-[11px] px-1.5 py-0.5 rounded bg-white/10 text-zinc-300">Free</span></button>
+                          <button data-model-value="mimo-v2.5" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">Mimo V2.5</span><span class="text-[11px] px-1.5 py-0.5 rounded bg-white/10 text-zinc-300">Free</span></button>
+                          <div class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">CMD-ROUTER-SE</div>
+                          <button data-model-value="muse-spark-1.2-contributor" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between bg-white/[0.08] text-[13px] border border-white/5"><span class="text-white font-medium flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-terracotta"></span> Muse Spark 1.2 Contributor</span><span class="text-[11px] text-zinc-400">High</span></button>
+                          <button data-model-value="big-pickle" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">Big Pickle Ultra</span><span class="text-[11px] text-zinc-500">Ultra</span></button>
+                          <div class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">BAI</div>
+                          <button data-model-value="nemotron-3-ultra" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.08] transition text-[13px] bg-white/[0.04]"><span class="text-white">Nemotron 3 Ultra</span><span class="text-[11px] text-zinc-500">Ultra</span></button>
+                          <button data-model-value="nemotron-3-nano" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">Nemotron 3 Nano</span><span class="text-[11px] text-zinc-500">Free</span></button>
+                          <div class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">OpenAI</div>
+                          <button data-model-value="gpt-5" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">GPT-5</span><span class="text-[11px] text-zinc-500">High</span></button>
+                          <button data-model-value="gpt-5-mini" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">GPT-5 Mini</span><span class="text-[11px] text-zinc-500">Free</span></button>
+                          <div class="h-1"></div>
+                        </div>
+                        <div class="border-t border-white/[0.06] p-1 bg-[#0F0F11]">
+                          <button class="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-white/[0.06] text-[13px] text-zinc-300 flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3a5 5 0 015 5M8 13a5 5 0 01-5-5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11 3l1 1-1 1M5 13l-1-1 1-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg> Refresh models</button>
+                          <button class="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-white/[0.06] text-[13px] text-zinc-300 flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M11.5 3.5l1 1-7 7H4v-1.5l7-7z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 4l1-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg> Edit models…</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="ml-auto flex items-center gap-1">
+                      <button class="send-btn inline-flex items-center gap-1 pl-3 pr-1.5 h-7 rounded-full bg-terracotta text-white text-[12.5px] font-medium hover:bg-terracotta-hover transition shadow-sm">
+                        Send
+                        <span class="w-5 h-5 rounded-full bg-white/15 grid place-items-center">
+                          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M5 8l3 3 4-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -815,8 +939,73 @@
                 </div>
               </div>
             </div>
-            <div class="shrink-0 p-2 border-t border-line bg-white/90">
-              <input placeholder="Yeni pane..." class="w-full h-7 px-2.5 rounded-md bg-white border border-line text-[13px]" />
+            <div class="shrink-0 p-2 border-t border-line bg-white/90 backdrop-blur">
+              <div class="rounded-lg bg-white border border-line shadow-card overflow-hidden">
+                <div class="p-2">
+                  <textarea rows="1" placeholder="Ask Lokma to plan, code, or explain — try “add 60/min rate limit per user”" class="composer-input w-full resize-none bg-transparent text-[13px] leading-[1.5] placeholder:text-zinc-400 focus:outline-none min-h-[28px] py-1"></textarea>
+                  <div class="file-chips hidden flex flex-wrap gap-1 mt-1.5"></div>
+                  <div class="flex items-center gap-1 mt-1.5 flex-wrap relative">
+                    <button class="attach-btn w-7 h-7 grid place-items-center rounded-md bg-white border border-line hover:bg-muted text-zinc-600 transition shrink-0" title="Dosya / belge yükle" aria-label="Attach file">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5.5 8.2l4.2-4.2a1.8 1.8 0 112.5 2.5L6.8 12a2.8 2.8 0 01-4-4L7 3.8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <input type="file" multiple hidden accept=".pdf,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp,.doc,.docx" class="file-input" />
+                    <button class="mic-btn w-7 h-7 grid place-items-center rounded-md bg-white border border-line hover:bg-muted text-zinc-600 transition shrink-0" title="Mikrofon — sesle yaz" aria-label="Voice input">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="6" y="3" width="4" height="7" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 8.5a3.5 3.5 0 007 0M8 12v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                    </button>
+                    <span class="mic-status hidden text-[11px] text-red-600 font-medium animate-pulse">● Rec</span>
+                    <div class="w-px h-4 bg-line mx-0.5 hidden sm:block"></div>
+                    <div class="inline-flex p-0.5 rounded-full bg-muted border border-line shrink-0" role="tablist" aria-label="Mode">
+                      <button data-mode="steer" class="mode-btn px-2.5 py-1 rounded-full bg-[#262624] text-white text-[11px] font-medium leading-none">Steer</button>
+                      <button data-mode="queue" class="mode-btn px-2.5 py-1 rounded-full text-zinc-600 hover:bg-white text-[11px] font-medium leading-none">Queue</button>
+                    </div>
+                    <button class="model-trigger inline-flex items-center gap-1.5 pl-1.5 pr-2 h-6 rounded-full bg-[#1E1E20] border border-[#2A2A2E] text-white text-[11px] font-medium hover:bg-[#252529] transition shrink-0">
+                      <span class="w-4 h-4 rounded-full bg-white/10 grid place-items-center text-[9px]">◐</span>
+                      <span class="model-current max-w-[120px] sm:max-w-[140px] truncate">Muse Spark</span>
+                      <svg width="10" height="10" viewBox="0 0 16 16" fill="none" class="opacity-60 shrink-0"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <div class="model-dropdown hidden absolute bottom-[calc(100%+8px)] left-0 w-[340px] max-w-[92vw] z-50">
+                      <div class="rounded-xl bg-[#111113] border border-[#2A2A2E] shadow-[0_16px_48px_rgba(0,0,0,0.5),0_4px_16px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col max-h-[420px]">
+                        <div class="p-2 border-b border-white/[0.06]">
+                          <div class="relative">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500"><circle cx="7" cy="7" r="4.2" stroke="currentColor" stroke-width="1.3"/><path d="M10.2 10.2L13 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                            <input placeholder="Search models" class="model-search w-full h-8 pl-8 pr-3 rounded-lg bg-[#1E1E20] border border-white/10 text-[13px] text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/15 focus:bg-[#242428]" />
+                          </div>
+                        </div>
+                        <div class="model-list flex-1 overflow-y-auto model-dd py-1">
+                          <div class="px-2.5 pt-2 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">Anthropic</div>
+                          <button data-model-value="claude-4-sonnet" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white font-[450]">Claude 4 Sonnet</span><span class="text-[11px] text-zinc-500">High</span></button>
+                          <button data-model-value="claude-4-opus" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">Claude 4 Opus</span><span class="text-[11px] text-zinc-500">High</span></button>
+                          <div class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">AIHUBMIX</div>
+                          <button data-model-value="deepseek-v4-flash" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">Deepseek V4 Flash</span><span class="text-[11px] px-1.5 py-0.5 rounded bg-white/10 text-zinc-300">Free</span></button>
+                          <button data-model-value="mimo-v2.5" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">Mimo V2.5</span><span class="text-[11px] px-1.5 py-0.5 rounded bg-white/10 text-zinc-300">Free</span></button>
+                          <div class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">CMD-ROUTER-SE</div>
+                          <button data-model-value="muse-spark-1.2-contributor" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between bg-white/[0.08] text-[13px] border border-white/5"><span class="text-white font-medium flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-terracotta"></span> Muse Spark 1.2 Contributor</span><span class="text-[11px] text-zinc-400">High</span></button>
+                          <button data-model-value="big-pickle" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">Big Pickle Ultra</span><span class="text-[11px] text-zinc-500">Ultra</span></button>
+                          <div class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">BAI</div>
+                          <button data-model-value="nemotron-3-ultra" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.08] transition text-[13px] bg-white/[0.04]"><span class="text-white">Nemotron 3 Ultra</span><span class="text-[11px] text-zinc-500">Ultra</span></button>
+                          <button data-model-value="nemotron-3-nano" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">Nemotron 3 Nano</span><span class="text-[11px] text-zinc-500">Free</span></button>
+                          <div class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">OpenAI</div>
+                          <button data-model-value="gpt-5" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">GPT-5</span><span class="text-[11px] text-zinc-500">High</span></button>
+                          <button data-model-value="gpt-5-mini" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">GPT-5 Mini</span><span class="text-[11px] text-zinc-500">Free</span></button>
+                          <div class="h-1"></div>
+                        </div>
+                        <div class="border-t border-white/[0.06] p-1 bg-[#0F0F11]">
+                          <button class="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-white/[0.06] text-[13px] text-zinc-300 flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3a5 5 0 015 5M8 13a5 5 0 01-5-5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11 3l1 1-1 1M5 13l-1-1 1-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg> Refresh models</button>
+                          <button class="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-white/[0.06] text-[13px] text-zinc-300 flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M11.5 3.5l1 1-7 7H4v-1.5l7-7z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 4l1-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg> Edit models…</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="ml-auto flex items-center gap-1">
+                      <button class="send-btn inline-flex items-center gap-1 pl-3 pr-1.5 h-7 rounded-full bg-terracotta text-white text-[12.5px] font-medium hover:bg-terracotta-hover transition shadow-sm">
+                        Send
+                        <span class="w-5 h-5 rounded-full bg-white/15 grid place-items-center">
+                          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M5 8l3 3 4-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           <div id="snap-overlay"><div id="snap-preview"></div></div>
@@ -1292,11 +1481,53 @@
               </div>
             </div>
             <div class="shrink-0 p-2 border-t border-line bg-white/90 backdrop-blur">
-              <div class="flex gap-1.5">
-                <input placeholder="Mobil pane'e yaz... (pane resize edilebilir)" class="flex-1 h-7 px-2.5 rounded-full bg-white border border-line text-[13px] placeholder:text-zinc-400" />
-                <button class="px-3 h-7 rounded-full bg-[#262624] text-white text-[12px]">Send</button>
+              <div class="rounded-lg bg-white border border-line shadow-card overflow-hidden">
+                <div class="p-2">
+                  <textarea rows="1" placeholder="Ask Lokma to plan, code, or explain — try “add 60/min rate limit per user”" class="composer-input w-full resize-none bg-transparent text-[13px] leading-[1.5] placeholder:text-zinc-400 focus:outline-none min-h-[28px] py-1"></textarea>
+                  <div class="file-chips hidden flex flex-wrap gap-1 mt-1.5"></div>
+                  <div class="flex items-center gap-1 mt-1.5 flex-wrap relative">
+                    <button class="attach-btn w-7 h-7 grid place-items-center rounded-md bg-white border border-line hover:bg-muted text-zinc-600 transition shrink-0" title="Dosya / belge yükle">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5.5 8.2l4.2-4.2a1.8 1.8 0 112.5 2.5L6.8 12a2.8 2.8 0 01-4-4L7 3.8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <input type="file" multiple hidden accept=".pdf,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp,.doc,.docx" class="file-input" />
+                    <button class="mic-btn w-7 h-7 grid place-items-center rounded-md bg-white border border-line hover:bg-muted text-zinc-600 transition shrink-0" title="Mikrofon">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="6" y="3" width="4" height="7" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 8.5a3.5 3.5 0 007 0M8 12v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                    </button>
+                    <span class="mic-status hidden text-[11px] text-red-600 font-medium animate-pulse">● Rec</span>
+                    <div class="w-px h-4 bg-line mx-0.5 hidden sm:block"></div>
+                    <div class="inline-flex p-0.5 rounded-full bg-muted border border-line shrink-0" role="tablist">
+                      <button data-mode="steer" class="mode-btn px-2.5 py-1 rounded-full bg-[#262624] text-white text-[11px] font-medium leading-none">Steer</button>
+                      <button data-mode="queue" class="mode-btn px-2.5 py-1 rounded-full text-zinc-600 hover:bg-white text-[11px] font-medium leading-none">Queue</button>
+                    </div>
+                    <button class="model-trigger inline-flex items-center gap-1.5 pl-1.5 pr-2 h-6 rounded-full bg-[#1E1E20] border border-[#2A2A2E] text-white text-[11px] font-medium hover:bg-[#252529] transition shrink-0">
+                      <span class="w-4 h-4 rounded-full bg-white/10 grid place-items-center text-[9px]">◐</span>
+                      <span class="model-current max-w-[120px] sm:max-w-[140px] truncate">Muse Spark</span>
+                      <svg width="10" height="10" viewBox="0 0 16 16" fill="none" class="opacity-60 shrink-0"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <div class="model-dropdown hidden absolute bottom-[calc(100%+8px)] left-0 w-[340px] max-w-[92vw] z-50">
+                      <div class="rounded-xl bg-[#111113] border border-[#2A2A2E] shadow-[0_16px_48px_rgba(0,0,0,0.5),0_4px_16px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col max-h-[420px]">
+                        <div class="p-2 border-b border-white/[0.06]"><div class="relative"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500"><circle cx="7" cy="7" r="4.2" stroke="currentColor" stroke-width="1.3"/><path d="M10.2 10.2L13 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><input placeholder="Search models" class="model-search w-full h-8 pl-8 pr-3 rounded-lg bg-[#1E1E20] border border-white/10 text-[13px] text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/15 focus:bg-[#242428]" /></div></div>
+                        <div class="model-list flex-1 overflow-y-auto model-dd py-1">
+                          <div class="px-2.5 pt-2 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">Anthropic</div>
+                          <button data-model-value="claude-4-sonnet" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white font-[450]">Claude 4 Sonnet</span><span class="text-[11px] text-zinc-500">High</span></button>
+                          <div class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">CMD-ROUTER-SE</div>
+                          <button data-model-value="muse-spark-1.2-contributor" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between bg-white/[0.08] text-[13px] border border-white/5"><span class="text-white font-medium flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-terracotta"></span> Muse Spark 1.2 Contributor</span><span class="text-[11px] text-zinc-400">High</span></button>
+                          <div class="h-1"></div>
+                        </div>
+                        <div class="border-t border-white/[0.06] p-1 bg-[#0F0F11]"><button class="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-white/[0.06] text-[13px] text-zinc-300 flex items-center gap-2">Refresh models</button><button class="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-white/[0.06] text-[13px] text-zinc-300 flex items-center gap-2">Edit models…</button></div>
+                      </div>
+                    </div>
+                    <div class="ml-auto flex items-center gap-1">
+                      <button class="send-btn inline-flex items-center gap-1 pl-3 pr-1.5 h-7 rounded-full bg-terracotta text-white text-[12.5px] font-medium hover:bg-terracotta-hover transition shadow-sm">
+                        Send
+                        <span class="w-5 h-5 rounded-full bg-white/15 grid place-items-center">
+                          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M5 8l3 3 4-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div class="mt-1 text-[10px] text-zinc-400 text-center">Pane’i sürükle taşı · köşeden çek büyüt/küçült · windowed modda serbest</div>
             </div>`;
     const paneC=document.getElementById('pane-c');
     if(paneC && paneC.parentNode===grid) grid.insertBefore(pane, paneC); else grid.appendChild(pane);
@@ -1509,6 +1740,137 @@
     const files = Array.from(e.clipboardData?.files||[]);
     if(files.length){ attachedFiles.push(...files); renderChips(); }
   });
+
+  // --- Tiling composer delegated handlers (same textarea as single view) ---
+  (function(){
+    // attach (delegated) — both single (id) and tiling (class)
+    document.addEventListener('click', e=>{
+      const btn = e.target.closest('.attach-btn, #attach-btn');
+      if(!btn) return;
+      const composer = btn.closest('.tiling-composer, #composer-card');
+      const input = composer ? composer.querySelector('.file-input, #file-input') : null;
+      if(input) input.click();
+    });
+    // file input change (delegated)
+    document.addEventListener('change', e=>{
+      if(!e.target.matches('.file-input, #file-input')) return;
+      const input = e.target;
+      const composer = input.closest('.tiling-composer, #composer-card');
+      const chips = composer ? composer.querySelector('.file-chips, #file-chips') : null;
+      if(!chips) return;
+      const files = Array.from(input.files || []);
+      if(files.length===0) return;
+      // simple chip rendering for tiling (no global attachedFiles, per-pane)
+      files.forEach(f=>{
+        const chip = document.createElement('span');
+        chip.className='inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-md bg-[#FDF0E6] border border-[#F2D5C2] text-[11px]';
+        chip.innerHTML=`<svg width="12" height="12" viewBox="0 0 16 16" fill="none" class="text-terracotta shrink-0"><path d="M5 3.5h4l3 3v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-8a1 1 0 011-1z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 3.5v3h3" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg><span class="max-w-[120px] truncate font-medium">${f.name}</span><span class="text-zinc-500">${(f.size/1024).toFixed(0)} KB</span><button class="w-4 h-4 grid place-items-center rounded hover:bg-black/5 ml-0.5">×</button>`;
+        chip.querySelector('button').onclick = ()=> chip.remove();
+        chips.appendChild(chip);
+      });
+      chips.classList.remove('hidden');
+      input.value='';
+    });
+    // mic (delegated) — per-pane mock
+    document.addEventListener('click', e=>{
+      const btn = e.target.closest('.mic-btn, #mic-btn');
+      if(!btn) return;
+      const composer = btn.closest('.tiling-composer, #composer-card');
+      const status = composer ? composer.querySelector('.mic-status, #mic-status') : null;
+      const isActive = btn.dataset.recording === '1';
+      if(isActive){
+        btn.dataset.recording='0';
+        btn.classList.remove('bg-red-50','border-red-200','text-red-600');
+        if(status) status.classList.add('hidden');
+        btn.innerHTML='<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="6" y="3" width="4" height="7" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 8.5a3.5 3.5 0 007 0M8 12v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>';
+      } else {
+        btn.dataset.recording='1';
+        btn.classList.add('bg-red-50','border-red-200','text-red-600');
+        if(status) status.classList.remove('hidden');
+        btn.innerHTML='<span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>';
+        setTimeout(()=>{ // auto stop after 2s mock
+          if(btn.dataset.recording==='1'){
+            btn.click();
+          }
+        }, 2000);
+      }
+    });
+    // mode toggle (delegated)
+    document.addEventListener('click', e=>{
+      const btn = e.target.closest('.mode-btn');
+      if(!btn) return;
+      const group = btn.closest('[role="tablist"]');
+      if(!group) return;
+      group.querySelectorAll('.mode-btn').forEach(b=> b.className='mode-btn px-2.5 py-1 rounded-full text-zinc-600 hover:bg-white text-[11px] font-medium leading-none');
+      btn.className='mode-btn px-2.5 py-1 rounded-full bg-[#262624] text-white text-[11px] font-medium leading-none';
+    });
+    // model trigger (delegated) — per-pane dropdown
+    document.addEventListener('click', e=>{
+      const trigger = e.target.closest('.model-trigger, #model-trigger');
+      if(!trigger) return;
+      e.stopPropagation();
+      const composer = trigger.closest('.tiling-composer, #composer-card');
+      const dropdown = composer ? composer.querySelector('.model-dropdown, #model-dropdown') : null;
+      if(!dropdown) return;
+      // close others
+      document.querySelectorAll('.model-dropdown, #model-dropdown').forEach(d=>{ if(d!==dropdown) d.classList.add('hidden'); });
+      dropdown.classList.toggle('hidden');
+      if(!dropdown.classList.contains('hidden')){
+        const search = dropdown.querySelector('.model-search, #model-search');
+        if(search) search.focus();
+      }
+    });
+    // close dropdown when clicking outside (per-pane)
+    document.addEventListener('click', e=>{
+      if(e.target.closest('.model-trigger, #model-trigger') || e.target.closest('.model-dropdown, #model-dropdown')) return;
+      document.querySelectorAll('.model-dropdown, #model-dropdown').forEach(d=> d.classList.add('hidden'));
+    });
+    // model option select (delegated)
+    document.addEventListener('click', e=>{
+      const opt = e.target.closest('.model-opt');
+      if(!opt) return;
+      const dropdown = opt.closest('.model-dropdown, #model-dropdown');
+      const composer = dropdown ? dropdown.closest('.tiling-composer, #composer-card') : null;
+      const current = composer ? composer.querySelector('.model-current, #model-current') : null;
+      if(current){
+        const clean = opt.textContent.trim().replace(/\s+(Free|High|Ultra)$/, '').trim();
+        current.textContent = clean.length > 18 ? clean.slice(0,18)+'…' : clean;
+      }
+      if(dropdown) dropdown.classList.add('hidden');
+      // active state
+      const list = dropdown ? dropdown.querySelectorAll('.model-opt') : [];
+      list.forEach(b=> b.classList.remove('bg-white/[0.08]','border','border-white/5'));
+      opt.classList.add('bg-white/[0.08]','border','border-white/5');
+    });
+    // model search (delegated)
+    document.addEventListener('input', e=>{
+      if(!e.target.matches('.model-search, #model-search')) return;
+      const search = e.target;
+      const dropdown = search.closest('.model-dropdown, #model-dropdown');
+      if(!dropdown) return;
+      const q = search.value.toLowerCase();
+      dropdown.querySelectorAll('.model-opt').forEach(el=>{
+        const txt2 = el.textContent.toLowerCase();
+        el.style.display = txt2.includes(q) ? '' : 'none';
+      });
+      dropdown.querySelectorAll('.model-list > div, #model-list > div').forEach(header=>{
+        if(header.textContent.includes('·') || header.classList.contains('h-1')) return;
+        let next = header.nextElementSibling; let hasVisible=false;
+        while(next && !next.matches('div')){
+          if(next.style.display !== 'none') hasVisible=true;
+          next = next.nextElementSibling;
+        }
+        header.style.display = hasVisible ? '' : 'none';
+      });
+    });
+    // auto-resize for all composer textareas
+    document.addEventListener('input', e=>{
+      if(!e.target.matches('.composer-input, #composer-input')) return;
+      const ta = e.target;
+      ta.style.height='auto';
+      ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+    });
+  })();
 
   // ——— Mikrofon (Web Speech API mock + real) ———
   const micBtn = document.getElementById('mic-btn');
@@ -2257,9 +2619,53 @@
               <div class="rounded-lg bg-white border border-line p-3 shadow-sm text-[13px] leading-5 overflow-auto max-h-[60vh]">${safeHTML}</div>
             </div>
             <div class="shrink-0 p-2 border-t border-line bg-white/90 backdrop-blur">
-              <div class="flex gap-1.5">
-                <input placeholder="Bu pane'e yaz..." class="flex-1 h-7 px-2.5 rounded-md bg-white border border-line text-[13px] placeholder:text-zinc-400 focus:outline-none focus:border-terracotta/40" />
-                <button class="px-3 h-7 rounded-full bg-terracotta text-white text-[12px] font-medium">Send</button>
+              <div class="rounded-lg bg-white border border-line shadow-card overflow-hidden">
+                <div class="p-2">
+                  <textarea rows="1" placeholder="Ask Lokma to plan, code, or explain — try “add 60/min rate limit per user”" class="composer-input w-full resize-none bg-transparent text-[13px] leading-[1.5] placeholder:text-zinc-400 focus:outline-none min-h-[28px] py-1"></textarea>
+                  <div class="file-chips hidden flex flex-wrap gap-1 mt-1.5"></div>
+                  <div class="flex items-center gap-1 mt-1.5 flex-wrap relative">
+                    <button class="attach-btn w-7 h-7 grid place-items-center rounded-md bg-white border border-line hover:bg-muted text-zinc-600 transition shrink-0" title="Dosya / belge yükle">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5.5 8.2l4.2-4.2a1.8 1.8 0 112.5 2.5L6.8 12a2.8 2.8 0 01-4-4L7 3.8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <input type="file" multiple hidden accept=".pdf,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp,.doc,.docx" class="file-input" />
+                    <button class="mic-btn w-7 h-7 grid place-items-center rounded-md bg-white border border-line hover:bg-muted text-zinc-600 transition shrink-0" title="Mikrofon">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="6" y="3" width="4" height="7" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 8.5a3.5 3.5 0 007 0M8 12v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                    </button>
+                    <span class="mic-status hidden text-[11px] text-red-600 font-medium animate-pulse">● Rec</span>
+                    <div class="w-px h-4 bg-line mx-0.5 hidden sm:block"></div>
+                    <div class="inline-flex p-0.5 rounded-full bg-muted border border-line shrink-0" role="tablist">
+                      <button data-mode="steer" class="mode-btn px-2.5 py-1 rounded-full bg-[#262624] text-white text-[11px] font-medium leading-none">Steer</button>
+                      <button data-mode="queue" class="mode-btn px-2.5 py-1 rounded-full text-zinc-600 hover:bg-white text-[11px] font-medium leading-none">Queue</button>
+                    </div>
+                    <button class="model-trigger inline-flex items-center gap-1.5 pl-1.5 pr-2 h-6 rounded-full bg-[#1E1E20] border border-[#2A2A2E] text-white text-[11px] font-medium hover:bg-[#252529] transition shrink-0">
+                      <span class="w-4 h-4 rounded-full bg-white/10 grid place-items-center text-[9px]">◐</span>
+                      <span class="model-current max-w-[120px] sm:max-w-[140px] truncate">Muse Spark</span>
+                      <svg width="10" height="10" viewBox="0 0 16 16" fill="none" class="opacity-60 shrink-0"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <div class="model-dropdown hidden absolute bottom-[calc(100%+8px)] left-0 w-[340px] max-w-[92vw] z-50">
+                      <div class="rounded-xl bg-[#111113] border border-[#2A2A2E] shadow-[0_16px_48px_rgba(0,0,0,0.5),0_4px_16px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col max-h-[420px]">
+                        <div class="p-2 border-b border-white/[0.06]"><div class="relative"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500"><circle cx="7" cy="7" r="4.2" stroke="currentColor" stroke-width="1.3"/><path d="M10.2 10.2L13 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><input placeholder="Search models" class="model-search w-full h-8 pl-8 pr-3 rounded-lg bg-[#1E1E20] border border-white/10 text-[13px] text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/15 focus:bg-[#242428]" /></div></div>
+                        <div class="model-list flex-1 overflow-y-auto model-dd py-1">
+                          <div class="px-2.5 pt-2 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">Anthropic</div>
+                          <button data-model-value="claude-4-sonnet" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white font-[450]">Claude 4 Sonnet</span><span class="text-[11px] text-zinc-500">High</span></button>
+                          <button data-model-value="claude-4-opus" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/[0.06] transition text-[13px]"><span class="text-white">Claude 4 Opus</span><span class="text-[11px] text-zinc-500">High</span></button>
+                          <div class="px-2.5 pt-3 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">CMD-ROUTER-SE</div>
+                          <button data-model-value="muse-spark-1.2-contributor" class="model-opt w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between bg-white/[0.08] text-[13px] border border-white/5"><span class="text-white font-medium flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-terracotta"></span> Muse Spark 1.2 Contributor</span><span class="text-[11px] text-zinc-400">High</span></button>
+                          <div class="h-1"></div>
+                        </div>
+                        <div class="border-t border-white/[0.06] p-1 bg-[#0F0F11]"><button class="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-white/[0.06] text-[13px] text-zinc-300 flex items-center gap-2">Refresh models</button><button class="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-white/[0.06] text-[13px] text-zinc-300 flex items-center gap-2">Edit models…</button></div>
+                      </div>
+                    </div>
+                    <div class="ml-auto flex items-center gap-1">
+                      <button class="send-btn inline-flex items-center gap-1 pl-3 pr-1.5 h-7 rounded-full bg-terracotta text-white text-[12.5px] font-medium hover:bg-terracotta-hover transition shadow-sm">
+                        Send
+                        <span class="w-5 h-5 rounded-full bg-white/15 grid place-items-center">
+                          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M5 8l3 3 4-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>`;
       const paneC=document.getElementById('pane-c');

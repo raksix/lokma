@@ -29,7 +29,9 @@ export default function App() {
   const [focusedPane, setFocusedPane] = useState<string>("a")
   const [extraPanes, setExtraPanes] = useState<PaneData[]>([])
   const [toast, setToast] = useState<string | null>(null)
+  const [tileLeftW, setTileLeftW] = useState(520)
   const dragRef = useRef<{ startX: number; startW: number; side: "left" | "right" } | null>(null)
+  const tileDragRef = useRef<{ startX: number; startW: number } | null>(null)
 
   useEffect(() => {
     const h = (e: Event) => {
@@ -69,8 +71,6 @@ export default function App() {
     const onUp = () => {
       document.body.classList.remove("resizing")
       if (dragRef.current) {
-        localStorage.setItem(dragRef.current.side === "left" ? "lokma-pane-left" : "lokma-pane-right", String(dragRef.current.side === "left" ? leftW : rightW))
-        // persist final width from state (need latest)
         setTimeout(() => {
           const lw = document.getElementById("pane-left-wrap")?.getBoundingClientRect().width
           const rw = document.getElementById("pane-right-wrap")?.getBoundingClientRect().width
@@ -79,6 +79,26 @@ export default function App() {
         }, 50)
       }
       dragRef.current = null
+      window.removeEventListener("mousemove", onMove)
+      window.removeEventListener("mouseup", onUp)
+    }
+    window.addEventListener("mousemove", onMove)
+    window.addEventListener("mouseup", onUp)
+  }
+
+  const startTileDrag = (e: React.MouseEvent) => {
+    e.preventDefault()
+    tileDragRef.current = { startX: e.clientX, startW: tileLeftW }
+    document.body.classList.add("resizing")
+    const onMove = (ev: MouseEvent) => {
+      if (!tileDragRef.current) return
+      const dx = ev.clientX - tileDragRef.current.startX
+      const nw = Math.max(320, Math.min(800, tileDragRef.current.startW + dx))
+      setTileLeftW(nw)
+    }
+    const onUp = () => {
+      document.body.classList.remove("resizing")
+      tileDragRef.current = null
       window.removeEventListener("mousemove", onMove)
       window.removeEventListener("mouseup", onUp)
     }
@@ -220,9 +240,13 @@ export default function App() {
                 </span>
               </div>
               <div className={`flex flex-1 min-h-0 overflow-hidden ${windowed ? "relative bg-[#FAF9F5] dark:bg-[#0F0F11] p-2 gap-2 flex-wrap content-start overflow-auto" : ""}`}>
-                <Pane id="a" initialTabs={[{ id: "tab-a-1", title: "Chat #482", content: <div className="space-y-3"><Card className="p-3 cursor-pointer" onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast",{detail:"Chat #482 — detay"}))}><div className="text-xs font-semibold">Aylin</div><div className="text-sm mt-1">Refactor auth middleware</div></Card><Card className="p-3 bg-[#262624] text-white cursor-pointer"><div className="text-xs font-semibold">Lokma</div><div className="text-sm mt-1">One hook, one decorator.</div></Card></div> }]} isFocused={focusedPane === "a"} onFocus={() => setFocusedPane("a")} onClosePane={() => {}} onSplit={() => setExtraPanes(p => [...p, { id: `pane-${Date.now()}`, title: "Split pane", content: <div className="p-3">Split pane</div> }])} />
-                {!windowed && <div className="w-1.5 bg-line hover:bg-[#CFC9BF] cursor-col-resize shrink-0 hidden lg:flex items-center justify-center"><span className="w-0.5 h-7 bg-zinc-300 rounded-full" /></div>}
-                <Pane id="b" initialTabs={[{ id: "tab-b-1", title: "auth.ts", content: <CodePaneContent /> }]} isFocused={focusedPane === "b"} onFocus={() => setFocusedPane("b")} onClosePane={() => {}} onSplit={() => setExtraPanes(p => [...p, { id: `pane-${Date.now()}`, title: "Split pane", content: <div className="p-3">Split</div> }])} />
+                <div style={!windowed ? { width: tileLeftW } : undefined} className={windowed ? "flex-1 min-w-[340px]" : "shrink-0 flex"}>
+                  <Pane id="a" initialTabs={[{ id: "tab-a-1", title: "Chat #482", content: <div className="space-y-3"><Card className="p-3 cursor-pointer" onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast",{detail:"Chat #482 — detay"}))}><div className="text-xs font-semibold">Aylin</div><div className="text-sm mt-1">Refactor auth middleware</div></Card><Card className="p-3 bg-[#262624] text-white cursor-pointer"><div className="text-xs font-semibold">Lokma</div><div className="text-sm mt-1">One hook, one decorator.</div></Card></div> }]} isFocused={focusedPane === "a"} onFocus={() => setFocusedPane("a")} onClosePane={() => {}} onSplit={() => setExtraPanes(p => [...p, { id: `pane-${Date.now()}`, title: "Split pane", content: <div className="p-3">Split pane</div> }])} />
+                </div>
+                {!windowed && <div onMouseDown={startTileDrag} onDoubleClick={() => setTileLeftW(520)} className="w-1 bg-line hover:bg-[#CFC9BF] dark:bg-[#232326] dark:hover:bg-[#3A3A3E] cursor-col-resize shrink-0 hidden lg:flex items-center justify-center group" title="Sürükle pane boyutlandır"><span className="w-0.5 h-7 bg-zinc-300 dark:bg-zinc-600 rounded-full opacity-0 group-hover:opacity-100 transition" /></div>}
+                <div className="flex-1 min-w-0 flex">
+                  <Pane id="b" initialTabs={[{ id: "tab-b-1", title: "auth.ts", content: <CodePaneContent /> }]} isFocused={focusedPane === "b"} onFocus={() => setFocusedPane("b")} onClosePane={() => {}} onSplit={() => setExtraPanes(p => [...p, { id: `pane-${Date.now()}`, title: "Split pane", content: <div className="p-3">Split</div> }])} />
+                </div>
                 {extraPanes.map(pane => (
                   <Pane key={pane.id} id={pane.id} initialTabs={[{ id: `tab-${pane.id}-1`, title: pane.title, content: pane.content }]} isFocused={focusedPane === pane.id} onFocus={() => setFocusedPane(pane.id)} onClosePane={() => setExtraPanes(prev => prev.filter(p => p.id !== pane.id))} onSplit={() => {}} />
                 ))}

@@ -176,6 +176,14 @@
 
       <!-- Right actions -->
       <div class="flex items-center gap-1 shrink-0">
+        <button onclick="openBrowserPane()" class="hidden md:inline-flex items-center gap-1.5 px-2.5 h-7 rounded-full bg-white border border-line text-[11.5px] font-medium hover:bg-muted transition" title="Harness Browser — AI kontrollü">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.2"/><path d="M3 8h10M8 3v10" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity=".4"/><path d="M3.5 5.5A6 6 0 0010 3M12.5 10.5A6 6 0 016 13" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
+          Browser
+        </button>
+        <button onclick="openMobilePane()" class="hidden md:inline-flex items-center gap-1.5 px-2.5 h-7 rounded-full bg-white border border-line text-[11.5px] font-medium hover:bg-muted transition" title="Mobil önizleme — RN web">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="5" y="2" width="6" height="12" rx="1.2" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="11.5" r="0.8" fill="currentColor"/><path d="M7 4h2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity=".5"/></svg>
+          Mobile
+        </button>
         <button class="hidden sm:inline-flex items-center gap-1.5 px-2.5 h-7 rounded-full bg-white border border-line text-[12.5px] font-medium hover:bg-zinc-50 transition">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
           New
@@ -749,171 +757,119 @@
     <!-- divider right -->
     <div id="div-right" class="pane-divider hidden xl:block"></div>
 
-    <!-- Right Inspector — glued to right edge -->
+    <!-- Right File Browser — sadece file browser (istek üzerine) -->
     <aside id="pane-right" class="pane hidden xl:flex w-[300px] shrink-0 border-l border-line bg-[#FDFCFB] flex-col overflow-hidden">
-      <div class="h-[36px] shrink-0 flex items-center justify-between px-3 border-b border-line/70">
-        <h2 class="font-serif text-[13px] tracking-tight">Inspector</h2>
+      <div class="h-8 shrink-0 flex items-center justify-between px-3 border-b border-line/70">
+        <h2 class="font-serif text-[13px] tracking-tight flex items-center gap-1.5">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" class="text-zinc-500"><path d="M3 3.5h2l1.5 1h5a1 1 0 011 1V12a1 1 0 01-1 1H3a1 1 0 01-1-1V4.5a1 1 0 011-1z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M5 6h6" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity=".7"/></svg>
+          Explorer
+        </h2>
         <div class="flex items-center gap-1">
-          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-white border border-line text-[10px] font-medium shadow-sm">
-            <span class="w-1 h-1 rounded-full bg-emerald-500"></span> Live
-          </span>
-          <button onclick="toggleRight()" class="w-6 h-6 grid place-items-center rounded-md hover:bg-white border border-transparent hover:border-line transition text-zinc-500" title="Kapat ]">
+          <button class="w-6 h-6 grid place-items-center rounded-md hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Yeni dosya">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M5 3.5h4l3 3v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-8a1 1 0 011-1z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 3.5v3h3" stroke="currentColor" stroke-width="1.2"/></svg>
+          </button>
+          <button onclick="toggleRight()" class="w-6 h-6 grid place-items-center rounded-md hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Kapat ]">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
         </div>
       </div>
-      <div class="flex-1 overflow-y-auto p-3 space-y-3">
-        <!-- Session -->
-        <div class="rounded-lg bg-white border border-line shadow-card overflow-hidden">
-          <div class="px-3 h-7 flex items-center justify-between border-b border-line bg-[#FDFCFB]">
-            <span class="text-[10.5px] font-semibold tracking-wide uppercase text-zinc-600">Session</span>
-            <button class="w-5 h-5 grid place-items-center rounded-md hover:bg-white border border-transparent hover:border-line transition">
-              <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="4" cy="8" r="1.2" fill="currentColor"/><circle cx="12" cy="8" r="1.2" fill="currentColor"/></svg>
-            </button>
-          </div>
-          <div class="p-3 space-y-2.5">
-            <div class="flex items-center gap-2.5">
-              <div class="w-8 h-8 rounded-lg bg-[#262624] text-white grid place-items-center text-[12px] font-medium">◐</div>
-              <div>
-                <div class="text-[12.5px] font-medium leading-none">lokma-web · main</div>
-                <div class="text-[10.5px] text-zinc-500 mt-0.5">482 · 9 msgs · 14:31</div>
-              </div>
-              <span class="ml-auto px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-medium">Healthy</span>
-            </div>
-            <div class="grid grid-cols-3 gap-1.5 text-center">
-              <div class="p-1.5 rounded-md bg-muted border border-line">
-                <div class="text-[14px] font-semibold leading-none">8</div>
-                <div class="text-[9px] tracking-widest uppercase text-zinc-500 mt-0.5">Tools</div>
-              </div>
-              <div class="p-1.5 rounded-md bg-muted border border-line">
-                <div class="text-[14px] font-semibold leading-none">3</div>
-                <div class="text-[9px] tracking-widest uppercase text-zinc-500 mt-0.5">Patches</div>
-              </div>
-              <div class="p-1.5 rounded-md bg-white border border-line">
-                <div class="text-[14px] font-semibold leading-none text-terracotta">2</div>
-                <div class="text-[9px] tracking-widest uppercase text-zinc-500 mt-0.5">Pending</div>
-              </div>
-            </div>
-            <div class="flex gap-1.5">
-              <button class="flex-1 h-7 rounded-md bg-[#262624] text-white text-[11.5px] font-medium hover:bg-black transition">View graph</button>
-              <button class="flex-1 h-7 rounded-md bg-white border border-line text-[11.5px] font-medium hover:bg-muted transition">Export</button>
-            </div>
-          </div>
+      <!-- Search files -->
+      <div class="px-2.5 py-2 shrink-0">
+        <div class="relative">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400"><circle cx="7" cy="7" r="3.8" stroke="currentColor" stroke-width="1.2"/><path d="M10 10l2.5 2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          <input id="file-search" placeholder="Dosya ara..." class="w-full h-7 pl-7 pr-3 rounded-md bg-white border border-line text-[12.5px] placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-terracotta/20 focus:border-terracotta/30" />
         </div>
-
-        <!-- Tools -->
-        <div class="rounded-lg bg-white border border-line shadow-card overflow-hidden">
-          <div class="px-3 h-7 flex items-center justify-between border-b border-line bg-[#FDFCFB]">
-            <span class="text-[10.5px] font-semibold tracking-wide uppercase text-zinc-600">Tools</span>
-            <span class="text-[10.5px] text-zinc-500">Last 15 min</span>
-          </div>
-          <div class="p-3 space-y-3">
-            <div class="flex gap-2.5">
-              <div class="flex flex-col items-center">
-                <span class="w-6 h-6 rounded-full bg-emerald-50 border border-emerald-200 grid place-items-center text-emerald-700">
-                  <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </span>
-                <span class="w-px flex-1 bg-line mt-1"></span>
+      </div>
+      <!-- Breadcrumb -->
+      <div class="px-3 py-1.5 flex items-center gap-1 text-[11px] text-zinc-500 border-y border-line/50 bg-[#FDFCFB] shrink-0">
+        <span class="px-1.5 py-0.5 rounded bg-white border border-line text-zinc-700">lokma</span>
+        <span>›</span>
+        <span class="text-zinc-700">plugins</span>
+        <span>›</span>
+        <span class="text-ink font-medium">auth.ts</span>
+      </div>
+      <!-- File tree -->
+      <div class="flex-1 overflow-y-auto p-2 space-y-0.5 text-[12.5px]" id="file-tree">
+        <div class="file-group" data-open="true">
+          <button onclick="toggleFileGroup(this)" class="w-full flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-white text-zinc-700 font-medium">
+            <svg class="w-3 h-3 text-zinc-400" viewBox="0 0 12 12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" class="text-amber-600"><path d="M3 3.5h2l1.5 1h5a1 1 0 011 1V12a1 1 0 01-1 1H3a1 1 0 01-1-1V4.5a1 1 0 011-1z" fill="currentColor" opacity=".15" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>
+            lokma-web
+            <span class="ml-auto text-[10px] text-zinc-400">12</span>
+          </button>
+          <div class="ml-2 pl-3 border-l border-line/40 space-y-0.5 mt-0.5">
+            <div class="file-group" data-open="true">
+              <button onclick="toggleFileGroup(this)" class="w-full flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-white text-zinc-700">
+                <svg class="w-3 h-3 text-zinc-400" viewBox="0 0 12 12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" class="text-amber-500"><path d="M3 3.5h2l1.5 1h5a1 1 0 011 1V12a1 1 0 01-1 1H3a1 1 0 01-1-1V4.5a1 1 0 011-1z" fill="currentColor" opacity=".15" stroke="currentColor" stroke-width="1.1"/></svg>
+                plugins
+              </button>
+              <div class="ml-3 pl-2 border-l border-line/40 space-y-0.5">
+                <a href="#" draggable="true" class="file-item flex items-center gap-2 px-1.5 py-1 rounded bg-[#FDF0E6] border border-[#F2D5C2] text-terracotta">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M5 3.5h4l3 3v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-8a1 1 0 011-1z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/><path d="M9 3.5v3h3" stroke="currentColor" stroke-width="1.1"/></svg>
+                  <span class="flex-1 truncate font-medium">auth.ts</span>
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                </a>
+                <a href="#" draggable="true" class="file-item flex items-center gap-2 px-1.5 py-1 rounded hover:bg-white hover:border hover:border-line border border-transparent">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M5 3.5h4l3 3v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-8a1 1 0 011-1z" stroke="currentColor" stroke-width="1.1"/><path d="M9 3.5v3h3" stroke="currentColor" stroke-width="1.1"/></svg>
+                  <span class="truncate">rate-limit.ts</span>
+                  <span class="ml-auto text-[10px] px-1 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-700">+18</span>
+                </a>
+                <a href="#" draggable="true" class="file-item flex items-center gap-2 px-1.5 py-1 rounded hover:bg-white hover:border hover:border-line border border-transparent text-zinc-600">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M5 3.5h4l3 3v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-8a1 1 0 011-1z" stroke="currentColor" stroke-width="1.1"/><path d="M9 3.5v3h3" stroke="currentColor" stroke-width="1.1"/></svg>
+                  <span class="truncate">jwt.ts</span>
+                </a>
               </div>
-              <div class="flex-1 pb-1">
-                <div class="text-[12px] font-medium leading-none">read · plugins/auth.ts</div>
-                <div class="text-[11px] text-zinc-500 mt-0.5">240 ms · found existing guard</div>
-              </div>
-              <span class="text-[10.5px] text-zinc-400">14:32</span>
             </div>
-            <div class="flex gap-2.5">
-              <div class="flex flex-col items-center">
-                <span class="w-6 h-6 rounded-full bg-amber-50 border border-amber-200 grid place-items-center text-amber-700">
-                  <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M8 3v5l3 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="8" r="5.2" stroke="currentColor" stroke-width="1.2"/></svg>
-                </span>
-                <span class="w-px flex-1 bg-line mt-1"></span>
-              </div>
-              <div class="flex-1 pb-1">
-                <div class="text-[12px] font-medium leading-none">write · plugins/auth.ts</div>
-                <div class="text-[11px] text-zinc-500 mt-0.5">Patch ready — awaiting approval</div>
-                <div class="mt-1.5 flex gap-1">
-                  <span class="px-1.5 py-0.5 rounded-md bg-terracotta/10 border border-terracotta/20 text-terracotta text-[10.5px] font-medium">+18 −4</span>
-                  <span class="px-1.5 py-0.5 rounded-md bg-white border border-line text-[10.5px]">View diff</span>
-                </div>
-              </div>
-              <span class="text-[10.5px] text-zinc-400">14:32</span>
-            </div>
-            <div class="flex gap-2.5">
-              <span class="w-6 h-6 rounded-full bg-white border border-line grid place-items-center text-zinc-500">
-                <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="currentColor" stroke-width="1.2"/><path d="M8 5.5v3.2l2.2 1.3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-              </span>
-              <div class="flex-1">
-                <div class="text-[12px] font-medium leading-none text-zinc-600">test · auth.spec.ts</div>
-                <div class="text-[11px] text-zinc-500 mt-0.5">Queued · after apply</div>
-              </div>
-              <span class="text-[10.5px] text-zinc-400">—</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Artifacts -->
-        <div class="rounded-lg bg-white border border-line shadow-card overflow-hidden">
-          <div class="px-3 h-7 flex items-center justify-between border-b border-line bg-[#FDFCFB]">
-            <span class="text-[10.5px] font-semibold tracking-wide uppercase text-zinc-600">Artifacts</span>
-            <span class="px-1.5 py-0.5 rounded-full bg-muted border border-line text-[10px]">2</span>
-          </div>
-          <div class="divide-y divide-line">
-            <a href="#" class="flex items-center gap-2.5 p-2.5 hover:bg-muted/50 transition">
-              <span class="w-7 h-7 rounded-md bg-[#FDF0E6] border border-[#F2D5C2] grid place-items-center text-terracotta">
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M5 3.5h4l3 3v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-8a1 1 0 011-1z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 3.5v3h3" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
-              </span>
-              <div class="min-w-0">
-                <div class="text-[12px] font-medium leading-none truncate">plugins/auth.ts</div>
-                <div class="text-[10.5px] text-zinc-500">Modified · 18 additions</div>
-              </div>
-              <span class="ml-auto w-5 h-5 rounded-full bg-white border border-line grid place-items-center">
-                <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              </span>
+            <a href="#" draggable="true" class="file-item flex items-center gap-2 px-1.5 py-1 rounded hover:bg-white hover:border hover:border-line border border-transparent">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M5 3.5h4l3 3v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-8a1 1 0 011-1z" stroke="currentColor" stroke-width="1.1"/><path d="M9 3.5v3h3" stroke="currentColor" stroke-width="1.1"/></svg>
+              <span class="truncate">app.ts</span>
             </a>
-            <a href="#" class="flex items-center gap-2.5 p-2.5 hover:bg-muted/50 transition">
-              <span class="w-7 h-7 rounded-md bg-zinc-50 border border-line grid place-items-center text-zinc-600">
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M5.5 8h5M8 5.5v5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-              </span>
-              <div class="min-w-0">
-                <div class="text-[12px] font-medium leading-none truncate">auth.spec.ts</div>
-                <div class="text-[10.5px] text-zinc-500">Proposed · not yet created</div>
-              </div>
-              <span class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 font-medium">Draft</span>
+            <a href="#" draggable="true" class="file-item flex items-center gap-2 px-1.5 py-1 rounded hover:bg-white hover:border hover:border-line border border-transparent">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="1.2" stroke="currentColor" stroke-width="1.1"/><path d="M5 6h6M5 8.5h6M5 11h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
+              <span class="truncate">package.json</span>
             </a>
           </div>
-          <div class="p-2 bg-[#FDFCFB] border-t border-line">
-            <button class="w-full h-7 rounded-md bg-white border border-line text-[11.5px] font-medium hover:bg-muted transition">Open in editor</button>
+        </div>
+        <div class="file-group" data-open="false">
+          <button onclick="toggleFileGroup(this)" class="w-full flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-white text-zinc-600">
+            <svg class="w-3 h-3 text-zinc-400 -rotate-90 transition-transform" viewBox="0 0 12 12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" class="text-amber-600"><path d="M3 3.5h2l1.5 1h5a1 1 0 011 1V12a1 1 0 01-1 1H3a1 1 0 01-1-1V4.5a1 1 0 011-1z" fill="currentColor" opacity=".15" stroke="currentColor" stroke-width="1.1"/></svg>
+            Docs
+          </button>
+          <div class="hidden ml-2 pl-3 border-l border-line/40 space-y-0.5 mt-0.5">
+            <a href="/docs.html" draggable="true" class="file-item flex items-center gap-2 px-1.5 py-1 rounded hover:bg-white border border-transparent text-[12px]">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="1.2" stroke="currentColor" stroke-width="1.1"/><path d="M5 7h6M5 9.5h6" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
+              00-LOKMA-KONTEKST.md
+            </a>
+            <a href="#" class="file-item flex items-center gap-2 px-1.5 py-1 rounded hover:bg-white border border-transparent text-[12px]"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="1.2" stroke="currentColor" stroke-width="1.1"/></svg> 21-WEB-HARNESS.md</a>
+            <a href="#" class="file-item flex items-center gap-2 px-1.5 py-1 rounded hover:bg-white border border-transparent text-[12px]"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="1.2" stroke="currentColor" stroke-width="1.1"/></svg> 36-AUTH.md</a>
           </div>
         </div>
-
-        <!-- Context -->
-        <div class="rounded-lg bg-white border border-line shadow-card overflow-hidden">
-          <div class="px-3 h-7 flex items-center border-b border-line bg-[#FDFCFB]">
-            <span class="text-[10.5px] font-semibold tracking-wide uppercase text-zinc-600">Context</span>
-          </div>
-          <div class="p-3 space-y-2.5">
-            <div class="flex items-center justify-between text-[11.5px]">
-              <span class="text-zinc-500">Tokens</span>
-              <span class="font-mono font-medium">8.2k / 128k</span>
-            </div>
-            <div class="h-1 rounded-full bg-muted overflow-hidden">
-              <div class="h-full w-[14%] bg-terracotta rounded-full"></div>
-            </div>
-            <div class="flex gap-1">
-              <span class="flex-1 text-center px-1.5 py-1 rounded-md bg-muted border border-line text-[10.5px]">temp 0.2</span>
-              <span class="flex-1 text-center px-1.5 py-1 rounded-md bg-muted border border-line text-[10.5px]">top-p 0.95</span>
-              <span class="flex-1 text-center px-1.5 py-1 rounded-md bg-white border border-line text-[10.5px] font-medium">stream</span>
-            </div>
+        <div class="file-group" data-open="false">
+          <button onclick="toggleFileGroup(this)" class="w-full flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-white text-zinc-600">
+            <svg class="w-3 h-3 text-zinc-400 -rotate-90 transition-transform" viewBox="0 0 12 12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" class="text-zinc-500"><path d="M5 3.5h4l3 3v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-8a1 1 0 011-1z" stroke="currentColor" stroke-width="1.1"/></svg>
+            .lokma
+          </button>
+          <div class="hidden ml-2 pl-3 border-l border-line/40 space-y-0.5 mt-0.5">
+            <a href="#" class="file-item flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-white border border-transparent text-[11px] font-mono">sessions/482.jsonl</a>
+            <a href="#" class="file-item flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-white border border-transparent text-[11px] font-mono">config.json</a>
           </div>
         </div>
-
-        <div class="rounded-lg border border-dashed border-line-strong bg-white/60 p-2.5">
-          <div class="text-[11.5px] font-medium">Need something else?</div>
-          <div class="text-[11.5px] text-zinc-500 mt-0.5">Run tests, open a PR, or explain the diff.</div>
-          <div class="flex gap-1.5 mt-2">
-            <button class="flex-1 h-6 rounded-md bg-white border border-line text-[11.5px] font-medium hover:bg-muted transition">Run tests</button>
-            <button class="flex-1 h-6 rounded-md bg-terracotta text-white text-[11.5px] font-medium hover:bg-terracotta-hover transition">Create PR</button>
+      </div>
+      <!-- File preview footer -->
+      <div class="shrink-0 border-t border-line bg-[#FDFCFB] p-2">
+        <div class="rounded-md bg-white border border-line p-2">
+          <div class="text-[11px] font-mono text-zinc-500">auth.ts — 18 additions</div>
+          <div class="mt-1 flex gap-1.5">
+            <button class="flex-1 h-6 rounded bg-[#262624] text-white text-[11px] font-medium">Open</button>
+            <button class="flex-1 h-6 rounded bg-white border border-line text-[11px]">Reveal</button>
           </div>
+        </div>
+        <div class="mt-2 flex items-center gap-1.5 text-[11px] text-zinc-500">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Git · 2 modified
+          <span class="ml-auto">LF · TS</span>
         </div>
       </div>
     </aside>
@@ -1085,7 +1041,189 @@
     });
   }
 
+  // --- File browser (right) ---
+  window.toggleFileGroup = function(btn){
+    const grp = btn.closest('.file-group');
+    const list = grp.querySelector('div');
+    const arrow = btn.querySelector('svg');
+    const isOpen = grp.dataset.open === "true";
+    grp.dataset.open = isOpen ? "false" : "true";
+    if(isOpen){ list.classList.add('hidden'); if(arrow) arrow.classList.add('-rotate-90'); }
+    else { list.classList.remove('hidden'); if(arrow) arrow.classList.remove('-rotate-90'); }
+  };
+  const fileSearch = document.getElementById('file-search');
+  if(fileSearch){
+    fileSearch.addEventListener('input', ()=>{
+      const q = fileSearch.value.toLowerCase().trim();
+      document.querySelectorAll('#file-tree .file-item').forEach(a=>{
+        const t = a.innerText.toLowerCase();
+        a.style.display = !q || t.includes(q) ? '' : 'none';
+      });
+      // hide empty groups
+      document.querySelectorAll('#file-tree .file-group').forEach(g=>{
+        const vis = Array.from(g.querySelectorAll('.file-item')).some(a=> a.style.display !== 'none');
+        // don't hide top-level if search empty
+        if(!q) g.style.display='';
+        else g.style.display = vis ? '' : 'none';
+        if(vis) g.querySelector('div')?.classList.remove('hidden');
+      });
+    });
+  }
+  // file items open as pane on click
+  document.querySelectorAll('#file-tree .file-item').forEach(a=>{
+    a.addEventListener('click', (e)=>{
+      e.preventDefault();
+      const name = a.innerText.trim().split('\n')[0].slice(0,30);
+      const html = `<div class="font-mono text-[12px]"><div class="text-zinc-500">// ${name}</div><pre class="mt-2 p-2 bg-muted rounded border border-line overflow-auto">/* file preview: ${name} */\nexport const demo = true;</pre></div>`;
+      if(typeof window.createPaneFromDrag === 'function'){
+        // use internal create
+        const title = name;
+        // fallback create via global
+        const evt = { preventDefault:()=>{} };
+        // directly call create
+        const grid=document.getElementById('tiling-grid');
+        if(grid){
+          // ensure tiling visible
+          if(document.getElementById('tiling-view').classList.contains('hidden')) window.toggleTiling(true);
+          const pane=document.createElement('div');
+          pane.className='tiling-pane flex flex-col min-w-[300px] flex-1 bg-[#FAF9F5] border-l border-line overflow-hidden';
+          pane.innerHTML=`
+            <div class="h-7 flex items-center gap-1.5 px-2.5 border-b border-line/60 bg-[#FDFCFB] shrink-0">
+              <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+              <span class="text-[11px] font-mono truncate">${name.replace(/</g,'&lt;')}</span>
+              <span class="ml-auto flex gap-1"><button onclick="closePane(this)" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500">×</button></span>
+            </div>
+            <div class="flex-1 overflow-y-auto p-3 bg-white"><pre class="text-[12px] leading-5 font-mono">${html}</pre></div>`;
+          const paneC=document.getElementById('pane-c');
+          if(paneC && paneC.parentNode===grid) grid.insertBefore(pane, paneC); else grid.appendChild(pane);
+        }
+      }
+    });
+  });
+
+  // --- Harness Browser (AI kontrollü) + Mobile Preview ---
+  window.openBrowserPane = function(url){
+    const target = url || 'https://lokma-concept.fermag.com.tr/docs.html';
+    if(document.getElementById('tiling-view').classList.contains('hidden')) window.toggleTiling(true);
+    const grid=document.getElementById('tiling-grid');
+    const pane=document.createElement('div');
+    pane.className='tiling-pane flex flex-col min-w-[420px] flex-[1.4] bg-white border-l border-line overflow-hidden';
+    const safeUrl = target.replace(/"/g,'&quot;');
+    pane.innerHTML=`
+            <div class="h-7 flex items-center gap-1 px-2 border-b border-line/60 bg-[#FDFCFB] shrink-0">
+              <span class="w-5 h-5 rounded-md bg-white border border-line grid place-items-center text-zinc-600"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.2"/><path d="M3 8h10M8 3v10" stroke="currentColor" stroke-width="1.1" opacity=".4"/></svg></span>
+              <span class="text-[11px] font-medium">Browser — harness page</span>
+              <span class="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px]">AI visible</span>
+              <span class="ml-auto flex gap-1">
+                <button onclick="this.closest('.tiling-pane').querySelector('iframe').src=this.closest('.tiling-pane').querySelector('iframe').src" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Yenile">↻</button>
+                <button onclick="closePane(this)" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500">×</button>
+              </span>
+            </div>
+            <div class="flex items-center gap-1 px-2 py-1.5 bg-[#FDFCFB] border-b border-line shrink-0">
+              <button class="w-6 h-6 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Geri">‹</button>
+              <button class="w-6 h-6 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="İleri">›</button>
+              <div class="flex-1 flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-white border border-line">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" class="text-emerald-500 shrink-0"><path d="M8 3.5a4 4 0 014 4M8 11.5a4 4 0 01-4-4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/></svg>
+                <input value="${safeUrl}" class="flex-1 bg-transparent text-[12px] focus:outline-none" onkeydown="if(event.key==='Enter'){this.closest('.tiling-pane').querySelector('iframe').src=this.value}" />
+                <span class="text-[10px] px-1 py-0.5 rounded bg-muted border border-line">AI kontroller</span>
+              </div>
+            </div>
+            <div class="flex-1 bg-zinc-100 relative overflow-hidden">
+              <iframe src="${safeUrl}" class="w-full h-full border-0 bg-white" sandbox="allow-scripts allow-same-origin allow-forms" loading="lazy"></iframe>
+              <div class="absolute top-2 right-2 px-2 py-1 rounded-full bg-[#262624] text-white text-[10px] font-medium shadow">AI görüyor & kontrol ediyor</div>
+            </div>
+            <div class="h-6 flex items-center gap-2 px-2 bg-[#FDFCFB] border-t border-line text-[11px] text-zinc-500">
+              <span>harness page — pane olarak browser</span>
+              <span class="ml-auto">1280×720 · 60fps</span>
+            </div>`;
+    const paneC=document.getElementById('pane-c');
+    if(paneC && paneC.parentNode===grid) grid.insertBefore(pane, paneC); else grid.appendChild(pane);
+  };
+  window.openMobilePane = function(){
+    if(document.getElementById('tiling-view').classList.contains('hidden')) window.toggleTiling(true);
+    const grid=document.getElementById('tiling-grid');
+    const pane=document.createElement('div');
+    pane.className='tiling-pane flex flex-col min-w-[360px] max-w-[420px] bg-[#FAF9F5] border-l border-line overflow-hidden';
+    pane.innerHTML=`
+            <div class="h-7 flex items-center gap-1.5 px-2.5 border-b border-line/60 bg-[#FDFCFB] shrink-0">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+              <span class="text-[11px] font-medium">Mobile — RN preview (web)</span>
+              <span class="ml-auto flex items-center gap-1">
+                <span class="px-1.5 py-0.5 rounded-full bg-white border border-line text-[10px]">iOS</span>
+                <span class="px-1.5 py-0.5 rounded-full bg-muted border border-line text-[10px]">Android</span>
+                <button onclick="closePane(this)" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500 ml-1">×</button>
+              </span>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 bg-zinc-100 flex justify-center">
+              <div class="w-[300px] h-[620px] bg-[#0F0F11] rounded-[28px] border-[8px] border-[#1E1E21] shadow-2xl overflow-hidden relative flex flex-col">
+                <div class="h-6 bg-black flex items-center justify-center"><span class="w-16 h-1 rounded-full bg-zinc-700"></span></div>
+                <div class="flex-1 bg-white p-3 overflow-y-auto">
+                  <div class="w-full h-8 rounded-full bg-muted border border-line flex items-center px-3 text-[12px] text-zinc-500">Lokma mobil — web üzerinden RN</div>
+                  <div class="mt-3 space-y-2">
+                    <div class="h-20 rounded-xl bg-terracotta text-white p-3"><div class="text-[12px] font-semibold">Hoş geldin, Aylin</div><div class="text-[11px] opacity-90">Mobil harness aynı session ile senkron</div></div>
+                    <div class="p-2 rounded-lg bg-white border border-line"><div class="text-[12px] font-medium">Chat #482</div><div class="text-[11px] text-zinc-500">Pane olarak sürükle · browser ile senkron</div></div>
+                    <div class="p-2 rounded-lg bg-white border border-line"><div class="text-[12px] font-medium">Browser pane</div><div class="text-[11px] text-zinc-500">AI aynı page'i görüyor</div></div>
+                  </div>
+                  <div class="mt-4 p-2 rounded-lg bg-[#FDF0E6] border border-[#F2D5C2] text-[11px]">Bu web üzerinden açılan RN web görünümü — gerçek RN build aynı API ile konuşur.</div>
+                </div>
+                <div class="h-8 bg-white border-t border-line flex items-center justify-around text-[10px] text-zinc-500"><span>● Chat</span><span>Sessions</span><span>Profile</span></div>
+              </div>
+            </div>
+            <div class="shrink-0 p-2 border-t border-line bg-white/90">
+              <div class="flex gap-1.5">
+                <input placeholder="Mobil pane'e yaz..." class="flex-1 h-7 px-2.5 rounded-full bg-white border border-line text-[13px]" />
+                <button class="px-3 h-7 rounded-full bg-[#262624] text-white text-[12px]">Send</button>
+              </div>
+            </div>`;
+    const paneC=document.getElementById('pane-c');
+    if(paneC && paneC.parentNode===grid) grid.insertBefore(pane, paneC); else grid.appendChild(pane);
+  };
+
+  // --- Doküman araştırması (Docs RAG mock) ---
+  (function(){
+    // docs.html page has grid, add search if on docs
+    const docsSearchId = 'docs-search';
+    // if on docs page, inject search bar above grid
+    const docsGrid = document.querySelector('a[href="#"]')?.closest('.grid');
+    // simpler: if current page is docs.html, add search input via JS
+    if(location.pathname.includes('docs')){
+      const container = document.querySelector('.max-w-\[820px\]');
+      if(container && !document.getElementById(docsSearchId)){
+        const bar = document.createElement('div');
+        bar.className='mb-4 p-2 rounded-xl bg-white border border-line shadow-sm flex gap-2 items-center';
+        bar.innerHTML=`
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" class="text-zinc-400 ml-1"><circle cx="7" cy="7" r="4.2" stroke="currentColor" stroke-width="1.3"/><path d="M10.2 10.2L13 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          <input id="${docsSearchId}" placeholder="Dokümanlarda ara — örn: pane system, auth, RBAC..." class="flex-1 bg-transparent text-[13px] placeholder:text-zinc-400 focus:outline-none" />
+          <button class="px-3 py-1 rounded-full bg-terracotta text-white text-[12px] font-medium">Ara</button>
+          <button class="px-3 py-1 rounded-full bg-white border border-line text-[12px]">Ask Docs</button>
+        `;
+        container.prepend(bar);
+        const input = bar.querySelector('input');
+        const askBtn = bar.querySelectorAll('button')[1];
+        function doSearch(){
+          const q=input.value.toLowerCase().trim();
+          document.querySelectorAll('.grid a').forEach(a=>{
+            const t=a.innerText.toLowerCase();
+            a.style.display=!q||t.includes(q)?'':'none';
+          });
+        }
+        input.addEventListener('input', doSearch);
+        bar.querySelector('button').addEventListener('click', doSearch);
+        askBtn.addEventListener('click', ()=>{
+          const q=input.value.trim();
+          if(!q) return;
+          const res=document.createElement('div');
+          res.className='mt-3 p-3 rounded-xl bg-[#FDF0E6] border border-[#F2D5C2] text-[13px] leading-5';
+          res.innerHTML=`<div class="font-medium text-terracotta">Docs araştırması — "${q.replace(/</g,'&lt;')}"</div><div class="mt-1 text-zinc-700">En alakalı: <b>24-WEB-PANE-SYSTEM</b> ve <b>36-AUTH</b>. Pane sistemi sidebars + browser + mobile ile entegre; harness page olarak browser AI tarafından görülebilir, mobile web üzerinden RN preview ile senkron.</div><div class="mt-2 text-[11px] text-zinc-500">Mock RAG — gerçek entegrasyonda vault + FTS5 + embeddings ile çalışır.</div>`;
+          bar.after(res);
+        });
+      }
+    }
+    // also add global docs quick ask in header search? (optional)
+  })();
+
   // --- Dark theme toggle ---
+
   (function(){
     const html = document.documentElement;
     const btn = document.getElementById('theme-toggle');

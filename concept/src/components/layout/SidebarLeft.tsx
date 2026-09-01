@@ -13,7 +13,7 @@ export function SidebarLeft({ onOpenTab }: { onOpenTab: (title: string, content:
   const toast = (msg: string) => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: msg }))
 
   return (
-    <aside className="w-[268px] shrink-0 border-r border-line bg-[#FDFCFB] dark:bg-[#161618] flex flex-col overflow-hidden">
+    <aside className="w-full border-r border-line bg-[#FDFCFB] dark:bg-[#161618] flex flex-col overflow-hidden">
       <div className="flex items-center gap-1 px-2 h-8 border-b border-line/80 shrink-0">
         <Button variant="ink" size="sm" className="h-6 px-2.5 text-[11px]" onClick={() => toast("Sessions — buradasın")}>SESSIONS</Button>
         <Button variant="ghost" size="sm" className="h-6 px-2.5 text-[11px] text-zinc-500" onClick={() => onOpenTab("Bots", <div className="p-3">Bots — yakında</div>)}>BOTS</Button>

@@ -12,7 +12,7 @@ export function FileBrowser({ onOpenFile }: { onOpenFile: (name: string) => void
   const toast = (msg: string) => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: msg }))
 
   return (
-    <aside className="w-[300px] shrink-0 border-l border-line bg-[#FDFCFB] dark:bg-[#161618] flex flex-col overflow-hidden">
+    <aside className="w-full border-l border-line bg-[#FDFCFB] dark:bg-[#161618] flex flex-col overflow-hidden">
       <div className="h-8 flex items-center justify-between px-3 border-b border-line/70 shrink-0">
         <span className="font-serif text-xs flex items-center gap-1.5">
           <Folder className="w-3 h-3 text-zinc-500" /> Explorer

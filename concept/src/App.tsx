@@ -17,6 +17,11 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 
 type PaneData = { id: string; title: string; content: React.ReactNode }
+type LayoutNode =
+  | { type: "pane"; id: string }
+  | { type: "split"; id: string; dir: "row" | "col"; sizes: number[]; children: LayoutNode[] }
+
+const genId = () => `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`
 
 export default function App() {
   const [leftCollapsed, setLeftCollapsed] = useState(false)
@@ -37,14 +42,21 @@ export default function App() {
   const [extraPanes, setExtraPanes] = useState<PaneData[]>([])
   const [toast, setToast] = useState<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
-  const [tileLeftW, setTileLeftW] = useState(520)
   const [windowPos, setWindowPos] = useState<Record<string, { x: number; y: number; w: number; h: number }>>({
     a: { x: 8, y: 8, w: 480, h: 520 },
     b: { x: 504, y: 8, w: 480, h: 520 },
   })
-  const [maximized, setMaximized] = useState<string | null>(null)
+  const [layout, setLayout] = useState<LayoutNode>({
+    type: "split",
+    id: "root",
+    dir: "row",
+    sizes: [50, 50],
+    children: [
+      { type: "pane", id: "a" },
+      { type: "pane", id: "b" },
+    ],
+  })
   const dragRef = useRef<{ startX: number; startW: number; side: "left" | "right" } | null>(null)
-  const tileDragRef = useRef<{ startX: number; startW: number } | null>(null)
   const winDragRef = useRef<{ id: string; sx: number; sy: number; ox: number; oy: number } | null>(null)
 
   useEffect(() => {
@@ -54,21 +66,23 @@ export default function App() {
         const j = JSON.parse(saved)
         if (j.leftW) setLeftW(j.leftW)
         if (j.rightW) setRightW(j.rightW)
-        if (j.tileLeftW) setTileLeftW(j.tileLeftW)
         if (typeof j.tiling === "boolean") setTiling(j.tiling)
         if (typeof j.windowed === "boolean") setWindowed(j.windowed)
+        if (j.layout) setLayout(j.layout)
       } catch {}
     }
   }, [])
 
   const saveLayout = () => {
-    localStorage.setItem("lokma:layout:v1", JSON.stringify({ leftW, rightW, tileLeftW, tiling, windowed, ts: Date.now() }))
-    window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Layout kaydedildi" }))
+    localStorage.setItem("lokma:layout:v1", JSON.stringify({ leftW, rightW, tiling, windowed, layout, ts: Date.now() }))
+    window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Layout kaydedildi — row/col split korundu" }))
   }
   const resetLayout = () => {
     localStorage.removeItem("lokma:layout:v1")
-    setLeftW(268); setRightW(300); setTileLeftW(520); setTiling(false); setWindowed(false); setMaximized(null)
-    window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Layout sıfırlandı" }))
+    setLeftW(268); setRightW(300); setTiling(false); setWindowed(false)
+    setLayout({ type: "split", id: "root", dir: "row", sizes: [50, 50], children: [{ type: "pane", id: "a" }, { type: "pane", id: "b" }] })
+    setExtraPanes([])
+    window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Layout sıfırlandı — dikey/yatay split reset" }))
   }
 
   useEffect(() => {
@@ -130,26 +144,6 @@ export default function App() {
     window.addEventListener("mouseup", onUp)
   }
 
-  const startTileDrag = (e: React.MouseEvent) => {
-    e.preventDefault()
-    tileDragRef.current = { startX: e.clientX, startW: tileLeftW }
-    document.body.classList.add("resizing")
-    const onMove = (ev: MouseEvent) => {
-      if (!tileDragRef.current) return
-      const dx = ev.clientX - tileDragRef.current.startX
-      const nw = Math.max(320, Math.min(800, tileDragRef.current.startW + dx))
-      setTileLeftW(nw)
-    }
-    const onUp = () => {
-      document.body.classList.remove("resizing")
-      tileDragRef.current = null
-      window.removeEventListener("mousemove", onMove)
-      window.removeEventListener("mouseup", onUp)
-    }
-    window.addEventListener("mousemove", onMove)
-    window.addEventListener("mouseup", onUp)
-  }
-
   const startWindowDrag = (e: React.MouseEvent, id: string) => {
     const pos = windowPos[id]
     if (!pos) return
@@ -176,16 +170,131 @@ export default function App() {
     setWindowPos(prev => ({ ...prev, [id]: { x: 8 + (n % 3) * 28, y: 8 + (n % 3) * 28, w: 420, h: 380 } }))
   }
 
+  // ——— layout tree helpers ———
+  const splitPane = (targetId: string, dir: "row" | "col") => {
+    const newId = genId()
+    ensureWindowPos(newId)
+    const newPane: LayoutNode = { type: "pane", id: newId }
+    // also add to extraPanes for rendering content mapping
+    setExtraPanes(prev => [...prev, { id: newId, title: `Pane ${newId.slice(2, 6)}`, content: <div className="p-3 text-sm">{dir === "row" ? "Yatay bölme" : "Dikey bölme"} — {newId} · sürükle resize et</div> }])
+    const recur = (node: LayoutNode): LayoutNode => {
+      if (node.type === "pane") {
+        if (node.id === targetId) {
+          return { type: "split", id: `s-${Date.now()}`, dir, sizes: [50, 50], children: [node, newPane] }
+        }
+        return node
+      }
+      return { ...node, children: node.children.map(recur) }
+    }
+    setLayout(prev => recur(prev))
+    setFocusedPane(newId)
+    window.dispatchEvent(new CustomEvent("lokma-toast", { detail: `${dir === "row" ? "Yatay" : "Dikey"} bölündü: ${targetId} → ${newId}` }))
+  }
+
+  const closePane = (targetId: string) => {
+    if (targetId === "a" || targetId === "b") {
+      window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Ana pane kapatılamaz — tab kapat" }))
+      return
+    }
+    const recur = (node: LayoutNode): LayoutNode | null => {
+      if (node.type === "pane") return node.id === targetId ? null : node
+      const children = node.children.map(recur).filter(Boolean) as LayoutNode[]
+      if (children.length === 0) return null
+      if (children.length === 1) return children[0]
+      // normalize sizes
+      const sizes = node.sizes.slice(0, children.length)
+      while (sizes.length < children.length) sizes.push(100 / children.length)
+      const sum = sizes.reduce((a, b) => a + b, 0)
+      return { ...node, children, sizes: sizes.map(s => (s / sum) * 100) }
+    }
+    setLayout(prev => {
+      const next = recur(prev)
+      return (next as LayoutNode) || { type: "split", id: "root", dir: "row", sizes: [50, 50], children: [{ type: "pane", id: "a" }, { type: "pane", id: "b" }] }
+    })
+    setExtraPanes(prev => prev.filter(p => p.id !== targetId))
+  }
+
   const handleOpenTab = (title: string, content: React.ReactNode) => {
     if (!tiling) setTiling(true)
-    const id = `extra-${Date.now()}`
+    const id = genId()
     ensureWindowPos(id)
     setExtraPanes(prev => [...prev, { id, title, content }])
+    // add as new pane in layout (append to root)
+    setLayout(prev => {
+      if (prev.type === "split") {
+        return { ...prev, children: [...prev.children, { type: "pane", id }], sizes: [...prev.sizes, 50].map((s, i, arr) => (s / arr.reduce((a, b) => a + b, 0)) * 100) }
+      }
+      return { type: "split", id: "root", dir: "row", sizes: [50, 50], children: [prev, { type: "pane", id }] }
+    })
     setFocusedPane(id)
   }
 
   const handleOpenFile = (name: string) => {
     handleOpenTab(name, <div className="font-mono text-xs p-3">File preview: {name}<pre className="mt-2 p-2 bg-muted rounded border border-line">export const demo = true;</pre></div>)
+  }
+
+  // render helpers for tiling tree
+  const renderPaneById = (id: string) => {
+    if (id === "a") return <Pane key={id} id={id} initialTabs={[{ id: "tab-a-1", title: "Chat #482", content: <div className="space-y-3"><Card className="p-3 cursor-pointer" onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast",{detail:"Chat #482 — detay"}))}><div className="text-xs font-semibold">Aylin</div><div className="text-sm mt-1">Refactor auth middleware</div></Card><Card className="p-3 bg-[#262624] text-white cursor-pointer"><div className="text-xs font-semibold">Lokma</div><div className="text-sm mt-1">One hook, one decorator.</div></Card></div> }]} isFocused={focusedPane === id} onFocus={() => setFocusedPane(id)} onClosePane={() => closePane(id)} onSplit={dir => splitPane(id, dir)} />
+    if (id === "b") return <Pane key={id} id={id} initialTabs={[{ id: "tab-b-1", title: "auth.ts", content: <CodePaneContent /> }]} isFocused={focusedPane === id} onFocus={() => setFocusedPane(id)} onClosePane={() => closePane(id)} onSplit={dir => splitPane(id, dir)} />
+    const extra = extraPanes.find(p => p.id === id)
+    if (extra) return <Pane key={id} id={id} initialTabs={[{ id: `tab-${id}-1`, title: extra.title, content: extra.content }]} isFocused={focusedPane === id} onFocus={() => setFocusedPane(id)} onClosePane={() => closePane(id)} onSplit={dir => splitPane(id, dir)} />
+    if (id === "browser") return <BrowserPane key={id} onClose={() => setShowBrowser(false)} />
+    if (id === "mobile") return <MobilePane key={id} onClose={() => setShowMobile(false)} />
+    return <div key={id} className="p-3 text-xs">Pane {id} not found</div>
+  }
+
+  const RenderSplit = ({ node }: { node: LayoutNode }) => {
+    if (node.type === "pane") return <div className="flex-1 min-w-0 min-h-0 flex">{renderPaneById(node.id)}</div>
+    const isRow = node.dir === "row"
+    return (
+      <div className={`flex flex-1 min-h-0 min-w-0 ${isRow ? "flex-row" : "flex-col"} overflow-hidden`}>
+        {node.children.map((child, i) => (
+          <div key={child.type === "pane" ? child.id : child.id} className="flex min-h-0 min-w-0" style={{ flex: `1 1 ${node.sizes[i] ?? 100 / node.children.length}%` }}>
+            <RenderSplit node={child} />
+            {i < node.children.length - 1 && (
+              <div
+                onMouseDown={e => {
+                  e.preventDefault()
+                  const start = isRow ? e.clientX : e.clientY
+                  const startSizes = [...node.sizes]
+                  const onMove = (ev: MouseEvent) => {
+                    const cur = isRow ? ev.clientX : ev.clientY
+                    const deltaPx = cur - start
+                    const container = (e.target as HTMLElement).parentElement?.parentElement
+                    const totalPx = isRow ? container?.getBoundingClientRect().width ?? 800 : container?.getBoundingClientRect().height ?? 600
+                    const deltaPct = (deltaPx / totalPx) * 100
+                    const left = Math.max(15, Math.min(85, startSizes[i] + deltaPct))
+                    const right = Math.max(15, Math.min(85, startSizes[i + 1] - deltaPct))
+                    if (left + right > 0) {
+                      const newSizes = [...startSizes]
+                      newSizes[i] = left
+                      newSizes[i + 1] = right
+                      setLayout(prev => {
+                        const update = (n: LayoutNode): LayoutNode => {
+                          if (n.type === "pane") return n
+                          if (n.id === node.id) return { ...n, sizes: newSizes }
+                          return { ...n, children: n.children.map(update) }
+                        }
+                        return update(prev)
+                      })
+                    }
+                  }
+                  const onUp = () => { document.body.classList.remove("resizing"); window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp) }
+                  document.body.classList.add("resizing")
+                  window.addEventListener("mousemove", onMove)
+                  window.addEventListener("mouseup", onUp)
+                }}
+                className={`${isRow ? "w-1 cursor-col-resize hover:w-1.5 hover:bg-[#CFC9BF] dark:hover:bg-[#3A3A3E]" : "h-1 cursor-row-resize hover:h-1.5 hover:bg-[#CFC9BF] dark:hover:bg-[#3A3A3E]"} bg-line dark:bg-[#232326] shrink-0 group flex items-center justify-center`}
+                title={isRow ? "Sağa sürükle" : "Aşağı sürükle"}
+              >
+                <span className={`${isRow ? "w-0.5 h-6" : "w-6 h-0.5"} bg-zinc-300 dark:bg-zinc-600 rounded-full opacity-0 group-hover:opacity-100`} />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    )
   }
 
   return (
@@ -195,11 +304,11 @@ export default function App() {
           <span className="w-1.5 h-1.5 rounded-full bg-terracotta" /> Vite 6 + React 19 + Tailwind v4 — Concept · UI Kit
         </span>
         <span className="hidden sm:inline-flex items-center gap-2 text-white/60 ml-2">
-          <span className="w-px h-3 bg-white/20" /> cream #FAF9F5 · terracotta #C96442 · component-based
+          <span className="w-px h-3 bg-white/20" /> cream #FAF9F5 · terracotta #C96442 · windows pane
         </span>
         <span className="ml-auto hidden md:flex items-center gap-1.5 text-[10px]">
           <span className="px-2 py-1 rounded-full bg-white/10 border border-white/10">Pane system</span>
-          <span className="px-2 py-1 rounded-full bg-white/10 border border-white/10">UI Kit</span>
+          <span className="px-2 py-1 rounded-full bg-white/10 border border-white/10">row / col split</span>
           <span className="hidden lg:inline-flex gap-1 ml-1">
             <kbd className="px-1 py-0.5 rounded bg-white/10 border border-white/10 text-[10px]">[</kbd>
             <kbd className="px-1 py-0.5 rounded bg-white/10 border border-white/10 text-[10px]">]</kbd>
@@ -213,10 +322,12 @@ export default function App() {
         onOpenBrowser={() => {
           if (!tiling) setTiling(true)
           setShowBrowser(true)
+          ensureWindowPos("browser")
         }}
         onOpenMobile={() => {
           if (!tiling) setTiling(true)
           setShowMobile(true)
+          ensureWindowPos("mobile")
         }}
         onSearch={() => setSearchOpen(true)}
       />
@@ -260,7 +371,7 @@ export default function App() {
                     Good afternoon, Aylin.<br />
                     <span className="italic font-normal text-zinc-500">What are we building today?</span>
                   </h1>
-                  <p className="mt-2 text-[13px] text-zinc-500">Start with a brief. Lokma will scaffold the plan, run tools, and keep an inspectable trail.</p>
+                  <p className="mt-2 text-[13px] text-zinc-500">Start with a brief. Lokma will scaffold the plan, run tools, and keep an inspectable trail. Dikey/yatay böl, windowed ile serbest taşı.</p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-6">
                     {[
@@ -296,32 +407,32 @@ export default function App() {
             </div>
           ) : (
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-              <div className="h-8 flex items-center gap-2 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#161618] shrink-0">
+              <div className="h-8 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#161618] shrink-0 overflow-x-auto">
                 <span className="px-2 py-1 rounded-md bg-[#262624] text-white text-xs">Tiling</span>
-                <span className="text-xs text-zinc-500 hidden sm:inline">pane’leri sürükle · tab olarak aç · windowed ile serbest yerleştir — [ / ] paneller</span>
-                <span className="ml-auto flex gap-1.5">
+                <span className="text-xs text-zinc-500 hidden sm:inline whitespace-nowrap">dikey/yatay böl · altına/üstüne/sağa/sola · windowed serbest · [ / ] · save/reset</span>
+                <span className="ml-auto flex gap-1 shrink-0">
                   <Button variant={windowed ? "ink" : "outline"} size="sm" className="h-6 text-xs gap-1" onClick={() => setWindowed(!windowed)}>
                     Windowed
                   </Button>
-                  <Button variant="outline" size="sm" className="h-6 text-xs" onClick={() => setExtraPanes(p => [...p, { id: `pane-${Date.now()}`, title: `Pane ${p.length + 1}`, content: <div className="p-3">Yeni pane — sürükle, resize et, tab ekle</div> }])}>
+                  <Button variant="outline" size="sm" className="h-6 text-xs" onClick={() => { const id = genId(); ensureWindowPos(id); setExtraPanes(p => [...p, { id, title: `Pane ${id.slice(2,6)}`, content: <div className="p-3">Yeni pane — altına/yanına böl</div> }]); setLayout(prev => ({ type: "split", id: "root", dir: "row", sizes: [...(prev.type==="split"?prev.sizes:[]), 50].map((s,i,a)=>s/a.reduce((x,y)=>x+y,0)*100), children: [...(prev.type==="split"?prev.children:[prev]), { type: "pane", id }] } as LayoutNode)) }}>
                     + Pane
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => handleOpenTab("Terminal", <TerminalPane />)}>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs hidden lg:inline-flex" onClick={() => handleOpenTab("Terminal", <TerminalPane />)}>
                     + Terminal
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => handleOpenTab("Orchestration", <OrchestrationPane />)}>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs hidden lg:inline-flex" onClick={() => handleOpenTab("Orchestration", <OrchestrationPane />)}>
                     + Agents
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => handleOpenTab("Git", <GitPane />)}>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs hidden lg:inline-flex" onClick={() => handleOpenTab("Git", <GitPane />)}>
                     + Git
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => handleOpenTab("Vault", <VaultPane />)}>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs hidden xl:inline-flex" onClick={() => handleOpenTab("Vault", <VaultPane />)}>
                     + Vault
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => handleOpenTab("Archify", <ArchifyPane />)}>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs hidden xl:inline-flex" onClick={() => handleOpenTab("Archify", <ArchifyPane />)}>
                     + Archify
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => handleOpenTab("Design", <DesignStudioPane />)}>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs hidden xl:inline-flex" onClick={() => handleOpenTab("Design", <DesignStudioPane />)}>
                     + Design
                   </Button>
                   <Button variant="ghost" size="sm" className="h-6 text-xs hidden sm:inline-flex" onClick={saveLayout}>
@@ -335,13 +446,13 @@ export default function App() {
                   </Button>
                 </span>
               </div>
-              <div className={`flex flex-1 min-h-0 overflow-hidden ${windowed ? "relative bg-[#FAF9F5] dark:bg-[#0F0F11] p-2 gap-2 flex-wrap content-start overflow-auto" : ""}`}>
+              <div className={`flex flex-1 min-h-0 overflow-hidden ${windowed ? "relative bg-[#FAF9F5] dark:bg-[#0F0F11] p-2 gap-2" : ""}`}>
                 {windowed ? (
                   <div className="relative w-full h-full min-h-[520px]">
                     {[
-                      { id: "a", node: <Pane id="a" initialTabs={[{ id: "tab-a-1", title: "Chat #482", content: <div className="space-y-3"><Card className="p-3 cursor-pointer" onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast",{detail:"Chat #482 — detay"}))}><div className="text-xs font-semibold">Aylin</div><div className="text-sm mt-1">Refactor auth middleware</div></Card><Card className="p-3 bg-[#262624] text-white cursor-pointer"><div className="text-xs font-semibold">Lokma</div><div className="text-sm mt-1">One hook, one decorator.</div></Card></div> }]} isFocused={focusedPane === "a"} onFocus={() => setFocusedPane("a")} onClosePane={() => {}} onSplit={() => setExtraPanes(p => [...p, { id: `pane-${Date.now()}`, title: "Split pane", content: <div className="p-3">Split pane</div> }])} /> },
-                      { id: "b", node: <Pane id="b" initialTabs={[{ id: "tab-b-1", title: "auth.ts", content: <CodePaneContent /> }]} isFocused={focusedPane === "b"} onFocus={() => setFocusedPane("b")} onClosePane={() => {}} onSplit={() => setExtraPanes(p => [...p, { id: `pane-${Date.now()}`, title: "Split pane", content: <div className="p-3">Split</div> }])} /> },
-                      ...extraPanes.map(p => ({ id: p.id, node: <Pane id={p.id} initialTabs={[{ id: `tab-${p.id}-1`, title: p.title, content: p.content }]} isFocused={focusedPane === p.id} onFocus={() => setFocusedPane(p.id)} onClosePane={() => setExtraPanes(prev => prev.filter(x => x.id !== p.id))} onSplit={() => {}} /> })),
+                      { id: "a", node: renderPaneById("a") },
+                      { id: "b", node: renderPaneById("b") },
+                      ...extraPanes.map(p => ({ id: p.id, node: renderPaneById(p.id) })),
                       ...(showBrowser ? [{ id: "browser", node: <BrowserPane onClose={() => setShowBrowser(false)} /> }] : []),
                       ...(showMobile ? [{ id: "mobile", node: <MobilePane onClose={() => setShowMobile(false)} /> }] : []),
                     ].map(({ id, node }) => {
@@ -352,7 +463,7 @@ export default function App() {
                             <span className="w-1.5 h-1.5 rounded-full bg-terracotta" /> {id}
                             <span className="ml-auto flex gap-1">
                               <button onClick={() => setWindowPos(prev => ({ ...prev, [id]: { ...prev[id], x: 8, y: 8, w: 480, h: 520 } }))} className="w-5 h-5 grid place-items-center rounded hover:bg-black/5">□</button>
-                              <button onClick={() => { if (id === "a" || id === "b") return; setExtraPanes(prev => prev.filter(x => x.id !== id)) }} className="w-5 h-5 grid place-items-center rounded hover:bg-black/5">×</button>
+                              <button onClick={() => { if (id === "a" || id === "b") return; closePane(id) }} className="w-5 h-5 grid place-items-center rounded hover:bg-black/5">×</button>
                             </span>
                           </div>
                           <div className="flex-1 min-h-0 overflow-hidden flex">{node}</div>
@@ -372,20 +483,7 @@ export default function App() {
                     })}
                   </div>
                 ) : (
-                  <>
-                    <div style={{ width: tileLeftW }} className="shrink-0 flex">
-                      <Pane id="a" initialTabs={[{ id: "tab-a-1", title: "Chat #482", content: <div className="space-y-3"><Card className="p-3 cursor-pointer" onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast",{detail:"Chat #482 — detay"}))}><div className="text-xs font-semibold">Aylin</div><div className="text-sm mt-1">Refactor auth middleware</div></Card><Card className="p-3 bg-[#262624] text-white cursor-pointer"><div className="text-xs font-semibold">Lokma</div><div className="text-sm mt-1">One hook, one decorator.</div></Card></div> }]} isFocused={focusedPane === "a"} onFocus={() => setFocusedPane("a")} onClosePane={() => {}} onSplit={() => setExtraPanes(p => [...p, { id: `pane-${Date.now()}`, title: "Split pane", content: <div className="p-3">Split pane</div> }])} />
-                    </div>
-                    <div onMouseDown={startTileDrag} onDoubleClick={() => setTileLeftW(520)} className="w-1 bg-line hover:bg-[#CFC9BF] dark:bg-[#232326] dark:hover:bg-[#3A3A3E] cursor-col-resize shrink-0 hidden lg:flex items-center justify-center group" title="Sürükle pane boyutlandır"><span className="w-0.5 h-7 bg-zinc-300 dark:bg-zinc-600 rounded-full opacity-0 group-hover:opacity-100 transition" /></div>
-                    <div className="flex-1 min-w-0 flex">
-                      <Pane id="b" initialTabs={[{ id: "tab-b-1", title: "auth.ts", content: <CodePaneContent /> }]} isFocused={focusedPane === "b"} onFocus={() => setFocusedPane("b")} onClosePane={() => {}} onSplit={() => setExtraPanes(p => [...p, { id: `pane-${Date.now()}`, title: "Split pane", content: <div className="p-3">Split</div> }])} />
-                    </div>
-                    {extraPanes.map(pane => (
-                      <Pane key={pane.id} id={pane.id} initialTabs={[{ id: `tab-${pane.id}-1`, title: pane.title, content: pane.content }]} isFocused={focusedPane === pane.id} onFocus={() => setFocusedPane(pane.id)} onClosePane={() => setExtraPanes(prev => prev.filter(p => p.id !== pane.id))} onSplit={() => {}} />
-                    ))}
-                    {showBrowser && <BrowserPane onClose={() => setShowBrowser(false)} />}
-                    {showMobile && <MobilePane onClose={() => setShowMobile(false)} />}
-                  </>
+                  <RenderSplit node={layout} />
                 )}
               </div>
             </div>
@@ -414,7 +512,7 @@ export default function App() {
       </div>
 
       <div className="h-6 border-t border-line bg-[#FDFCFB] dark:bg-[#161618] flex items-center px-3 text-[11px] text-zinc-500">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> All systems normal · sürükle resize aktif · [ / ] paneller · ⌘K ara
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> All systems normal · window pane · row/col split · [ / ] · ⌘K
         <span className="ml-auto">UI Kit — Button, Card, Input, Composer, Pane, FileBrowser · Vite 6 · Tailwind v4</span>
       </div>
 

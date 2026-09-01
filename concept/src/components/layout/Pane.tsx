@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { X, Plus, Copy } from "lucide-react"
+import { X, Plus, Copy, Columns2, Rows2 } from "lucide-react"
 import { Composer } from "./Composer"
 
 export type Tab = { id: string; title: string; content: React.ReactNode }
@@ -19,7 +19,7 @@ export function Pane({
   onClosePane: () => void
   isFocused: boolean
   onFocus: () => void
-  onSplit: () => void
+  onSplit: (dir: "row" | "col") => void
 }) {
   const [tabs, setTabs] = React.useState<Tab[]>(initialTabs)
   const [active, setActive] = React.useState(initialTabs[0]?.id)
@@ -146,8 +146,11 @@ export function Pane({
           <Button variant="ghost" size="iconSm" onClick={() => addTab(`Yeni sekme`, <div className="p-3 text-sm">Boş sekme — pane {id}</div>)}>
             <Plus className="w-3 h-3" />
           </Button>
-          <Button variant="ghost" size="iconSm" onClick={onSplit} title="Yanına pane ekle">
-            ⊞
+          <Button variant="ghost" size="iconSm" onClick={() => onSplit("row")} title="Yatay böl (yan yana)">
+            <Columns2 className="w-3 h-3" />
+          </Button>
+          <Button variant="ghost" size="iconSm" onClick={() => onSplit("col")} title="Dikey böl (alt alta)">
+            <Rows2 className="w-3 h-3" />
           </Button>
           <Button variant="ghost" size="iconSm" onClick={onClosePane}>
             <X className="w-3 h-3" />

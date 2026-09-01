@@ -386,15 +386,68 @@ export default function App() {
                     ))}
                   </div>
 
-                  <div className="mt-6 space-y-4">
-                    <Card className="p-3 cursor-pointer hover:shadow-sm transition" onClick={() => handleOpenTab("Auth middleware", <div className="p-3">Auth middleware details — preHandler hook</div>)}>
-                      <div className="text-xs font-semibold">Aylin</div>
-                      <div className="text-sm mt-1">Let's refactor the auth middleware. Move JWT verification into a Fastify <code className="px-1 py-0.5 rounded bg-muted border border-line text-xs">preHandler</code> hook.</div>
-                    </Card>
-                    <Card className="p-3 bg-[#262624] text-white dark:bg-[#1E1E21] cursor-pointer hover:shadow-md transition" onClick={() => handleOpenTab("Lokma yanıt", <div className="p-3">One hook, one decorator, zero magic — detay</div>)}>
-                      <div className="text-xs font-semibold">Lokma — Claude 4 Sonnet</div>
-                      <div className="text-sm mt-1">Perfect — one hook, one decorator, zero magic.</div>
-                    </Card>
+                  <div className="mt-6 space-y-5">
+                    {/* Today separator */}
+                    <div className="flex items-center gap-3 py-1">
+                      <div className="h-px flex-1 bg-line" />
+                      <span className="text-[11px] tracking-widest uppercase text-zinc-400 bg-muted px-2 py-0.5 rounded-full border border-line">Today · 14:31</span>
+                      <div className="h-px flex-1 bg-line" />
+                    </div>
+
+                    {/* Aylin — user bubble with profile */}
+                    <div className="flex gap-3 group">
+                      <img src="https://i.pravatar.cc/100?img=33" alt="Aylin" className="w-8 h-8 rounded-full object-cover border border-line shrink-0 mt-0.5 shadow-sm" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-xs font-semibold">Aylin</span>
+                          <span className="text-[11px] text-zinc-400">14:31</span>
+                          <span className="ml-auto hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400"><span className="w-1 h-1 rounded-full bg-emerald-500" /> you</span>
+                        </div>
+                        <div className="mt-1.5 rounded-2xl rounded-tl-sm bg-white dark:bg-[#1E1E21] border border-line shadow-sm p-3.5 group-hover:border-line-strong group-hover:shadow-md transition">
+                          <div className="text-[13.5px] leading-[1.6]">Let's refactor the auth middleware. Move JWT verification into a Fastify <code className="px-1.5 py-0.5 rounded-md bg-muted border border-line text-xs font-mono">preHandler</code> hook.</div>
+                          <div className="mt-2 flex items-center gap-1.5">
+                            <span className="px-1.5 py-0.5 rounded-full bg-[#FDF0E6] border border-[#F2D5C2] text-terracotta text-[11px]">auth.ts</span>
+                            <span className="px-1.5 py-0.5 rounded-full bg-muted border border-line text-[11px]">+18 lines</span>
+                          </div>
+                        </div>
+                        <div className="mt-1 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                          <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2">Copy</Button>
+                          <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2">Share</Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Lokma — assistant bubble with avatar */}
+                    <div className="flex gap-3 group">
+                      <div className="w-8 h-8 rounded-full bg-[#262624] dark:bg-white text-white dark:text-black grid place-items-center text-xs font-bold border border-line shrink-0 mt-0.5 shadow-sm">◐</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 flex-wrap">
+                          <span className="text-xs font-semibold">Lokma</span>
+                          <span className="px-1.5 py-0.5 rounded-full bg-[#262624] dark:bg-white text-white dark:text-black text-[10px]">Claude 4 Sonnet</span>
+                          <span className="text-[11px] text-zinc-400">14:31 · 1.2s</span>
+                          <span className="ml-auto hidden sm:inline-flex items-center gap-1 text-[11px] text-emerald-600"><span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" /> streaming done</span>
+                        </div>
+                        <div className="mt-1.5 rounded-2xl rounded-tl-sm bg-[#262624] dark:bg-[#1E1E21] text-white dark:text-[#EDE9E2] border border-[#262624] dark:border-[#232326] shadow-sm p-3.5 group-hover:shadow-md transition">
+                          <div className="text-[13.5px] leading-[1.6]">Perfect — one hook, one decorator, <span className="underline decoration-terracotta/50 underline-offset-4">zero magic.</span></div>
+                          <div className="mt-3 rounded-xl overflow-hidden border border-white/10 bg-white/5">
+                            <div className="flex items-center justify-between px-3 h-7 bg-white/5 border-b border-white/10 text-xs">
+                              <span className="font-mono">plugins/auth.ts</span>
+                              <span className="text-white/60">+18</span>
+                            </div>
+                            <pre className="p-3 text-xs leading-5 font-mono overflow-x-auto text-white/90"><code><span className="text-white/40">// Fastify preHandler</span>{"\n"}<span className="text-amber-300">app</span>.addHook(<span className="text-emerald-300">'preHandler'</span>, <span className="text-amber-300">async</span> (req, reply) =&gt; {"{"}{"\n"}  <span className="text-amber-300">if</span> (!req.routeOptions.config?.auth) <span className="text-amber-300">return</span>{"\n"}{"}"})</code></pre>
+                          </div>
+                          <div className="mt-2 flex gap-1.5">
+                            <Button variant="secondary" size="sm" className="h-6 text-[11px] gap-1 bg-white text-ink hover:bg-white/90" onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Diff kopyalandı" }))}>Copy diff</Button>
+                            <Button variant="ghost" size="sm" className="h-6 text-[11px] gap-1 text-white/80 hover:text-white hover:bg-white/10" onClick={() => handleOpenTab("auth.ts", <CodePaneContent />)}>Open in pane</Button>
+                          </div>
+                        </div>
+                        <div className="mt-1.5 flex items-center gap-1 text-[11px] text-zinc-400">
+                          <span>✓ 1 tool · 12k tokens · $0.04</span>
+                          <span className="mx-1">·</span>
+                          <button onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Regenerate" }))} className="hover:text-ink hover:underline">↻ Regenerate</button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

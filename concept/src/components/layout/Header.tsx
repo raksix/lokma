@@ -6,16 +6,25 @@ export function Header({ onToggleLeft, onToggleRight, onOpenBrowser, onOpenMobil
   const [dark, setDark] = useState(false)
   useEffect(() => {
     const stored = localStorage.getItem("lokma-theme")
-    const prefers = window.matchMedia("(prefers-color-scheme: dark)").matches
-    if (stored === "dark" || (!stored && prefers)) {
+    if (stored === "dark") {
       document.documentElement.classList.add("dark")
       setDark(true)
+    } else if (stored === "light") {
+      document.documentElement.classList.remove("dark")
+      setDark(false)
+    } else {
+      // default light — do not auto-follow system
+      document.documentElement.classList.remove("dark")
+      setDark(false)
     }
   }, [])
   const toggle = () => {
     const isDark = document.documentElement.classList.toggle("dark")
     localStorage.setItem("lokma-theme", isDark ? "dark" : "light")
     setDark(isDark)
+  }
+  const toast = (msg: string) => {
+    window.dispatchEvent(new CustomEvent("lokma-toast", { detail: msg }))
   }
   return (
     <header className="shrink-0 z-40 bg-[#FAF9F5]/80 backdrop-blur-xl border-b border-line dark:bg-[#0F0F11]/80">
@@ -47,15 +56,15 @@ export function Header({ onToggleLeft, onToggleRight, onOpenBrowser, onOpenMobil
           <Button variant="outline" size="iconSm" onClick={toggle} title="Tema">
             {dark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
           </Button>
-          <Button variant="outline" size="iconSm">
+          <Button variant="outline" size="iconSm" onClick={() => toast("Ara — yakında")} title="Ara">
             <Search className="w-3.5 h-3.5" />
           </Button>
           <Button variant="outline" size="iconSm" onClick={onToggleRight} title="Sağ panel ]">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="3" width="11" height="10" rx="1.2" stroke="currentColor" strokeWidth="1.2"/><path d="M10 3v10" stroke="currentColor" strokeWidth="1.2"/></svg>
           </Button>
-          <div className="w-6 h-6 rounded-full bg-white border border-line overflow-hidden ml-1">
+          <button onClick={() => toast("Profil — yakında")} className="w-6 h-6 rounded-full bg-white border border-line overflow-hidden ml-1 hover:ring-2 hover:ring-terracotta/20 transition">
             <img src="https://i.pravatar.cc/100?img=33" alt="Aylin" className="w-full h-full object-cover" />
-          </div>
+          </button>
         </div>
       </div>
     </header>

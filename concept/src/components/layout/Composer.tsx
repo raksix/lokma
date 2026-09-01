@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { Paperclip, Mic, Search, Sparkles } from "lucide-react"
+import { Paperclip, Mic, Search, Sparkles, X } from "lucide-react"
 
 type Model = { id: string; label: string; tag?: string }
 
@@ -20,6 +20,7 @@ export function Composer({ placeholder = "Ask Lokma to plan, code, or explain â€
   const [model, setModel] = React.useState("muse-spark-1.2-contributor")
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
+  const [recording, setRecording] = React.useState(false)
   const fileRef = React.useRef<HTMLInputElement>(null)
   const taRef = React.useRef<HTMLTextAreaElement>(null)
 
@@ -31,6 +32,36 @@ export function Composer({ placeholder = "Ask Lokma to plan, code, or explain â€
     setText("")
     setFiles([])
     if (taRef.current) taRef.current.style.height = "auto"
+  }
+
+  const toggleMic = () => {
+    if (recording) {
+      setRecording(false)
+      return
+    }
+    const SR = (window as unknown as { webkitSpeechRecognition?: unknown; SpeechRecognition?: unknown }).webkitSpeechRecognition || (window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition
+    if (SR) {
+      try {
+        const rec = new (SR as unknown as new () => { lang: string; interimResults: boolean; continuous: boolean; onresult: (e: { results: Array<Array<{ transcript: string }>> }) => void; onend: () => void; start: () => void; stop: () => void })()
+        rec.lang = "tr-TR"
+        rec.interimResults = true
+        rec.continuous = false
+        rec.onresult = (e) => {
+          const txt = Array.from(e.results).map(r => r[0].transcript).join("")
+          setText(txt)
+        }
+        rec.onend = () => setRecording(false)
+        rec.start()
+        setRecording(true)
+      } catch {
+        setRecording(true)
+        setTimeout(() => setRecording(false), 1200)
+      }
+    } else {
+      setRecording(true)
+      setTimeout(() => setRecording(false), 1200)
+      window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Mikrofon tarayÄ±cÄ±da desteklenmiyor" }))
+    }
   }
 
   return (
@@ -60,9 +91,9 @@ export function Composer({ placeholder = "Ask Lokma to plan, code, or explain â€
               <Badge key={i} variant="outline" className="bg-[#FDF0E6] border-[#F2D5C2] text-terracotta gap-1 pr-1">
                 <Paperclip className="w-3 h-3" />
                 <span className="max-w-[120px] truncate">{f.name}</span>
-                <button onClick={() => setFiles(files.filter((_, j) => j !== i))} className="w-4 h-4 grid place-items-center rounded hover:bg-black/5 ml-1">
-                  Ã—
-                </button>
+                <Button variant="ghost" size="iconSm" onClick={() => setFiles(files.filter((_, j) => j !== i))} className="w-4 h-4 ml-1 p-0 hover:bg-black/5">
+                  <X className="w-3 h-3" />
+                </Button>
               </Badge>
             ))}
           </div>
@@ -72,9 +103,10 @@ export function Composer({ placeholder = "Ask Lokma to plan, code, or explain â€
             <Paperclip className="w-3.5 h-3.5" />
           </Button>
           <input ref={fileRef} type="file" multiple hidden accept=".pdf,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp,.doc,.docx" onChange={e => setFiles([...files, ...Array.from(e.target.files || [])])} />
-          <Button variant="outline" size="iconSm" title="Mikrofon">
+          <Button variant={recording ? "ink" : "outline"} size="iconSm" onClick={toggleMic} title="Mikrofon" className={recording ? "animate-pulse" : ""}>
             <Mic className="w-3.5 h-3.5" />
           </Button>
+          {recording && <span className="text-[11px] text-red-600 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" /> Rec</span>}
           <div className="w-px h-4 bg-line mx-0.5 hidden sm:block" />
           <div className="inline-flex p-0.5 rounded-full bg-muted border border-line">
             <Button variant={mode === "steer" ? "ink" : "ghost"} size="sm" className={cn("h-6 px-2.5 rounded-full text-[11px]", mode === "steer" ? "" : "hover:bg-white")} onClick={() => setMode("steer")}>
@@ -102,13 +134,13 @@ export function Composer({ placeholder = "Ask Lokma to plan, code, or explain â€
                     <div key={g.group}>
                       <div className="px-2.5 pt-2 pb-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-500">{g.group}</div>
                       {g.items.map(m => (
-                        <button key={m.id} onClick={() => { setModel(m.id); setOpen(false) }} className={cn("w-full text-left px-2.5 py-1.5 rounded-md mx-1 flex items-center justify-between hover:bg-white/10 text-[13px] text-white", model === m.id && "bg-white/10 border border-white/5")}>
+                        <Button key={m.id} variant="ghost" size="sm" onClick={() => { setModel(m.id); setOpen(false) }} className={cn("w-[calc(100%-8px)] mx-1 justify-between text-[13px] text-white hover:bg-white/10 hover:text-white", model === m.id && "bg-white/10 border border-white/5")}>
                           <span className="flex items-center gap-1.5">
                             {model === m.id && <span className="w-1.5 h-1.5 rounded-full bg-terracotta" />}
                             {m.label}
                           </span>
                           {m.tag && <span className="text-[11px] text-zinc-400">{m.tag}</span>}
-                        </button>
+                        </Button>
                       ))}
                     </div>
                   ))}

@@ -1,13 +1,15 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Search, Folder, File, Plus } from "lucide-react"
+import { Search, Folder, File, Plus, ChevronDown } from "lucide-react"
 import { useState } from "react"
+import { cn } from "@/lib/utils"
 
 export function FileBrowser({ onOpenFile }: { onOpenFile: (name: string) => void }) {
   const [q, setQ] = useState("")
   const [openLokma, setOpenLokma] = useState(true)
   const [openPlugins, setOpenPlugins] = useState(true)
   const [openDocs, setOpenDocs] = useState(false)
+  const toast = (msg: string) => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: msg }))
 
   return (
     <aside className="w-[300px] shrink-0 border-l border-line bg-[#FDFCFB] dark:bg-[#161618] flex flex-col overflow-hidden">
@@ -15,7 +17,7 @@ export function FileBrowser({ onOpenFile }: { onOpenFile: (name: string) => void
         <span className="font-serif text-xs flex items-center gap-1.5">
           <Folder className="w-3 h-3 text-zinc-500" /> Explorer
         </span>
-        <Button variant="ghost" size="iconSm">
+        <Button variant="ghost" size="iconSm" onClick={() => toast("Yeni dosya — yakında")}>
           <Plus className="w-3 h-3" />
         </Button>
       </div>
@@ -30,17 +32,17 @@ export function FileBrowser({ onOpenFile }: { onOpenFile: (name: string) => void
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-0.5 text-xs">
         <div>
-          <button onClick={() => setOpenLokma(!openLokma)} className="w-full flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-white dark:hover:bg-[#1E1E21] font-medium">
-            <span className={openLokma ? "" : "-rotate-90"}>▾</span>
+          <Button variant="ghost" size="sm" onClick={() => setOpenLokma(!openLokma)} className="w-full justify-start gap-1.5 px-1.5 h-6 text-xs font-medium">
+            <ChevronDown className={cn("w-3 h-3 transition-transform", !openLokma && "-rotate-90")} />
             <Folder className="w-3 h-3 text-amber-600" /> lokma-web
-          </button>
+          </Button>
           {openLokma && (
             <div className="ml-2 pl-3 border-l border-line/40 space-y-0.5 mt-0.5">
               <div>
-                <button onClick={() => setOpenPlugins(!openPlugins)} className="w-full flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-white dark:hover:bg-[#1E1E21]">
-                  <span className={openPlugins ? "" : "-rotate-90"}>▾</span>
+                <Button variant="ghost" size="sm" onClick={() => setOpenPlugins(!openPlugins)} className="w-full justify-start gap-1.5 px-1.5 h-6 text-xs">
+                  <ChevronDown className={cn("w-3 h-3 transition-transform", !openPlugins && "-rotate-90")} />
                   <Folder className="w-3 h-3 text-amber-500" /> plugins
-                </button>
+                </Button>
                 {openPlugins && (
                   <div className="ml-3 pl-2 border-l border-line/40 space-y-0.5">
                     {[
@@ -50,32 +52,32 @@ export function FileBrowser({ onOpenFile }: { onOpenFile: (name: string) => void
                     ]
                       .filter(f => !q || f.name.toLowerCase().includes(q.toLowerCase()))
                       .map(f => (
-                        <button key={f.name} onClick={() => onOpenFile(f.name)} className={`w-full flex items-center gap-2 px-1.5 py-1 rounded text-xs text-left ${f.active ? "bg-[#FDF0E6] border border-[#F2D5C2] text-terracotta" : "hover:bg-white dark:hover:bg-[#1E1E21] border border-transparent"}`}>
-                          <File className="w-3 h-3" />
-                          <span className="flex-1 truncate">{f.name}</span>
+                        <Button key={f.name} variant="ghost" size="sm" onClick={() => onOpenFile(f.name)} className={cn("w-full justify-start gap-2 px-1.5 h-6 text-xs font-normal border", f.active ? "bg-[#FDF0E6] border-[#F2D5C2] text-terracotta" : "border-transparent hover:bg-white dark:hover:bg-[#1E1E21]")}>
+                          <File className="w-3 h-3 shrink-0" />
+                          <span className="flex-1 truncate text-left">{f.name}</span>
                           {f.badge && <span className="text-[10px]">{f.badge}</span>}
-                        </button>
+                        </Button>
                       ))}
                   </div>
                 )}
               </div>
-              <button onClick={() => onOpenFile("app.ts")} className="w-full flex items-center gap-2 px-1.5 py-1 rounded hover:bg-white dark:hover:bg-[#1E1E21] text-left">
+              <Button variant="ghost" size="sm" onClick={() => onOpenFile("app.ts")} className="w-full justify-start gap-2 px-1.5 h-6 text-xs">
                 <File className="w-3 h-3" /> app.ts
-              </button>
+              </Button>
             </div>
           )}
         </div>
         <div>
-          <button onClick={() => setOpenDocs(!openDocs)} className="w-full flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-white dark:hover:bg-[#1E1E21] text-zinc-600">
-            <span className={openDocs ? "" : "-rotate-90"}>▾</span>
+          <Button variant="ghost" size="sm" onClick={() => setOpenDocs(!openDocs)} className="w-full justify-start gap-1.5 px-1.5 h-6 text-xs text-zinc-600">
+            <ChevronDown className={cn("w-3 h-3 transition-transform", !openDocs && "-rotate-90")} />
             <Folder className="w-3 h-3" /> Docs
-          </button>
+          </Button>
           {openDocs && (
             <div className="ml-2 pl-3 border-l border-line/40 space-y-0.5 mt-0.5">
               {["00-LOKMA-KONTEKST.md", "21-WEB-HARNESS.md", "36-AUTH.md"].map(n => (
-                <button key={n} onClick={() => onOpenFile(n)} className="w-full flex items-center gap-2 px-1.5 py-1 rounded hover:bg-white dark:hover:bg-[#1E1E21] text-xs text-left">
+                <Button key={n} variant="ghost" size="sm" onClick={() => onOpenFile(n)} className="w-full justify-start gap-2 px-1.5 h-6 text-xs">
                   <File className="w-3 h-3" /> {n}
-                </button>
+                </Button>
               ))}
             </div>
           )}
@@ -85,10 +87,10 @@ export function FileBrowser({ onOpenFile }: { onOpenFile: (name: string) => void
         <div className="rounded-md bg-white dark:bg-[#1E1E21] border border-line p-2">
           <div className="text-[11px] font-mono text-zinc-500">auth.ts — 18 additions</div>
           <div className="mt-1 flex gap-1.5">
-            <Button size="sm" className="flex-1 h-6 text-xs">
+            <Button size="sm" className="flex-1 h-6 text-xs" onClick={() => onOpenFile("auth.ts")}>
               Open
             </Button>
-            <Button variant="outline" size="sm" className="flex-1 h-6 text-xs">
+            <Button variant="outline" size="sm" className="flex-1 h-6 text-xs" onClick={() => toast("Reveal — yakında")}>
               Reveal
             </Button>
           </div>

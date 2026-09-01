@@ -38,7 +38,7 @@ export function Pane({
     setTabs(prev => {
       const idx = prev.findIndex(t => t.id === tabId)
       const next = prev.filter(t => t.id !== tabId)
-      if (next.length === 0) return prev // keep at least one
+      if (next.length === 0) return prev
       if (active === tabId) {
         const newActive = next[Math.max(0, idx - 1)]
         setActive(newActive.id)
@@ -47,7 +47,6 @@ export function Pane({
     })
   }
 
-  // expose addTab via ref? Use imperative handle via onFocus container
   React.useEffect(() => {
     const el = document.querySelector(`[data-pane="${id}"]`) as HTMLElement
     if (el) (el as unknown as { addTab: typeof addTab }).addTab = addTab
@@ -65,11 +64,11 @@ export function Pane({
             <button
               key={t.id}
               onClick={() => setActive(t.id)}
-              className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap border", active === t.id ? "bg-[#262624] text-white border-[#262624] dark:bg-white dark:text-black" : "bg-white dark:bg-[#1E1E21] border-line hover:bg-muted")}
+              className={cn("inline-flex items-center gap-1.5 px-2.5 h-6 rounded-md text-[11px] font-medium whitespace-nowrap border shrink-0 transition-colors", active === t.id ? "bg-[#262624] text-white border-[#262624] dark:bg-white dark:text-black" : "bg-white dark:bg-[#1E1E21] border-line hover:bg-muted text-zinc-700 dark:text-zinc-200")}
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              {t.title}
-              <span onClick={e => closeTab(t.id, e)} className="w-3.5 h-3.5 grid place-items-center rounded hover:bg-black/10 ml-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+              <span className="truncate max-w-[100px]">{t.title}</span>
+              <span onClick={e => closeTab(t.id, e)} className="w-3.5 h-3.5 grid place-items-center rounded hover:bg-black/10 dark:hover:bg-white/10 ml-0.5">
                 <X className="w-3 h-3" />
               </span>
             </button>
@@ -115,13 +114,12 @@ export function Pane({
   )
 }
 
-// Simple code preview for pane B
 export function CodePaneContent() {
   return (
     <div className="rounded-lg overflow-hidden border border-line bg-white dark:bg-[#1E1E21]">
       <div className="flex items-center justify-between px-3 h-7 bg-muted/50 border-b border-line">
         <span className="font-mono text-xs">plugins/auth.ts</span>
-        <Button variant="outline" size="sm" className="h-6 text-xs gap-1">
+        <Button variant="outline" size="sm" className="h-6 text-xs gap-1" onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Kopyalandı" }))}>
           <Copy className="w-3 h-3" /> Copy
         </Button>
       </div>

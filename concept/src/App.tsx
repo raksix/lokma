@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Header } from "@/components/layout/Header"
 import { SidebarLeft } from "@/components/layout/SidebarLeft"
 import { FileBrowser } from "@/components/layout/FileBrowser"
@@ -20,11 +20,20 @@ export default function App() {
   const [showMobile, setShowMobile] = useState(false)
   const [focusedPane, setFocusedPane] = useState<string>("a")
   const [extraPanes, setExtraPanes] = useState<PaneData[]>([])
+  const [toast, setToast] = useState<string | null>(null)
+
+  useEffect(() => {
+    const h = (e: Event) => {
+      const msg = (e as CustomEvent).detail as string
+      setToast(msg)
+      setTimeout(() => setToast(null), 1600)
+    }
+    window.addEventListener("lokma-toast", h as EventListener)
+    return () => window.removeEventListener("lokma-toast", h as EventListener)
+  }, [])
 
   const handleOpenTab = (title: string, content: React.ReactNode) => {
     if (!tiling) setTiling(true)
-    // find focused pane and add tab via DOM (since Pane manages its own tabs via internal state, we need to use a different approach)
-    // For now, add as extra pane
     const id = `extra-${Date.now()}`
     setExtraPanes(prev => [...prev, { id, title, content }])
     setFocusedPane(id)
@@ -99,11 +108,11 @@ export default function App() {
                   </div>
 
                   <div className="mt-6 space-y-4">
-                    <Card className="p-3">
+                    <Card className="p-3 cursor-pointer" onClick={() => handleOpenTab("Auth middleware", <div className="p-3">Auth middleware details</div>)}>
                       <div className="text-xs font-semibold">Aylin</div>
                       <div className="text-sm mt-1">Let's refactor the auth middleware. Move JWT verification into a Fastify <code className="px-1 py-0.5 rounded bg-muted border border-line text-xs">preHandler</code> hook.</div>
                     </Card>
-                    <Card className="p-3 bg-[#262624] text-white dark:bg-[#1E1E21]">
+                    <Card className="p-3 bg-[#262624] text-white dark:bg-[#1E1E21] cursor-pointer" onClick={() => handleOpenTab("Lokma yanıt", <div className="p-3">One hook, one decorator, zero magic — detay</div>)}>
                       <div className="text-xs font-semibold">Lokma — Claude 4 Sonnet</div>
                       <div className="text-sm mt-1">Perfect — one hook, one decorator, zero magic.</div>
                     </Card>
@@ -158,6 +167,12 @@ export default function App() {
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> All systems normal
         <span className="ml-auto">UI Kit — Button, Card, Input, Composer, Pane, FileBrowser · Vite 6 · Tailwind v4</span>
       </div>
+
+      {toast && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-3 py-1.5 rounded-full bg-[#262624] text-white text-xs shadow-lg border border-white/10">
+          {toast}
+        </div>
+      )}
     </div>
   )
 }

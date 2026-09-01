@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.dark *));
+
 @theme {
   --color-cream: #FAF9F5;
   --color-paper: #FFFFFF;
@@ -64,14 +66,12 @@
 }
 
 html { scrollbar-gutter: stable; }
-
 body {
   background: #FAF9F5;
   color: #262624;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
-
 .dark body {
   background: #0F0F11;
   color: #EDE9E2;
@@ -85,7 +85,6 @@ body::before {
   opacity: 0.22;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
 }
-
 .dark body::before { opacity: 0.08; }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -103,3 +102,59 @@ body::before {
 .pane-divider.dragging { background: #C96442 !important; width: 2px; }
 body.resizing { user-select:none !important; cursor:col-resize !important; }
 body.resizing .pane { transition:none !important; }
+
+/* ——— Light is default, no overrides needed ——— */
+/* Dark overrides: target hardcoded light hexes only when .dark present */
+.dark .bg-\[\#FAF9F5\],
+.dark [class*="bg-[#FAF9F5]"] { background-color: #0F0F11 !important; }
+.dark .bg-\[\#FAF9F5\]\/80,
+.dark [class*="bg-[#FAF9F5]/80"] { background-color: rgba(15,15,17,0.88) !important; }
+.dark .bg-\[\#FAF9F5\]\/90,
+.dark [class*="bg-[#FAF9F5]/90"] { background-color: rgba(15,15,17,0.90) !important; }
+.dark .bg-white,
+.dark [class*="bg-white"]:not(.bg-\[\#111113\]):not(.bg-\[\#1E1E20\]):not(.bg-\[\#0A84FF\]) { background-color: #1E1E21 !important; border-color: #2A2A2E !important; color: #EDE9E2 !important; }
+.dark .bg-\[\#FDFCFB\],
+.dark [class*="bg-[#FDFCFB]"] { background-color: #161618 !important; border-color: #232326 !important; }
+.dark .bg-muted,
+.dark [class*="bg-muted"] { background-color: #1E1E21 !important; border-color: #2A2A2E !important; color: #EDE9E2 !important; }
+.dark .bg-\[\#FDF0E6\],
+.dark [class*="bg-[#FDF0E6]"] { background-color: #2A1E15 !important; border-color: #3A2A1A !important; color: #EDE9E2 !important; }
+.dark .border-line,
+.dark [class*="border-line"] { border-color: #232326 !important; }
+.dark .border-line\/50,
+.dark [class*="border-line/50"] { border-color: rgba(35,35,38,0.5) !important; }
+.dark .border-line\/60,
+.dark [class*="border-line/60"] { border-color: rgba(35,35,38,0.6) !important; }
+.dark .border-line-strong,
+.dark [class*="border-line-strong"] { border-color: #2A2A2E !important; }
+.dark .text-ink,
+.dark [class*="text-ink"] { color: #EDE9E2 !important; }
+.dark .text-zinc-900 { color: #EDE9E2 !important; }
+.dark .text-zinc-800 { color: #E0E0E5 !important; }
+.dark .text-zinc-700 { color: #C8C8CD !important; }
+.dark .text-zinc-600 { color: #A8A8AD !important; }
+.dark .text-zinc-500 { color: #8E8E93 !important; }
+.dark .text-zinc-400 { color: #6E6E73 !important; }
+.dark .placeholder\:text-zinc-400::placeholder { color: #6E6E73 !important; }
+.dark input,
+.dark textarea { color: #EDE9E2 !important; }
+.dark input.bg-white,
+.dark textarea.bg-white { background: #1E1E21 !important; }
+.dark pre { background: #1C1C1E !important; color: #EDE9E2 !important; }
+.dark code { background: #232326 !important; border-color: #2A2A2E !important; color: #EDE9E2 !important; }
+.dark .shadow-sm,
+.dark .shadow { box-shadow: 0 1px 2px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.3) !important; }
+.dark .bg-\[\#262624\] { background: #EDE9E2 !important; color: #0F0F11 !important; }
+.dark .bg-\[\#262624\].text-white,
+.dark [class*="bg-[#262624]"].text-white { color: #0F0F11 !important; }
+.dark .text-white { color: #EDE9E2 !important; }
+/* keep terracotta visible in dark */
+.dark .bg-terracotta { background-color: #C96442 !important; color: white !important; }
+.dark .bg-terracotta\/5 { background: rgba(201,100,66,0.10) !important; }
+.dark .text-terracotta { color: #E07A4F !important; }
+.dark .bg-emerald-50 { background: #0F241A !important; border-color: #1E3A2A !important; color: #6EE7B7 !important; }
+.dark .bg-amber-50 { background: #241E0F !important; border-color: #3A2E1E !important; }
+.dark .pane-divider { background: #232326 !important; }
+.dark .pane-divider:hover { background: #3A3A3E !important; }
+.dark [class*="bg-[#FAF9F5]"] input,
+.dark [class*="bg-white"] input { color: #EDE9E2 !important; }

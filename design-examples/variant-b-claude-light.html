@@ -1346,148 +1346,192 @@
     });
   })();
 
-  // --- Drag-to-pane: sitedeki her şey pane'e sürüklenebilir ---
+  // --- Drag-to-pane: sitedeki her şey pane'e sürüklenebilir (FIX soldan sürükle) ---
   (function(){
     const tilingView = document.getElementById('tiling-view');
     const singleView = document.getElementById('single-view');
     const grid = document.getElementById('tiling-grid');
-    if(!grid) return;
-    // helper to make elements draggable
+    const mainEl = document.querySelector('main');
+    if(!grid || !tilingView) return;
+
+    function getCardTitle(el){
+      return (el.querySelector('.font-medium, .font-semibold, h1, h2, h3')?.innerText || el.innerText || 'Pane').trim().slice(0,48).replace(/\s+/g,' ').trim();
+    }
+    function getCardHTML(el){
+      return el.outerHTML;
+    }
+
     function makeDraggable(el){
-      if(el.dataset.dragSetup) return;
-      el.dataset.dragSetup = "1";
-      el.draggable = true;
-      el.classList.add('cursor-grab', 'active:cursor-grabbing');
+      if(!el || el.dataset.dragSetup) return;
+      el.dataset.dragSetup="1";
+      el.setAttribute('draggable','true');
+      el.classList.add('cursor-grab','active:cursor-grabbing');
       el.addEventListener('dragstart', (e)=>{
-        const title = (el.querySelector('.font-medium, .font-semibold, h1, h2, h3')?.innerText || el.innerText || 'Pane').trim().slice(0,40);
-        e.dataTransfer.setData('text/plain', title);
-        e.dataTransfer.setData('text/html', el.outerHTML);
-        e.dataTransfer.effectAllowed = 'copy';
-        el.classList.add('opacity-50', 'ring-2', 'ring-terracotta/30');
+        const card = el;
+        const title = getCardTitle(card);
+        const html = getCardHTML(card);
+        try{
+          e.dataTransfer.setData('text/plain', title);
+          e.dataTransfer.setData('text/html', html);
+        }catch{}
+        e.dataTransfer.effectAllowed='copy';
         window._dragTitle = title;
-        window._dragHTML = el.outerHTML;
-        // show tiling view hint
+        window._dragHTML = html;
+        window._dragSrc = card;
+        card.classList.add('opacity-40','ring-2','ring-terracotta/30');
         grid.classList.add('ring-2','ring-terracotta/30');
-        // auto-show tiling if hidden and dragging from single view
-        if(tilingView.classList.contains('hidden')){
-          // don't auto-switch immediately, just hint, switch on drop
+        if(mainEl) mainEl.classList.add('ring-1','ring-terracotta/20');
+        let badge=document.getElementById('drag-badge');
+        if(!badge){
+          badge=document.createElement('div');
+          badge.id='drag-badge';
+          badge.className='fixed top-3 left-1/2 -translate-x-1/2 z-[9999] px-3 py-1.5 rounded-full bg-[#262624] text-white text-[11px] font-medium shadow-lg pointer-events-none flex items-center gap-1.5';
+          badge.innerHTML='<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="1.5" stroke="white" stroke-width="1.2"/><path d="M6 3v10M10 3v10M3 6h10M3 10h10" stroke="white" stroke-width="1" opacity=".7"/></svg> Pane\'e bırak → tiling olarak aç';
+          document.body.appendChild(badge);
         }
       });
       el.addEventListener('dragend', ()=>{
-        el.classList.remove('opacity-50','ring-2','ring-terracotta/30');
+        el.classList.remove('opacity-40','ring-2','ring-terracotta/30');
         grid.classList.remove('ring-2','ring-terracotta/30');
+        if(mainEl) mainEl.classList.remove('ring-1','ring-terracotta/20');
+        const badge=document.getElementById('drag-badge');
+        if(badge) badge.remove();
+        setTimeout(()=>{ if(!grid.matches(':hover') && !mainEl.matches(':hover')){ window._dragTitle=null; window._dragHTML=null; } }, 800);
       });
     }
+
     function refreshDraggables(){
-      // chat bubbles, code cards, quick starters, left pinned/project items, right inspector cards, session/docs cards
-      document.querySelectorAll('#main-scroll .space-y-5 > div, #main-scroll .grid button, #pane-left a, #pane-left .project-group > div > a, #pane-right .rounded-lg, #pane-right a, .grid a, pre').forEach(makeDraggable);
-      // also tiling panes themselves (header drag to reorder)
+      document.querySelectorAll('#pane-left a, #pane-left button.pane-action').forEach(makeDraggable);
+      document.querySelectorAll('#main-scroll .space-y-5 > div, #main-scroll .grid button, #main-scroll pre, #main-scroll .rounded-xl').forEach(makeDraggable);
+      document.querySelectorAll('#pane-right .rounded-lg, #pane-right a').forEach(makeDraggable);
+      document.querySelectorAll('.grid a, .space-y-2 a, .space-y-3 > div').forEach(el=>{
+        if(el.closest('#pane-left')||el.closest('#pane-right')) return;
+        makeDraggable(el);
+      });
       document.querySelectorAll('.tiling-pane').forEach(pane=>{
         const hdr = pane.querySelector('.h-7');
         if(hdr && !hdr.dataset.dragSetup){
           hdr.dataset.dragSetup="1";
-          hdr.draggable=true;
-          hdr.classList.add('cursor-grab');
+          hdr.setAttribute('draggable','true');
+          hdr.classList.add('cursor-grab','active:cursor-grabbing');
           hdr.addEventListener('dragstart', e=>{
             window._dragPane = pane;
+            window._dragIsPaneMove = true;
             e.dataTransfer.effectAllowed='move';
-            e.dataTransfer.setData('text/plain','pane-move');
+            try{ e.dataTransfer.setData('text/plain','pane-move'); }catch{}
+            e.stopPropagation();
+          });
+          hdr.addEventListener('dragend', ()=>{
+            window._dragPane=null; window._dragIsPaneMove=false;
           });
         }
       });
     }
     refreshDraggables();
-    // observe for new panes
     new MutationObserver(refreshDraggables).observe(document.body, {childList:true, subtree:true});
 
-    // drop handling for grid and panes
-    function createPaneFromDrag(title, html){
-      // ensure tiling visible
-      if(tilingView.classList.contains('hidden')){
-        if(typeof window.toggleTiling === 'function') window.toggleTiling(true);
+    document.addEventListener('dragstart', (e)=>{
+      const leftCard = e.target.closest('#pane-left a');
+      const anyCard = e.target.closest('#main-scroll .space-y-5 > div, #main-scroll .rounded-xl, #pane-right .rounded-lg, .grid a');
+      const src = leftCard || anyCard;
+      if(src && !window._dragHTML){
+        const title = getCardTitle(src);
+        const html = getCardHTML(src);
+        try{
+          e.dataTransfer.setData('text/plain', title);
+          e.dataTransfer.setData('text/html', html);
+        }catch{}
+        window._dragTitle=title; window._dragHTML=html;
+        window._dragSrc=src;
       }
-      const id = 'pane-' + Date.now().toString(36);
-      const pane = document.createElement('div');
-      pane.className = 'tiling-pane flex flex-col min-w-[300px] flex-1 bg-[#FAF9F5] border-l border-line overflow-hidden';
-      pane.dataset.pane = id;
-      pane.innerHTML = `
+    }, true);
+
+    function createPaneFromDrag(title, html){
+      if(tilingView.classList.contains('hidden')){
+        if(typeof window.toggleTiling==='function') window.toggleTiling(true);
+      }
+      const id='pane-'+Date.now().toString(36);
+      const pane=document.createElement('div');
+      pane.className='tiling-pane flex flex-col min-w-[300px] flex-1 bg-[#FAF9F5] border-l border-line overflow-hidden';
+      pane.dataset.pane=id;
+      const safeTitle = (title||'Yeni pane').replace(/</g,'&lt;').slice(0,50);
+      const safeHTML = html || '<div class="text-zinc-500">Boş</div>';
+      pane.innerHTML=`
             <div class="h-7 flex items-center gap-1.5 px-2.5 border-b border-line/60 bg-[#FDFCFB] shrink-0">
               <span class="w-1.5 h-1.5 rounded-full bg-terracotta"></span>
-              <span class="text-[11px] font-medium truncate">${title.replace(/</g,'&lt;')}</span>
+              <span class="text-[11px] font-medium truncate">${safeTitle}</span>
               <span class="ml-auto flex items-center gap-1">
                 <button onclick="closePane(this)" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Kapat">×</button>
               </span>
             </div>
             <div class="flex-1 overflow-y-auto p-3 space-y-2 bg-[#FAF9F5]">
-              <div class="rounded-lg bg-white border border-line p-3 shadow-sm text-[13px] leading-5 overflow-auto max-h-[60vh]">${html}</div>
+              <div class="rounded-lg bg-white border border-line p-3 shadow-sm text-[13px] leading-5 overflow-auto max-h-[60vh]">${safeHTML}</div>
             </div>
             <div class="shrink-0 p-2 border-t border-line bg-white/90 backdrop-blur">
               <div class="flex gap-1.5">
-                <input placeholder="Bu pane'e yaz..." class="flex-1 h-7 px-2.5 rounded-md bg-white border border-line text-[13px]" />
+                <input placeholder="Bu pane'e yaz..." class="flex-1 h-7 px-2.5 rounded-md bg-white border border-line text-[13px] placeholder:text-zinc-400 focus:outline-none focus:border-terracotta/40" />
                 <button class="px-3 h-7 rounded-full bg-terracotta text-white text-[12px] font-medium">Send</button>
               </div>
             </div>`;
-      // insert before hidden pane-c or at end
-      const paneC = document.getElementById('pane-c');
-      if(paneC && paneC.parentNode === grid){
+      const paneC=document.getElementById('pane-c');
+      if(paneC && paneC.parentNode===grid){
         grid.insertBefore(pane, paneC);
       } else {
         grid.appendChild(pane);
       }
       refreshDraggables();
+      pane.animate([{transform:'scale(0.98)', opacity:'0.6'},{transform:'scale(1)', opacity:'1'}],{duration:220, easing:'ease-out'});
     }
 
-    // allow drop on grid
-    grid.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; grid.classList.add('bg-terracotta/5'); });
-    grid.addEventListener('dragleave', ()=> grid.classList.remove('bg-terracotta/5'));
-    grid.addEventListener('drop', e=>{
+    function handleDrop(e, isGrid){
       e.preventDefault();
-      grid.classList.remove('bg-terracotta/5', 'ring-2','ring-terracotta/30');
-      // pane reorder?
-      if(window._dragPane && grid.contains(window._dragPane)){
-        const targetPane = e.target.closest('.tiling-pane');
-        if(targetPane && targetPane !== window._dragPane){
-          // reorder: insert dragged before target
+      grid.classList.remove('bg-terracotta/5','ring-2','ring-terracotta/30');
+      if(mainEl) mainEl.classList.remove('ring-1','ring-terracotta/20');
+      const badge=document.getElementById('drag-badge');
+      if(badge) badge.remove();
+      if(window._dragIsPaneMove && window._dragPane && grid.contains(window._dragPane)){
+        const targetPane=e.target.closest('.tiling-pane');
+        if(targetPane && targetPane!==window._dragPane){
           grid.insertBefore(window._dragPane, targetPane);
         }
-        window._dragPane=null;
+        window._dragPane=null; window._dragIsPaneMove=false;
         return;
       }
-      const title = window._dragTitle || e.dataTransfer.getData('text/plain') || 'Yeni pane';
-      const html = window._dragHTML || e.dataTransfer.getData('text/html') || '<div class="text-zinc-500">Boş</div>';
-      createPaneFromDrag(title, html);
-      window._dragHTML=null; window._dragTitle=null;
-    });
-
-    // also allow drop on single-view to create tiling pane (hint)
-    const mainScroll = document.getElementById('main-scroll');
-    if(mainScroll){
-      mainScroll.addEventListener('dragover', e=>{ e.preventDefault(); });
-      mainScroll.addEventListener('drop', e=>{
-        // if dropped on single view, create pane in tiling
-        if(e.target.closest('.tiling-pane')) return;
-        const title = window._dragTitle || 'Pane';
-        const html = window._dragHTML || '';
-        if(html){
-          e.preventDefault();
-          createPaneFromDrag(title, html);
-        }
-      });
+      const title = window._dragTitle || (e.dataTransfer?e.dataTransfer.getData('text/plain'):'') || 'Yeni pane';
+      const html = window._dragHTML || (e.dataTransfer?e.dataTransfer.getData('text/html'):'') || '';
+      if(html || title){
+        createPaneFromDrag(title, html);
+      }
+      window._dragHTML=null; window._dragTitle=null; window._dragSrc=null;
     }
 
-    // visual hint: when dragging, show floating badge
-    let badge=null;
-    document.addEventListener('dragstart', ()=>{
-      badge=document.createElement('div');
-      badge.className='fixed top-3 left-1/2 -translate-x-1/2 z-[9999] px-3 py-1.5 rounded-full bg-[#262624] text-white text-[11px] font-medium shadow-lg pointer-events-none';
-      badge.textContent='Pane'e bırak → tiling olarak aç';
-      document.body.appendChild(badge);
+    grid.addEventListener('dragover', e=>{ e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect='copy'; grid.classList.add('bg-terracotta/5'); });
+    grid.addEventListener('dragleave', ()=> grid.classList.remove('bg-terracotta/5'));
+    grid.addEventListener('drop', e=> handleDrop(e,true));
+
+    const singleViewEl=document.getElementById('single-view');
+    const mainScrollEl=document.getElementById('main-scroll');
+    [singleViewEl, mainScrollEl, mainEl].forEach(el=>{
+      if(!el) return;
+      el.addEventListener('dragover', e=>{ e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect='copy'; if(!tilingView.classList.contains('hidden')) return; el.classList.add('bg-terracotta/5'); });
+      el.addEventListener('dragleave', ()=> el.classList.remove('bg-terracotta/5'));
+      el.addEventListener('drop', e=>{
+        if(e.target.closest && e.target.closest('#tiling-grid')) return;
+        const hasHTML = window._dragHTML || (e.dataTransfer && e.dataTransfer.getData('text/html'));
+        if(!hasHTML) return;
+        e.preventDefault();
+        el.classList.remove('bg-terracotta/5');
+        handleDrop(e,false);
+      });
     });
-    document.addEventListener('dragend', ()=>{
-      if(badge){ badge.remove(); badge=null; }
-      window._dragPane=null;
-    });
+
+    const tilingHeader = tilingView.querySelector('.h-8');
+    if(tilingHeader){
+      tilingHeader.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
+      tilingHeader.addEventListener('drop', e=> handleDrop(e,true));
+    }
   })();
+
 
   // auto-resize textarea
   const ta = document.getElementById('composer-input');

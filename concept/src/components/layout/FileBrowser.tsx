@@ -74,11 +74,16 @@ export function FileBrowser({ onOpenFile }: { onOpenFile: (name: string) => void
           </Button>
           {openDocs && (
             <div className="ml-2 pl-3 border-l border-line/40 space-y-0.5 mt-0.5">
-              {["00-LOKMA-KONTEKST.md", "21-WEB-HARNESS.md", "36-AUTH.md"].map(n => (
+              {["00-LOKMA-KONTEKST.md", "21-WEB-HARNESS.md", "36-AUTH.md"]
+                .filter(n => !q || n.toLowerCase().includes(q.toLowerCase()))
+                .map(n => (
                 <Button key={n} variant="ghost" size="sm" onClick={() => onOpenFile(n)} className="w-full justify-start gap-2 px-1.5 h-6 text-xs">
                   <File className="w-3 h-3" /> {n}
                 </Button>
               ))}
+              {["00-LOKMA-KONTEKST.md", "21-WEB-HARNESS.md", "36-AUTH.md"].filter(n => !q || n.toLowerCase().includes(q.toLowerCase())).length === 0 && (
+                <div className="px-1.5 py-1 text-[11px] text-zinc-400">Eşleşen doküman yok</div>
+              )}
             </div>
           )}
         </div>

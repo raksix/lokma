@@ -5,6 +5,7 @@ import { FileBrowser } from "@/components/layout/FileBrowser"
 import { Pane, CodePaneContent } from "@/components/layout/Pane"
 import { BrowserPane } from "@/components/layout/BrowserPane"
 import { MobilePane } from "@/components/layout/MobilePane"
+import { SearchModal } from "@/components/layout/SearchModal"
 import { Composer } from "@/components/layout/Composer"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -29,6 +30,7 @@ export default function App() {
   const [focusedPane, setFocusedPane] = useState<string>("a")
   const [extraPanes, setExtraPanes] = useState<PaneData[]>([])
   const [toast, setToast] = useState<string | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [tileLeftW, setTileLeftW] = useState(520)
   const dragRef = useRef<{ startX: number; startW: number; side: "left" | "right" } | null>(null)
   const tileDragRef = useRef<{ startX: number; startW: number } | null>(null)
@@ -45,12 +47,18 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault()
+        setSearchOpen(v => !v)
+        return
+      }
       if (e.key === "[" && !e.metaKey && !e.ctrlKey) setLeftCollapsed(v => !v)
       if (e.key === "]" && !e.metaKey && !e.ctrlKey) setRightCollapsed(v => !v)
+      if (e.key === "Escape" && searchOpen) setSearchOpen(false)
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [])
+  }, [searchOpen])
 
   const startDrag = (e: React.MouseEvent, side: "left" | "right") => {
     e.preventDefault()
@@ -147,6 +155,7 @@ export default function App() {
           if (!tiling) setTiling(true)
           setShowMobile(true)
         }}
+        onSearch={() => setSearchOpen(true)}
       />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -279,9 +288,11 @@ export default function App() {
       </div>
 
       <div className="h-6 border-t border-line bg-[#FDFCFB] dark:bg-[#161618] flex items-center px-3 text-[11px] text-zinc-500">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> All systems normal · sürükle resize aktif · [ / ] kısayollar
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> All systems normal · sürükle resize aktif · [ / ] paneller · ⌘K ara
         <span className="ml-auto">UI Kit — Button, Card, Input, Composer, Pane, FileBrowser · Vite 6 · Tailwind v4</span>
       </div>
+
+      <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} onOpenDoc={handleOpenFile} />
 
       {toast && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-3 py-1.5 rounded-full bg-[#262624] text-white text-xs shadow-lg border border-white/10 animate-pulse">

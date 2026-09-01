@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button"
 import { Moon, Sun, Search, Globe, Smartphone } from "lucide-react"
 import { useEffect, useState } from "react"
 
-export function Header({ onToggleLeft, onToggleRight, onOpenBrowser, onOpenMobile }: { onToggleLeft: () => void; onToggleRight: () => void; onOpenBrowser: () => void; onOpenMobile: () => void }) {
+export function Header({ onToggleLeft, onToggleRight, onOpenBrowser, onOpenMobile, onSearch }: { onToggleLeft: () => void; onToggleRight: () => void; onOpenBrowser: () => void; onOpenMobile: () => void; onSearch: () => void }) {
   const [dark, setDark] = useState(false)
   useEffect(() => {
     const stored = localStorage.getItem("lokma-theme")
@@ -56,7 +56,7 @@ export function Header({ onToggleLeft, onToggleRight, onOpenBrowser, onOpenMobil
           <Button variant="outline" size="iconSm" onClick={toggle} title="Tema">
             {dark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
           </Button>
-          <Button variant="outline" size="iconSm" onClick={() => toast("Ara — yakında")} title="Ara">
+          <Button variant="outline" size="iconSm" onClick={onSearch} title="Ara ⌘K">
             <Search className="w-3.5 h-3.5" />
           </Button>
           <Button variant="outline" size="iconSm" onClick={onToggleRight} title="Sağ panel ]">

@@ -135,6 +135,21 @@
   .tiling-resize-handle.se { right:-4px; bottom:-4px; width:14px; height:14px; cursor:nwse-resize; }
   html.dark .tiling-resize-handle.e::after, html.dark .tiling-resize-handle.s::after { background:#2A2A2E; }
   #tiling-grid.windowed .tiling-resize-handle { display:none !important; }
+  /* Pane tabs + focus */
+  .pane-tab-bar { scrollbar-width:none; -ms-overflow-style:none; }
+  .pane-tab-bar::-webkit-scrollbar { display:none; }
+  .pane-tabs { scrollbar-width:none; }
+  .pane-tabs::-webkit-scrollbar { display:none; }
+  .pane-tab { transition: all 120ms; border:1px solid transparent; }
+  .pane-tab.active { background:#262624 !important; color:white !important; border-color:#262624 !important; }
+  html.dark .pane-tab.active { background:#EDE9E2 !important; color:#0F0F11 !important; border-color:#EDE9E2 !important; }
+  .pane-tab:not(.active):hover { background:white; border-color:#E8E4DE; }
+  html.dark .pane-tab:not(.active):hover { background:#1E1E21; border-color:#2A2A2E; }
+  .tiling-pane.focused { border-color: rgba(201,100,66,0.4) !important; box-shadow: 0 0 0 1px rgba(201,100,66,0.25) inset; }
+  .tiling-pane.focused .pane-tab-bar { background:#FDF0E6 !important; }
+  html.dark .tiling-pane.focused .pane-tab-bar { background:#1E1E21 !important; }
+  .pane-tab-content { display:none; }
+  .pane-tab-content.active { display:block; }
 
   /* robust dark fallbacks via attribute selector */
   html.dark [class*="bg-[#FAF9F5]"] { background-color:#0F0F11 !important; }
@@ -705,26 +720,34 @@
           </span>
         </div>
         <div id="tiling-grid" class="flex flex-1 min-h-0 overflow-hidden">
-          <!-- Pane A — Chat -->
-          <div class="tiling-pane flex-1 flex flex-col min-w-[300px] bg-[#FAF9F5] overflow-hidden" data-pane="a">
-            <div class="h-7 flex items-center gap-1.5 px-2.5 border-b border-line/60 bg-[#FDFCFB] shrink-0">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              <span class="text-[11px] font-medium truncate">Chat #482 — Refactor auth middleware</span>
-              <span class="ml-auto flex items-center gap-1">
-                <button onclick="splitPane(this)" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Yanına pane ekle">⊞</button>
-                <button onclick="closePane(this)" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Kapat">×</button>
-              </span>
+          <!-- Pane A — Chat (tabbed) -->
+          <div class="tiling-pane flex-1 flex flex-col min-w-[300px] bg-[#FAF9F5] overflow-hidden" data-pane="a" onclick="setFocusedPane(this)">
+            <div class="pane-tab-bar h-7 flex items-center gap-1 px-1 border-b border-line/60 bg-[#FDFCFB] shrink-0">
+              <div class="pane-tabs flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
+                <button class="pane-tab active flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#262624] text-white text-[11px] font-medium whitespace-nowrap" data-tab="tab-a-1" onclick="switchTab(this); event.stopPropagation();">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  Chat #482
+                  <span class="w-3.5 h-3.5 grid place-items-center rounded hover:bg-white/15 ml-1 text-[11px]" onclick="closeTab(event, this)">×</span>
+                </button>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                <button onclick="addTabToPane(this.closest('.tiling-pane')); event.stopPropagation();" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Yeni tab">+</button>
+                <button onclick="splitPane(this); event.stopPropagation();" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Yanına pane ekle">⊞</button>
+                <button onclick="closePane(this); event.stopPropagation();" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Kapat">×</button>
+              </div>
             </div>
-            <div class="flex-1 overflow-y-auto p-3 space-y-3 bg-[#FAF9F5]">
-              <div class="p-3 rounded-xl bg-white border border-line shadow-sm">
-                <div class="text-[12.5px] font-semibold">Aylin</div>
-                <div class="text-[13px] leading-5 mt-1">Let\'s refactor the auth middleware. Move JWT verification into a Fastify <code class="px-1 py-0.5 rounded bg-muted border border-line text-[11px] font-mono">preHandler</code> hook.</div>
+            <div class="pane-tab-contents flex-1 overflow-y-auto bg-[#FAF9F5] relative">
+              <div class="pane-tab-content active p-3 space-y-3" data-tab="tab-a-1">
+                <div class="p-3 rounded-xl bg-white border border-line shadow-sm">
+                  <div class="text-[12.5px] font-semibold">Aylin</div>
+                  <div class="text-[13px] leading-5 mt-1">Let&apos;s refactor the auth middleware. Move JWT verification into a Fastify <code class="px-1 py-0.5 rounded bg-muted border border-line text-[11px] font-mono">preHandler</code> hook.</div>
+                </div>
+                <div class="p-3 rounded-xl bg-[#262624] text-white">
+                  <div class="text-[12.5px] font-semibold">Lokma — Claude 4 Sonnet</div>
+                  <div class="text-[13px] leading-5 mt-1 text-white/90">Perfect — one hook, one decorator, zero magic. <span class="underline decoration-white/30">Apply patch</span></div>
+                </div>
+                <div class="text-[11px] text-zinc-400 text-center">— pane A · tab 1 — sürükle pane’e ekle, soldan yeni session tab olarak gelir —</div>
               </div>
-              <div class="p-3 rounded-xl bg-[#262624] text-white">
-                <div class="text-[12.5px] font-semibold">Lokma — Claude 4 Sonnet</div>
-                <div class="text-[13px] leading-5 mt-1 text-white/90">Perfect — one hook, one decorator, zero magic. <span class="underline decoration-white/30">Apply patch</span></div>
-              </div>
-              <div class="text-[11px] text-zinc-400 text-center">— pane A scroll —</div>
             </div>
             <div class="shrink-0 p-2 border-t border-line bg-white/90 backdrop-blur">
               <div class="flex gap-1.5">
@@ -737,22 +760,30 @@
           <div id="tiling-divider" class="w-1.5 bg-line hover:bg-[#CFC9BF] cursor-col-resize shrink-0 relative flex items-center justify-center" title="Sürükle · çift tıkla sıfırla">
             <span class="w-0.5 h-7 bg-zinc-300 rounded-full pointer-events-none"></span>
           </div>
-          <!-- Pane B — Code / Second chat -->
-          <div class="tiling-pane flex-1 flex flex-col min-w-[300px] bg-[#FAF9F5] overflow-hidden" data-pane="b">
-            <div class="h-7 flex items-center gap-1.5 px-2.5 border-b border-line/60 bg-[#FDFCFB] shrink-0">
-              <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-              <span class="text-[11px] font-medium truncate">Code — plugins/auth.ts</span>
-              <span class="ml-auto flex items-center gap-1">
-                <button onclick="splitPane(this)" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Böl">⊞</button>
-                <button onclick="closePane(this)" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Kapat">×</button>
-              </span>
+          <!-- Pane B — Code (tabbed) -->
+          <div class="tiling-pane flex-1 flex flex-col min-w-[300px] bg-[#FAF9F5] overflow-hidden" data-pane="b" onclick="setFocusedPane(this)">
+            <div class="pane-tab-bar h-7 flex items-center gap-1 px-1 border-b border-line/60 bg-[#FDFCFB] shrink-0">
+              <div class="pane-tabs flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
+                <button class="pane-tab active flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#262624] text-white text-[11px] font-medium whitespace-nowrap" data-tab="tab-b-1" onclick="switchTab(this); event.stopPropagation();">
+                  <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                  auth.ts
+                  <span class="w-3.5 h-3.5 grid place-items-center rounded hover:bg-white/15 ml-1 text-[11px]" onclick="closeTab(event, this)">×</span>
+                </button>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                <button onclick="addTabToPane(this.closest('.tiling-pane')); event.stopPropagation();" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Yeni tab">+</button>
+                <button onclick="splitPane(this); event.stopPropagation();" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Böl">⊞</button>
+                <button onclick="closePane(this); event.stopPropagation();" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Kapat">×</button>
+              </div>
             </div>
-            <div class="flex-1 overflow-y-auto p-0 bg-white">
-              <div class="px-3 py-1.5 bg-muted/50 border-b border-line text-[11px] font-mono text-zinc-500">plugins/auth.ts — diff</div>
-              <pre class="p-3 text-[11.5px] leading-5 font-mono overflow-x-auto"><code><span class="text-zinc-400">// Fastify preHandler</span>
+            <div class="pane-tab-contents flex-1 overflow-y-auto bg-white relative">
+              <div class="pane-tab-content active" data-tab="tab-b-1">
+                <div class="px-3 py-1.5 bg-muted/50 border-b border-line text-[11px] font-mono text-zinc-500">plugins/auth.ts — diff</div>
+                <pre class="p-3 text-[11.5px] leading-5 font-mono overflow-x-auto"><code><span class="text-zinc-400">// Fastify preHandler</span>
 <span class="text-[#9A6B4A]">app</span>.addHook(<span class="text-[#6A8A4A]">'preHandler'</span>, <span class="text-[#9A6B4A]">async</span> (req, reply) =&gt; {
   <span class="text-[#9A6B4A]">if</span> (!req.routeOptions.config?.auth) <span class="text-[#9A6B4A]">return</span>
 })</code></pre>
+              </div>
             </div>
             <div class="shrink-0 p-2 border-t border-line bg-white/90 backdrop-blur">
               <div class="flex gap-1.5">
@@ -761,19 +792,27 @@
               </div>
             </div>
           </div>
-          <!-- Pane C — hidden initially, for + Pane demo -->
-          <div id="pane-c" class="tiling-pane hidden flex-1 flex flex-col min-w-[280px] bg-[#FAF9F5] border-l border-line overflow-hidden" data-pane="c">
-            <div class="h-7 flex items-center gap-1.5 px-2.5 border-b border-line/60 bg-[#FDFCFB] shrink-0">
-              <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-              <span class="text-[11px] font-medium truncate">Chat #483 — New pane</span>
-              <span class="ml-auto flex items-center gap-1">
-                <button onclick="closePane(this)" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500">×</button>
-              </span>
+          <!-- Pane C — hidden, tabbed -->
+          <div id="pane-c" class="tiling-pane hidden flex-1 flex flex-col min-w-[280px] bg-[#FAF9F5] border-l border-line overflow-hidden" data-pane="c" onclick="setFocusedPane(this)">
+            <div class="pane-tab-bar h-7 flex items-center gap-1 px-1 border-b border-line/60 bg-[#FDFCFB] shrink-0">
+              <div class="pane-tabs flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
+                <button class="pane-tab active flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#262624] text-white text-[11px] font-medium whitespace-nowrap" data-tab="tab-c-1" onclick="switchTab(this); event.stopPropagation();">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                  New pane
+                  <span class="w-3.5 h-3.5 grid place-items-center rounded hover:bg-white/15 ml-1 text-[11px]" onclick="closeTab(event, this)">×</span>
+                </button>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                <button onclick="addTabToPane(this.closest('.tiling-pane')); event.stopPropagation();" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Yeni tab">+</button>
+                <button onclick="closePane(this); event.stopPropagation();" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500">×</button>
+              </div>
             </div>
-            <div class="flex-1 overflow-y-auto p-3">
-              <div class="rounded-lg border border-dashed border-line-strong p-6 text-center">
-                <div class="text-[13px] font-medium">Yeni pane</div>
-                <div class="text-[12px] text-zinc-500 mt-1">Boş pane — buraya chat, terminal veya artifact gelebilir.</div>
+            <div class="pane-tab-contents flex-1 overflow-y-auto p-3 bg-[#FAF9F5]">
+              <div class="pane-tab-content active" data-tab="tab-c-1">
+                <div class="rounded-lg border border-dashed border-line-strong p-6 text-center">
+                  <div class="text-[13px] font-medium">Yeni pane</div>
+                  <div class="text-[12px] text-zinc-500 mt-1">Boş pane — buraya chat, terminal veya artifact gelebilir.</div>
+                </div>
               </div>
             </div>
             <div class="shrink-0 p-2 border-t border-line bg-white/90">
@@ -1100,37 +1139,7 @@
       });
     });
   }
-  // file items open as pane on click
-  document.querySelectorAll('#file-tree .file-item').forEach(a=>{
-    a.addEventListener('click', (e)=>{
-      e.preventDefault();
-      const name = a.innerText.trim().split('\n')[0].slice(0,30);
-      const html = `<div class="font-mono text-[12px]"><div class="text-zinc-500">// ${name}</div><pre class="mt-2 p-2 bg-muted rounded border border-line overflow-auto">/* file preview: ${name} */\nexport const demo = true;</pre></div>`;
-      if(typeof window.createPaneFromDrag === 'function'){
-        // use internal create
-        const title = name;
-        // fallback create via global
-        const evt = { preventDefault:()=>{} };
-        // directly call create
-        const grid=document.getElementById('tiling-grid');
-        if(grid){
-          // ensure tiling visible
-          if(document.getElementById('tiling-view').classList.contains('hidden')) window.toggleTiling(true);
-          const pane=document.createElement('div');
-          pane.className='tiling-pane flex flex-col min-w-[300px] flex-1 bg-[#FAF9F5] border-l border-line overflow-hidden';
-          pane.innerHTML=`
-            <div class="h-7 flex items-center gap-1.5 px-2.5 border-b border-line/60 bg-[#FDFCFB] shrink-0">
-              <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-              <span class="text-[11px] font-mono truncate">${name.replace(/</g,'&lt;')}</span>
-              <span class="ml-auto flex gap-1"><button onclick="closePane(this)" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500">×</button></span>
-            </div>
-            <div class="flex-1 overflow-y-auto p-3 bg-white"><pre class="text-[12px] leading-5 font-mono">${html}</pre></div>`;
-          const paneC=document.getElementById('pane-c');
-          if(paneC && paneC.parentNode===grid) grid.insertBefore(pane, paneC); else grid.appendChild(pane);
-        }
-      }
-    });
-  });
+  // file items now open as tab in focused pane — handled below via delegated click
 
   // --- Harness Browser (AI kontrollü) + Mobile Preview ---
   window.openBrowserPane = function(url){
@@ -1956,6 +1965,163 @@
       }));
     }).observe(grid, {childList:true, subtree:true});
     // also make window handles work in tiling mode (already added via windowed, but ensure all panes have window handles when windowed)
+  })();
+
+  // --- Pane tabs + focus (sidebar yeni session -> focus pane'e tab) ---
+  let focusedPane = null;
+  window.setFocusedPane = function(pane){
+    if(!pane) return;
+    document.querySelectorAll('.tiling-pane').forEach(p=> p.classList.remove('focused'));
+    pane.classList.add('focused');
+    focusedPane = pane;
+  };
+  // init focused pane to first visible
+  (function(){
+    const first = document.querySelector('#tiling-grid .tiling-pane:not(.hidden)');
+    if(first) setFocusedPane(first);
+    // click any pane to focus
+    document.getElementById('tiling-grid')?.addEventListener('click', e=>{
+      const pane = e.target.closest('.tiling-pane');
+      if(pane) setFocusedPane(pane);
+    });
+    // also focus when switching to tiling
+    const origToggle = window.toggleTiling;
+    if(origToggle){
+      window.toggleTiling = function(show){
+        origToggle(show);
+        if(show){
+          const first2 = document.querySelector('#tiling-grid .tiling-pane:not(.hidden)');
+          if(first2) setTimeout(()=> setFocusedPane(first2), 50);
+        }
+      };
+    }
+  })();
+
+  function genTabId(pane){
+    return 'tab-' + pane.dataset.pane + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2,4);
+  }
+  window.switchTab = function(tabBtn){
+    const pane = tabBtn.closest('.tiling-pane');
+    if(!pane) return;
+    const tabId = tabBtn.dataset.tab;
+    pane.querySelectorAll('.pane-tab').forEach(t=> t.classList.toggle('active', t===tabBtn));
+    pane.querySelectorAll('.pane-tab-content').forEach(c=> c.classList.toggle('active', c.dataset.tab===tabId));
+    setFocusedPane(pane);
+  };
+  window.closeTab = function(e, closeBtn){
+    e.stopPropagation();
+    const tabBtn = closeBtn.closest('.pane-tab');
+    const pane = tabBtn.closest('.tiling-pane');
+    const tabId = tabBtn.dataset.tab;
+    const content = pane.querySelector(`.pane-tab-content[data-tab="${tabId}"]`);
+    const wasActive = tabBtn.classList.contains('active');
+    tabBtn.remove();
+    if(content) content.remove();
+    const remaining = pane.querySelectorAll('.pane-tab');
+    if(remaining.length===0){
+      // if no tabs left, close pane if more than one pane, else create empty tab
+      const visiblePanes = Array.from(document.querySelectorAll('#tiling-grid .tiling-pane')).filter(p=> !p.classList.contains('hidden'));
+      if(visiblePanes.length > 1){
+        pane.classList.add('hidden');
+        pane.classList.remove('flex','focused');
+        // focus another pane
+        const next = visiblePanes.find(p=> p!==pane);
+        if(next) setFocusedPane(next);
+      } else {
+        // keep one empty tab
+        addTabToPane(pane, 'Yeni sekme', '<div class="text-zinc-500">Boş sekme</div>');
+      }
+    } else if(wasActive){
+      const last = remaining[remaining.length-1];
+      switchTab(last);
+    }
+  };
+  window.addTabToPane = function(pane, title, html){
+    if(!pane) pane = focusedPane || document.querySelector('#tiling-grid .tiling-pane:not(.hidden)');
+    if(!pane) return;
+    setFocusedPane(pane);
+    const tabId = genTabId(pane);
+    const tabsWrap = pane.querySelector('.pane-tabs');
+    const contentsWrap = pane.querySelector('.pane-tab-contents');
+    if(!tabsWrap || !contentsWrap) return;
+    // deactivate old
+    pane.querySelectorAll('.pane-tab').forEach(t=> t.classList.remove('active'));
+    pane.querySelectorAll('.pane-tab-content').forEach(c=> c.classList.remove('active'));
+    const tabBtn = document.createElement('button');
+    tabBtn.className='pane-tab active flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#262624] text-white text-[11px] font-medium whitespace-nowrap';
+    tabBtn.dataset.tab = tabId;
+    tabBtn.onclick = function(){ switchTab(tabBtn); };
+    const dotColor = pane.dataset.pane==='a' ? 'bg-emerald-500' : pane.dataset.pane==='b' ? 'bg-blue-500' : 'bg-amber-500';
+    const safeTitle = (title||'Yeni sekme').replace(/</g,'&lt;').slice(0,28);
+    tabBtn.innerHTML=`<span class="w-1.5 h-1.5 rounded-full ${dotColor}"></span> ${safeTitle} <span class="w-3.5 h-3.5 grid place-items-center rounded hover:bg-white/15 ml-1 text-[11px]" onclick="closeTab(event, this)">×</span>`;
+    tabsWrap.appendChild(tabBtn);
+    const content = document.createElement('div');
+    content.className='pane-tab-content active p-3 space-y-2';
+    content.dataset.tab = tabId;
+    content.innerHTML = html || '<div class="text-zinc-500">Yeni sekme</div>';
+    contentsWrap.appendChild(content);
+    // scroll tabs into view
+    tabBtn.scrollIntoView({behavior:'smooth', block:'nearest', inline:'nearest'});
+    return tabId;
+  };
+  window.addTabToFocusedPane = function(title, html){
+    return addTabToPane(focusedPane, title, html);
+  };
+  // Sidebar -> tab in focused pane
+  (function(){
+    function handleSidebarTab(e, title, html){
+      e.preventDefault();
+      // ensure tiling visible
+      if(document.getElementById('tiling-view').classList.contains('hidden')){
+        if(typeof window.toggleTiling==='function') window.toggleTiling(true);
+      }
+      // if no focused pane, focus first
+      if(!focusedPane || focusedPane.classList.contains('hidden')){
+        const first = document.querySelector('#tiling-grid .tiling-pane:not(.hidden)');
+        if(first) setFocusedPane(first);
+      }
+      addTabToFocusedPane(title, html);
+    }
+    // New session + all left links
+    document.addEventListener('click', e=>{
+      const a = e.target.closest('#pane-left a');
+      if(!a) return;
+      // ignore if it's a toggle button already handled
+      if(a.closest('.project-group') && a.tagName==='BUTTON') return;
+      const text = a.innerText.trim().split('\n')[0].slice(0,32);
+      const isNew = text.toLowerCase().includes('new session');
+      if(isNew){
+        handleSidebarTab(e, 'Yeni session', `
+          <div class="p-3 rounded-xl bg-white border border-line shadow-sm">
+            <div class="text-[12px] font-semibold">Yeni session</div>
+            <div class="text-[13px] leading-5 mt-1">Boş session — buradan başla. Komut yaz, pane olarak sürükle.</div>
+            <div class="mt-3 flex gap-1.5"><span class="px-2 py-1 rounded-full bg-muted border border-line text-[11px]">Claude 4 Sonnet</span><span class="px-2 py-1 rounded-full bg-terracotta/10 border border-terracotta/20 text-terracotta text-[11px]">Steer</span></div>
+          </div>
+          <div class="p-3 rounded-xl bg-[#FDF0E6] border border-[#F2D5C2] text-[12px]">Focus pane'e tab olarak eklendi — diğer panelleri de tab’layabilirsin.</div>
+        `);
+      } else {
+        // for any other sidebar item, copy its outerHTML as preview
+        const preview = `<div class="rounded-lg bg-white border border-line p-2 text-[12px]">${a.outerHTML}</div><div class="mt-2 text-[12px] text-zinc-500">Soldan <b>${text.replace(/</g,'&lt;')}</b> focus pane'e tab olarak açıldı.</div>`;
+        handleSidebarTab(e, text, preview);
+      }
+    });
+    // also handle file browser right sidebar items -> tab
+    document.addEventListener('click', e=>{
+      const f = e.target.closest('#file-tree .file-item');
+      if(!f) return;
+      e.preventDefault();
+      const name = f.innerText.trim().split('\n')[0].slice(0,32);
+      const html = `<div class="font-mono text-[12px]"><div class="text-zinc-500">// ${name.replace(/</g,'&lt;')}</div><pre class="mt-2 p-2 bg-muted rounded border border-line overflow-auto">/* file preview: ${name.replace(/</g,'&lt;')} */\nexport const demo = true;</pre><div class="mt-2 text-[11px] text-zinc-500">Sağ file browser → focus pane'e tab olarak eklendi.</div></div>`;
+      // ensure tiling visible and focused
+      if(document.getElementById('tiling-view').classList.contains('hidden')){
+        if(typeof window.toggleTiling==='function') window.toggleTiling(true);
+      }
+      if(!focusedPane) {
+        const first = document.querySelector('#tiling-grid .tiling-pane:not(.hidden)');
+        if(first) setFocusedPane(first);
+      }
+      addTabToFocusedPane(name, html);
+    });
   })();
 
   // --- Drag-to-pane: sitedeki her şey pane'e sürüklenebilir (FIX soldan sürükle) ---

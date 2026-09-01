@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Header } from "@/components/layout/Header"
 import { SidebarLeft } from "@/components/layout/SidebarLeft"
 import { FileBrowser } from "@/components/layout/FileBrowser"
@@ -14,6 +14,14 @@ type PaneData = { id: string; title: string; content: React.ReactNode }
 export default function App() {
   const [leftCollapsed, setLeftCollapsed] = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
+  const [leftW, setLeftW] = useState(() => {
+    const v = localStorage.getItem("lokma-pane-left")
+    return v ? parseInt(v, 10) : 268
+  })
+  const [rightW, setRightW] = useState(() => {
+    const v = localStorage.getItem("lokma-pane-right")
+    return v ? parseInt(v, 10) : 300
+  })
   const [tiling, setTiling] = useState(false)
   const [windowed, setWindowed] = useState(false)
   const [showBrowser, setShowBrowser] = useState(false)
@@ -21,6 +29,7 @@ export default function App() {
   const [focusedPane, setFocusedPane] = useState<string>("a")
   const [extraPanes, setExtraPanes] = useState<PaneData[]>([])
   const [toast, setToast] = useState<string | null>(null)
+  const dragRef = useRef<{ startX: number; startW: number; side: "left" | "right" } | null>(null)
 
   useEffect(() => {
     const h = (e: Event) => {
@@ -31,6 +40,51 @@ export default function App() {
     window.addEventListener("lokma-toast", h as EventListener)
     return () => window.removeEventListener("lokma-toast", h as EventListener)
   }, [])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "[" && !e.metaKey && !e.ctrlKey) setLeftCollapsed(v => !v)
+      if (e.key === "]" && !e.metaKey && !e.ctrlKey) setRightCollapsed(v => !v)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
+
+  const startDrag = (e: React.MouseEvent, side: "left" | "right") => {
+    e.preventDefault()
+    const startW = side === "left" ? leftW : rightW
+    dragRef.current = { startX: e.clientX, startW, side }
+    document.body.classList.add("resizing")
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return
+      const dx = ev.clientX - dragRef.current.startX
+      if (dragRef.current.side === "left") {
+        const nw = Math.max(180, Math.min(380, dragRef.current.startW + dx))
+        setLeftW(nw)
+      } else {
+        const nw = Math.max(240, Math.min(480, dragRef.current.startW - dx))
+        setRightW(nw)
+      }
+    }
+    const onUp = () => {
+      document.body.classList.remove("resizing")
+      if (dragRef.current) {
+        localStorage.setItem(dragRef.current.side === "left" ? "lokma-pane-left" : "lokma-pane-right", String(dragRef.current.side === "left" ? leftW : rightW))
+        // persist final width from state (need latest)
+        setTimeout(() => {
+          const lw = document.getElementById("pane-left-wrap")?.getBoundingClientRect().width
+          const rw = document.getElementById("pane-right-wrap")?.getBoundingClientRect().width
+          if (lw) localStorage.setItem("lokma-pane-left", String(Math.round(lw)))
+          if (rw) localStorage.setItem("lokma-pane-right", String(Math.round(rw)))
+        }, 50)
+      }
+      dragRef.current = null
+      window.removeEventListener("mousemove", onMove)
+      window.removeEventListener("mouseup", onUp)
+    }
+    window.addEventListener("mousemove", onMove)
+    window.addEventListener("mouseup", onUp)
+  }
 
   const handleOpenTab = (title: string, content: React.ReactNode) => {
     if (!tiling) setTiling(true)
@@ -55,6 +109,10 @@ export default function App() {
         <span className="ml-auto hidden md:flex items-center gap-1.5 text-[10px]">
           <span className="px-2 py-1 rounded-full bg-white/10 border border-white/10">Pane system</span>
           <span className="px-2 py-1 rounded-full bg-white/10 border border-white/10">UI Kit</span>
+          <span className="hidden lg:inline-flex gap-1 ml-1">
+            <kbd className="px-1 py-0.5 rounded bg-white/10 border border-white/10 text-[10px]">[</kbd>
+            <kbd className="px-1 py-0.5 rounded bg-white/10 border border-white/10 text-[10px]">]</kbd>
+          </span>
         </span>
       </div>
 
@@ -72,8 +130,26 @@ export default function App() {
       />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        {!leftCollapsed && <SidebarLeft onOpenTab={handleOpenTab} />}
-        <div className="w-px bg-line dark:bg-[#232326] shrink-0 hidden xl:block" />
+        {!leftCollapsed && (
+          <div id="pane-left-wrap" style={{ width: leftW }} className="shrink-0 flex">
+            <SidebarLeft onOpenTab={handleOpenTab} />
+          </div>
+        )}
+        {!leftCollapsed && (
+          <div
+            onMouseDown={e => startDrag(e, "left")}
+            onDoubleClick={() => setLeftCollapsed(true)}
+            className="w-1 bg-line hover:bg-[#CFC9BF] dark:bg-[#232326] dark:hover:bg-[#3A3A3E] cursor-col-resize shrink-0 hidden xl:flex items-center justify-center group"
+            title="Sürükle yeniden boyutlandır · çift tık gizle"
+          >
+            <span className="w-0.5 h-7 bg-zinc-300 dark:bg-zinc-600 rounded-full opacity-0 group-hover:opacity-100 transition" />
+          </div>
+        )}
+        {leftCollapsed && (
+          <button onClick={() => setLeftCollapsed(false)} className="w-6 shrink-0 hidden xl:grid place-items-center bg-[#FDFCFB] dark:bg-[#161618] border-r border-line hover:bg-muted text-zinc-400" title="Sol paneli aç [">
+            ›
+          </button>
+        )}
 
         <main className="flex-1 min-w-0 flex flex-col bg-[#FAF9F5] dark:bg-[#0F0F11] overflow-hidden">
           {!tiling ? (
@@ -108,11 +184,11 @@ export default function App() {
                   </div>
 
                   <div className="mt-6 space-y-4">
-                    <Card className="p-3 cursor-pointer" onClick={() => handleOpenTab("Auth middleware", <div className="p-3">Auth middleware details</div>)}>
+                    <Card className="p-3 cursor-pointer hover:shadow-sm transition" onClick={() => handleOpenTab("Auth middleware", <div className="p-3">Auth middleware details — preHandler hook</div>)}>
                       <div className="text-xs font-semibold">Aylin</div>
                       <div className="text-sm mt-1">Let's refactor the auth middleware. Move JWT verification into a Fastify <code className="px-1 py-0.5 rounded bg-muted border border-line text-xs">preHandler</code> hook.</div>
                     </Card>
-                    <Card className="p-3 bg-[#262624] text-white dark:bg-[#1E1E21] cursor-pointer" onClick={() => handleOpenTab("Lokma yanıt", <div className="p-3">One hook, one decorator, zero magic — detay</div>)}>
+                    <Card className="p-3 bg-[#262624] text-white dark:bg-[#1E1E21] cursor-pointer hover:shadow-md transition" onClick={() => handleOpenTab("Lokma yanıt", <div className="p-3">One hook, one decorator, zero magic — detay</div>)}>
                       <div className="text-xs font-semibold">Lokma — Claude 4 Sonnet</div>
                       <div className="text-sm mt-1">Perfect — one hook, one decorator, zero magic.</div>
                     </Card>
@@ -130,7 +206,7 @@ export default function App() {
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               <div className="h-8 flex items-center gap-2 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#161618] shrink-0">
                 <span className="px-2 py-1 rounded-md bg-[#262624] text-white text-xs">Tiling</span>
-                <span className="text-xs text-zinc-500 hidden sm:inline">pane’leri sürükle · tab olarak aç · windowed ile serbest yerleştir</span>
+                <span className="text-xs text-zinc-500 hidden sm:inline">pane’leri sürükle · tab olarak aç · windowed ile serbest yerleştir — [ / ] paneller</span>
                 <span className="ml-auto flex gap-1.5">
                   <Button variant={windowed ? "ink" : "outline"} size="sm" className="h-6 text-xs gap-1" onClick={() => setWindowed(!windowed)}>
                     Windowed
@@ -143,11 +219,9 @@ export default function App() {
                   </Button>
                 </span>
               </div>
-              <div className={`flex flex-1 min-h-0 overflow-hidden ${windowed ? "relative bg-[#FAF9F5] dark:bg-[#0F0F11] p-2 gap-2" : ""}`}>
-                <Pane id="a" initialTabs={[{ id: "tab-a-1", title: "Chat #482", content: <div className="space-y-3"><Card className="p-3"><div className="text-xs font-semibold">Aylin</div><div className="text-sm mt-1">Refactor auth middleware</div></Card><Card className="p-3 bg-[#262624] text-white"><div className="text-xs font-semibold">Lokma</div><div className="text-sm mt-1">One hook, one decorator.</div></Card></div> }]} isFocused={focusedPane === "a"} onFocus={() => setFocusedPane("a")} onClosePane={() => {}} onSplit={() => setExtraPanes(p => [...p, { id: `pane-${Date.now()}`, title: "Split pane", content: <div className="p-3">Split pane</div> }])} />
-                <div className="w-1.5 bg-line hover:bg-[#CFC9BF] cursor-col-resize shrink-0 hidden lg:flex items-center justify-center">
-                  <span className="w-0.5 h-7 bg-zinc-300 rounded-full" />
-                </div>
+              <div className={`flex flex-1 min-h-0 overflow-hidden ${windowed ? "relative bg-[#FAF9F5] dark:bg-[#0F0F11] p-2 gap-2 flex-wrap content-start overflow-auto" : ""}`}>
+                <Pane id="a" initialTabs={[{ id: "tab-a-1", title: "Chat #482", content: <div className="space-y-3"><Card className="p-3 cursor-pointer" onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast",{detail:"Chat #482 — detay"}))}><div className="text-xs font-semibold">Aylin</div><div className="text-sm mt-1">Refactor auth middleware</div></Card><Card className="p-3 bg-[#262624] text-white cursor-pointer"><div className="text-xs font-semibold">Lokma</div><div className="text-sm mt-1">One hook, one decorator.</div></Card></div> }]} isFocused={focusedPane === "a"} onFocus={() => setFocusedPane("a")} onClosePane={() => {}} onSplit={() => setExtraPanes(p => [...p, { id: `pane-${Date.now()}`, title: "Split pane", content: <div className="p-3">Split pane</div> }])} />
+                {!windowed && <div className="w-1.5 bg-line hover:bg-[#CFC9BF] cursor-col-resize shrink-0 hidden lg:flex items-center justify-center"><span className="w-0.5 h-7 bg-zinc-300 rounded-full" /></div>}
                 <Pane id="b" initialTabs={[{ id: "tab-b-1", title: "auth.ts", content: <CodePaneContent /> }]} isFocused={focusedPane === "b"} onFocus={() => setFocusedPane("b")} onClosePane={() => {}} onSplit={() => setExtraPanes(p => [...p, { id: `pane-${Date.now()}`, title: "Split pane", content: <div className="p-3">Split</div> }])} />
                 {extraPanes.map(pane => (
                   <Pane key={pane.id} id={pane.id} initialTabs={[{ id: `tab-${pane.id}-1`, title: pane.title, content: pane.content }]} isFocused={focusedPane === pane.id} onFocus={() => setFocusedPane(pane.id)} onClosePane={() => setExtraPanes(prev => prev.filter(p => p.id !== pane.id))} onSplit={() => {}} />
@@ -159,17 +233,34 @@ export default function App() {
           )}
         </main>
 
-        <div className="w-px bg-line dark:bg-[#232326] shrink-0 hidden xl:block" />
-        {!rightCollapsed && <FileBrowser onOpenFile={handleOpenFile} />}
+        {rightCollapsed ? (
+          <button onClick={() => setRightCollapsed(false)} className="w-6 shrink-0 hidden xl:grid place-items-center bg-[#FDFCFB] dark:bg-[#161618] border-l border-line hover:bg-muted text-zinc-400" title="Sağ paneli aç ]">
+            ‹
+          </button>
+        ) : (
+          <>
+            <div
+              onMouseDown={e => startDrag(e, "right")}
+              onDoubleClick={() => setRightCollapsed(true)}
+              className="w-1 bg-line hover:bg-[#CFC9BF] dark:bg-[#232326] dark:hover:bg-[#3A3A3E] cursor-col-resize shrink-0 hidden xl:flex items-center justify-center group"
+              title="Sürükle yeniden boyutlandır · çift tık gizle"
+            >
+              <span className="w-0.5 h-7 bg-zinc-300 dark:bg-zinc-600 rounded-full opacity-0 group-hover:opacity-100 transition" />
+            </div>
+            <div id="pane-right-wrap" style={{ width: rightW }} className="shrink-0 hidden xl:flex">
+              <FileBrowser onOpenFile={handleOpenFile} />
+            </div>
+          </>
+        )}
       </div>
 
       <div className="h-6 border-t border-line bg-[#FDFCFB] dark:bg-[#161618] flex items-center px-3 text-[11px] text-zinc-500">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> All systems normal
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> All systems normal · sürükle resize aktif · [ / ] kısayollar
         <span className="ml-auto">UI Kit — Button, Card, Input, Composer, Pane, FileBrowser · Vite 6 · Tailwind v4</span>
       </div>
 
       {toast && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-3 py-1.5 rounded-full bg-[#262624] text-white text-xs shadow-lg border border-white/10">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-3 py-1.5 rounded-full bg-[#262624] text-white text-xs shadow-lg border border-white/10 animate-pulse">
           {toast}
         </div>
       )}

@@ -11,7 +11,7 @@ Before you write any code, read these files in order. They are the **only** spec
 
 1. `Docs/00-LOKMA-KONTEKST.md` — project rules (Docs single source, component/DRY/clean code, English docs & code)
 2. `Docs/01-PROJE-TANIMI.md` — what Lokma is (innovative agentic harness, CLI+Web, two surfaces share `lokma-core` + `SessionStore JSONL`)
-3. `Docs/02-TEKNIK-KARARLAR.md` — stack A decisions (bun workspaces, Fastify 5, Next 15, Tailwind v4, shadcn, flexlayout-react, Zustand, WS/SSE)
+3. `Docs/02-TEKNIK-KARARLAR.md` — stack A decisions (bun workspaces, Fastify 5, Vite 6, Tailwind v4, shadcn, flexlayout-react, Zustand, WS/SSE)
 4. `Docs/11-ARASTIRMA-omp-temalar-ve-tasarim.md` — OMP theme system + visual language (themes/*.json → Chalk + CSS vars)
 5. `Docs/12-HARNESS-MIMARI-cli-web-nasil-kurulur.md` — CLI+Web harness layers (Ink TUI + Fastify + WS/SSE + provider abstraction `lokma-ai`)
 6. `Docs/20-WEB-HARNESS-overview.md` — **Web harness overview:** single loop, pane-first, theme-aware, real-time, feature parity table (every Claude Code capability must exist in web)

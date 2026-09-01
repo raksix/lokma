@@ -8,14 +8,14 @@
 |------|------|--------|
 | `00-LOKMA-KONTEKST.md` | **MAIN FILE** — read & update every prompt | ✅ |
 | `01-PROJE-TANIMI.md` | What Lokma is (innovative harness) | ✅ |
-| `02-TEKNIK-KARARLAR.md` | Stack **A picked** + arch (shadcn/domain/Tauri/dual) | ✅ Decided 2026-08-31 |
+| `02-TEKNIK-KARARLAR.md` | Stack **A — Vite 6 + React 19** (was Next.js 15 → Vite 2026-09-01) + arch (shadcn/domain/Tauri/dual) | ✅ Updated 2026-09-01 |
 | `03-YOL-HARITASI.md` | Roadmap — ultra-detailed Phases 0–3 (agents + testing + design + bots + setup) | ✅ EN (03-25 synced, 30-35) |
 | `10-ARASTIRMA-claude-code-birebir-analiz.md` | Claude Code full inventory (18KB) | ✅ |
 | `11-ARASTIRMA-omp-temalar-ve-tasarim.md` | OMP themes & design language (7.6KB) | ✅ |
 | `12-HARNESS-MIMARI-cli-web-nasil-kurulur.md` | CLI+Web harness architecture (17KB) | ✅ |
 | `13-ARASTIRMA-ozet-ve-sonraki-adimlar.md` | Synthesis + Phase 0 plan (3.3KB) | ✅ |
 | `20-WEB-HARNESS-overview.md` | **Web harness overview** — why/principles/parity/arch | ✅ EN 6.4KB |
-| `21-WEB-STACK-alternatives.md` | **Stack decision matrix** — frontend/backend/pane/state/realtime | ✅ EN 9.8KB — **PICK A/B/C/D** |
+| `21-WEB-STACK-alternatives.md` | **Stack decision matrix** — frontend/backend/pane/state/realtime (Vite 6 selected) | ✅ EN — **Vite since 2026-09-01** |
 | `22-WEB-FEATURES-provider-model-session.md` | **Provider/model/session/usage** + parity checklist | ✅ EN 13KB |
 | `23-PLUGIN-SYSTEM-deepseek-cordis.md` | **Plugin system** — DeepSeek Cordis + Lokma kernel | ✅ EN 9.4KB |
 | `24-WEB-PANE-SYSTEM-and-orchestration.md` | **Pane system** — sidebars, browser, live logs, orchestration | ✅ EN 12KB |

@@ -6,7 +6,7 @@
 ## Proje Kimliği
 - **Ad:** Lokma
 - **Klasör:** `/mnt/apopic/lokma`
-- **Durum:** 2026-08-31 15:40 UTC — Phase 0 scaffold canlı (lokma.fermag.com.tr) + Docs ultra-detailed: agent system (30) + skills/memory/vault (27-29) + config (26) + Archify (31) + setup optional (32) + testing harness (33) + design canvas (34) + Lokma Bots (35) + Auth & Permissions (36)
+- **Durum:** 2026-08-31 15:40 UTC — Phase 0 scaffold canlı (lokma.fermag.com.tr) — **Vite 6 + React 19** (was Next.js 15 → Vite 2026-09-01) + Docs ultra-detailed: agent system (30) + skills/memory/vault (27-29) + config (26) + Archify (31) + setup optional (32) + testing harness (33) + design canvas (34) + Lokma Bots (35) + Auth & Permissions (36)
 - **Tip:** Innovative Agentic Coding Harness (CLI + Web) — open-source, multi-provider, themeable, collision-free multi-agent
 - **Repo:** `https://github.com/raksix/lokma` (PUBLIC, main branch) — description: "Innovative agentic coding harness (CLI + Web) — multi-provider, themeable, open-source"
 
@@ -31,7 +31,7 @@
 - **Felsefe:** *The model reasons, the harness acts* — Lokma is the harness that makes any model useful
 - **Görünüş:** Themes — `lokma theme set omp` / `claude` / `midnight` / `paper` (same tokens CLI + Web)
 - **Teknoloji (planlanan):**
-  - Monorepo: `packages/lokma-core` (agent loop) + `lokma-ai` (multi-provider) + `lokma-tui` (Ink) + `lokma-web` (Next.js + WS) + `lokma-cli`
+  - Monorepo: `packages/lokma-core` (agent loop) + `lokma-ai` (multi-provider) + `lokma-tui` (Ink) + `lokma-web` (Vite 6 SPA + Fastify 5 WS) + `lokma-cli`
   - Provider: Anthropic + OpenAI/DeepSeek/Google/Ollama/OpenRouter
   - Theme: `themes/*.json` → CLI (Chalk) + Web (CSS vars) shared tokens
 
@@ -133,11 +133,15 @@
 ## Bekleyen Sorular (Furkan'a)
 - [x] GitHub repo: `raksix/lokma` PUBLIC — done 2026-08-31
 - [x] İlk provider multi-provider (Anthropic + OpenAI/DeepSeek/Google/Ollama/OpenRouter) — specced
-- [x] **Stack decision:** **A — Next.js 15 + Tailwind + shadcn/ui + React 19 + Fastify 5 + flexlayout-react** — picked 2026-08-31 (clarify) — Phase 0 unblocked
+- [x] **Stack decision:** **A — Vite 6 + React 19 + Tailwind v4 + shadcn/ui + Fastify 5 + flexlayout-react** — picked 2026-08-31 as Next.js 15 → **switched to Vite 6 on 2026-09-01** per your request (DeepSeek Harness pattern) — Phase 0 unblocked
 - [x] Domain: `lokma.fermag.com.tr` (prod on 67) — picked 2026-08-31 — `lokma.sh` reserved for future
 - [x] Desktop: **Tauri** (Rust, lightweight) — picked 2026-08-31 (Phase 3)
 - [x] Lisans: **Dual — core MIT + cloud private** — picked 2026-08-31
 - [x] Design system: **shadcn/ui** (https://ui.shadcn.com/) — picked 2026-08-31 *"tasarım için shadcn kullanak"*
+
+### 2026-09-01 13:00 UTC — Stack Vite'a çevrildi
+- **Furkan:** "vite'a çevirek zaten temelleri attık yapmaya başlamadık dökümanları da ona göre yapalım"
+- **Hermes:** Stack A **Next.js 15 → Vite 6 + React 19**'a çevrildi (DeepSeek Harness `Vite 6 + @vitejs/plugin-react` pattern, pure SPA, `web/dist/` static). `Docs/02`, `21`, `03`, `20`, `25`, `12`, `README` güncellendi. Sırada: `packages/lokma-web/web` Next.js scaffold'u Vite'a migrate edilecek (`vite.config.ts` proxy `/api`+`/ws` → `:3456`, `index.html` + `src/App.tsx`), `ecosystem.config.cjs` ve `package.json` güncelleme, `bun run build` doğrulama.
 
 ## Son Durum
 - **Son güncelleme:** 2026-08-31 15:40 UTC

@@ -1,6 +1,6 @@
 # 03 — Roadmap (Ultra-Detailed)
 
-> **Status 2026-08-31 02:35 UTC:** Docs set 01–35 complete (~210KB synthesized + ~1.5 MB raw / 12,240 lines) · **Stack A picked** (Next+Fastify+shadcn) + domain lokma.fermag.com.tr + Tauri + dual license + shadcn — Phase 0 unblocked · Code scaffold next
+> **Status 2026-09-01 UTC:** Docs set 01–36 complete · **Stack A — Vite 6 + React 19 + Tailwind v4 + shadcn/ui + Fastify 5 + flexlayout-react** (Next.js 15 → Vite 6 on 2026-09-01 per your request) + domain lokma.fermag.com.tr + Tauri + dual license + shadcn — Phase 0 scaffold Vite
 > **English from 2026-08-31 01:45 (chat Turkish) · Single source: `00-LOKMA-KONTEKST.md`**
 > **Detail docs:** `20-overview` · `21-stack` · `22-features` · `23-plugins` · `24-panes` · `25-roadmap` · `26-config` · `27-skills` · `28-memory` · `29-obsidian` · `30-agent-system` · `31-archify` · `32-setup` · `33-testing` · `34-design` · `35-bots`
 
@@ -8,7 +8,7 @@
 
 ## Phase 0 — Setup ✅ + Scaffolding (Next, 1–2 days)
 
-> **Stack picked A** (Next 15 + Tailwind + shadcn/ui + Fastify 5 + flexlayout-react) — 2026-08-31 clarify — Phase 0 unblocked. See `02-TEKNIK-KARARLAR.md`.
+> **Stack picked A — Vite 6 + React 19** (was Next 15 → Vite 2026-09-01) + Tailwind v4 + shadcn/ui + Fastify 5 + flexlayout-react — 2026-09-01 switched per your request. See `02-TEKNIK-KARARLAR.md`.
 
 ### Already done (✅)
 
@@ -24,12 +24,12 @@
 
 ### Scaffold next — UNBLOCKED (Stack A picked 2026-08-31)
 
-- [ ] Monorepo: `bun workspaces` (`pnpm` alt), `packages/lokma-core` + `lokma-ai` + `lokma-shared` (Zod schemas) + `lokma-web` (`web/` Next.js + `server/` Fastify 5) + `themes/` + `.lokma/worktrees/` + `.agentlocks/`
+- [ ] Monorepo: `bun workspaces` (`pnpm` alt), `packages/lokma-core` + `lokma-ai` + `lokma-shared` (Zod schemas) + `lokma-web` (`web/` Vite 6 SPA + `server/` Fastify 5) + `themes/` + `.lokma/worktrees/` + `.agentlocks/`
 - [ ] `lokma-core`: `Context` kernel (~300 lines), `ToolRegistry`, `SessionStore` (JSONL `~/.lokma/projects/<hash>/sessions/*.jsonl`), `Provider` types Zod in `lokma-shared`
 - [ ] `lokma-ai`: Anthropic + OpenAI adapters, `stream()` abstraction, mock `models` catalog
 - [ ] `lokma-shared`: `AgentSchema` + `LockSchema` + `MemorySchema` + `SkillSchema` + WS protocol (text_delta/tool_*/permission/cost)
 - [ ] `lokma-web/server`: Fastify 5 + `@fastify/websocket` + `@fastify/cors`, routes `GET /health`, `GET /api/config` (masked), `GET /api/providers`, `GET /api/models`, `GET /api/sessions`, `GET /api/agents`, `GET /api/vault/graph`, `WS /ws/:sessionId`
-- [ ] `lokma-web/web`: Next.js 15 App Router + Tailwind v4 + shadcn/ui — App Shell header + left/right borders (static before flexlayout), Chat stub + mock WS, App Shell proves two surfaces import same `lokma-shared`
+- [ ] `lokma-web/web`: Vite 6 + React 19 + Tailwind v4 + shadcn/ui — App Shell header + left/right borders (static before flexlayout), Chat stub + mock WS, `vite.config.ts` proxy `/api`+`/ws` → `:3456`, proves two surfaces import same `lokma-shared`
 - [ ] `Config & credentials` — layered `~/.lokma/config.json | .lokma/settings.json | env LOKMA_* | CLI flags`, `credentials.json` AES-GCM 0600, `lokma config/auth/doctor` — see `26-*` §5–7
 - [ ] `Auto-skills scaffold` — `skills/` (repo) + `~/.lokma/skills/` (user+hub), `registry.scan()` + `build_skills_system_prompt()` + `skill_view` trie, stub `curator.ts` — see `27-*` §7
 - [ ] `Memory scaffold` — `~/.lokma/memories/MEMORY.md+USER.md` (§-delimited), `state.db` FTS5, `session_search` stub, `VaultPort` interface (`vault/memory.fermag.com.tr/lokma` prefix), `memory` tool — see `28-*` §5

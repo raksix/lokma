@@ -35,7 +35,7 @@
 ### Harness Ham (753 satır)
 - 9 bileşenli harness tanımı (model interface → orchestration)
 - CLI: Ink/React (Yoga), generator backpressure, tool registry, brush Python REPL
-- Web: Remote Control vs Cloud VM, Fastify WS + Next.js + xterm.js, SSE 3-tier buffer
+- Web: Remote Control vs Cloud VM, Fastify WS + Vite + xterm.js, SSE 3-tier buffer
 - Agent loop: query.ts 1730 satır analizi, compaction, tool calling JSON schema
 - Sandbox: Docker/gVisor/Firecracker matrix (<125ms boot), E2B/Modal/Daytona
 - 18 kaynakça (Claude Docs, OpenHands, Aider, Continue, Ink, Firecracker...)
@@ -50,7 +50,7 @@
    │   ├── lokma-core   # agent loop + tools + session
    │   ├── lokma-ai     # multi-provider
    │   ├── lokma-tui    # Ink
-   │   ├── lokma-web    # Fastify + Next.js
+   │   ├── lokma-web    # Fastify + Vite 6 SPA
    │   └── lokma-shared # zod schemas
    ├── themes/          # 4 tema JSON
    └── Docs/            # burası

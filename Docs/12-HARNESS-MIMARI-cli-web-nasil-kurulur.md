@@ -50,7 +50,7 @@ lokma/
 │   ├── lokma-core      # Agent loop, session, tools (ana paket)
 │   ├── lokma-ai        # Multi-provider LLM client (streaming)
 │   ├── lokma-tui       # Terminal UI (Ink + React)
-│   ├── lokma-web       # Web harness (Next.js + WebSocket)
+│   ├── lokma-web       # Web harness (Vite 6 SPA + Fastify WS)
 │   ├── lokma-cli       # CLI entry (lokma bin)
 │   └── lokma-shared    # Zod schemas, types, utils
 ├── themes/             # Tema JSON'ları
@@ -230,7 +230,7 @@ packages/lokma-web/
 │   │   ├── files.ts     # GET /files, read/write
 │   │   └── mcp.ts       # MCP config
 │   └── ws.ts            # WebSocket handler (agent loop → client)
-├── web/                 # Next.js 15 frontend
+├── web/                 # Vite 6 SPA (React 19 + Tailwind + shadcn)
 │   ├── app/
 │   │   ├── (chat)/      # Chat UI (Claude Code web benzeri)
 │   │   ├── sessions/    # Session list
@@ -384,9 +384,9 @@ npm publish          # veya curl install script
 ### Web
 ```bash
 # packages/lokma-web
-bun run build        # Next.js standalone
-pm2: lokma-web :3456 (local), lokma-cloud :4401 (cloud)
-nginx: lokma.fermag.com.tr → :3456, /api → :4401
+bun run build        # vite build → web/dist/ static
+pm2: lokma-server :3456 (Fastify) + lokma-web :3457 (Vite preview/static)
+nginx: lokma.fermag.com.tr → :3457 (static) + /api + /ws → :3456
 ```
 
 ---
@@ -398,7 +398,7 @@ nginx: lokma.fermag.com.tr → :3456, /api → :4401
 | **Faz 0** | Araştırma (bu doküman) + repo scaffold + `lokma-core` iskelet | 1 hafta |
 | **Faz 1** | CLI MVP: `lokma` + `lokma -p` + Read/Write/Edit/Bash/Grep/Glob + permission (manual) + session (JSONL) | 2-3 hafta |
 | **Faz 2** | CLI Full: hooks, MCP, AskUserQuestion, Agent (subagent), TodoWrite, WebFetch, themes | 2 hafta |
-| **Faz 3** | Web Harness MVP: Fastify WS + Next.js chat + streaming + file tree + terminal | 2-3 hafta |
+| **Faz 3** | Web Harness MVP: Fastify WS + Vite chat + streaming + file tree + terminal | 2-3 hafta |
 | **Faz 4** | Provider genişletme + cloud sandbox + Desktop (Electron) | Sonra |
 
 **İlk commit:** `lokma-core` + `lokma-ai` + `lokma-cli` iskelet, `lokma --help` çalışır, `lokma -p "hello"` mock response döner.

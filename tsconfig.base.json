@@ -37,7 +37,7 @@
   "exclude": [
     "node_modules",
     "dist",
-    ".next",
+    "dist-ssr",
     ".turbo"
   ]
 }

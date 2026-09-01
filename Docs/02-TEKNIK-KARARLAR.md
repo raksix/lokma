@@ -2,18 +2,18 @@
 
 > Stack and architecture decisions accumulate here. Each decision is dated and reasoned.
 
-## Stack — Decided 2026-08-31
+## Stack — Decided 2026-08-31 · Updated 2026-09-01 → Vite
 
-**Picked: A — Next.js 15 + Tailwind + shadcn/ui + React 19 + Fastify 5 + flexlayout-react + WS/SSE** (your choice via clarify, 2026-08-31). Phase 0 scaffold unblocked.
+**Picked: A — Vite 6 + React 19 + Tailwind v4 + shadcn/ui + Fastify 5 + flexlayout-react + WS/SSE** (2026-08-31 clarify: Next.js 15 → 2026-09-01 switched to Vite 6 per your request, same proven infra). Phase 0 scaffold unblocked.
 
 | ID | Frontend | Backend | Pane | Realtime | Status |
 |----|----------|---------|------|----------|--------|
-| **A — ✅ Selected** | Next.js 15 + Tailwind + **shadcn/ui** + React 19 | Fastify 5 | flexlayout-react | WS + SSE | ✅ Picked 2026-08-31 |
+| **A — ✅ Selected** | Vite 6 + React 19 + Tailwind v4 + **shadcn/ui** | Fastify 5 | flexlayout-react | WS + SSE | ✅ Picked 2026-08-31 · **Vite since 2026-09-01** |
 | **B** | SvelteKit 2 | Hono (Bun) | flexlayout-react | WS | ❌ Not picked |
-| **C** | Next.js 15 | Fastify 5 | dnd-kit + Resizable (custom) | WS + SSE | ❌ Not picked |
-| **D** | Next.js 15 | NestJS 11 | flexlayout-react | WS | ❌ Not picked |
+| **C** | Vite 6 + React 19 | Fastify 5 | dnd-kit + Resizable (custom) | WS + SSE | ❌ Not picked |
+| **D** | Vite 6 + React 19 | NestJS 11 | flexlayout-react | WS | ❌ Not picked |
 
-**Why A:** Proven on your infra (67: Randevona, notes.fermag, Sunumly all Next.js+Fastify+PM2+nginx+shadcn), least risk, fastest to MVP, hiring pool, IDE-grade panes out of the box. Design system is **shadcn/ui** (https://ui.shadcn.com/) — see Design row below.
+**Why A (Vite):** DeepSeek Harness pattern (Vite 6 + React 18 + `@vitejs/plugin-react`) — pure SPA, no SSR/RSC overhead, fastest HMR, smallest bundle (~90kb vs ~180kb Next). Same Fastify 5 + PM2 + nginx you run on 67; Vite `build` → static `dist/` served by `server/` or `nginx`, `dev` proxies `/api` + `/ws` to Fastify `:3456`. Design system **shadcn/ui** (https://ui.shadcn.com/) stays — see Design row. Previous Next.js choice (2026-08-31) superseded 2026-09-01.
 
 Other fixed choices (stack-independent):
 
@@ -50,7 +50,7 @@ Other fixed choices (stack-independent):
 
 ## Architecture
 
-- **Shared core:** `packages/lokma-core` (agent loop, tool registry, sessions, plugin kernel) + `lokma-ai` (provider abstraction, streaming) + `lokma-shared` (Zod schemas, WS protocol) — shared by CLI (Ink TUI) and Web (Fastify WS + Next.js).
+- **Shared core:** `packages/lokma-core` (agent loop, tool registry, sessions, plugin kernel) + `lokma-ai` (provider abstraction, streaming) + `lokma-shared` (Zod schemas, WS protocol) — shared by CLI (Ink TUI) and Web (Fastify WS + Vite React).
 - **Plugin system:** Everything is a plugin (DeepSeek Harness Cordis-inspired) — see `23-PLUGIN-SYSTEM-deepseek-cordis.md` for 5 Cordis ideas, service keys, events, `inject`, `waterfall` etc. No vendored Cordis.
 - **Pane system:** IDE-grade draggable panes (flexlayout-react) — see `24-WEB-PANE-SYSTEM-and-orchestration.md` for left/right sidebars, file browser, live logs, browser preview, drag session into session, orchestration.
 
@@ -75,6 +75,7 @@ Other fixed choices (stack-independent):
 | 2026-08-31 | Design canvas — Open Design-inspired: 6 artifact types (Prototype/Deck/Mobile/Image/Document/HyperFrame), `DESIGN.md` brand contract (7+ H2), `design-systems/` + `templates/`, Design Studio pane + `/api/design/*` + export HTML/PDF/PPTX/MP4 — see `34-DESIGN-open-design-inspired.md` | Your request: *"lokmanın kendi içinde tasarım da yapılabilsin, claude design gibi"* — open-design 92.9k★ (1,325+831 lines) |
 | 2026-08-31 | Lokma Bots — Grok-bots-inspired: `bot.json` spec, persona→bot→agent mapping, Bot Gallery pane, lifecycle create→playground→publish→fork→run as agent, sharing/marketplace — see `35-BOTS-lokma-bots.md` | Your request: *"hermese bots geldi grok bots gibi lokma bots planı çıkar"* — grok-bots 1,121 lines |
 | 2026-08-31 | Stack picked: **A — Next.js 15 + Tailwind + shadcn/ui + React 19 + Fastify 5 + flexlayout-react** — see `21-*` §9 | Your clarify 2026-08-31 — proven on 67, Phase 0 unblocked |
+| 2026-09-01 | Stack switched: **A — Vite 6 + React 19 + Tailwind v4 + shadcn/ui + Fastify 5 + flexlayout-react** — see `21-*` §9 rev | Your request 2026-09-01 *\"vite'a çevirek\"* — DeepSeek Harness (Vite 6 + React) pattern, no SSR, `web/dist/` static + Fastify 5, faster HMR |
 | 2026-08-31 | Domain picked: `lokma.fermag.com.tr` (PM2+nginx on 67) — `lokma.sh` reserved | Your clarify 2026-08-31 |
 | 2026-08-31 | Desktop picked: **Tauri** (Phase 3) | Your clarify 2026-08-31 — lightweight Rust vs Electron |
 | 2026-08-31 | License picked: **Dual — core MIT + cloud private** (`raksix/lokma` PUBLIC) | Your clarify 2026-08-31 — open core |
@@ -82,4 +83,4 @@ Other fixed choices (stack-independent):
 
 ---
 
-*Stack picked A (Next+Fastify+shadcn) 2026-08-31 — Phase 0 scaffold ready. Remaining: Desktop already picked Tauri (Phase 3), no blockers.*
+*Stack picked A (Vite 6 + React 19 since 2026-09-01, was Next.js 15) — Phase 0 scaffold ready. Remaining: Desktop already picked Tauri (Phase 3), no blockers.*

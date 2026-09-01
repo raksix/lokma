@@ -4,8 +4,7 @@
     "noEmit": true
   },
   "include": [
-    "packages/*/src/**/*",
-    "packages/lokma-web/*/src/**/*"
+    "packages/*/src/**/*"
   ],
   "references": [
     {

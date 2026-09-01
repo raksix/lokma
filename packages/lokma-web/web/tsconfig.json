@@ -18,28 +18,25 @@
         "src/hooks/*"
       ]
     },
-    "jsx": "preserve",
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
     "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
     "allowJs": true,
     "noEmit": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": [
+      "vite/client"
+    ]
   },
   "include": [
-    ".next/types/**/*",
-    "next-env.d.ts",
     "src/**/*",
-    ".next/types/**/*.ts"
+    "vite.config.ts",
+    "index.html"
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    ".next"
+    "dist"
   ]
 }

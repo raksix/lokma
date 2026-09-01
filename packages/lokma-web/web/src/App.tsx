@@ -1,12 +1,6 @@
-'use client';
-
 import * as React from 'react';
 import { AppShell } from '@/components/app-shell';
-
-/**
- * Page — generates a stable sessionId per browser (localStorage) and mounts AppShell.
- * One page, one shell — DRY.
- */
+import './index.css';
 
 function useSessionId(): string {
   const [id, setId] = React.useState('sess_phase0_demo');
@@ -24,7 +18,7 @@ function useSessionId(): string {
   return id;
 }
 
-export default function Page() {
+export default function App() {
   const sessionId = useSessionId();
   return <AppShell sessionId={sessionId} />;
 }

@@ -1,4 +1,4 @@
-/** PM2 ecosystem for Lokma Phase 0 scaffold — lokal 3456 */
+/** PM2 ecosystem for Lokma Phase 0 — Vite SPA + Fastify */
 module.exports = {
   apps: [
     {
@@ -14,9 +14,9 @@ module.exports = {
     {
       name: 'lokma-web',
       cwd: '/mnt/apopic/lokma/packages/lokma-web/web',
-      script: 'node_modules/next/dist/bin/next',
-      args: 'start -p 3457 --hostname 127.0.0.1',
-      interpreter: 'node',
+      script: '/usr/local/bin/bun',
+      args: 'x vite preview --host 127.0.0.1 --port 3457',
+      interpreter: 'none',
       env: { NODE_ENV: 'production', PORT: '3457' },
       watch: false,
       max_memory_restart: '400M',

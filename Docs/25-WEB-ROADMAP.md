@@ -1,17 +1,17 @@
 # Web Harness — Roadmap (Ultra-Detailed)
 
-> **Docs are done, code is next. Stack decision first: `21-WEB-STACK-alternatives.md` §9 — pick A/B/C/D (recommendation A: Next 15 + Fastify 5 + flexlayout-react + Zustand + WS/SSE). Everything below assumes A. Companion: `03-YOL-HARITASI.md` (phased master).**
+> **Docs are done, code is next. Stack A — Vite 6 + React 19 + Fastify 5 + flexlayout-react + Zustand + WS/SSE (was Next.js 15 → Vite 6 on 2026-09-01). See `21-WEB-STACK-alternatives.md` §9 and `03-YOL-HARITASI.md`.**
 
 ## Phase 0 — Scaffolding (1–2 days)
 
 Goal: monorepo builds, two surfaces import the same schemas, empty panes render.
 
-- [ ] **Monorepo:** `bun` workspaces (`pnpm` alt), `packages/lokma-core` + `lokma-ai` + `lokma-shared` (Zod) + `lokma-web` (`web/` Next.js 15 + `server/` Fastify 5) + `themes/` + `.lokma/worktrees/` + `.agentlocks/`, root `tsconfig`/`eslint`/`prettier`, `/.gitignore` entries for `worktrees` + `.agentlocks`.
+- [ ] **Monorepo:** `bun` workspaces (`pnpm` alt), `packages/lokma-core` + `lokma-ai` + `lokma-shared` (Zod) + `lokma-web` (`web/` Vite 6 SPA + `server/` Fastify 5) + `themes/` + `.lokma/worktrees/` + `.agentlocks/`, root `tsconfig`/`eslint`/`prettier`, `/.gitignore` entries for `worktrees` + `.agentlocks`.
 - [ ] **lokma-core:** `Context` kernel (~300 lines), `ToolRegistry`, `SessionStore` (JSONL `~/.lokma/projects/<hash>/sessions/*.jsonl`), `Provider` types Zod in `lokma-shared`, agent loop stub `query()` → mock `text_delta` stream.
 - [ ] **lokma-ai:** Anthropic + OpenAI adapters, `stream()` abstraction, mock `models` catalog + cache.
 - [ ] **lokma-shared:** `AgentSchema` + `LockSchema` + `MemorySchema` + `SkillSchema` + `VaultGraphSchema`, WS protocol (`text_delta`/`tool_start`/`tool_result`/`permission_request`/`ask_user_question`/`done`+`cost`+`agent.*`).
 - [ ] **lokma-web/server:** Fastify 5 + `@fastify/websocket` + `@fastify/cors`, routes `GET /health`, `GET /api/config` (masked `keySet`), `GET /api/providers`, `GET /api/models`, `GET /api/sessions`, `GET /api/skills`, `GET /api/agents`, `GET /api/vault/graph`, `WS /ws/:sessionId` echo mock.
-- [ ] **lokma-web/web:** Next.js 15 App Router + Tailwind v4 + shadcn/ui, App Shell header + left/right borders (static before flexlayout), Chat stub (input + mock messages), `bun dev` runs `server` + `web` concurrently.
+- [ ] **lokma-web/web:** Vite 6 + React 19 + Tailwind v4 + shadcn/ui, App Shell header + left/right borders (static before flexlayout), Chat stub (input + mock messages), `vite.config.ts` proxy `/api`+`/ws` → `:3456`, `bun dev` runs `server` + `web` concurrently.
 - [ ] **Config & credentials:** `~/.lokma/config.json | .lokma/settings.json | env LOKMA_* | CLI flags` hierarchy, `credentials.json` AES-GCM 0600, `lokma config/auth/doctor` + watcher `config/changed` — `26-*`.
 - [ ] **Skills/memory/vault scaffolds:** `skills/` + `~/.lokma/skills/`, `registry.scan()` + `build_skills_system_prompt()` trie, `~/.lokma/memories/MEMORY.md+USER.md` + `state.db` FTS5 stub, `VaultPort` interface (`POST /api/vault/ingest` → lokma-vault / memory.fermag.com.tr/lokma) — `27-*` `28-*` `29-*`.
 - [ ] **Agent scaffolds:** `~/.lokma/agents/<id>/SOUL.md+IDENTITY.json+MEMORY.md+config.json+sessions/` layout, `registry.ts`+`orchestrator.ts` stubs, `.agentlocks/locks/<sha1>.json` + `worktree` helpers, 6 persona templates `skills/lokma-personas/*` (`reviewer/planner/tester/researcher/builder/custodian`), feature flag `agents` off by default — `30-*` §2,5,6,10,12.

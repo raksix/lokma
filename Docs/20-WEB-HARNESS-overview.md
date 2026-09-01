@@ -54,7 +54,7 @@ No web-only shortcuts, no "lite" mode. Full harness or nothing.
 ## 4. High-Level Architecture
 
 ```
-Browser (Next.js, React)
+Browser (Vite 6 + React 19)
   ├─ App Shell (pane layout, sidebars, command palette)
   ├─ Chat (streaming messages, tool renderers, slash menu)
   ├─ File Browser (project tree, open/preview, drag-drop)
@@ -92,7 +92,7 @@ lokma/
 │       ├── server/     # Fastify + WS
 │       │   ├── routes/ (sessions, providers, models, usage, files, mcp)
 │       │   └── ws.ts
-│       └── web/        # Next.js app
+│       └── web/        # Vite 6 SPA (React 19 + Tailwind + shadcn)
 │           ├── app/    # (chat) / sessions / settings / plugins
 │           └── components/ (Chat, FileTree, Terminal, PaneLayout, ...)
 ├── themes/             # claude.json, omp.json, midnight.json, paper.json
@@ -114,7 +114,7 @@ Start with **21** if you want to make a decision. Start with **22** if you want 
 
 ## 7. Open Questions (Resolved in 21)
 
-- Frontend: Next.js vs SvelteKit vs Remix?
+- Frontend: Vite vs Next.js vs SvelteKit vs Remix? (picked Vite 6 — was Next.js 15, switched 2026-09-01)
 - Backend: Fastify vs Hono vs NestJS?
 - Pane: mosaic vs dock vs flexlayout vs custom?
 - Realtime: WebSocket vs SSE vs tRPC?

@@ -110,6 +110,19 @@
   html.dark .bg-terracotta\/10 { background:rgba(201,100,66,0.12) !important; }
 
 
+  /* Windowed mode — windows gibi serbest yerleştirme */
+  #tiling-grid.windowed { position:relative; overflow:hidden; background:#FAF9F5; }
+  #tiling-grid.windowed .tiling-pane { position:absolute !important; box-shadow:0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08); border-radius:8px; overflow:hidden; transition: box-shadow 150ms; }
+  #tiling-grid.windowed .tiling-pane.dragging-window { opacity:0.92; box-shadow:0 16px 48px rgba(0,0,0,0.2); z-index:50 !important; }
+  #tiling-grid.windowed #tiling-divider { display:none !important; }
+  .window-handle { position:absolute; background:transparent; z-index:10; }
+  .window-handle.e { right:-3px; top:8px; bottom:8px; width:6px; cursor:ew-resize; }
+  .window-handle.s { bottom:-3px; left:8px; right:8px; height:6px; cursor:ns-resize; }
+  .window-handle.se { right:-4px; bottom:-4px; width:12px; height:12px; cursor:nwse-resize; }
+  #snap-overlay { position:absolute; inset:0; pointer-events:none; display:none; z-index:40; }
+  #snap-overlay.active { display:block; }
+  #snap-preview { position:absolute; background:rgba(201,100,66,0.12); border:2px solid rgba(201,100,66,0.4); border-radius:8px; transition: all 120ms ease; }
+
   /* robust dark fallbacks via attribute selector */
   html.dark [class*="bg-[#FAF9F5]"] { background-color:#0F0F11 !important; }
   html.dark [class*="bg-[#FDFCFB]"] { background-color:#161618 !important; }
@@ -670,6 +683,10 @@
           <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#262624] text-white text-[11px] font-medium"><svg width="10" height="10" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M6 3v10M10 3v10M3 6h10M3 10h10" stroke="currentColor" stroke-width="1" opacity=".7"/></svg> Tiling</span>
           <span class="text-[11px] text-zinc-500 hidden sm:inline">pane’leri sürükle · ayırıcıyı çek · çift tıkla sıfırla</span>
           <span class="ml-auto flex items-center gap-1.5">
+            <button id="windowed-toggle" onclick="toggleWindowed()" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-line text-[11px] font-medium hover:bg-muted" title="Windows gibi serbest yerleştir">
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/><rect x="8" y="3" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/><rect x="3" y="8" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/><rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/></svg>
+              Windowed
+            </button>
             <button onclick="addPane()" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-terracotta text-white text-[11px] font-medium hover:bg-terracotta-hover">+ Pane</button>
             <button onclick="toggleTiling(false)" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-line text-[11px] font-medium hover:bg-muted">Tekil görünüme dön</button>
           </span>
@@ -750,6 +767,7 @@
               <input placeholder="Yeni pane..." class="w-full h-7 px-2.5 rounded-md bg-white border border-line text-[13px]" />
             </div>
           </div>
+          <div id="snap-overlay"><div id="snap-preview"></div></div>
         </div>
       </div>
     </main>
@@ -1484,6 +1502,227 @@
     });
   })();
 
+  // --- Windowed mode — windows gibi serbest yerleştirme (alta/sağa/sola) ---
+  window.toggleWindowed = function(){
+    const grid = document.getElementById('tiling-grid');
+    const btn = document.getElementById('windowed-toggle');
+    const isWindowed = grid.classList.contains('windowed');
+    if(isWindowed){
+      grid.classList.remove('windowed');
+      if(btn){ btn.classList.remove('bg-[#262624]','text-white'); btn.classList.add('bg-white','text-zinc-700'); }
+      grid.querySelectorAll('.tiling-pane').forEach(pane=>{
+        pane.style.left=''; pane.style.top=''; pane.style.width=''; pane.style.height=''; pane.style.flex='';
+        pane.style.zIndex='';
+        pane.classList.remove('window','dragging-window');
+      });
+      document.getElementById('snap-overlay')?.classList.remove('active');
+    } else {
+      grid.classList.add('windowed');
+      if(btn){ btn.classList.add('bg-[#262624]','text-white'); btn.classList.remove('bg-white','text-zinc-700'); }
+      const panes = Array.from(grid.querySelectorAll('.tiling-pane')).filter(p=> !p.classList.contains('hidden'));
+      const gridRect = grid.getBoundingClientRect();
+      // simple auto-layout: 2 panes side-by-side, 3 panes -> 2 top 1 bottom, etc.
+      panes.forEach((pane,i)=>{
+        pane.style.position='absolute';
+        pane.style.flex='';
+        pane.classList.add('window');
+        if(!pane.querySelector('.window-handle.e')){
+          pane.insertAdjacentHTML('beforeend','<div class="window-handle e" title="Sağa çek genişlet"></div><div class="window-handle s" title="Aşağı çek"></div><div class="window-handle se" title="Köşeden boyutlandır"></div>');
+        }
+        // bring to front handler
+        pane.addEventListener('mousedown', ()=> bringToFront(pane));
+        // initial placement
+        if(panes.length===1){
+          pane.style.left='8px'; pane.style.top='8px'; pane.style.width='calc(100% - 16px)'; pane.style.height='calc(100% - 16px)';
+        } else if(panes.length===2){
+          if(i===0){ pane.style.left='8px'; pane.style.top='8px'; pane.style.width='calc(50% - 12px)'; pane.style.height='calc(100% - 16px)'; }
+          else { pane.style.left='calc(50% + 4px)'; pane.style.top='8px'; pane.style.width='calc(50% - 12px)'; pane.style.height='calc(100% - 16px)'; }
+        } else if(panes.length===3){
+          if(i===0){ pane.style.left='8px'; pane.style.top='8px'; pane.style.width='calc(50% - 12px)'; pane.style.height='calc(50% - 12px)'; }
+          else if(i===1){ pane.style.left='calc(50% + 4px)'; pane.style.top='8px'; pane.style.width='calc(50% - 12px)'; pane.style.height='calc(50% - 12px)'; }
+          else { pane.style.left='8px'; pane.style.top='calc(50% + 4px)'; pane.style.width='calc(100% - 16px)'; pane.style.height='calc(50% - 12px)'; }
+        } else {
+          // 4+ : cascade
+          const cols = 2;
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+          pane.style.left = `calc(${col*50}% + ${col?4:8}px)`;
+          pane.style.top = `${8 + row* ( (gridRect.height-16)/Math.ceil(panes.length/cols) + 8)}px`;
+          pane.style.width = 'calc(50% - 12px)';
+          pane.style.height = `${(gridRect.height-16)/Math.ceil(panes.length/cols) - 8}px`;
+        }
+      });
+      initWindowDragging();
+    }
+  };
+  function bringToFront(pane){
+    const grid = document.getElementById('tiling-grid');
+    let maxZ=10;
+    grid.querySelectorAll('.tiling-pane').forEach(p=>{ const z=parseInt(p.style.zIndex||'0',10); if(z>maxZ) maxZ=z; });
+    pane.style.zIndex = maxZ+1;
+  }
+  function initWindowDragging(){
+    const grid = document.getElementById('tiling-grid');
+    const overlay = document.getElementById('snap-overlay');
+    const preview = document.getElementById('snap-preview');
+    if(!grid || !overlay) return;
+    let dragging=null, startX=0, startY=0, startL=0, startT=0, startW=0, startH=0, mode='move';
+    let snapTarget=null;
+
+    function getSnap(px, py, gw, gh){
+      const thresh=28;
+      const nearLeft = px < thresh;
+      const nearRight = px + startW > gw - thresh;
+      const nearTop = py < thresh;
+      const nearBottom = py + startH > gh - thresh;
+      const centerX = px + startW/2;
+      const centerY = py + startH/2;
+      // corners first
+      if(nearLeft && nearTop) return {left:'8px', top:'8px', width:'calc(50% - 12px)', height:'calc(50% - 12px)', key:'tl'};
+      if(nearRight && nearTop) return {left:'calc(50% + 4px)', top:'8px', width:'calc(50% - 12px)', height:'calc(50% - 12px)', key:'tr'};
+      if(nearLeft && nearBottom) return {left:'8px', top:'calc(50% + 4px)', width:'calc(50% - 12px)', height:'calc(50% - 12px)', key:'bl'};
+      if(nearRight && nearBottom) return {left:'calc(50% + 4px)', top:'calc(50% + 4px)', width:'calc(50% - 12px)', height:'calc(50% - 12px)', key:'br'};
+      if(nearLeft) return {left:'8px', top:'8px', width:'calc(50% - 12px)', height:'calc(100% - 16px)', key:'left'};
+      if(nearRight) return {left:'calc(50% + 4px)', top:'8px', width:'calc(50% - 12px)', height:'calc(100% - 16px)', key:'right'};
+      if(nearTop) return {left:'8px', top:'8px', width:'calc(100% - 16px)', height:'calc(50% - 12px)', key:'top'};
+      if(nearBottom) return {left:'8px', top:'calc(50% + 4px)', width:'calc(100% - 16px)', height:'calc(50% - 12px)', key:'bottom'};
+      // center -> maximize
+      if(centerX > gw*0.35 && centerX < gw*0.65 && centerY > gh*0.35 && centerY < gh*0.65){
+        // optional maximize preview when hovering center? not now
+      }
+      return null;
+    }
+
+    // header drag
+    grid.querySelectorAll('.tiling-pane .h-7').forEach(hdr=>{
+      if(hdr.dataset.winDrag) return;
+      hdr.dataset.winDrag="1";
+      hdr.style.cursor='grab';
+      hdr.addEventListener('mousedown', e=>{
+        if(!grid.classList.contains('windowed')) return;
+        const pane = hdr.closest('.tiling-pane');
+        if(!pane) return;
+        // ignore clicks on buttons inside header
+        if(e.target.closest('button')) return;
+        dragging=pane; mode='move';
+        bringToFront(pane);
+        const rect = pane.getBoundingClientRect();
+        const gRect = grid.getBoundingClientRect();
+        startX=e.clientX; startY=e.clientY;
+        startL=rect.left - gRect.left;
+        startT=rect.top - gRect.top;
+        startW=rect.width; startH=rect.height;
+        pane.classList.add('dragging-window');
+        overlay.classList.add('active');
+        document.body.classList.add('resizing');
+        e.preventDefault();
+      });
+    });
+    // resize handles (delegated)
+    grid.addEventListener('mousedown', e=>{
+      if(!grid.classList.contains('windowed')) return;
+      const handle = e.target.closest('.window-handle');
+      if(!handle) return;
+      const pane = handle.closest('.tiling-pane');
+      if(!pane) return;
+      dragging=pane;
+      bringToFront(pane);
+      const rect = pane.getBoundingClientRect();
+      const gRect = grid.getBoundingClientRect();
+      startX=e.clientX; startY=e.clientY;
+      startL=rect.left - gRect.left;
+      startT=rect.top - gRect.top;
+      startW=rect.width; startH=rect.height;
+      if(handle.classList.contains('e')) mode='e';
+      else if(handle.classList.contains('s')) mode='s';
+      else if(handle.classList.contains('se')) mode='se';
+      pane.classList.add('dragging-window');
+      document.body.classList.add('resizing');
+      e.preventDefault(); e.stopPropagation();
+    });
+
+    window.addEventListener('mousemove', e=>{
+      if(!dragging) return;
+      const gRect = grid.getBoundingClientRect();
+      const dx=e.clientX-startX;
+      const dy=e.clientY-startY;
+      if(mode==='move'){
+        let nl = startL + dx;
+        let nt = startT + dy;
+        // clamp inside grid
+        nl = Math.max(0, Math.min(gRect.width - startW, nl));
+        nt = Math.max(0, Math.min(gRect.height - startH, nt));
+        dragging.style.left = nl+'px';
+        dragging.style.top = nt+'px';
+        dragging.style.width = startW+'px';
+        dragging.style.height = startH+'px';
+        // snap preview
+        const snap = getSnap(nl, nt, gRect.width, gRect.height);
+        if(snap){
+          preview.style.left=snap.left; preview.style.top=snap.top; preview.style.width=snap.width; preview.style.height=snap.height;
+          overlay.classList.add('active');
+          snapTarget=snap;
+        } else {
+          overlay.classList.remove('active');
+          snapTarget=null;
+        }
+      } else if(mode==='e'){
+        let nw = startW + dx;
+        nw = Math.max(260, Math.min(gRect.width - startL, nw));
+        dragging.style.width = nw+'px';
+      } else if(mode==='s'){
+        let nh = startH + dy;
+        nh = Math.max(180, Math.min(gRect.height - startT, nh));
+        dragging.style.height = nh+'px';
+      } else if(mode==='se'){
+        let nw = startW + dx;
+        let nh = startH + dy;
+        nw = Math.max(260, Math.min(gRect.width - startL, nw));
+        nh = Math.max(180, Math.min(gRect.height - startT, nh));
+        dragging.style.width = nw+'px';
+        dragging.style.height = nh+'px';
+      }
+    });
+    window.addEventListener('mouseup', ()=>{
+      if(!dragging) return;
+      if(snapTarget && mode==='move'){
+        dragging.style.left=snapTarget.left;
+        dragging.style.top=snapTarget.top;
+        dragging.style.width=snapTarget.width;
+        dragging.style.height=snapTarget.height;
+      }
+      dragging.classList.remove('dragging-window');
+      dragging=null;
+      snapTarget=null;
+      overlay.classList.remove('active');
+      document.body.classList.remove('resizing');
+      mode='move';
+    });
+    // double-click header to maximize/restore
+    grid.addEventListener('dblclick', e=>{
+      const hdr = e.target.closest('.h-7');
+      if(!hdr || !grid.classList.contains('windowed')) return;
+      if(e.target.closest('button')) return;
+      const pane = hdr.closest('.tiling-pane');
+      if(!pane) return;
+      const isMax = pane.dataset.max==='1';
+      if(!isMax){
+        pane.dataset.prevLeft=pane.style.left;
+        pane.dataset.prevTop=pane.style.top;
+        pane.dataset.prevW=pane.style.width;
+        pane.dataset.prevH=pane.style.height;
+        pane.style.left='8px'; pane.style.top='8px'; pane.style.width='calc(100% - 16px)'; pane.style.height='calc(100% - 16px)';
+        pane.dataset.max='1';
+      } else {
+        pane.style.left=pane.dataset.prevLeft||'8px';
+        pane.style.top=pane.dataset.prevTop||'8px';
+        pane.style.width=pane.dataset.prevW||'calc(50% - 12px)';
+        pane.style.height=pane.dataset.prevH||'calc(100% - 16px)';
+        pane.dataset.max='0';
+      }
+    });
+  }
+
   // --- Drag-to-pane: sitedeki her şey pane'e sürüklenebilir (FIX soldan sürükle) ---
   (function(){
     const tilingView = document.getElementById('tiling-view');
@@ -1590,8 +1829,19 @@
       }
       const id='pane-'+Date.now().toString(36);
       const pane=document.createElement('div');
-      pane.className='tiling-pane flex flex-col min-w-[300px] flex-1 bg-[#FAF9F5] border-l border-line overflow-hidden';
+      const isWindowed = grid.classList.contains('windowed');
+      pane.className='tiling-pane flex flex-col min-w-[300px] ' + (isWindowed ? 'bg-[#FAF9F5] border border-line shadow-xl' : 'flex-1 bg-[#FAF9F5] border-l border-line') + ' overflow-hidden';
       pane.dataset.pane=id;
+      if(isWindowed){
+        pane.style.position='absolute';
+        const n = grid.querySelectorAll('.tiling-pane:not(.hidden)').length;
+        pane.style.left = (16 + (n*28)%180) + 'px';
+        pane.style.top = (16 + (n*24)%140) + 'px';
+        pane.style.width = '420px';
+        pane.style.height = '360px';
+        let maxZ=20; grid.querySelectorAll('.tiling-pane').forEach(pp=>{ const z=parseInt(pp.style.zIndex||'0',10); if(z>maxZ) maxZ=z; });
+        pane.style.zIndex = maxZ+1;
+      }
       const safeTitle = (title||'Yeni pane').replace(/</g,'&lt;').slice(0,50);
       const safeHTML = html || '<div class="text-zinc-500">Boş</div>';
       pane.innerHTML=`
@@ -1616,6 +1866,13 @@
         grid.insertBefore(pane, paneC);
       } else {
         grid.appendChild(pane);
+      }
+      if(isWindowed){
+        // add resize handles for new window
+        if(!pane.querySelector('.window-handle.e')){
+          pane.insertAdjacentHTML('beforeend','<div class="window-handle e" title="Sağa çek genişlet"></div><div class="window-handle s" title="Aşağı çek"></div><div class="window-handle se" title="Köşeden boyutlandır"></div>');
+        }
+        pane.addEventListener('mousedown', ()=>{ let maxZ=20; grid.querySelectorAll('.tiling-pane').forEach(pp=>{ const z=parseInt(pp.style.zIndex||'0',10); if(z>maxZ) maxZ=z; }); pane.style.zIndex=maxZ+1; });
       }
       refreshDraggables();
       pane.animate([{transform:'scale(0.98)', opacity:'0.6'},{transform:'scale(1)', opacity:'1'}],{duration:220, easing:'ease-out'});

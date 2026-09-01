@@ -65,7 +65,16 @@ export function Composer({ placeholder = "Ask Lokma to plan, code, or explain â€
   }
 
   return (
-    <div className="rounded-lg bg-white border border-line shadow-sm overflow-hidden">
+    <div
+      onDragOver={e => { e.preventDefault(); (e.currentTarget as HTMLDivElement).dataset.drag = "1" }}
+      onDragLeave={e => { delete (e.currentTarget as HTMLDivElement).dataset.drag }}
+      onDrop={e => {
+        e.preventDefault()
+        delete (e.currentTarget as HTMLDivElement).dataset.drag
+        const dt = e.dataTransfer.files
+        if (dt && dt.length) setFiles(prev => [...prev, ...Array.from(dt)])
+      }}
+      className="rounded-lg bg-white border border-line shadow-sm overflow-hidden data-[drag=1]:ring-2 data-[drag=1]:ring-terracotta/30 data-[drag=1]:border-terracotta/30 transition">
       <div className="p-2">
         <Textarea
           ref={taRef}

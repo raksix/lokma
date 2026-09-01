@@ -4,6 +4,11 @@ import { useEffect, useState } from "react"
 
 export function Header({ onToggleLeft, onToggleRight, onOpenBrowser, onOpenMobile, onSearch }: { onToggleLeft: () => void; onToggleRight: () => void; onOpenBrowser: () => void; onOpenMobile: () => void; onSearch: () => void }) {
   const [dark, setDark] = useState(false)
+  const [time, setTime] = useState(() => new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }))
+  useEffect(() => {
+    const id = setInterval(() => setTime(new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })), 60000)
+    return () => clearInterval(id)
+  }, [])
   useEffect(() => {
     const stored = localStorage.getItem("lokma-theme")
     if (stored === "dark") {
@@ -43,7 +48,7 @@ export function Header({ onToggleLeft, onToggleRight, onOpenBrowser, onOpenMobil
         </div>
         <div className="flex-1 flex justify-center">
           <span className="hidden lg:flex items-center gap-1.5 text-xs text-zinc-500">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> main
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> main · {time}
           </span>
         </div>
         <div className="flex items-center gap-1">

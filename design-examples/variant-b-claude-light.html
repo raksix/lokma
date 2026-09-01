@@ -1346,6 +1346,149 @@
     });
   })();
 
+  // --- Drag-to-pane: sitedeki her şey pane'e sürüklenebilir ---
+  (function(){
+    const tilingView = document.getElementById('tiling-view');
+    const singleView = document.getElementById('single-view');
+    const grid = document.getElementById('tiling-grid');
+    if(!grid) return;
+    // helper to make elements draggable
+    function makeDraggable(el){
+      if(el.dataset.dragSetup) return;
+      el.dataset.dragSetup = "1";
+      el.draggable = true;
+      el.classList.add('cursor-grab', 'active:cursor-grabbing');
+      el.addEventListener('dragstart', (e)=>{
+        const title = (el.querySelector('.font-medium, .font-semibold, h1, h2, h3')?.innerText || el.innerText || 'Pane').trim().slice(0,40);
+        e.dataTransfer.setData('text/plain', title);
+        e.dataTransfer.setData('text/html', el.outerHTML);
+        e.dataTransfer.effectAllowed = 'copy';
+        el.classList.add('opacity-50', 'ring-2', 'ring-terracotta/30');
+        window._dragTitle = title;
+        window._dragHTML = el.outerHTML;
+        // show tiling view hint
+        grid.classList.add('ring-2','ring-terracotta/30');
+        // auto-show tiling if hidden and dragging from single view
+        if(tilingView.classList.contains('hidden')){
+          // don't auto-switch immediately, just hint, switch on drop
+        }
+      });
+      el.addEventListener('dragend', ()=>{
+        el.classList.remove('opacity-50','ring-2','ring-terracotta/30');
+        grid.classList.remove('ring-2','ring-terracotta/30');
+      });
+    }
+    function refreshDraggables(){
+      // chat bubbles, code cards, quick starters, left pinned/project items, right inspector cards, session/docs cards
+      document.querySelectorAll('#main-scroll .space-y-5 > div, #main-scroll .grid button, #pane-left a, #pane-left .project-group > div > a, #pane-right .rounded-lg, #pane-right a, .grid a, pre').forEach(makeDraggable);
+      // also tiling panes themselves (header drag to reorder)
+      document.querySelectorAll('.tiling-pane').forEach(pane=>{
+        const hdr = pane.querySelector('.h-7');
+        if(hdr && !hdr.dataset.dragSetup){
+          hdr.dataset.dragSetup="1";
+          hdr.draggable=true;
+          hdr.classList.add('cursor-grab');
+          hdr.addEventListener('dragstart', e=>{
+            window._dragPane = pane;
+            e.dataTransfer.effectAllowed='move';
+            e.dataTransfer.setData('text/plain','pane-move');
+          });
+        }
+      });
+    }
+    refreshDraggables();
+    // observe for new panes
+    new MutationObserver(refreshDraggables).observe(document.body, {childList:true, subtree:true});
+
+    // drop handling for grid and panes
+    function createPaneFromDrag(title, html){
+      // ensure tiling visible
+      if(tilingView.classList.contains('hidden')){
+        if(typeof window.toggleTiling === 'function') window.toggleTiling(true);
+      }
+      const id = 'pane-' + Date.now().toString(36);
+      const pane = document.createElement('div');
+      pane.className = 'tiling-pane flex flex-col min-w-[300px] flex-1 bg-[#FAF9F5] border-l border-line overflow-hidden';
+      pane.dataset.pane = id;
+      pane.innerHTML = `
+            <div class="h-7 flex items-center gap-1.5 px-2.5 border-b border-line/60 bg-[#FDFCFB] shrink-0">
+              <span class="w-1.5 h-1.5 rounded-full bg-terracotta"></span>
+              <span class="text-[11px] font-medium truncate">${title.replace(/</g,'&lt;')}</span>
+              <span class="ml-auto flex items-center gap-1">
+                <button onclick="closePane(this)" class="w-5 h-5 grid place-items-center rounded hover:bg-white border border-transparent hover:border-line text-zinc-500" title="Kapat">×</button>
+              </span>
+            </div>
+            <div class="flex-1 overflow-y-auto p-3 space-y-2 bg-[#FAF9F5]">
+              <div class="rounded-lg bg-white border border-line p-3 shadow-sm text-[13px] leading-5 overflow-auto max-h-[60vh]">${html}</div>
+            </div>
+            <div class="shrink-0 p-2 border-t border-line bg-white/90 backdrop-blur">
+              <div class="flex gap-1.5">
+                <input placeholder="Bu pane'e yaz..." class="flex-1 h-7 px-2.5 rounded-md bg-white border border-line text-[13px]" />
+                <button class="px-3 h-7 rounded-full bg-terracotta text-white text-[12px] font-medium">Send</button>
+              </div>
+            </div>`;
+      // insert before hidden pane-c or at end
+      const paneC = document.getElementById('pane-c');
+      if(paneC && paneC.parentNode === grid){
+        grid.insertBefore(pane, paneC);
+      } else {
+        grid.appendChild(pane);
+      }
+      refreshDraggables();
+    }
+
+    // allow drop on grid
+    grid.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; grid.classList.add('bg-terracotta/5'); });
+    grid.addEventListener('dragleave', ()=> grid.classList.remove('bg-terracotta/5'));
+    grid.addEventListener('drop', e=>{
+      e.preventDefault();
+      grid.classList.remove('bg-terracotta/5', 'ring-2','ring-terracotta/30');
+      // pane reorder?
+      if(window._dragPane && grid.contains(window._dragPane)){
+        const targetPane = e.target.closest('.tiling-pane');
+        if(targetPane && targetPane !== window._dragPane){
+          // reorder: insert dragged before target
+          grid.insertBefore(window._dragPane, targetPane);
+        }
+        window._dragPane=null;
+        return;
+      }
+      const title = window._dragTitle || e.dataTransfer.getData('text/plain') || 'Yeni pane';
+      const html = window._dragHTML || e.dataTransfer.getData('text/html') || '<div class="text-zinc-500">Boş</div>';
+      createPaneFromDrag(title, html);
+      window._dragHTML=null; window._dragTitle=null;
+    });
+
+    // also allow drop on single-view to create tiling pane (hint)
+    const mainScroll = document.getElementById('main-scroll');
+    if(mainScroll){
+      mainScroll.addEventListener('dragover', e=>{ e.preventDefault(); });
+      mainScroll.addEventListener('drop', e=>{
+        // if dropped on single view, create pane in tiling
+        if(e.target.closest('.tiling-pane')) return;
+        const title = window._dragTitle || 'Pane';
+        const html = window._dragHTML || '';
+        if(html){
+          e.preventDefault();
+          createPaneFromDrag(title, html);
+        }
+      });
+    }
+
+    // visual hint: when dragging, show floating badge
+    let badge=null;
+    document.addEventListener('dragstart', ()=>{
+      badge=document.createElement('div');
+      badge.className='fixed top-3 left-1/2 -translate-x-1/2 z-[9999] px-3 py-1.5 rounded-full bg-[#262624] text-white text-[11px] font-medium shadow-lg pointer-events-none';
+      badge.textContent='Pane'e bırak → tiling olarak aç';
+      document.body.appendChild(badge);
+    });
+    document.addEventListener('dragend', ()=>{
+      if(badge){ badge.remove(); badge=null; }
+      window._dragPane=null;
+    });
+  })();
+
   // auto-resize textarea
   const ta = document.getElementById('composer-input');
   ta.addEventListener('input', () => {

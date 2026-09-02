@@ -57,6 +57,9 @@ export default function App() {
     ],
   })
   const singleScrollRef = useRef<HTMLDivElement>(null)
+  const [singleAylinText, setSingleAylinText] = useState("Let's refactor the auth middleware. Move JWT verification into a Fastify preHandler hook.")
+  const [editingSingle, setEditingSingle] = useState(false)
+  const [singleAylinDraft, setSingleAylinDraft] = useState(singleAylinText)
   const dragRef = useRef<{ startX: number; startW: number; side: "left" | "right" } | null>(null)
   const winDragRef = useRef<{ id: string; sx: number; sy: number; ox: number; oy: number } | null>(null)
 
@@ -250,6 +253,28 @@ export default function App() {
     handleOpenTab(name, <div className="font-mono text-xs p-3">File preview: {name}<pre className="mt-2 p-2 bg-muted rounded border border-line">export const demo = true;</pre></div>)
   }
 
+  const handleForkFrom = (fromTitle: string) => {
+    const forkTitle = `Fork · ${fromTitle.slice(0, 24)}`
+    const content = (
+      <div className="space-y-4">
+        <div className="p-2 rounded-md bg-amber-50 dark:bg-[#241E0F] border border-amber-200 dark:border-[#3A2E1A] text-xs flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Forked from “{fromTitle}” — yeni dal, bu mesajdan itibaren ayrı session’da devam
+        </div>
+        <div className="flex gap-3">
+          <img src="https://i.pravatar.cc/100?img=33" alt="Aylin" className="w-7 h-7 rounded-full object-cover border border-line shrink-0" />
+          <div className="flex-1 rounded-2xl bg-white dark:bg-[#1E1E21] border border-line p-3 text-[13px] leading-[1.6]">{singleAylinText}</div>
+        </div>
+        <div className="flex gap-3">
+          <div className="w-7 h-7 rounded-full bg-[#262624] dark:bg-white text-white dark:text-black grid place-items-center text-[11px] font-bold border border-line shrink-0">◐</div>
+          <div className="flex-1 text-[13px] leading-[1.6]">Perfect — one hook, one decorator, zero magic. <span className="text-zinc-500">(forked)</span></div>
+        </div>
+        <div className="p-2 rounded-md bg-muted border border-line text-xs">Yeni dal — buradan devam et. Composer ile yaz.</div>
+      </div>
+    )
+    handleOpenTab(forkTitle, content)
+    window.dispatchEvent(new CustomEvent("lokma-toast", { detail: `Fork açıldı: ${forkTitle}` }))
+  }
+
   // render helpers for tiling tree
   const renderPaneById = (id: string) => {
     if (id === "a") return <Pane key={id} id={id} initialTabs={[{ id: "tab-a-1", title: "Chat #482", content: <div className="space-y-4">
@@ -440,17 +465,30 @@ export default function App() {
                               <span className="text-[11px] text-zinc-400">14:31</span>
                               <span className="ml-auto hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400"><span className="w-1 h-1 rounded-full bg-emerald-500" /> you</span>
                             </div>
-                            <div className="mt-1.5 rounded-2xl rounded-tl-sm bg-white dark:bg-[#1E1E21] border border-line shadow-sm p-3.5 group-hover:border-line-strong group-hover:shadow-md transition">
-                              <div className="text-[13.5px] leading-[1.6]">Let's refactor the auth middleware. Move JWT verification into a Fastify <code className="px-1.5 py-0.5 rounded-md bg-muted border border-line text-xs font-mono">preHandler</code> hook.</div>
-                              <div className="mt-2 flex items-center gap-1.5">
-                                <span className="px-1.5 py-0.5 rounded-full bg-[#FDF0E6] border border-[#F2D5C2] text-terracotta text-[11px]">auth.ts</span>
-                                <span className="px-1.5 py-0.5 rounded-full bg-muted border border-line text-[11px]">+18 lines</span>
+                            {editingSingle ? (
+                              <div className="mt-1.5 rounded-2xl bg-white dark:bg-[#1E1E21] border border-terracotta/30 shadow-sm p-2">
+                                <textarea value={singleAylinDraft} onChange={e => setSingleAylinDraft(e.target.value)} rows={3} className="w-full rounded-md border border-line bg-white dark:bg-[#0F0F11] p-2 text-[13px] focus:outline-none focus:border-terracotta/30" />
+                                <div className="mt-2 flex gap-1.5 justify-end">
+                                  <Button variant="ghost" size="sm" className="h-6 text-[11px]" onClick={() => { setEditingSingle(false); setSingleAylinDraft(singleAylinText) }}>Cancel</Button>
+                                  <Button size="sm" className="h-6 text-[11px]" onClick={() => { setSingleAylinText(singleAylinDraft); setEditingSingle(false); window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Prompt güncellendi — rewind ile yeniden gönder" })) }}>Save & rewind</Button>
+                                </div>
                               </div>
-                            </div>
-                            <div className="mt-1 flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                              <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => { document.getElementById("single-msg-lokma")?.scrollIntoView({ behavior: "smooth" }); window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Aylin mesajına gidildi" })) }}>Copy</Button>
-                              <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2">Share</Button>
-                            </div>
+                            ) : (
+                              <>
+                                <div className="mt-1.5 rounded-2xl rounded-tl-sm bg-white dark:bg-[#1E1E21] border border-line shadow-sm p-3.5 group-hover:border-line-strong group-hover:shadow-md transition">
+                                  <div className="text-[13.5px] leading-[1.6]">{singleAylinText}</div>
+                                  <div className="mt-2 flex items-center gap-1.5">
+                                    <span className="px-1.5 py-0.5 rounded-full bg-[#FDF0E6] border border-[#F2D5C2] text-terracotta text-[11px]">auth.ts</span>
+                                    <span className="px-1.5 py-0.5 rounded-full bg-muted border border-line text-[11px]">+18 lines</span>
+                                  </div>
+                                </div>
+                                <div className="mt-1 flex gap-1 opacity-0 group-hover:opacity-100 transition flex-wrap">
+                                  <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => { setSingleAylinDraft(singleAylinText); setEditingSingle(true) }}>✎ Edit</Button>
+                                  <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => { document.getElementById("single-msg-lokma")?.scrollIntoView({ behavior: "smooth" }); window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Rewind: bu mesaja sarıldı — sonraki mesajlar gizlendi" })) }}>↩ Rewind</Button>
+                                  <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => { navigator.clipboard.writeText(singleAylinText); window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Kopyalandı" })) }}>Copy</Button>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
 
@@ -476,9 +514,12 @@ export default function App() {
                             <div className="mt-2 flex gap-1.5">
                               <Button variant="secondary" size="sm" className="h-6 text-[11px] gap-1 bg-white text-ink hover:bg-white/90 border border-line" onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Diff kopyalandı" }))}>Copy diff</Button>
                               <Button variant="ghost" size="sm" className="h-6 text-[11px] gap-1" onClick={() => handleOpenTab("auth.ts", <CodePaneContent />)}>Open in pane</Button>
+                              <Button variant="ghost" size="sm" className="h-6 text-[11px] gap-1" onClick={() => handleForkFrom("Perfect — one hook, one decorator")}>⎇ Fork</Button>
                             </div>
                             <div className="mt-1.5 flex items-center gap-1 text-[11px] text-zinc-400">
                               <span>✓ 1 tool · 12k tokens · $0.04</span>
+                              <span className="mx-1">·</span>
+                              <button onClick={() => { navigator.clipboard.writeText("Perfect — one hook, one decorator, zero magic."); window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Kopyalandı" })) }} className="hover:text-ink hover:underline">⎙ Copy</button>
                               <span className="mx-1">·</span>
                               <button onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Regenerate" }))} className="hover:text-ink hover:underline">↻ Regenerate</button>
                             </div>

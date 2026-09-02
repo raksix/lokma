@@ -205,6 +205,7 @@ export function Pane({
         <Composer
           placeholder={`Pane ${id} — sürükle bırak · profil chat · Ask Lokma`}
           onSend={(text, files) => {
+            const userText = text
             const content = (
               <div className="space-y-4">
                 <div className="flex gap-2.5 group">
@@ -215,8 +216,13 @@ export function Pane({
                       <span className="text-[11px] text-zinc-400">{new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</span>
                     </div>
                     <div className="mt-1 rounded-2xl rounded-tl-sm bg-white dark:bg-[#1E1E21] border border-line shadow-sm p-3 group-hover:border-line-strong transition">
-                      <div className="text-[13px] leading-[1.6]">{text}</div>
+                      <div className="text-[13px] leading-[1.6]">{userText}</div>
                       {files.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{files.map(f => <span key={f.name} className="px-1.5 py-0.5 rounded-full bg-[#FDF0E6] border border-[#F2D5C2] text-terracotta text-[11px]">{f.name}</span>)}</div>}
+                    </div>
+                    <div className="mt-1 flex gap-1 opacity-0 group-hover:opacity-100 transition flex-wrap">
+                      <button onClick={() => { navigator.clipboard.writeText(userText); window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Kopyalandı" })) }} className="text-[11px] px-2 py-0.5 rounded-full hover:bg-muted border border-transparent hover:border-line">⎙ Copy</button>
+                      <button onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Edit — yakında (inline edit)" }))} className="text-[11px] px-2 py-0.5 rounded-full hover:bg-muted border border-transparent hover:border-line">✎ Edit</button>
+                      <button onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Rewind — bu mesaja sarıldı" }))} className="text-[11px] px-2 py-0.5 rounded-full hover:bg-muted border border-transparent hover:border-line">↩ Rewind</button>
                     </div>
                   </div>
                 </div>
@@ -229,6 +235,11 @@ export function Pane({
                       <span className="text-[11px] text-zinc-400">· 0.9s</span>
                     </div>
                     <div className="mt-1 text-[13px] leading-[1.6]">Alındı — pane <b>{id}</b> içinde işliyorum. <span className="text-zinc-500">Mock yanıt, bubble’sız düz metin.</span></div>
+                    <div className="mt-1.5 flex gap-1 flex-wrap">
+                      <button onClick={() => { navigator.clipboard.writeText(`Alındı — pane ${id} içinde işliyorum.`); window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Kopyalandı" })) }} className="text-[11px] px-2 py-0.5 rounded-full hover:bg-muted border border-transparent hover:border-line">⎙ Copy</button>
+                      <button onClick={() => { const forkTitle = `Fork · ${userText.slice(0, 20)}`; const forkContent = <div className="p-3 text-xs">Forked from pane {id} — “{userText.slice(0, 30)}...”<div className="mt-2 p-2 rounded bg-amber-50 border border-amber-200 text-[11px]">Yeni dal — buradan devam</div></div>; addTab(forkTitle, forkContent); window.dispatchEvent(new CustomEvent("lokma-toast", { detail: `Fork: ${forkTitle}` })) }} className="text-[11px] px-2 py-0.5 rounded-full hover:bg-muted border border-transparent hover:border-line">⎇ Fork</button>
+                      <button onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Regenerate" }))} className="text-[11px] px-2 py-0.5 rounded-full hover:bg-muted border border-transparent hover:border-line">↻ Regenerate</button>
+                    </div>
                     <div className="mt-1 text-[11px] text-zinc-400">✓ 1 tool · profil chat senkron</div>
                   </div>
                 </div>

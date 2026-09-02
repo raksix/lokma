@@ -230,15 +230,24 @@ export function Pane({
                   <div className="w-7 h-7 rounded-full bg-[#262624] dark:bg-white text-white dark:text-black grid place-items-center text-[11px] font-bold border border-line shrink-0 mt-0.5 shadow-sm">◐</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-1.5">
-                      <span className="text-xs font-semibold">Lokma</span>
-                      <span className="px-1 py-0.5 rounded-full bg-[#262624] dark:bg-white text-white dark:text-black text-[10px]">Sonnet</span>
+                      <span className="text-xs font-semibold">Lokma.AI</span>
+                      <span className="px-1 py-0.5 rounded-full bg-[#6C5CE7] text-white text-[10px]">Thought ▸</span>
                       <span className="text-[11px] text-zinc-400">· 0.9s</span>
                     </div>
-                    <div className="mt-1 text-[13px] leading-[1.6]">Alındı — pane <b>{id}</b> içinde işliyorum. <span className="text-zinc-500">Mock yanıt, bubble’sız düz metin.</span></div>
+                    <details open className="mt-2 rounded-lg border border-line bg-muted/30 dark:bg-[#1E1E21]/50 overflow-hidden">
+                      <summary className="px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-muted/50 list-none flex items-center gap-1.5"><span className="text-[10px]">▸</span> Thought <span className="ml-auto text-[11px] text-zinc-400">Ran cat · tail</span></summary>
+                      <div className="px-3 py-2 border-t border-line text-xs leading-[1.6]">Verifying pane onSend — edit/rewind/fork eklendi.</div>
+                    </details>
+                    <div className="mt-2 text-[13px] leading-[1.6]">Alındı — pane <b>{id}</b> içinde işliyorum. <span className="text-zinc-500">Mock yanıt, image gibi.</span></div>
+                    <div className="mt-2 rounded-lg overflow-hidden border border-line bg-[#0F0F11] dark:bg-[#161618]">
+                      <div className="flex items-center gap-2 px-3 h-7 bg-[#1E1E21] border-b border-white/10 text-xs"><span className="font-mono text-white">Pane.tsx</span><span className="text-emerald-400 text-[11px]">+12</span><span className="text-red-400 text-[11px]">-1</span><span className="ml-auto w-5 h-5 grid place-items-center rounded hover:bg-white/10 text-white/60">×</span></div>
+                      <pre className="p-3 text-xs leading-5 font-mono overflow-x-auto text-white/90"><code><span className="text-[#8BE9FD]">const</span> Composer <span className="text-[#FF79C6]">=</span> () <span className="text-[#FF79C6]">=&gt;</span> {"{"} <span className="text-[#6272A4]">// edit/rewind/fork</span> {"}"}</code></pre>
+                    </div>
                     <div className="mt-1.5 flex gap-1 flex-wrap">
                       <button onClick={() => { navigator.clipboard.writeText(`Alındı — pane ${id} içinde işliyorum.`); window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Kopyalandı" })) }} className="text-[11px] px-2 py-0.5 rounded-full hover:bg-muted border border-transparent hover:border-line">⎙ Copy</button>
                       <button onClick={() => { const forkTitle = `Fork · ${userText.slice(0, 20)}`; const forkContent = <div className="p-3 text-xs">Forked from pane {id} — “{userText.slice(0, 30)}...”<div className="mt-2 p-2 rounded bg-amber-50 border border-amber-200 text-[11px]">Yeni dal — buradan devam</div></div>; addTab(forkTitle, forkContent); window.dispatchEvent(new CustomEvent("lokma-toast", { detail: `Fork: ${forkTitle}` })) }} className="text-[11px] px-2 py-0.5 rounded-full hover:bg-muted border border-transparent hover:border-line">⎇ Fork</button>
                       <button onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Regenerate" }))} className="text-[11px] px-2 py-0.5 rounded-full hover:bg-muted border border-transparent hover:border-line">↻ Regenerate</button>
+                      <a href="https://lokma-concept.fermag.com.tr" target="_blank" className="ml-auto text-[11px] text-terracotta hover:underline">Canlı</a>
                     </div>
                     <div className="mt-1 text-[11px] text-zinc-400">✓ 1 tool · profil chat senkron</div>
                   </div>

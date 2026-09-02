@@ -492,29 +492,44 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* Lokma — BUBBLE YOK, düz metin */}
+                        {/* Lokma — BUBBLE YOK, düz metin — image gibi Thought + code block */}
                         <div id="single-msg-lokma" className="flex gap-3 group scroll-mt-16">
-                          <div className="w-8 h-8 rounded-full bg-[#262624] dark:bg-white text-white dark:text-black grid place-items-center text-xs font-bold border border-line shrink-0 mt-0.5 shadow-sm">◐</div>
+                          <div className="w-8 h-8 rounded-full bg-[#6C5CE7] dark:bg-[#6C5CE7] text-white grid place-items-center text-xs font-bold border border-line shrink-0 mt-0.5 shadow-sm">◐</div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-baseline gap-2 flex-wrap">
-                              <span className="text-xs font-semibold">Lokma</span>
-                              <span className="px-1.5 py-0.5 rounded-full bg-[#262624] dark:bg-white text-white dark:text-black text-[10px]">Claude 4 Sonnet</span>
+                              <span className="text-xs font-semibold">Lokma.AI</span>
+                              <span className="px-1.5 py-0.5 rounded-full bg-[#6C5CE7] text-white text-[10px]">Thought ▸</span>
                               <span className="text-[11px] text-zinc-400">14:31 · 1.2s</span>
-                              <span className="ml-auto hidden sm:inline-flex items-center gap-1 text-[11px] text-emerald-600"><span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" /> streaming done</span>
                             </div>
-                            {/* düz metin, bubble yok */}
-                            <div className="mt-1.5 text-[13.5px] leading-[1.6]">Perfect — one hook, one decorator, <span className="underline decoration-terracotta/50 underline-offset-4">zero magic.</span></div>
-                            <div className="mt-3 rounded-xl overflow-hidden border border-line bg-[#0F0F11] dark:bg-[#1E1E21]">
-                              <div className="flex items-center justify-between px-3 h-7 bg-white/5 border-b border-white/10 text-xs dark:bg-[#232326]">
-                                <span className="font-mono text-white">plugins/auth.ts</span>
-                                <span className="text-white/60">+18</span>
+                            {/* Thought collapsible */}
+                            <details open className="mt-2 rounded-lg border border-line bg-muted/30 dark:bg-[#1E1E21]/50 overflow-hidden">
+                              <summary className="px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-muted/50 list-none flex items-center gap-1.5">
+                                <span className="text-[10px]">▸</span> Thought
+                                <span className="ml-auto text-[11px] text-zinc-400">Ran cat · tail -n 60</span>
+                              </summary>
+                              <div className="px-3 py-2 border-t border-line text-xs leading-[1.6] space-y-1">
+                                <div className="font-mono text-[11px] text-zinc-500">Ran <code className="px-1 py-0.5 rounded bg-white dark:bg-[#0F0F11] border border-line">cat /mnt/apopic/lokma/concept/src/components/layout/Pane.tsx | tail -n 60</code></div>
+                                <div>Verifying <code className="px-1 py-0.5 rounded bg-white dark:bg-[#0F0F11] border border-line text-[11px]">Pane onSend</code> implementation and noting missing edit/rewind buttons — reconciling a partial write that reverted Pane's onSend.</div>
                               </div>
-                              <pre className="p-3 text-xs leading-5 font-mono overflow-x-auto text-white/90"><code><span className="text-white/40">// Fastify preHandler</span>{"\n"}<span className="text-amber-300">app</span>.addHook(<span className="text-emerald-300">'preHandler'</span>, <span className="text-amber-300">async</span> (req, reply) =&gt; {"{"}{"\n"}  <span className="text-amber-300">if</span> (!req.routeOptions.config?.auth) <span className="text-amber-300">return</span>{"\n"}{"}"})</code></pre>
+                            </details>
+                            {/* düz metin */}
+                            <div className="mt-2 text-[13.5px] leading-[1.6]">Perfect — one hook, one decorator, <span className="underline decoration-terracotta/50 underline-offset-4">zero magic.</span></div>
+                            {/* Code block — image gibi Pane.tsx +12 -1 */}
+                            <div className="mt-3 rounded-lg overflow-hidden border border-line bg-[#0F0F11] dark:bg-[#161618]">
+                              <div className="flex items-center gap-2 px-3 h-7 bg-[#1E1E21] border-b border-white/10 text-xs">
+                                <span className="font-mono text-white">Pane.tsx</span>
+                                <span className="text-emerald-400 text-[11px]">+12</span>
+                                <span className="text-red-400 text-[11px]">-1</span>
+                                <span className="ml-auto w-5 h-5 grid place-items-center rounded hover:bg-white/10 text-white/60 cursor-pointer">×</span>
+                              </div>
+                              <pre className="p-3 text-xs leading-5 font-mono overflow-x-auto text-white/90"><code><span className="text-[#8BE9FD]">const</span> <span className="text-white">Composer</span> <span className="text-[#FF79C6]">=</span> <span className="text-[#8BE9FD]">()</span> <span className="text-[#FF79C6]">=&gt;</span> {"{"}{"\n"}  <span className="text-[#6272A4]">// placeholder + onSend + edit/rewind/fork</span>{"\n"}{"}"}</code></pre>
                             </div>
-                            <div className="mt-2 flex gap-1.5">
+                            <div className="mt-2 text-xs text-zinc-500">Ran 2 commands · <span className="text-emerald-600">✓ built</span></div>
+                            <div className="mt-2 flex gap-1.5 flex-wrap">
                               <Button variant="secondary" size="sm" className="h-6 text-[11px] gap-1 bg-white text-ink hover:bg-white/90 border border-line" onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Diff kopyalandı" }))}>Copy diff</Button>
                               <Button variant="ghost" size="sm" className="h-6 text-[11px] gap-1" onClick={() => handleOpenTab("auth.ts", <CodePaneContent />)}>Open in pane</Button>
                               <Button variant="ghost" size="sm" className="h-6 text-[11px] gap-1" onClick={() => handleForkFrom("Perfect — one hook, one decorator")}>⎇ Fork</Button>
+                              <a href="https://lokma-concept.fermag.com.tr" target="_blank" className="ml-auto text-xs text-terracotta hover:underline">Canlı: https://lokma-concept.fermag.com.tr</a>
                             </div>
                             <div className="mt-1.5 flex items-center gap-1 text-[11px] text-zinc-400">
                               <span>✓ 1 tool · 12k tokens · $0.04</span>

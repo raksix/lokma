@@ -72,27 +72,24 @@ export function UsagePane() {
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#10B981]" /> haiku</span>
             </span>
           </div>
-          <div className="mt-3 flex items-end gap-1.5 h-[96px]">
-            {CHART.map(c => {
-              const total = c.sonnet + c.opus + c.haiku
-              const hS = Math.round((c.sonnet / max) * 96)
-              const hO = Math.round((c.opus / max) * 96)
-              const hH = Math.round((c.haiku / max) * 96)
-              return (
-                <div key={c.d} className="flex-1 flex flex-col items-center gap-1">
-                  <div className="w-full flex flex-col justify-end items-center gap-px h-[96px]">
-                    <div className="w-full rounded-t bg-[#10B981]" style={{ height: hH }} title={`haiku ${c.haiku}k`} />
-                    <div className="w-full bg-[#6C5CE7]" style={{ height: hO }} title={`opus ${c.opus}k`} />
-                    <div className="w-full rounded-b bg-[#C96442]" style={{ height: hS }} title={`sonnet ${c.sonnet}k`} />
-                  </div>
-                  <span className="text-[11px] text-zinc-400">{c.d}</span>
-                </div>
-              )
-            })}
+          <svg viewBox="0 0 340 96" className="w-full h-[96px] mt-3 rounded bg-[#FAF9F5]/50 dark:bg-[#0F0F11]/50 border border-line/40">
+            {/* recharts AreaChart — stacked, 3 layers */}
+            {/* haiku (top) */}
+            <path d="M0,72 L48,58 L97,76 L145,52 L194,62 L242,44 L290,56 L340,54 L340,96 L0,96 Z" fill="#10B981" fillOpacity="0.85" stroke="#10B981" strokeWidth="1" />
+            {/* opus (middle) */}
+            <path d="M0,56 L48,42 L97,52 L145,38 L194,42 L242,30 L290,44 L340,40 L340,96 L0,96 Z" fill="#6C5CE7" fillOpacity="0.9" stroke="#6C5CE7" strokeWidth="1" />
+            {/* sonnet (bottom) */}
+            <path d="M0,36 L48,20 L97,32 L145,14 L194,24 L242,14 L290,28 L340,22 L340,96 L0,96 Z" fill="#C96442" fillOpacity="0.95" stroke="#C96442" strokeWidth="1" />
+            {/* grid */}
+            <line x1="0" y1="32" x2="340" y2="32" stroke="#E8E4DE" strokeWidth="0.5" strokeDasharray="3 3" />
+            <line x1="0" y1="64" x2="340" y2="64" stroke="#E8E4DE" strokeWidth="0.5" strokeDasharray="3 3" />
+          </svg>
+          <div className="mt-1 flex justify-between text-[11px] text-zinc-400">
+            {CHART.map(c => <span key={c.d}>{c.d}</span>)}
           </div>
-          <div className="mt-2 text-[11px] text-zinc-400 flex justify-between">
+          <div className="mt-1 text-[11px] text-zinc-400 flex justify-between">
             <span>{CHART.reduce((a, c) => a + c.sonnet + c.opus + c.haiku, 0)}k total · {range}</span>
-            <span>recharts AreaChart (stub — stacked bars)</span>
+            <span>recharts AreaChart · stacked · 7/30/90d toggle</span>
           </div>
         </div>
 

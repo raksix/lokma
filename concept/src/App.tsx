@@ -18,6 +18,9 @@ import { SkillsPane } from "@/components/layout/SkillsPane"
 import { TestingPane } from "@/components/layout/TestingPane"
 import { BotsPane } from "@/components/layout/BotsPane"
 import { AgentHubPane } from "@/components/layout/AgentHubPane"
+import { AuthPane } from "@/components/layout/AuthPane"
+import { SetupWizardPane } from "@/components/layout/SetupWizardPane"
+import { PluginMarketplacePane } from "@/components/layout/PluginMarketplacePane"
 import { Composer } from "@/components/layout/Composer"
 import { FooterBar, Toast, CollapseButton, ResizeHandle } from "@/components/layout/ShellParts"
 import { HeroSection } from "@/components/chat/HeroSection"
@@ -410,6 +413,9 @@ export default function App() {
                 onOpenTesting={() => handleOpenTab("Testing Lab", <TestingPane />)}
                 onOpenBots={() => handleOpenTab("Bots", <BotsPane />)}
                 onOpenHub={() => handleOpenTab("Agent Hub", <AgentHubPane />)}
+                onOpenAuth={() => handleOpenTab("Auth", <AuthPane />)}
+                onOpenSetup={() => handleOpenTab("Setup", <SetupWizardPane />)}
+                onOpenPlugins={() => handleOpenTab("Plugins", <PluginMarketplacePane />)}
                 onSave={saveLayout}
                 onReset={resetLayout}
                 onSingle={() => setTiling(false)}

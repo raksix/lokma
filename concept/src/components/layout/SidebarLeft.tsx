@@ -14,9 +14,9 @@ const SESSIONS: Session[] = [
 ]
 
 const PROJECTS = [
-  { name: "lokma", path: "/mnt/apopic/lokma", sessions: 4, branch: "main" },
-  { name: "bounty-hunter", path: "/mnt/apopic/bounty", sessions: 2, branch: "main" },
-  { name: "Home", path: "~/", sessions: 3, branch: null as string | null },
+  { name: "lokma", path: "/mnt/apopic/lokma", sessions: 4, branch: "main", worktree: "worktree/lokma-482", checkpoints: 12, locks: 0 },
+  { name: "bounty-hunter", path: "/mnt/apopic/bounty", sessions: 2, branch: "main", worktree: null as string | null, checkpoints: 3, locks: 1 },
+  { name: "Home", path: "~/", sessions: 3, branch: null as string | null, worktree: null as string | null, checkpoints: 0, locks: 0 },
 ]
 
 export function SidebarLeft({ onOpenTab }: { onOpenTab: (title: string, content: React.ReactNode) => void }) {
@@ -100,8 +100,9 @@ export function SidebarLeft({ onOpenTab }: { onOpenTab: (title: string, content:
                   <div className="text-xs font-semibold flex items-center gap-1.5">
                     {p.name}
                     <span className="text-[11px] font-normal text-zinc-400">{p.sessions} sessions</span>
+                    {p.worktree && <span className="px-1 py-0 rounded-full bg-[#6C5CE7] text-white text-[10px] flex items-center gap-1">⎇ {p.worktree.split('/').pop()}</span>}
                   </div>
-                  <div className="text-[11px] text-zinc-400 truncate">{p.path}</div>
+                  <div className="text-[11px] text-zinc-400 truncate flex items-center gap-1">{p.path} <span className="hidden sm:inline">· {p.checkpoints} checkpoints</span> {p.locks > 0 && <span className="px-1 py-0 rounded bg-amber-50 border border-amber-200 text-amber-700">{p.locks} lock</span>}</div>
                 </div>
                 {p.branch && <span className="self-center px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] flex items-center gap-1"><GitBranch className="w-3 h-3" />{p.branch}</span>}
               </button>

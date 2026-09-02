@@ -68,6 +68,32 @@ export function LokmaMessage({
             Canlı: https://lokma-concept.fermag.com.tr
           </a>
         </div>
+        <div className="mt-3 rounded-lg border border-amber-200 dark:border-[#3A2E1A] bg-amber-50 dark:bg-[#241E0F] p-2.5 flex gap-2 items-start">
+          <span className="w-7 h-7 rounded-md bg-amber-500 text-white grid place-items-center text-xs shrink-0">⚡</span>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-semibold">Permission — Bash: npm test</div>
+            <div className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">lokma wants to run <code className="px-1 py-0 rounded bg-white border border-line">npm test</code> in /mnt/apopic/lokma</div>
+            <div className="mt-2 flex gap-1 flex-wrap">
+              <button onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Allow — once" }))} className="h-6 px-2.5 rounded-full bg-[#262624] text-white text-xs">Allow</button>
+              <button onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Deny" }))} className="h-6 px-2.5 rounded-full bg-white border border-line text-xs">Deny</button>
+              <button onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Always allow npm *" }))} className="h-6 px-2.5 rounded-full bg-white border border-line text-xs">Always allow</button>
+              <span className="ml-auto text-[11px] text-zinc-400 hidden sm:inline">auto · ask · deny · Settings → Permissions</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-lg border border-line bg-white dark:bg-[#1E1E21] p-2.5">
+          <div className="text-xs font-semibold">AskUserQuestion — which model for this task?</div>
+          <div className="mt-2 grid grid-cols-1 gap-1">
+            {["Claude 4 Sonnet — balanced (recommended)", "Claude 4 Opus — max quality", "Haiku — fast & cheap"].map(o => (
+              <button key={o} onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: o }))} className="text-left px-2.5 py-1.5 rounded-md border border-line hover:border-terracotta/30 hover:bg-[#FDF0E6] dark:hover:bg-[#2A1E15] text-xs flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-terracotta" /> {o}
+              </button>
+            ))}
+          </div>
+          <div className="text-[11px] text-zinc-400 mt-1">WS: ask_user_question → choices · answered → done + cost</div>
+        </div>
+
         <div className="mt-1.5 flex items-center gap-1 text-[11px] text-zinc-400">
           <span>✓ 1 tool · 12k tokens · $0.04</span>
           <span className="mx-1">·</span>

@@ -173,12 +173,12 @@ export function SettingsPane() {
             <div className="text-xs font-medium">Themes — themes/*.json → CSS vars + Chalk tokens</div>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { id: "claude", name: "Claude", desc: "cream #FAF9F5 + terracotta #C96442", bg: "#FAF9F5", accent: "#C96442" },
-                { id: "omp", name: "OMP", desc: "near-black + indigo #6366F1", bg: "#0A0A0F", accent: "#6366F1" },
-                { id: "midnight", name: "Midnight", desc: "true black #000 + zinc", bg: "#000000", accent: "#27272A" },
-                { id: "paper", name: "Paper", desc: "warm paper #FFFBF5 + ink", bg: "#FFFBF5", accent: "#78716C" },
+                { id: "claude", name: "Claude", desc: "cream #FAF9F5 + terracotta #C96442", bg: "#FAF9F5", accent: "#C96442", mode: "light" as const },
+                { id: "omp", name: "OMP", desc: "near-black + indigo #6366F1", bg: "#0A0A0F", accent: "#6366F1", mode: "dark" as const },
+                { id: "midnight", name: "Midnight", desc: "true black #000 + zinc", bg: "#000000", accent: "#27272A", mode: "dark" as const },
+                { id: "paper", name: "Paper", desc: "warm paper #FFFBF5 + ink", bg: "#FFFBF5", accent: "#78716C", mode: "light" as const },
               ].map(t => (
-                <button key={t.id} onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: `Theme: ${t.id} — lokma theme set ${t.id}` }))} className="text-left rounded-lg border border-line p-2.5 hover:border-terracotta/30 hover:shadow-sm transition bg-white dark:bg-[#1E1E21]">
+                <button key={t.id} onClick={() => { const isDark = t.mode === "dark"; document.documentElement.classList.toggle("dark", isDark); localStorage.setItem("lokma-theme", isDark ? "dark" : "light"); window.dispatchEvent(new CustomEvent("lokma-toast", { detail: `Theme: ${t.id} — lokma theme set ${t.id}` })) }} className="text-left rounded-lg border border-line p-2.5 hover:border-terracotta/30 hover:shadow-sm transition bg-white dark:bg-[#1E1E21]">
                   <div className="flex items-center gap-2">
                     <span className="w-8 h-8 rounded-md border border-line shrink-0" style={{ background: t.bg }} />
                     <span className="w-3 h-3 rounded-full shrink-0" style={{ background: t.accent }} />

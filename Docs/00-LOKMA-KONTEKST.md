@@ -143,9 +143,15 @@
 - **Furkan:** "vite'a çevirek zaten temelleri attık yapmaya başlamadık dökümanları da ona göre yapalım"
 - **Hermes:** Stack A **Next.js 15 → Vite 6 + React 19**'a çevrildi (DeepSeek Harness `Vite 6 + @vitejs/plugin-react` pattern, pure SPA, `web/dist/` static). `Docs/02`, `21`, `03`, `20`, `25`, `12`, `README` güncellendi. Sırada: `packages/lokma-web/web` Next.js scaffold'u Vite'a migrate edilecek (`vite.config.ts` proxy `/api`+`/ws` → `:3456`, `index.html` + `src/App.tsx`), `ecosystem.config.cjs` ve `package.json` güncelleme, `bun run build` doğrulama.
 
+### 2026-09-02 08:00 UTC — Concept gap audit + 6 missing panes built
+- **Furkan:** "temizinden bi docs oku. concept design de olmayan bir yer var mı bak varsa onu da yapalım"
+- **Hermes:** Docs 00-36 full okundu vs concept/src audit edildi. Mevcut: SidebarLeft (Sessions/Projects), FileBrowser (Files/Terminal/Browser), Pane system (SplitTree/TilingBar/WindowedCanvas + drag/snap/resize), Composer (model selector + steer/queue), Chat (Thought/code/fork/rewind), Orchestration (live tree), Git, Vault (FTS5 stub), Archify, Design Studio, Header/Search — toplam ~14 pane/component.
+- **Eksik (6 ana pane hiç yoktu):** Usage (Docs 22 §3 KPI+chart+session table), Settings→Providers/Models/Config/Appearance/Permissions/MCP (Docs 22 §1-2 + 26 + 11), Skills (27 Use-when/trie/curator), Testing Lab (33 TestSprite 6-stage + video/trace/Shannon), Bots Gallery (35 bot.json + lifecycle), Agent Hub (30 caps/queue/SOUL/memory/budgets — Orchestration'dan ayrı registry).
+- **Yapılan:** `concept/src/components/layout/` altına 6 yeni pane eklendi: `UsagePane.tsx` (8239B), `SettingsPane.tsx` (6 tabs, providers/models/config/appearance/perms/mcp), `SkillsPane.tsx` (registry + skill_view), `TestingPane.tsx` (6-stage + runs + Shannon), `BotsPane.tsx` (Gallery + bot.json), `AgentHubPane.tsx` (caps 20/5/20 + SOUL/MEMORY + queue). TilingBar +6 buton (+ Usage, + Hub, + Settings, + Skills, + Tests, + Bots) + App.tsx wire. Build ✅ 1857 modules, 407k JS, 60k CSS. Commit 9b9b2f5 push'landı.
+
 ## Son Durum
-- **Son güncelleme:** 2026-08-31 15:40 UTC
-- **Son işlem:** `36-AUTH-and-PERMISSIONS.md` (19KB, RBAC admin/member/viewer + project visibility/creation policy + session inheritance + JWT + `can()`) + `Docs/README` + `00` sync — **Commit 1c56c0e/9ca5063** + Phase 0 scaffold canlı (`lokma.fermag.com.tr` PM2 :3456/:3457, `bun install → bun run build → lokma web --port 3456` teyitli, `design-examples/` 13 HTML)
+- **Son güncelleme:** 2026-09-02 08:05 UTC
+- **Son işlem:** Concept gap audit + 6 missing panes (Usage, Settings, Skills, Testing, Bots, Agent Hub) — **Commit 9b9b2f5** push'landı — concept build ✅ 407k JS. Phase 0 scaffold canlı + concept design artık Docs 22-36'ın tüm ana bölümlerini kapsıyor
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

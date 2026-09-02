@@ -26,6 +26,7 @@ export function Pane({
   const [dragOver, setDragOver] = React.useState(false)
   const [dropZone, setDropZone] = React.useState<"center" | "left" | "right" | "top" | "bottom">("center")
   const paneRef = React.useRef<HTMLDivElement>(null)
+  const scrollRef = React.useRef<HTMLDivElement>(null)
 
   const activeTab = tabs.find(t => t.id === active)
 
@@ -55,6 +56,19 @@ export function Pane({
     if (el) (el as unknown as { addTab: typeof addTab }).addTab = addTab
   }, [id])
 
+  React.useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const sticky = document.getElementById(`${id}-sticky`) as HTMLElement | null
+    if (!sticky) return
+    const onScroll = () => {
+      const show = el.scrollTop > 80
+      sticky.style.display = show ? "flex" : "none"
+    }
+    el.addEventListener("scroll", onScroll)
+    return () => el.removeEventListener("scroll", onScroll)
+  }, [id, tabs, active])
+
   const startResize = (e: React.MouseEvent, dir: "e" | "s" | "se") => {
     e.preventDefault()
     e.stopPropagation()
@@ -63,7 +77,6 @@ export function Pane({
     const startX = e.clientX, startY = e.clientY
     const startW = el.getBoundingClientRect().width
     const startH = el.getBoundingClientRect().height
-    // disable flex so width/height stick
     el.style.flex = "0 0 auto"
     document.body.classList.add("resizing")
     const onMove = (ev: MouseEvent) => {
@@ -93,18 +106,14 @@ export function Pane({
     const text = e.dataTransfer.getData("text/plain") || (window as unknown as { _dragTitle?: string })._dragTitle || ""
     const title = text ? text.slice(0, 40) : "Dropped"
     const isFile = text.startsWith("@") || text.endsWith(".ts") || text.endsWith(".md")
-    // zone-aware: edge drops split, center adds tab
     if (dropZone !== "center") {
       const dir = dropZone === "left" || dropZone === "right" ? "row" : "col"
       const pos = dropZone === "left" || dropZone === "top" ? "before" : "after"
-      // create content for new pane from drop
       const content = isFile ? (
         <div className="font-mono text-xs p-3">File dropped: <span className="text-terracotta">{text}</span><pre className="mt-2 p-2 bg-muted rounded border border-line">export const dropped = true;</pre></div>
       ) : (
         <div className="p-3"><div className="text-xs font-semibold">{title}</div><div className="text-sm mt-1">Sürükle-bırak ile {dropZone} bölgesine bölündü</div></div>
       )
-      // we need to split via onSplit but also need to pass title/content — use window event to let App handle
-      // fallback: if App handles split via onSplit, we store pending drop in window
       ;(window as unknown as { _pendingSplit?: { title: string; content: React.ReactNode } })._pendingSplit = { title, content }
       onSplit(dir as "row" | "col", pos as "before" | "after")
       window.dispatchEvent(new CustomEvent("lokma-toast", { detail: `${dropZone === "left" ? "Sola" : dropZone === "right" ? "Sağa" : dropZone === "top" ? "Üste" : "Alta"} bölündü: ${title}` }))
@@ -189,7 +198,7 @@ export function Pane({
           </Button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto bg-[#FAF9F5] dark:bg-[#0F0F11]">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto bg-[#FAF9F5] dark:bg-[#0F0F11] relative">
         {activeTab ? <div className="p-3">{activeTab.content}</div> : <div className="p-6 text-center text-sm text-zinc-500">Boş pane — sürükle bırak ile doldur</div>}
       </div>
       <div className="shrink-0 p-2 border-t border-line bg-white/90 dark:bg-[#161618]/90 backdrop-blur">
@@ -219,9 +228,7 @@ export function Pane({
                       <span className="px-1 py-0.5 rounded-full bg-[#262624] dark:bg-white text-white dark:text-black text-[10px]">Sonnet</span>
                       <span className="text-[11px] text-zinc-400">· 0.9s</span>
                     </div>
-                    <div className="mt-1 rounded-2xl rounded-tl-sm bg-[#262624] dark:bg-[#1E1E21] text-white dark:text-[#EDE9E2] border border-[#262624] dark:border-[#232326] shadow-sm p-3">
-                      <div className="text-[13px] leading-[1.6]">Alındı — pane <b>{id}</b> içinde işliyorum. <span className="text-white/60">Mock yanıt, profil chat havalı.</span></div>
-                    </div>
+                    <div className="mt-1 text-[13px] leading-[1.6]">Alındı — pane <b>{id}</b> içinde işliyorum. <span className="text-zinc-500">Mock yanıt, bubble’sız düz metin.</span></div>
                     <div className="mt-1 text-[11px] text-zinc-400">✓ 1 tool · profil chat senkron</div>
                   </div>
                 </div>
@@ -240,7 +247,6 @@ export function Pane({
           <div className={`rounded-md border-2 ${dropZone==="top"?"border-terracotta bg-terracotta/10":"border-transparent"} flex items-center justify-center text-[10px] text-terracotta`}>ÜST</div>
           <div className={`rounded-md border-2 ${dropZone==="left"?"border-terracotta bg-terracotta/10":dropZone==="right"?"border-terracotta bg-terracotta/10":dropZone==="center"?"border-terracotta bg-terracotta/5":"border-transparent"} col-span-1 row-span-1 flex items-center justify-center text-xs font-medium text-terracotta`}>{dropZone==="center"?"Bırak → tab":dropZone==="left"?"◀ Sola böl":dropZone==="right"?"Sağa böl ▶":dropZone}</div>
           <div className={`rounded-md border-2 ${dropZone==="bottom"?"border-terracotta bg-terracotta/10":"border-transparent"} flex items-center justify-center text-[10px] text-terracotta`}>ALT</div>
-          {/* subtle center hint */}
           <div className="absolute inset-0 pointer-events-none border-2 border-terracotta/20 rounded-md" />
         </div>
       )}

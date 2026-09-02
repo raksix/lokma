@@ -97,7 +97,15 @@ export default function App() {
       setTimeout(() => setToast(null), 1600)
     }
     window.addEventListener("lokma-toast", h as EventListener)
-    return () => window.removeEventListener("lokma-toast", h as EventListener)
+    const onClosePane = (e: Event) => {
+      const id = (e as CustomEvent).detail as string
+      if (id) closePane(id)
+    }
+    window.addEventListener("lokma-close-pane", onClosePane as EventListener)
+    return () => {
+      window.removeEventListener("lokma-toast", h as EventListener)
+      window.removeEventListener("lokma-close-pane", onClosePane as EventListener)
+    }
   }, [])
 
   useEffect(() => {

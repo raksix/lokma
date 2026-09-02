@@ -73,10 +73,64 @@ export function Pane({
     })
   }
 
+  const [tabBarOver, setTabBarOver] = React.useState(false)
+
+  const handleTabBarDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setTabBarOver(false)
+    const text = e.dataTransfer.getData("text/plain") || (window as unknown as { _dragTitle?: string })._dragTitle || ""
+    const dragPaneId = (window as unknown as { _dragPaneId?: string })._dragPaneId
+    // pane → tab bar: whole pane becomes a tab
+    if (text.startsWith("Pane ") && dragPaneId && dragPaneId !== id) {
+      const title = text
+      const content = <div className="p-3 text-xs">Pane <b>{dragPaneId}</b> tab olarak eklendi — tab → pane ters işlem</div>
+      addTab(title, content)
+      // close source pane via App handler if available
+      const srcEl = document.querySelector(`[data-pane="${dragPaneId}"]`) as HTMLElement | null
+      if (srcEl) {
+        // find close button and click, or dispatch event
+        window.dispatchEvent(new CustomEvent("lokma-close-pane", { detail: dragPaneId }))
+      }
+      window.dispatchEvent(new CustomEvent("lokma-toast", { detail: `Pane tab oldu: ${title} → ${id}` }))
+      return
+    }
+    // tab → tab bar: move tab
+    const dragTab = (window as unknown as { _dragTab?: { paneId: string; tabId: string; title: string } })._dragTab
+    if (dragTab && dragTab.paneId !== id) {
+      addTab(dragTab.title, <div className="p-3 text-xs">Tab <b>{dragTab.title}</b> taşındı — {dragTab.paneId} → {id}</div>)
+      window.dispatchEvent(new CustomEvent("lokma-move-tab", { detail: { fromPane: dragTab.paneId, tabId: dragTab.tabId } }))
+      window.dispatchEvent(new CustomEvent("lokma-toast", { detail: `Tab taşındı: ${dragTab.title} → ${id}` }))
+      return
+    }
+    // fallback: normal file/session drop onto tab bar → add tab
+    if (text) {
+      const title = text.slice(0, 40)
+      addTab(title, <div className="p-3 text-xs">“{title}” tab bar’a bırakıldı</div>)
+    }
+  }
+
   React.useEffect(() => {
     const el = document.querySelector(`[data-pane="${id}"]`) as HTMLElement
     if (el) (el as unknown as { addTab: typeof addTab }).addTab = addTab
   }, [id])
+
+  React.useEffect(() => {
+    const onMoveTab = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { fromPane: string; tabId: string }
+      if (detail.fromPane === id && detail.tabId) {
+        setTabs(prev => {
+          const next = prev.filter(t => t.id !== detail.tabId)
+          if (next.length === 0) return prev
+          // keep active valid
+          if (active === detail.tabId) setActive(next[0].id)
+          return next
+        })
+      }
+    }
+    window.addEventListener("lokma-move-tab", onMoveTab as EventListener)
+    return () => window.removeEventListener("lokma-move-tab", onMoveTab as EventListener)
+  }, [id, active])
 
   React.useEffect(() => {
     const el = scrollRef.current
@@ -168,17 +222,18 @@ export function Pane({
   const onTabDragStart = (e: React.DragEvent, title: string) => {
     e.dataTransfer.setData("text/plain", title)
     e.dataTransfer.effectAllowed = "move"
-    // custom preview — pane tab ghost
     const preview = createDragPreview(title, "tab → pane")
     e.dataTransfer.setDragImage(preview, 20, 20)
     ;(window as unknown as { _dragTitle?: string })._dragTitle = title
+    ;(window as unknown as { _dragTab?: { paneId: string; tabId: string; title: string } })._dragTab = { paneId: id, tabId: tabs.find(t => t.title === title)?.id || "", title }
   }
 
   const onPaneDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData("text/plain", `Pane ${id}`)
     e.dataTransfer.effectAllowed = "move"
-    const preview = createDragPreview(`Pane ${id}`, "sürükle → böl")
+    const preview = createDragPreview(`Pane ${id}`, "sürükle → tab yap")
     e.dataTransfer.setDragImage(preview, 20, 20)
+    ;(window as unknown as { _dragPaneId?: string })._dragPaneId = id
   }
 
   return (
@@ -203,12 +258,16 @@ export function Pane({
       className={cn("relative flex-1 flex flex-col min-w-[280px] bg-[#FAF9F5] dark:bg-[#0F0F11] overflow-hidden border-r border-line last:border-r-0", isFocused && "ring-1 ring-terracotta/30", dragOver && "pane-drop-ring")}
       title="Sürükle bırak: soldan session/file sürükle · pane’i header’dan sürükle · çift tık maximize · köşeden resize"
     >
-      <div className="h-7 flex items-center gap-1 px-1 border-b border-line/60 bg-[#FDFCFB] dark:bg-[#161618] shrink-0">
+      <div
+        onDragOver={e => { e.preventDefault(); setTabBarOver(true) }}
+        onDragLeave={() => setTabBarOver(false)}
+        onDrop={handleTabBarDrop}
+        className={`h-7 flex items-center gap-1 px-1 border-b border-line/60 shrink-0 ${tabBarOver ? "bg-terracotta/10 border-terracotta/30" : "bg-[#FDFCFB] dark:bg-[#161618]"}`}>
         <div
           draggable
           onDragStart={onPaneDragStart}
           className="w-6 h-6 grid place-items-center rounded hover:bg-muted cursor-grab active:cursor-grabbing shrink-0"
-          title="Pane’i tut sürükle — başka pane’e bırak böl"
+          title="Pane’i tut sürükle — tab bar’a bırak tab yap"
         >
           <GripVertical className="w-3 h-3 text-zinc-400" />
         </div>

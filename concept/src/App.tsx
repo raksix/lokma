@@ -235,7 +235,22 @@ export default function App() {
 
   // render helpers for tiling tree
   const renderPaneById = (id: string) => {
-    if (id === "a") return <Pane key={id} id={id} initialTabs={[{ id: "tab-a-1", title: "Chat #482", content: <div className="space-y-3"><Card className="p-3 cursor-pointer" onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast",{detail:"Chat #482 — detay"}))}><div className="text-xs font-semibold">Aylin</div><div className="text-sm mt-1">Refactor auth middleware</div></Card><Card className="p-3 bg-[#262624] text-white cursor-pointer"><div className="text-xs font-semibold">Lokma</div><div className="text-sm mt-1">One hook, one decorator.</div></Card></div> }]} isFocused={focusedPane === id} onFocus={() => setFocusedPane(id)} onClosePane={() => closePane(id)} onSplit={dir => splitPane(id, dir)} />
+    if (id === "a") return <Pane key={id} id={id} initialTabs={[{ id: "tab-a-1", title: "Chat #482", content: <div className="space-y-4">
+      <div className="flex gap-2.5">
+        <img src="https://i.pravatar.cc/100?img=33" alt="Aylin" className="w-7 h-7 rounded-full object-cover border border-line shrink-0 mt-0.5 shadow-sm" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-1.5"><span className="text-xs font-semibold">Aylin</span><span className="text-[11px] text-zinc-400">14:31</span></div>
+          <div className="mt-1 rounded-2xl rounded-tl-sm bg-white dark:bg-[#1E1E21] border border-line shadow-sm p-3 text-[13px] leading-[1.6]">Refactor auth middleware</div>
+        </div>
+      </div>
+      <div className="flex gap-2.5">
+        <div className="w-7 h-7 rounded-full bg-[#262624] dark:bg-white text-white dark:text-black grid place-items-center text-[11px] font-bold border border-line shrink-0 mt-0.5 shadow-sm">◐</div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-1.5"><span className="text-xs font-semibold">Lokma</span><span className="px-1 py-0.5 rounded-full bg-[#262624] dark:bg-white text-white dark:text-black text-[10px]">Sonnet</span></div>
+          <div className="mt-1 rounded-2xl rounded-tl-sm bg-[#262624] dark:bg-[#1E1E21] text-white dark:text-[#EDE9E2] border border-[#262624] dark:border-[#232326] shadow-sm p-3 text-[13px] leading-[1.6]">One hook, one decorator.</div>
+        </div>
+      </div>
+    </div> }]} isFocused={focusedPane === id} onFocus={() => setFocusedPane(id)} onClosePane={() => closePane(id)} onSplit={dir => splitPane(id, dir)} />
     if (id === "b") return <Pane key={id} id={id} initialTabs={[{ id: "tab-b-1", title: "auth.ts", content: <CodePaneContent /> }]} isFocused={focusedPane === id} onFocus={() => setFocusedPane(id)} onClosePane={() => closePane(id)} onSplit={dir => splitPane(id, dir)} />
     const extra = extraPanes.find(p => p.id === id)
     if (extra) return <Pane key={id} id={id} initialTabs={[{ id: `tab-${id}-1`, title: extra.title, content: extra.content }]} isFocused={focusedPane === id} onFocus={() => setFocusedPane(id)} onClosePane={() => closePane(id)} onSplit={dir => splitPane(id, dir)} />

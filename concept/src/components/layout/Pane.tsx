@@ -162,18 +162,36 @@ export function Pane({
       </div>
       <div className="shrink-0 p-2 border-t border-line bg-white/90 dark:bg-[#161618]/90 backdrop-blur">
         <Composer
-          placeholder={`Pane ${id} — sürükle bırak aktif · Ask Lokma to plan, code, or explain`}
+          placeholder={`Pane ${id} — sürükle bırak · profil chat · Ask Lokma`}
           onSend={(text, files) => {
             const content = (
-              <div className="space-y-2">
-                <div className="p-3 rounded-xl bg-white dark:bg-[#1E1E21] border border-line">
-                  <div className="text-xs font-semibold">Sen</div>
-                  <div className="text-sm mt-1">{text}</div>
-                  {files.length > 0 && <div className="mt-2 text-xs text-zinc-500">{files.map(f => f.name).join(", ")}</div>}
+              <div className="space-y-4">
+                <div className="flex gap-2.5 group">
+                  <img src="https://i.pravatar.cc/100?img=33" alt="Aylin" className="w-7 h-7 rounded-full object-cover border border-line shrink-0 mt-0.5 shadow-sm" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xs font-semibold">Aylin</span>
+                      <span className="text-[11px] text-zinc-400">{new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</span>
+                    </div>
+                    <div className="mt-1 rounded-2xl rounded-tl-sm bg-white dark:bg-[#1E1E21] border border-line shadow-sm p-3 group-hover:border-line-strong transition">
+                      <div className="text-[13px] leading-[1.6]">{text}</div>
+                      {files.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{files.map(f => <span key={f.name} className="px-1.5 py-0.5 rounded-full bg-[#FDF0E6] border border-[#F2D5C2] text-terracotta text-[11px]">{f.name}</span>)}</div>}
+                    </div>
+                  </div>
                 </div>
-                <div className="p-3 rounded-xl bg-[#262624] text-white">
-                  <div className="text-xs font-semibold">Lokma</div>
-                  <div className="text-sm mt-1">Mock yanıt — pane {id} içinde.</div>
+                <div className="flex gap-2.5 group">
+                  <div className="w-7 h-7 rounded-full bg-[#262624] dark:bg-white text-white dark:text-black grid place-items-center text-[11px] font-bold border border-line shrink-0 mt-0.5 shadow-sm">◐</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xs font-semibold">Lokma</span>
+                      <span className="px-1 py-0.5 rounded-full bg-[#262624] dark:bg-white text-white dark:text-black text-[10px]">Sonnet</span>
+                      <span className="text-[11px] text-zinc-400">· 0.9s</span>
+                    </div>
+                    <div className="mt-1 rounded-2xl rounded-tl-sm bg-[#262624] dark:bg-[#1E1E21] text-white dark:text-[#EDE9E2] border border-[#262624] dark:border-[#232326] shadow-sm p-3">
+                      <div className="text-[13px] leading-[1.6]">Alındı — pane <b>{id}</b> içinde işliyorum. <span className="text-white/60">Mock yanıt, profil chat havalı.</span></div>
+                    </div>
+                    <div className="mt-1 text-[11px] text-zinc-400">✓ 1 tool · profil chat senkron</div>
+                  </div>
                 </div>
               </div>
             )

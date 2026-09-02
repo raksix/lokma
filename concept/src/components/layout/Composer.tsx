@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { Paperclip, Mic, Search, Sparkles, X, Zap } from "lucide-react"
+import { Paperclip, Mic, Search, Sparkles, X, LifeBuoy, ListTree } from "lucide-react"
 
 type Model = { id: string; label: string; tag?: string }
 
@@ -107,11 +107,11 @@ export function Composer({ placeholder = "Ask Lokma to plan, code, or explain â€
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <div className="inline-flex p-0.5 rounded-full bg-[#262624] border border-[#262624]">
-            <Button variant={mode === "steer" ? "default" : "ghost"} size="sm" className={cn("h-6 px-3 rounded-full text-[11px] gap-1", mode === "steer" ? "bg-white text-ink hover:bg-white" : "text-white/70 hover:text-white hover:bg-white/10")} onClick={() => setMode("steer")}>
-              <Zap className="w-3 h-3" /> Steer
+            <Button variant={mode === "steer" ? "default" : "ghost"} size="iconSm" className={cn("h-6 w-6 rounded-full p-0", mode === "steer" ? "bg-white text-ink hover:bg-white" : "text-white/70 hover:text-white hover:bg-white/10")} onClick={() => setMode("steer")} title="Steer â€” direksiyon">
+              <LifeBuoy className="w-3.5 h-3.5" />
             </Button>
-            <Button variant={mode === "queue" ? "default" : "ghost"} size="sm" className={cn("h-6 px-3 rounded-full text-[11px]", mode === "queue" ? "bg-white text-ink hover:bg-white" : "text-white/70 hover:text-white hover:bg-white/10")} onClick={() => setMode("queue")}>
-              Queue
+            <Button variant={mode === "queue" ? "default" : "ghost"} size="iconSm" className={cn("h-6 w-6 rounded-full p-0", mode === "queue" ? "bg-white text-ink hover:bg-white" : "text-white/70 hover:text-white hover:bg-white/10")} onClick={() => setMode("queue")} title="Queue">
+              <ListTree className="w-3.5 h-3.5" />
             </Button>
           </div>
           <div className="relative">

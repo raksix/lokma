@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Input } from "@/components/ui/input"
 
 const BOTS = [
+  { id: "lokma-ceo", name: "Lokma CEO", persona: "planner", model: "opus", desc: "Strategic CEO — owns vision, roadmap, and final decisions. Systems thinker, phase shipper.", featured: true, runs: 0, owner: "furkan" },
   { id: "vault-scout", name: "Vault Scout", persona: "researcher", model: "sonnet", desc: "Scans vault graph, finds related notes, proposes links", featured: true, runs: 42, owner: "lokma" },
   { id: "archify-pro", name: "Archify Pro", persona: "builder", model: "opus", desc: "Generates arch diagrams from codebase → typed IR → SVG", featured: true, runs: 31, owner: "lokma" },
   { id: "test-healer", name: "Test Healer", persona: "tester", model: "haiku", desc: "Reads failing test video+trace, patches selector/timing", featured: false, runs: 18, owner: "furkan" },
@@ -16,7 +17,7 @@ const TABS = ["Featured", "Mine", "Shared"] as const
 export function BotsPane() {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Featured")
   const [q, setQ] = useState("")
-  const [selected, setSelected] = useState<string>("vault-scout")
+  const [selected, setSelected] = useState<string>("lokma-ceo")
   const sel = BOTS.find(b => b.id === selected) || BOTS[0]
   const filtered = BOTS.filter(b => {
     const byTab = tab === "Featured" ? b.featured : tab === "Mine" ? b.owner === "furkan" : b.owner === "shared" || b.owner === "lokma"

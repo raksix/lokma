@@ -6,7 +6,7 @@
 ## Proje Kimliği
 - **Ad:** Lokma
 - **Klasör:** `/mnt/apopic/lokma`
-- **Durum:** 2026-08-31 15:40 UTC — Phase 0 scaffold canlı (lokma.fermag.com.tr) — **Vite 6 + React 19** (was Next.js 15 → Vite 2026-09-01) + Docs ultra-detailed: agent system (30) + skills/memory/vault (27-29) + config (26) + Archify (31) + setup optional (32) + testing harness (33) + design canvas (34) + Lokma Bots (35) + Auth & Permissions (36)
+- **Durum:** 2026-09-02 08:45 UTC — Phase 0 scaffold canlı (lokma.fermag.com.tr) — **Vite 6 + React 19** + Docs ultra-detailed: agent system (30) + skills/memory/vault (27-29) + config (26) + Archify (31) + setup optional (32) + testing harness (33) + design canvas (34) + Lokma Bots (35) + Auth & Permissions (36) + **Lokma CEO bot (37)**
 - **Tip:** Innovative Agentic Coding Harness (CLI + Web) — open-source, multi-provider, themeable, collision-free multi-agent
 - **Repo:** `https://github.com/raksix/lokma` (PUBLIC, main branch) — description: "Innovative agentic coding harness (CLI + Web) — multi-provider, themeable, open-source"
 
@@ -61,6 +61,7 @@
 | `33-TESTING-autonomous-harness-testsprite-inspired.md` | **Testing — autonomous harness** — TestSprite-inspired self-hosted: plan→inventory→codegen→sandbox(video+trace)→classify→heal, element `expect` guarantee, API + Shannon/security | ✅ 13KB (raw 655+1,136) |
 | `34-DESIGN-open-design-inspired.md` | **Design — Open Design-inspired canvas** — 6 artifacts (Prototype/Deck/Mobile/Image/Document/HyperFrame), `DESIGN.md` brand contract, `design-systems/` + Design Studio + export HTML/PDF/PPTX/MP4 | ✅ 13KB (raw 1,325+831) |
 | `35-BOTS-lokma-bots.md` | **Lokma Bots — Grok-bots-inspired** — `bot.json` spec, persona→bot→agent mapping, Bot Gallery, lifecycle create→playground→publish→fork→run, sharing/marketplace | ✅ 12KB (raw 1,121) |
+| `37-BOT-lokma-ceo.md` | **Bot: Lokma CEO** — strategic CEO bot (vision/roadmap/decisions), bot.json + knowledge 4 files + lifecycle + Gallery Featured | ✅ 5.6KB |
 | `30-AGENT-SYSTEM-personality-memory-orchestration-collision.md` | **Agent system — ULTRA-DETAILED** — personality, per-agent memory, per-agent model, caps+queue, self-spawn, orchestration, bus+coordinator+heartbeat, 3-layer collision-free, 23 extras (EN) | ✅ 40KB (raw 2699 lines) |
 | `36-AUTH-and-PERMISSIONS.md` | **Auth & permissions — RBAC + project-scoped** — admin/member/viewer, project visibility/creation policy, session inheritance, JWT, `can()` | ✅ 19KB |
 | `99-NOTLAR.md` | Hızlı notlar | ✅ |
@@ -152,9 +153,19 @@
 ### 2026-09-02 08:30 UTC — 10-loop polish (Auth, Setup, Vault deep, Usage AreaChart, Plugins, Chat perms, Projects)
 - **Loops 1-10:** AuthPane (RBAC login/JWT/can), SetupWizardPane (init 3-step + doctor 8 checks), VaultPane deep (2D/3D SVG graph + depth slider + wikilink), UsagePane AreaChart (recharts stacked SVG), Settings live theme (4 themes toggle), PluginMarketplacePane (Cordis + marketplace 5 plugins), LokmaMessage permission card + AskUserQuestion, SidebarLeft worktree pill + checkpoints, TilingBar +3 buttons. Build 1860 modules 441k JS ✅. Commit d47eaa2 push'landı.
 
+### 2026-09-02 08:45 UTC — Lokma CEO bot created
+- **Furkan:** "kanka yeni bir bıt oluştur adı lokma ceo olsun"
+- **Hermes:** **Lokma CEO** bot oluşturuldu — strategic CEO persona (Docs/37-BOT-lokma-ceo.md, 5.6KB).
+  - Spec: `lokma-ceo` · 👑 · `anthropic/claude-opus-4` (fallback gpt-5/gemini/deepseek) · tools 9 + skills 6 + mcp 3 · budgets 120k/$5/50 turns · `visibility: public` Featured · `createdFrom: soul:planner` · tags ceo/strategy/leadership
+  - Storage: `.lokma/bots/lokma-ceo/bot.json` (canonical) + `bots/lokma-ceo/bot.json` (mirror) + `SOUL.md` + `MEMORY.md` + `knowledge/` (4 files: vision, roadmap-priorities, decision-framework, business-model — 11KB total)
+  - Gallery: `concept/src/components/layout/BotsPane.tsx` — `BOTS[]` ilk sıraya eklendi (featured, owner furkan, runs 0), default selected → `lokma-ceo`, search + tabs uyumlu
+  - Docs: `37-BOT-lokma-ceo.md` (lifecycle CLI/REST/Web, 3-option rule, example tasks, roadmap slot) + `00-KONTEKST.md` güncellendi (Durum + Docs envanteri)
+  - SystemPrompt: vision/roadmap/decisions/orchestration/business + How You Operate 6 adım + Guardrails + Outputs (roadmap slices, ADRs, bot specs)
+  - Knowledge: vision (north star, 3 pillars, anti-goals) + roadmap-priorities (Phase 0→3 CEO sequencing 5 rules) + decision-framework (ADR template, 6 decided ADRs, escalation) + business-model (open core MIT + cloud private, 4 revenue levers, TokenLedger discipline)
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-02 08:30 UTC
-- **Son işlem:** 10-loop polish — Auth/Setup/Vault/Usage/Plugins/Chat/Projects — **Commit d47eaa2** — 24 layout panes + 4 chat/pane components, concept Docs 20-36 %100 kapsıyor, build ✅
+- **Son güncelleme:** 2026-09-02 08:45 UTC
+- **Son işlem:** Lokma CEO bot — **lokma-ceo** 👑 Featured — bot.json + 4 knowledge + SOUL/MEMORY + BotsPane + Docs/37 — concept build pending
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

@@ -30,6 +30,7 @@
 | `33-TESTING-autonomous-harness-testsprite-inspired.md` | **Testing — autonomous harness** — TestSprite-inspired self-hosted: video+trace, expect/actual, API, Shannon/security | ✅ EN 13KB (raw 655+1,136) |
 | `34-DESIGN-open-design-inspired.md` | **Design — Open Design-inspired canvas** — 6 artifacts, DESIGN.md, design-systems, Design Studio, export | ✅ EN 13KB (raw 1,325+831) |
 | `35-BOTS-lokma-bots.md` | **Lokma Bots — Grok-bots-inspired** — bot.json, persona→bot→agent, Gallery, lifecycle, sharing | ✅ EN 12KB (raw 1,121) |
+| `37-BOT-lokma-ceo.md` | **Bot: Lokma CEO** — strategic CEO bot (vision/roadmap/decisions) + bot.json + 4 knowledge files | ✅ EN 5.6KB |
 | `36-AUTH-and-PERMISSIONS.md` | **Auth & permissions — RBAC + project-scoped** — admin/member/viewer, project visibility/creation policy, session inheritance, JWT, `can()` | ✅ EN 19KB |
 | `raw/10-claude-code-ham-arastirma.md` | Raw: Claude Code 957 lines, 53KB | ✅ |
 | `raw/11-omp-ham-arastirma.md` | Raw: OMP 360 lines, 30KB | ✅ |
@@ -55,7 +56,7 @@
 | `raw/42-grok-bots-ham-arastirma.md` | Raw: Grok Bots 1,121 lines, 114KB | ✅ |
 | `99-NOTLAR.md` | Scratch notes | ✅ |
 
-**Total:** 26 synthesized docs (~210KB) + 22 raw (~1.5 MB / 12,240 lines) + 3 system docs = **~51 files**
+**Total:** 27 synthesized docs (~216KB) + 22 raw (~1.5 MB / 12,240 lines) + 3 system docs = **~52 files**
 
 ## Workflow
 
@@ -69,5 +70,6 @@
 
 - **Created:** 2026-08-31
 - **Research:** ✅ Complete (Claude Code + OMP + harness + web harness + Hermes skills/memory/Obsidian MCPs + agent system + Archify + Open Design + TestSprite + Grok Bots)
-- **Web harness docs:** ✅ Complete (20-26, English) + auto-skills (27) + infinite memory+vault+graph (28-29) + agent system (30, ultra-detailed) + Archify (31) + setup optional stack (32) + testing harness (33) + design canvas (34) + Lokma Bots (35)
+- **Web harness docs:** ✅ Complete (20-26, English) + auto-skills (27) + infinite memory+vault+graph (28-29) + agent system (30, ultra-detailed) + Archify (31) + setup optional stack (32) + testing harness (33) + design canvas (34) + Lokma Bots (35) + Lokma CEO bot (37)
+- **Concept:** ✅ 24 panes + Bots Gallery now includes **Lokma CEO** (Featured, lokma-ceo)
 - **Next:** Pick stack (21-*) → Scaffold Phase 0 monorepo (packages/lokma-core+ai+shared+web + themes + agents/archify/design/testing/bots scaffolds)

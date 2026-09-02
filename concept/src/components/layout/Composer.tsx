@@ -93,17 +93,16 @@ export function Composer({ placeholder = "Ask Lokma to plan, code, or explain �
       }}
       className="rounded-xl bg-white border border-line shadow-[0_1px_2px_rgba(38,38,36,0.06),0_4px_12px_rgba(38,38,36,0.04)] overflow-hidden data-[drag=1]:ring-2 data-[drag=1]:ring-terracotta/30 data-[drag=1]:border-terracotta/30 transition">
       {/* Top chip row — image gibi Onboarding + Steer/Queue + Muse Spark */}
-      <div className="flex items-center gap-1.5 px-2.5 py-2 border-b border-line/50 bg-[#FDFCFB] dark:bg-[#161618] flex-wrap">
+      <div className="flex items-center gap-1 px-2 py-1 border-b border-line/50 bg-[#FDFCFB] dark:bg-[#161618] flex-wrap">
         <div className="flex items-center gap-1 flex-wrap flex-1">
           {contexts.map(c => (
-            <span key={c} className="inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-full bg-[#262624] text-white text-xs">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {c}
-              <button onClick={() => setContexts(prev => prev.filter(x => x !== c))} className="w-4 h-4 grid place-items-center rounded-full hover:bg-white/10">
-                <X className="w-3 h-3" />
+            <span key={c} className="inline-flex items-center gap-1 pl-1.5 pr-0.5 py-0.5 rounded-full bg-[#262624] text-white text-[11px]">
+              <span className="w-1 h-1 rounded-full bg-emerald-500" /> {c}
+              <button onClick={() => setContexts(prev => prev.filter(x => x !== c))} className="w-3.5 h-3.5 grid place-items-center rounded-full hover:bg-white/10">
+                <X className="w-2.5 h-2.5" />
               </button>
             </span>
           ))}
-          <span className="hidden sm:inline-flex items-center gap-1 text-xs text-zinc-400 ml-1">sürükle bırak · profil chat · Ask Lokma</span>
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <div className="inline-flex p-0.5 rounded-full bg-[#262624] border border-[#262624]">
@@ -149,7 +148,7 @@ export function Composer({ placeholder = "Ask Lokma to plan, code, or explain �
         </div>
       </div>
 
-      <div className="p-2.5">
+      <div className="p-1.5">
         <Textarea
           ref={taRef}
           rows={1}
@@ -203,7 +202,7 @@ export function Composer({ placeholder = "Ask Lokma to plan, code, or explain �
       </div>
 
       {/* Bottom context row — image gibi repeated chips */}
-      <div className="flex items-center gap-1 px-2 py-1.5 border-t border-line/50 bg-[#FDFCFB] dark:bg-[#161618] overflow-x-auto">
+      <div className="flex items-center gap-1 px-2 py-1 border-t border-line/50 bg-[#FDFCFB] dark:bg-[#161618] overflow-x-auto">
         {contexts.map(c => (
           <span key={c} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white dark:bg-[#1E1E21] border border-line text-xs whitespace-nowrap">
             <span className="w-1.5 h-1.5 rounded-full bg-zinc-300" /> {c}

@@ -308,7 +308,7 @@ export function Pane({
       </div>
       <div className="shrink-0 p-2 border-t border-line bg-white/90 dark:bg-[#161618]/90 backdrop-blur">
         <Composer
-          placeholder={`Pane ${id} — sürükle bırak · profil chat · Ask Lokma`}
+          placeholder={`Ask Lokma — pane ${id}`}
           onSend={(text, files) => {
             const userText = text
             const content = (

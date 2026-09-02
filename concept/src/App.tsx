@@ -318,23 +318,6 @@ export default function App() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-[#FAF9F5] dark:bg-[#0F0F11] text-ink dark:text-white">
-      <div className="w-full bg-[#262624] text-[#FAF9F5] text-[11px] h-7 flex items-center px-3 shrink-0">
-        <span className="flex items-center gap-1.5 font-medium">
-          <span className="w-1.5 h-1.5 rounded-full bg-terracotta" /> Vite 6 + React 19 + Tailwind v4 — Concept · UI Kit
-        </span>
-        <span className="hidden sm:inline-flex items-center gap-2 text-white/60 ml-2">
-          <span className="w-px h-3 bg-white/20" /> cream #FAF9F5 · terracotta #C96442 · windows pane
-        </span>
-        <span className="ml-auto hidden md:flex items-center gap-1.5 text-[10px]">
-          <span className="px-2 py-1 rounded-full bg-white/10 border border-white/10">Pane system</span>
-          <span className="px-2 py-1 rounded-full bg-white/10 border border-white/10">row / col split</span>
-          <span className="hidden lg:inline-flex gap-1 ml-1">
-            <kbd className="px-1 py-0.5 rounded bg-white/10 border border-white/10 text-[10px]">[</kbd>
-            <kbd className="px-1 py-0.5 rounded bg-white/10 border border-white/10 text-[10px]">]</kbd>
-          </span>
-        </span>
-      </div>
-
       <Header
         onToggleLeft={() => setLeftCollapsed(!leftCollapsed)}
         onToggleRight={() => setRightCollapsed(!rightCollapsed)}

@@ -1,10 +1,32 @@
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { X, Plus, Copy, Columns2, Rows2 } from "lucide-react"
+import { X, Plus, Copy, Columns2, Rows2, GripVertical } from "lucide-react"
 import { Composer } from "./Composer"
 
 export type Tab = { id: string; title: string; content: React.ReactNode }
+
+function createDragPreview(title: string, subtitle?: string) {
+  let el = document.getElementById("pane-drag-preview") as HTMLDivElement | null
+  if (!el) {
+    el = document.createElement("div")
+    el.id = "pane-drag-preview"
+    el.style.position = "fixed"
+    el.style.top = "-1000px"
+    el.style.left = "-1000px"
+    el.style.pointerEvents = "none"
+    el.style.zIndex = "9999"
+    document.body.appendChild(el)
+  }
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#262624;color:#FAF9F5;border:1px solid #3A3A3E;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:Inter,sans-serif;min-width:160px;max-width:240px">
+      <span style="width:6px;height:6px;border-radius:999px;background:#C96442;flex-shrink:0"></span>
+      <span style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</span>
+      ${subtitle ? `<span style="font-size:11px;color:rgba(255,255,255,0.6);white-space:nowrap">${subtitle}</span>` : ""}
+    </div>
+  `
+  return el
+}
 
 export function Pane({
   id,
@@ -112,7 +134,7 @@ export function Pane({
       const content = isFile ? (
         <div className="font-mono text-xs p-3">File dropped: <span className="text-terracotta">{text}</span><pre className="mt-2 p-2 bg-muted rounded border border-line">export const dropped = true;</pre></div>
       ) : (
-        <div className="p-3"><div className="text-xs font-semibold">{title}</div><div className="text-sm mt-1">Sürükle-bırak ile {dropZone} bölgesine bölündü</div></div>
+        <div className="p-3"><div className="text-xs font-semibold">{title}</div><div className="text-sm mt-1">Sürükle-bırak ile {dropZone} bölgesine bölündü — Windows snap gibi</div></div>
       )
       ;(window as unknown as { _pendingSplit?: { title: string; content: React.ReactNode } })._pendingSplit = { title, content }
       onSplit(dir as "row" | "col", pos as "before" | "after")
@@ -122,7 +144,7 @@ export function Pane({
     const content = isFile ? (
       <div className="font-mono text-xs p-3">File dropped: <span className="text-terracotta">{text}</span><pre className="mt-2 p-2 bg-muted rounded border border-line">export const dropped = true; // from drag</pre></div>
     ) : (
-      <div className="p-3"><div className="text-xs font-semibold">Sürükle-bırak</div><div className="text-sm mt-1">“{title}” pane’e tab olarak eklendi · sürükle-bırak aktif</div></div>
+      <div className="p-3"><div className="text-xs font-semibold">Sürükle-bırak</div><div className="text-sm mt-1">“{title}” pane’e tab olarak eklendi</div></div>
     )
     addTab(title, content)
     window.dispatchEvent(new CustomEvent("lokma-toast", { detail: `Tab eklendi: ${title}` }))
@@ -135,12 +157,28 @@ export function Pane({
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
     const w = rect.width, h = rect.height
-    const edge = 0.22
+    const edge = 0.24
     if (x < w * edge) setDropZone("left")
     else if (x > w * (1 - edge)) setDropZone("right")
     else if (y < h * edge) setDropZone("top")
     else if (y > h * (1 - edge)) setDropZone("bottom")
     else setDropZone("center")
+  }
+
+  const onTabDragStart = (e: React.DragEvent, title: string) => {
+    e.dataTransfer.setData("text/plain", title)
+    e.dataTransfer.effectAllowed = "move"
+    // custom preview — pane tab ghost
+    const preview = createDragPreview(title, "tab → pane")
+    e.dataTransfer.setDragImage(preview, 20, 20)
+    ;(window as unknown as { _dragTitle?: string })._dragTitle = title
+  }
+
+  const onPaneDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData("text/plain", `Pane ${id}`)
+    e.dataTransfer.effectAllowed = "move"
+    const preview = createDragPreview(`Pane ${id}`, "sürükle → böl")
+    e.dataTransfer.setDragImage(preview, 20, 20)
   }
 
   return (
@@ -163,15 +201,23 @@ export function Pane({
       onDragLeave={() => { setDragOver(false); setDropZone("center") }}
       onDrop={handleDrop}
       className={cn("relative flex-1 flex flex-col min-w-[280px] bg-[#FAF9F5] dark:bg-[#0F0F11] overflow-hidden border-r border-line last:border-r-0", isFocused && "ring-1 ring-terracotta/30", dragOver && "pane-drop-ring")}
-      title="Sürükle bırak: soldan session/file sürükle · çift tık maximize · köşeden resize"
+      title="Sürükle bırak: soldan session/file sürükle · pane’i header’dan sürükle · çift tık maximize · köşeden resize"
     >
       <div className="h-7 flex items-center gap-1 px-1 border-b border-line/60 bg-[#FDFCFB] dark:bg-[#161618] shrink-0">
+        <div
+          draggable
+          onDragStart={onPaneDragStart}
+          className="w-6 h-6 grid place-items-center rounded hover:bg-muted cursor-grab active:cursor-grabbing shrink-0"
+          title="Pane’i tut sürükle — başka pane’e bırak böl"
+        >
+          <GripVertical className="w-3 h-3 text-zinc-400" />
+        </div>
         <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto scrollbar-none">
           {tabs.map(t => (
             <button
               key={t.id}
               draggable
-              onDragStart={e => { e.dataTransfer.setData("text/plain", t.title); e.dataTransfer.effectAllowed = "move" }}
+              onDragStart={e => onTabDragStart(e, t.title)}
               onClick={() => setActive(t.id)}
               className={cn("inline-flex items-center gap-1.5 px-2.5 h-6 rounded-md text-[11px] font-medium whitespace-nowrap border shrink-0 transition-colors cursor-grab active:cursor-grabbing hover:border-terracotta/20", active === t.id ? "bg-[#262624] text-white border-[#262624] dark:bg-white dark:text-black" : "bg-white dark:bg-[#1E1E21] border-line hover:bg-muted text-zinc-700 dark:text-zinc-200")}
             >
@@ -227,7 +273,7 @@ export function Pane({
                   </div>
                 </div>
                 <div className="flex gap-2.5 group">
-                  <div className="w-7 h-7 rounded-full bg-[#262624] dark:bg-white text-white dark:text-black grid place-items-center text-[11px] font-bold border border-line shrink-0 mt-0.5 shadow-sm">◐</div>
+                  <div className="w-7 h-7 rounded-full bg-[#6C5CE7] text-white grid place-items-center text-[11px] font-bold border border-line shrink-0 mt-0.5 shadow-sm">◐</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-1.5">
                       <span className="text-xs font-semibold">Lokma.AI</span>
@@ -263,11 +309,14 @@ export function Pane({
       <div onMouseDown={e => startResize(e, "s")} className="pane-handle pane-handle-s" title="Aşağı sürükle uzat" />
       <div onMouseDown={e => startResize(e, "se")} className="pane-handle pane-handle-se" title="Çapraz sürükle">◢</div>
       {dragOver && (
-        <div className="absolute inset-0 pointer-events-none grid grid-cols-3 grid-rows-3 gap-1 p-1">
-          <div className={`rounded-md border-2 ${dropZone==="top"?"border-terracotta bg-terracotta/10":"border-transparent"} flex items-center justify-center text-[10px] text-terracotta`}>ÜST</div>
-          <div className={`rounded-md border-2 ${dropZone==="left"?"border-terracotta bg-terracotta/10":dropZone==="right"?"border-terracotta bg-terracotta/10":dropZone==="center"?"border-terracotta bg-terracotta/5":"border-transparent"} col-span-1 row-span-1 flex items-center justify-center text-xs font-medium text-terracotta`}>{dropZone==="center"?"Bırak → tab":dropZone==="left"?"◀ Sola böl":dropZone==="right"?"Sağa böl ▶":dropZone}</div>
-          <div className={`rounded-md border-2 ${dropZone==="bottom"?"border-terracotta bg-terracotta/10":"border-transparent"} flex items-center justify-center text-[10px] text-terracotta`}>ALT</div>
-          <div className="absolute inset-0 pointer-events-none border-2 border-terracotta/20 rounded-md" />
+        <div className="absolute inset-0 pointer-events-none p-1">
+          {/* Windows snap preview — where drop will land */}
+          {dropZone === "left" && <div className="absolute inset-y-1 left-1 w-[50%] rounded-lg border-2 border-terracotta bg-terracotta/10 shadow-[0_8px_24px_rgba(201,100,66,0.15)] flex items-center justify-center text-xs font-semibold text-terracotta">◀ Sola böl — 50%</div>}
+          {dropZone === "right" && <div className="absolute inset-y-1 right-1 w-[50%] rounded-lg border-2 border-terracotta bg-terracotta/10 shadow-[0_8px_24px_rgba(201,100,66,0.15)] flex items-center justify-center text-xs font-semibold text-terracotta">Sağa böl ▶ — 50%</div>}
+          {dropZone === "top" && <div className="absolute inset-x-1 top-1 h-[50%] rounded-lg border-2 border-terracotta bg-terracotta/10 shadow-[0_8px_24px_rgba(201,100,66,0.15)] flex items-center justify-center text-xs font-semibold text-terracotta">▲ Üste böl — 50%</div>}
+          {dropZone === "bottom" && <div className="absolute inset-x-1 bottom-1 h-[50%] rounded-lg border-2 border-terracotta bg-terracotta/10 shadow-[0_8px_24px_rgba(201,100,66,0.15)] flex items-center justify-center text-xs font-semibold text-terracotta">▼ Alta böl — 50%</div>}
+          {dropZone === "center" && <div className="absolute inset-0 rounded-lg border-2 border-terracotta bg-terracotta/5 flex items-center justify-center text-xs font-medium text-terracotta">Bırak → tab olarak ekle</div>}
+          <div className="absolute inset-0 rounded-lg border border-terracotta/20 pointer-events-none" />
         </div>
       )}
     </div>

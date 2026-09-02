@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { Paperclip, Mic, Search, Sparkles, X } from "lucide-react"
+import { Paperclip, Mic, Search, Sparkles, X, Zap } from "lucide-react"
 
 type Model = { id: string; label: string; tag?: string }
 
@@ -21,6 +21,7 @@ export function Composer({ placeholder = "Ask Lokma to plan, code, or explain �
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
   const [recording, setRecording] = React.useState(false)
+  const [contexts, setContexts] = React.useState<string[]>(["Onboarding flow..."])
   const fileRef = React.useRef<HTMLInputElement>(null)
   const taRef = React.useRef<HTMLTextAreaElement>(null)
 
@@ -90,64 +91,36 @@ export function Composer({ placeholder = "Ask Lokma to plan, code, or explain �
         const dt = e.dataTransfer.files
         if (dt && dt.length) setFiles(prev => [...prev, ...Array.from(dt)])
       }}
-      className="rounded-lg bg-white border border-line shadow-sm overflow-hidden data-[drag=1]:ring-2 data-[drag=1]:ring-terracotta/30 data-[drag=1]:border-terracotta/30 transition">
-      <div className="p-2">
-        <Textarea
-          ref={taRef}
-          rows={1}
-          placeholder={placeholder}
-          value={text}
-          onChange={e => {
-            setText(e.target.value)
-            e.target.style.height = "auto"
-            e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"
-          }}
-          onKeyDown={e => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault()
-              handleSend()
-            }
-          }}
-          className="min-h-[28px] py-1 border-0 focus-visible:ring-0 shadow-none"
-        />
-        {files.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1.5">
-            {files.map((f, i) => (
-              <Badge key={i} variant="outline" className="bg-[#FDF0E6] border-[#F2D5C2] text-terracotta gap-1 pr-1">
-                <Paperclip className="w-3 h-3" />
-                <span className="max-w-[120px] truncate">{f.name}</span>
-                <Button variant="ghost" size="iconSm" onClick={() => setFiles(files.filter((_, j) => j !== i))} className="w-4 h-4 ml-1 p-0 hover:bg-black/5">
-                  <X className="w-3 h-3" />
-                </Button>
-              </Badge>
-            ))}
-          </div>
-        )}
-        <div className="flex items-center gap-1 mt-1.5 flex-wrap relative">
-          <Button variant="outline" size="iconSm" onClick={() => fileRef.current?.click()} title="Dosya / belge yükle">
-            <Paperclip className="w-3.5 h-3.5" />
-          </Button>
-          <input ref={fileRef} type="file" multiple hidden accept=".pdf,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp,.doc,.docx" onChange={e => setFiles([...files, ...Array.from(e.target.files || [])])} />
-          <Button variant={recording ? "ink" : "outline"} size="iconSm" onClick={toggleMic} title="Mikrofon" className={recording ? "animate-pulse" : ""}>
-            <Mic className="w-3.5 h-3.5" />
-          </Button>
-          {recording && <span className="text-[11px] text-red-600 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" /> Rec</span>}
-          <div className="w-px h-4 bg-line mx-0.5 hidden sm:block" />
-          <div className="inline-flex p-0.5 rounded-full bg-muted border border-line">
-            <Button variant={mode === "steer" ? "ink" : "ghost"} size="sm" className={cn("h-6 px-2.5 rounded-full text-[11px]", mode === "steer" ? "" : "hover:bg-white")} onClick={() => setMode("steer")}>
-              Steer
+      className="rounded-xl bg-white border border-line shadow-[0_1px_2px_rgba(38,38,36,0.06),0_4px_12px_rgba(38,38,36,0.04)] overflow-hidden data-[drag=1]:ring-2 data-[drag=1]:ring-terracotta/30 data-[drag=1]:border-terracotta/30 transition">
+      {/* Top chip row — image gibi Onboarding + Steer/Queue + Muse Spark */}
+      <div className="flex items-center gap-1.5 px-2.5 py-2 border-b border-line/50 bg-[#FDFCFB] dark:bg-[#161618] flex-wrap">
+        <div className="flex items-center gap-1 flex-wrap flex-1">
+          {contexts.map(c => (
+            <span key={c} className="inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-full bg-[#262624] text-white text-xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {c}
+              <button onClick={() => setContexts(prev => prev.filter(x => x !== c))} className="w-4 h-4 grid place-items-center rounded-full hover:bg-white/10">
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+          <span className="hidden sm:inline-flex items-center gap-1 text-xs text-zinc-400 ml-1">sürükle bırak · profil chat · Ask Lokma</span>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <div className="inline-flex p-0.5 rounded-full bg-[#262624] border border-[#262624]">
+            <Button variant={mode === "steer" ? "default" : "ghost"} size="sm" className={cn("h-6 px-3 rounded-full text-[11px] gap-1", mode === "steer" ? "bg-white text-ink hover:bg-white" : "text-white/70 hover:text-white hover:bg-white/10")} onClick={() => setMode("steer")}>
+              <Zap className="w-3 h-3" /> Steer
             </Button>
-            <Button variant={mode === "queue" ? "ink" : "ghost"} size="sm" className={cn("h-6 px-2.5 rounded-full text-[11px]", mode === "queue" ? "" : "hover:bg-white")} onClick={() => setMode("queue")}>
+            <Button variant={mode === "queue" ? "default" : "ghost"} size="sm" className={cn("h-6 px-3 rounded-full text-[11px]", mode === "queue" ? "bg-white text-ink hover:bg-white" : "text-white/70 hover:text-white hover:bg-white/10")} onClick={() => setMode("queue")}>
               Queue
             </Button>
           </div>
           <div className="relative">
-            <Button variant="outline" size="sm" className="h-6 pl-1.5 pr-2 rounded-full bg-[#1E1E20] border-[#2A2A2E] text-white hover:bg-[#252529] hover:text-white text-[11px] gap-1.5" onClick={() => setOpen(!open)}>
-              <span className="w-4 h-4 rounded-full bg-white/10 grid place-items-center text-[9px]">◐</span>
-              <span className="max-w-[120px] truncate">{MODELS.flatMap(g => g.items).find(m => m.id === model)?.label || "Muse Spark"}</span>
+            <Button variant="outline" size="sm" className="h-6 pl-1.5 pr-2 rounded-full bg-white border-line text-xs gap-1.5 max-w-[140px]" onClick={() => setOpen(!open)}>
+              <span className="w-4 h-4 rounded-full bg-[#262624] text-white grid place-items-center text-[9px]">◐</span>
+              <span className="truncate">{MODELS.flatMap(g => g.items).find(m => m.id === model)?.label || "Muse Spark"}</span>
             </Button>
             {open && (
-              <div className="absolute bottom-[calc(100%+8px)] left-0 w-[340px] max-w-[92vw] z-50 rounded-xl bg-[#111113] border border-[#2A2A2E] shadow-2xl overflow-hidden flex flex-col max-h-[420px]">
+              <div className="absolute bottom-[calc(100%+8px)] right-0 w-[340px] max-w-[92vw] z-50 rounded-xl bg-[#111113] border border-[#2A2A2E] shadow-2xl overflow-hidden flex flex-col max-h-[420px]">
                 <div className="p-2 border-b border-white/10">
                   <div className="relative">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
@@ -173,16 +146,70 @@ export function Composer({ placeholder = "Ask Lokma to plan, code, or explain �
               </div>
             )}
           </div>
-          <div className="ml-auto flex items-center gap-1">
-            <span className="hidden lg:inline text-[10px] text-zinc-400">↵ send</span>
-            <Button onClick={handleSend} className="h-7 pl-3 pr-1.5 rounded-full gap-1">
+        </div>
+      </div>
+
+      <div className="p-2.5">
+        <Textarea
+          ref={taRef}
+          rows={1}
+          placeholder={placeholder}
+          value={text}
+          onChange={e => {
+            setText(e.target.value)
+            e.target.style.height = "auto"
+            e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"
+          }}
+          onKeyDown={e => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault()
+              handleSend()
+            }
+          }}
+          className="min-h-[28px] py-1 border-0 focus-visible:ring-0 shadow-none text-[13px]"
+        />
+        {files.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {files.map((f, i) => (
+              <Badge key={i} variant="outline" className="bg-[#FDF0E6] border-[#F2D5C2] text-terracotta gap-1 pr-1">
+                <Paperclip className="w-3 h-3" />
+                <span className="max-w-[120px] truncate">{f.name}</span>
+                <Button variant="ghost" size="iconSm" onClick={() => setFiles(files.filter((_, j) => j !== i))} className="w-4 h-4 ml-1 p-0 hover:bg-black/5">
+                  <X className="w-3 h-3" />
+                </Button>
+              </Badge>
+            ))}
+          </div>
+        )}
+        <div className="flex items-center gap-1.5 mt-2">
+          <Button variant="outline" size="iconSm" onClick={() => fileRef.current?.click()} title="Dosya / belge yükle">
+            <Paperclip className="w-3.5 h-3.5" />
+          </Button>
+          <input ref={fileRef} type="file" multiple hidden accept=".pdf,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp,.doc,.docx" onChange={e => setFiles([...files, ...Array.from(e.target.files || [])])} />
+          <Button variant={recording ? "ink" : "outline"} size="iconSm" onClick={toggleMic} title="Mikrofon" className={recording ? "animate-pulse" : ""}>
+            <Mic className="w-3.5 h-3.5" />
+          </Button>
+          {recording && <span className="text-[11px] text-red-600 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" /> Rec</span>}
+          <div className="ml-auto flex items-center gap-1.5">
+            <span className="hidden sm:inline text-[11px] text-zinc-400">↵ send · shift+↵ new line</span>
+            <Button onClick={handleSend} className="h-7 pl-3 pr-1.5 rounded-full gap-1 bg-[#F45D5D] hover:bg-[#E04A4A] text-white">
               Send
-              <span className="w-5 h-5 rounded-full bg-white/15 grid place-items-center">
+              <span className="w-5 h-5 rounded-full bg-white/20 grid place-items-center">
                 <Sparkles className="w-3 h-3" />
               </span>
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* Bottom context row — image gibi repeated chips */}
+      <div className="flex items-center gap-1 px-2 py-1.5 border-t border-line/50 bg-[#FDFCFB] dark:bg-[#161618] overflow-x-auto">
+        {contexts.map(c => (
+          <span key={c} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white dark:bg-[#1E1E21] border border-line text-xs whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-zinc-300" /> {c}
+          </span>
+        ))}
+        <button onClick={() => setContexts(prev => [...prev, `Onboarding flow ${prev.length + 1}`])} className="w-6 h-6 grid place-items-center rounded-full border border-dashed border-line text-zinc-400 hover:text-ink hover:border-terracotta/30">+</button>
       </div>
     </div>
   )

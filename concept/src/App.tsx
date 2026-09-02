@@ -50,10 +50,11 @@ export default function App() {
     type: "split",
     id: "root",
     dir: "row",
-    sizes: [50, 50],
+    sizes: [33, 34, 33],
     children: [
       { type: "pane", id: "a" },
-      { type: "pane", id: "b" },
+      { type: "pane", id: "center" },
+      { type: "pane", id: "empty" },
     ],
   })
   const singleScrollRef = useRef<HTMLDivElement>(null)
@@ -84,9 +85,9 @@ export default function App() {
   const resetLayout = () => {
     localStorage.removeItem("lokma:layout:v1")
     setLeftW(268); setRightW(300); setTiling(false); setWindowed(false)
-    setLayout({ type: "split", id: "root", dir: "row", sizes: [50, 50], children: [{ type: "pane", id: "a" }, { type: "pane", id: "b" }] })
+    setLayout({ type: "split", id: "root", dir: "row", sizes: [33, 34, 33], children: [{ type: "pane", id: "a" }, { type: "pane", id: "center" }, { type: "pane", id: "empty" }] })
     setExtraPanes([])
-    window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Layout sıfırlandı — dikey/yatay split reset" }))
+    window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Layout sıfırlandı — 3 pane image" }))
   }
 
   useEffect(() => {
@@ -293,34 +294,9 @@ export default function App() {
 
   // render helpers for tiling tree
   const renderPaneById = (id: string) => {
-    if (id === "a") return <Pane key={id} id={id} initialTabs={[{ id: "tab-a-1", title: "Chat #482", content: <div className="space-y-4">
-      <div id="pane-a-sticky" className="hidden sticky top-0 z-10 -mx-1 mb-2 px-2 py-1.5 rounded-full bg-white dark:bg-[#1E1E21] border border-line shadow-sm items-center gap-2 cursor-pointer hover:border-terracotta/30 text-xs" onClick={() => document.getElementById("pane-a-aylin")?.scrollIntoView({ behavior: "smooth", block: "center" })}>
-        <img src="https://i.pravatar.cc/100?img=33" alt="Aylin" className="w-5 h-5 rounded-full object-cover border border-line" />
-        <span className="font-medium truncate">Aylin — “Refactor auth…”</span>
-        <span className="ml-auto text-terracotta">↥ git</span>
-      </div>
-      <div className="flex gap-3">
-        <div className="w-7 h-7 rounded-full bg-[#262624] dark:bg-white text-white dark:text-black grid place-items-center text-[11px] font-bold border border-line shrink-0 mt-0.5 shadow-sm">◐</div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-1.5"><span className="text-xs font-semibold">Lokma</span><span className="px-1 py-0.5 rounded-full bg-[#262624] dark:bg-white text-white dark:text-black text-[10px]">Sonnet</span><span className="text-[11px] text-zinc-400">14:31 · 0.8s</span></div>
-          <div className="mt-1 text-[13px] leading-[1.6]">One hook, one decorator — profil chat pane’de de bubble’sız.</div>
-        </div>
-      </div>
-      <div id="pane-a-aylin" className="flex gap-2.5 scroll-mt-16">
-        <img src="https://i.pravatar.cc/100?img=33" alt="Aylin" className="w-7 h-7 rounded-full object-cover border border-line shrink-0 mt-0.5 shadow-sm" />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-1.5"><span className="text-xs font-semibold">Aylin</span><span className="text-[11px] text-zinc-400">14:31</span></div>
-          <div className="mt-1 rounded-2xl rounded-tl-sm bg-white dark:bg-[#1E1E21] border border-line shadow-sm p-3 text-[13px] leading-[1.6]">Refactor auth middleware</div>
-        </div>
-      </div>
-      <div className="flex gap-2.5">
-        <div className="w-7 h-7 rounded-full bg-[#262624] dark:bg-white text-white dark:text-black grid place-items-center text-[11px] font-bold border border-line shrink-0 mt-0.5 shadow-sm">◐</div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-1.5"><span className="text-xs font-semibold">Lokma</span><span className="px-1 py-0.5 rounded-full bg-[#262624] dark:bg-white text-white dark:text-black text-[10px]">Sonnet</span></div>
-          <div className="mt-1 text-[13px] leading-[1.6]">One hook, one decorator.</div>
-        </div>
-      </div>
-    </div> }]} isFocused={focusedPane === id} onFocus={() => setFocusedPane(id)} onClosePane={() => closePane(id)} onSplit={(dir, pos) => splitPane(id, dir, pos)} />
+    if (id === "a") return <Pane key={id} id={id} initialTabs={[{ id: "tab-a-1", title: "auth.ts", content: <div className="space-y-3"><div className="text-xs text-zinc-500">File dropped: <span className="font-medium text-ink">auth.ts</span></div><div className="rounded-lg overflow-hidden border border-line bg-white dark:bg-[#1E1E21]"><div className="px-3 py-2 text-xs font-mono bg-muted/30 border-b border-line">export const dropped = true;</div></div></div> }]} isFocused={focusedPane === id} onFocus={() => setFocusedPane(id)} onClosePane={() => closePane(id)} onSplit={(dir, pos) => splitPane(id, dir, pos)} />
+    if (id === "center") return <div key={id} className="flex-1 flex flex-col bg-[#FDE8E8] dark:bg-[#2A1E1E] border border-[#FECACA] dark:border-[#3A2A2A] rounded-lg overflow-hidden"><div className="h-7 flex items-center gap-1.5 px-2 bg-white/50 dark:bg-white/5 border-b border-[#FECACA] dark:border-[#3A2A2A] text-xs"><span className="w-4 h-4 grid place-items-center rounded bg-white border border-line">←</span> Sola böl <span className="ml-auto px-1.5 py-0.5 rounded bg-white border border-line text-[11px]">ALT</span></div><div className="flex-1 grid place-items-center text-xs text-zinc-500">Context/Alternate View — peach</div></div>
+    if (id === "empty") return <div key={id} className="flex-1 flex flex-col bg-white dark:bg-[#161618] border border-line rounded-lg overflow-hidden"><div className="h-7 flex items-center gap-1 px-2 border-b border-line/60 bg-[#FDFCFB] dark:bg-[#161618]"><span className="w-6 h-6 grid place-items-center rounded hover:bg-muted cursor-pointer">+</span><span className="ml-auto flex gap-1"><span className="w-6 h-6 grid place-items-center rounded hover:bg-muted">▦</span><span className="w-6 h-6 grid place-items-center rounded hover:bg-muted">×</span></span></div><div className="flex-1 grid place-items-center text-xs text-zinc-400">Boş pane — sürükle bırak</div></div>
     if (id === "b") return <Pane key={id} id={id} initialTabs={[{ id: "tab-b-1", title: "auth.ts", content: <CodePaneContent /> }]} isFocused={focusedPane === id} onFocus={() => setFocusedPane(id)} onClosePane={() => closePane(id)} onSplit={(dir, pos) => splitPane(id, dir, pos)} />
     const extra = extraPanes.find(p => p.id === id)
     if (extra) return <Pane key={id} id={id} initialTabs={[{ id: `tab-${id}-1`, title: extra.title, content: extra.content }]} isFocused={focusedPane === id} onFocus={() => setFocusedPane(id)} onClosePane={() => closePane(id)} onSplit={(dir, pos) => splitPane(id, dir, pos)} />
@@ -578,9 +554,9 @@ export default function App() {
             </div>
           ) : (
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-              <div className="h-8 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#161618] shrink-0 overflow-x-auto">
-                <span className="px-2 py-1 rounded-md bg-[#262624] text-white text-xs">Tiling</span>
-                <span className="text-xs text-zinc-500 hidden sm:inline whitespace-nowrap">dikey/yatay böl · altına/üstüne/sağa/sola · windowed serbest · [ / ] · save/reset</span>
+              <div className="h-8 flex items-center gap-1.5 px-3 border-b border-line bg-white dark:bg-[#161618] shrink-0 overflow-x-auto">
+                <span className="px-2 py-1 rounded-md bg-[#262624] text-white text-xs hidden sm:inline">Tiling</span>
+                <span className="text-xs text-zinc-500 hidden sm:inline whitespace-nowrap">3 pane · file drop · sola böl · windowed serbest</span>
                 <span className="ml-auto flex gap-1 shrink-0">
                   <Button variant={windowed ? "ink" : "outline"} size="sm" className="h-6 text-xs gap-1" onClick={() => setWindowed(!windowed)}>
                     Windowed

@@ -19,6 +19,9 @@ export function TilingBar({
   onOpenAuth,
   onOpenSetup,
   onOpenPlugins,
+  onOpenObservability,
+  onOpenCron,
+  onOpenExtras,
   onSave,
   onReset,
   onSingle,
@@ -41,6 +44,9 @@ export function TilingBar({
   onOpenAuth: () => void
   onOpenSetup: () => void
   onOpenPlugins: () => void
+  onOpenObservability: () => void
+  onOpenCron: () => void
+  onOpenExtras: () => void
   onSave: () => void
   onReset: () => void
   onSingle: () => void
@@ -67,6 +73,9 @@ export function TilingBar({
         <Button variant="ghost" size="sm" className="h-6 text-xs hidden xl:inline-flex" onClick={onOpenAuth}>+ Auth</Button>
         <Button variant="ghost" size="sm" className="h-6 text-xs hidden xl:inline-flex" onClick={onOpenSetup}>+ Setup</Button>
         <Button variant="ghost" size="sm" className="h-6 text-xs hidden xl:inline-flex" onClick={onOpenPlugins}>+ Plugins</Button>
+        <Button variant="ghost" size="sm" className="h-6 text-xs hidden xl:inline-flex" onClick={onOpenObservability}>+ Observe</Button>
+        <Button variant="ghost" size="sm" className="h-6 text-xs hidden xl:inline-flex" onClick={onOpenCron}>+ Cron</Button>
+        <Button variant="ghost" size="sm" className="h-6 text-xs hidden xl:inline-flex" onClick={onOpenExtras}>+ Extras</Button>
         <Button variant="ghost" size="sm" className="h-6 text-xs hidden sm:inline-flex" onClick={onSave}>Save</Button>
         <Button variant="ghost" size="sm" className="h-6 text-xs hidden sm:inline-flex" onClick={onReset}>Reset</Button>
         <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={onSingle}>Tekil</Button>

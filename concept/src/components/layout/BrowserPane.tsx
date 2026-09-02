@@ -26,6 +26,17 @@ export function BrowserPane({ initialUrl = "https://lokma-concept.fermag.com.tr/
           )}
         </span>
       </div>
+      <div className="px-2 py-1 flex gap-1 border-b border-line/50 bg-muted/20 overflow-x-auto">
+        {[
+          { id: "builder-1", label: "builder-1", url: "localhost:3000" },
+          { id: "reviewer-2", label: "reviewer-2", url: "localhost:3001" },
+        ].map(t => (
+          <button key={t.id} onClick={() => { setUrl(`https://${t.url}`); setSrc(`https://${t.url}`); toast(`Browser per agent — ${t.id} → ${t.url}`) }} className="px-2 py-1 rounded-full bg-white dark:bg-[#1E1E21] border border-line text-[11px] flex items-center gap-1 hover:border-terracotta/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {t.label} · {t.url}
+          </button>
+        ))}
+        <span className="ml-auto text-[11px] text-zinc-400 hidden sm:inline">browser per agent · worktree-scoped</span>
+      </div>
       <div className="flex items-center gap-1 px-2 py-1.5 bg-[#FDFCFB] dark:bg-[#161618] border-b border-line shrink-0">
         <Button variant="ghost" size="iconSm" onClick={() => toast("Geri — yakında")}>
           <ChevronLeft className="w-3 h-3" />

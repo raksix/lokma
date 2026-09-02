@@ -21,6 +21,9 @@ import { AgentHubPane } from "@/components/layout/AgentHubPane"
 import { AuthPane } from "@/components/layout/AuthPane"
 import { SetupWizardPane } from "@/components/layout/SetupWizardPane"
 import { PluginMarketplacePane } from "@/components/layout/PluginMarketplacePane"
+import { ObservabilityPane } from "@/components/layout/ObservabilityPane"
+import { CronApprovalsPane } from "@/components/layout/CronApprovalsPane"
+import { ExtrasPane } from "@/components/layout/ExtrasPane"
 import { Composer } from "@/components/layout/Composer"
 import { FooterBar, Toast, CollapseButton, ResizeHandle } from "@/components/layout/ShellParts"
 import { HeroSection } from "@/components/chat/HeroSection"
@@ -416,6 +419,9 @@ export default function App() {
                 onOpenAuth={() => handleOpenTab("Auth", <AuthPane />)}
                 onOpenSetup={() => handleOpenTab("Setup", <SetupWizardPane />)}
                 onOpenPlugins={() => handleOpenTab("Plugins", <PluginMarketplacePane />)}
+                onOpenObservability={() => handleOpenTab("Observability", <ObservabilityPane />)}
+                onOpenCron={() => handleOpenTab("Cron & Approvals", <CronApprovalsPane />)}
+                onOpenExtras={() => handleOpenTab("Extras", <ExtrasPane />)}
                 onSave={saveLayout}
                 onReset={resetLayout}
                 onSingle={() => setTiling(false)}

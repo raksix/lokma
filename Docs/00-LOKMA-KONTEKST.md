@@ -6,7 +6,7 @@
 ## Proje Kimliği
 - **Ad:** Lokma
 - **Klasör:** `/mnt/apopic/lokma`
-- **Durum:** 2026-09-02 08:45 UTC — Phase 0 scaffold canlı (lokma.fermag.com.tr) — **Vite 6 + React 19** + Docs ultra-detailed: agent system (30) + skills/memory/vault (27-29) + config (26) + Archify (31) + setup optional (32) + testing harness (33) + design canvas (34) + Lokma Bots (35) + Auth & Permissions (36) + **Lokma CEO bot (37)**
+- **Durum:** 2026-09-02 12:00 UTC — Phase 0 scaffold canlı (lokma.fermag.com.tr) — **Vite 6 + React 19** + Docs ultra-detailed: agent system (30) + skills/memory/vault (27-29) + config (26) + Archify (31) + setup optional (32) + testing harness (33) + design canvas (34) + Lokma Bots (35) + Auth & Permissions (36) + **Lokma CEO bot (37)** — concept 24 panes spec-complete, 5 thin panes polished (e475890, 497k JS)
 - **Tip:** Innovative Agentic Coding Harness (CLI + Web) — open-source, multi-provider, themeable, collision-free multi-agent
 - **Repo:** `https://github.com/raksix/lokma` (PUBLIC, main branch) — description: "Innovative agentic coding harness (CLI + Web) — multi-provider, themeable, open-source"
 
@@ -166,9 +166,18 @@
 ### 2026-09-02 09:15 UTC — devam (loops 11-15) — Phase 3 extras polish
 - **Loops 11-15:** ObservabilityPane (trace timeline #7, replay/share), CronApprovalsPane (#5 cron + #6 approvals), ExtrasPane (23 ranked, 13/23 done), BrowserPane per-agent tabs (#11), TilingBar +3 (Observe/Cron/Extras). Build 1863 modules 460k JS ✅. Commit 05e1f0e push'landı.
 
+### 2026-09-02 12:00 UTC — loop sync — thin panes full-spec polish
+- **Sync loop (cron):** Docs 00-36 vs concept/src audit — all 24 expected panes already wired (SidebarLeft, FileBrowser, Pane/SplitTree/TilingBar/WindowedCanvas, Composer, Chat, Terminal, Browser per-agent, Orchestration, Git, Vault FTS5+graph, Usage AreaChart, Settings 6 tabs, Skills, Testing 6-stage, Bots Gallery, AgentHub caps/SOUL, Archify, Design Studio 6 types, Auth RBAC, SetupWizard, Plugin Marketplace, Observability trace, Cron & Approvals, Extras 23) — **5 thin panes were stub-level (41-59 lines) missing core spec details** → rebuilt in same run to full spec.
+- **ArchifyPane:** 41→340 lines — typed JSON IR preview + 5 types (architecture/workflow/sequence/dataflow/lifecycle) + 4 presets (signal-flow/blueprint/classic/minimal) + theme dark/light + viewer contract (#focus/#reach/#route/#lens) + delta Before/Delta/After + share card 1200×630 + validation receipt (5 gates: schema/layout/route/label/share) + API list + storage `~/.lokma/archify/<id>/` + export PNG/SVG/WebM/Card — matches Docs/31 9 sections.
+- **TerminalPane:** 41→160 lines — per-agent tabs (harness/builder-1/reviewer-2/tester-3) + harness logs live · xterm PTY per agent + cwd/lease + search filter + copy/clear/run/kill/maximize + WT isolation hint — matches Docs/24 pane system.
+- **GitPane:** 48→170 lines — file list with owner/lock/worktree pills + advisory locks `.agentlocks/<sha>.json` (60s heartbeat) + 3-layer safe banner + worktree per agent (`main` vs `worktrees/<id>`) + commit log + coordinator merge + expectedSha guard — matches Docs/30 §10 collision-free.
+- **OrchestrationPane:** 54→190 lines — live agent cards with lease/worktree/bus counts + bus mailbox (SQLite WAL+WS, 4 typed messages) + coordinator file-ownership graph + 3-layer safe + patterns (delegate/fan-out/pipeline/map/team) + fan-out button — matches Docs/30 §8-10.
+- **DesignStudioPane:** 55→185 lines — 6 artifacts (prototype/deck/mobile/image/document/hyperframe) + DESIGN.md 9-section picker (4 systems stripe-linear/omp-dark/paper-ink/minimal-geo, presets A1/A2/B/C) + sandbox iframe live preview + 26 runtimes hint + export HTML/PDF/PPTX/ZIP/MP4 + 5D critique — matches Docs/34.
+- **Build:** `bun run build` 1863 modules 497k JS gzip 130.8k ✅ (was 460k — +37k for full panes). Commit e475890 push'landı.
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-02 09:15 UTC
-- **Son işlem:** devam Phase 3 extras (Observability/Cron/Extras) — Commit 05e1f0e + önceki CEO bot — **lokma-ceo** 👑 Featured — bot.json + 4 knowledge + SOUL/MEMORY + BotsPane + Docs/37 — concept build pending
+- **Son güncelleme:** 2026-09-02 12:00 UTC
+- **Son işlem:** loop sync — 5 thin panes full-spec polish (Archify/Terminal/Git/Orchestration/Design) — Commit e475890 — build 1863 modules 497k JS ✅ — all 24 panes spec-complete
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

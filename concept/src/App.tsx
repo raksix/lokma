@@ -13,8 +13,12 @@ import { VaultPane } from "@/components/layout/VaultPane"
 import { ArchifyPane } from "@/components/layout/ArchifyPane"
 import { DesignStudioPane } from "@/components/layout/DesignStudioPane"
 import { Composer } from "@/components/layout/Composer"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
+import { FooterBar, Toast, CollapseButton, ResizeHandle } from "@/components/layout/ShellParts"
+import { HeroSection } from "@/components/chat/HeroSection"
+import { SingleChatView } from "@/components/chat/SingleChatView"
+import { TilingBar } from "@/components/panes/TilingBar"
+import { SplitTree } from "@/components/panes/SplitTree"
+import { WindowedCanvas } from "@/components/panes/WindowedCanvas"
 
 type PaneData = { id: string; title: string; content: React.ReactNode }
 type LayoutNode =
@@ -195,7 +199,6 @@ export default function App() {
     setWindowPos(prev => ({ ...prev, [id]: { x: 8 + (n % 3) * 28, y: 8 + (n % 3) * 28, w: 420, h: 380 } }))
   }
 
-  // ——— layout tree helpers ———
   const splitPane = (targetId: string, dir: "row" | "col", pos: "before" | "after" = "after") => {
     const newId = genId()
     ensureWindowPos(newId)
@@ -234,7 +237,6 @@ export default function App() {
     setLayout(prev => {
       const next = recur(prev)
       if (!next) {
-        // en az bir pane kalsın — yeni boş pane oluştur
         const nid = genId()
         setExtraPanes(p => [...p, { id: nid, title: `Pane ${nid.slice(2,6)}`, content: <div className="p-6 text-center text-sm text-zinc-500">Yeni pane — kapatılan yerine açıldı</div> }])
         setFocusedPane(nid)
@@ -250,7 +252,6 @@ export default function App() {
       return n
     })
     if (focusedPane === targetId) {
-      // focus’u başka pane’e al
       setTimeout(() => {
         const allIds = ["a", "b", ...extraPanes.map(p => p.id)].filter(id => id !== targetId)
         if (allIds.length) setFocusedPane(allIds[0])
@@ -264,7 +265,6 @@ export default function App() {
     const id = genId()
     ensureWindowPos(id)
     setExtraPanes(prev => [...prev, { id, title, content }])
-    // add as new pane in layout (append to root)
     setLayout(prev => {
       if (prev.type === "split") {
         return { ...prev, children: [...prev.children, { type: "pane", id }], sizes: [...prev.sizes, 50].map((s, i, arr) => (s / arr.reduce((a, b) => a + b, 0)) * 100) }
@@ -300,7 +300,6 @@ export default function App() {
     window.dispatchEvent(new CustomEvent("lokma-toast", { detail: `Fork açıldı: ${forkTitle}` }))
   }
 
-  // render helpers for tiling tree
   const renderPaneById = (id: string) => {
     if (id === "a") return <Pane key={id} id={id} initialTabs={[{ id: "tab-a-1", title: "auth.ts", content: <div className="space-y-3"><div className="text-xs text-zinc-500">File dropped: <span className="font-medium text-ink">auth.ts</span></div><div className="rounded-lg overflow-hidden border border-line bg-white dark:bg-[#1E1E21]"><div className="px-3 py-2 text-xs font-mono bg-muted/30 border-b border-line">export const dropped = true;</div></div></div> }]} isFocused={focusedPane === id} onFocus={() => setFocusedPane(id)} onClosePane={() => closePane(id)} onSplit={(dir, pos) => splitPane(id, dir, pos)} />
     if (id === "center") return <div key={id} className="flex-1 flex flex-col bg-[#FDE8E8] dark:bg-[#2A1E1E] border border-[#FECACA] dark:border-[#3A2A2A] rounded-lg overflow-hidden"><div className="h-7 flex items-center gap-1.5 px-2 bg-white/50 dark:bg-white/5 border-b border-[#FECACA] dark:border-[#3A2A2A] text-xs"><span className="w-4 h-4 grid place-items-center rounded bg-white border border-line">←</span> Sola böl <span className="ml-auto px-1.5 py-0.5 rounded bg-white border border-line text-[11px]">ALT</span></div><div className="flex-1 grid place-items-center text-xs text-zinc-500">Context/Alternate View — peach</div></div>
@@ -313,74 +312,32 @@ export default function App() {
     return <div key={id} className="p-3 text-xs">Pane {id} not found</div>
   }
 
-  const RenderSplit = ({ node }: { node: LayoutNode }) => {
-    if (node.type === "pane") return <div className="flex-1 min-w-0 min-h-0 flex">{renderPaneById(node.id)}</div>
-    const isRow = node.dir === "row"
-    return (
-      <div className={`flex flex-1 min-h-0 min-w-0 ${isRow ? "flex-row" : "flex-col"} overflow-hidden`}>
-        {node.children.map((child, i) => (
-          <div key={child.type === "pane" ? child.id : child.id} className="flex min-h-0 min-w-0" style={{ flex: `1 1 ${node.sizes[i] ?? 100 / node.children.length}%` }}>
-            <RenderSplit node={child} />
-            {i < node.children.length - 1 && (
-              <div
-                onMouseDown={e => {
-                  e.preventDefault()
-                  const start = isRow ? e.clientX : e.clientY
-                  const startSizes = [...node.sizes]
-                  const onMove = (ev: MouseEvent) => {
-                    const cur = isRow ? ev.clientX : ev.clientY
-                    const deltaPx = cur - start
-                    const container = (e.target as HTMLElement).parentElement?.parentElement
-                    const totalPx = isRow ? container?.getBoundingClientRect().width ?? 800 : container?.getBoundingClientRect().height ?? 600
-                    const deltaPct = (deltaPx / totalPx) * 100
-                    const left = Math.max(15, Math.min(85, startSizes[i] + deltaPct))
-                    const right = Math.max(15, Math.min(85, startSizes[i + 1] - deltaPct))
-                    if (left + right > 0) {
-                      const newSizes = [...startSizes]
-                      newSizes[i] = left
-                      newSizes[i + 1] = right
-                      setLayout(prev => {
-                        const update = (n: LayoutNode): LayoutNode => {
-                          if (n.type === "pane") return n
-                          if (n.id === node.id) return { ...n, sizes: newSizes }
-                          return { ...n, children: n.children.map(update) }
-                        }
-                        return update(prev)
-                      })
-                    }
-                  }
-                  const onUp = () => { document.body.classList.remove("resizing"); window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp) }
-                  document.body.classList.add("resizing")
-                  window.addEventListener("mousemove", onMove)
-                  window.addEventListener("mouseup", onUp)
-                }}
-                className={`${isRow ? "w-1 cursor-col-resize hover:w-1.5 hover:bg-[#CFC9BF] dark:hover:bg-[#3A3A3E]" : "h-1 cursor-row-resize hover:h-1.5 hover:bg-[#CFC9BF] dark:hover:bg-[#3A3A3E]"} bg-line dark:bg-[#232326] shrink-0 group flex items-center justify-center`}
-                title={isRow ? "Sağa sürükle" : "Aşağı sürükle"}
-              >
-                <span className={`${isRow ? "w-0.5 h-6" : "w-6 h-0.5"} bg-zinc-300 dark:bg-zinc-600 rounded-full opacity-0 group-hover:opacity-100`} />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    )
+  const handleResizeLayout = (nodeId: string, sizes: number[]) => {
+    setLayout(prev => {
+      const update = (n: LayoutNode): LayoutNode => {
+        if (n.type === "pane") return n
+        if (n.id === nodeId) return { ...n, sizes }
+        return { ...n, children: n.children.map(update) }
+      }
+      return update(prev)
+    })
   }
+
+  const windowedPanes = [
+    { id: "a", node: renderPaneById("a") },
+    { id: "b", node: renderPaneById("b") },
+    ...extraPanes.map(p => ({ id: p.id, node: renderPaneById(p.id) })),
+    ...(showBrowser ? [{ id: "browser", node: <BrowserPane onClose={() => setShowBrowser(false)} /> }] : []),
+    ...(showMobile ? [{ id: "mobile", node: <MobilePane onClose={() => setShowMobile(false)} /> }] : []),
+  ]
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-[#FAF9F5] dark:bg-[#0F0F11] text-ink dark:text-white">
       <Header
         onToggleLeft={() => setLeftCollapsed(!leftCollapsed)}
         onToggleRight={() => setRightCollapsed(!rightCollapsed)}
-        onOpenBrowser={() => {
-          if (!tiling) setTiling(true)
-          setShowBrowser(true)
-          ensureWindowPos("browser")
-        }}
-        onOpenMobile={() => {
-          if (!tiling) setTiling(true)
-          setShowMobile(true)
-          ensureWindowPos("mobile")
-        }}
+        onOpenBrowser={() => { if (!tiling) setTiling(true); setShowBrowser(true); ensureWindowPos("browser") }}
+        onOpenMobile={() => { if (!tiling) setTiling(true); setShowMobile(true); ensureWindowPos("mobile") }}
         onSearch={() => setSearchOpen(true)}
       />
 
@@ -390,166 +347,31 @@ export default function App() {
             <SidebarLeft onOpenTab={handleOpenTab} />
           </div>
         )}
-        {!leftCollapsed && (
-          <div
-            onMouseDown={e => startDrag(e, "left")}
-            onDoubleClick={() => setLeftCollapsed(true)}
-            className="w-1 bg-line hover:bg-[#CFC9BF] dark:bg-[#232326] dark:hover:bg-[#3A3A3E] cursor-col-resize shrink-0 hidden xl:flex items-center justify-center group"
-            title="Sürükle yeniden boyutlandır · çift tık gizle"
-          >
-            <span className="w-0.5 h-7 bg-zinc-300 dark:bg-zinc-600 rounded-full opacity-0 group-hover:opacity-100 transition" />
-          </div>
-        )}
-        {leftCollapsed && (
-          <button onClick={() => setLeftCollapsed(false)} className="w-6 shrink-0 hidden xl:grid place-items-center bg-[#FDFCFB] dark:bg-[#161618] border-r border-line hover:bg-muted text-zinc-400" title="Sol paneli aç [">
-            ›
-          </button>
-        )}
+        {!leftCollapsed && <ResizeHandle side="left" onMouseDown={e => startDrag(e, "left")} onDoubleClick={() => setLeftCollapsed(true)} />}
+        {leftCollapsed && <CollapseButton side="left" onOpen={() => setLeftCollapsed(false)} />}
 
         <main className="flex-1 min-w-0 flex flex-col bg-[#FAF9F5] dark:bg-[#0F0F11] overflow-hidden">
           {!tiling ? (
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               <div ref={singleScrollRef} className="flex-1 overflow-y-auto">
                 <div className="max-w-[820px] mx-auto w-full px-4 sm:px-5 py-5">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white dark:bg-[#1E1E21] border border-line text-[10.5px] font-medium">
-                      <span className="w-1.5 h-1.5 rounded-full bg-terracotta" /> Lokma Harness · #482
-                    </span>
-                    <Button variant="outline" size="sm" className="ml-auto gap-1.5 text-xs" onClick={() => setTiling(true)}>
-                      Pane olarak aç
-                    </Button>
-                  </div>
-                  <h1 className="font-serif text-[30px] leading-[1.08] tracking-tight">
-                    Good afternoon, Aylin.<br />
-                    <span className="italic font-normal text-zinc-500">What are we building today?</span>
-                  </h1>
-                  <p className="mt-2 text-[13px] text-zinc-500">Start with a brief. Lokma will scaffold the plan, run tools, and keep an inspectable trail. Dikey/yatay böl, windowed ile serbest taşı.</p>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-6">
-                    {[
-                      { title: "Scaffold a new API", desc: "Fastify + Drizzle + auth" },
-                      { title: "Review this PR", desc: "Security, types, tests" },
-                      { title: "Design a landing", desc: "Figma → code" },
-                    ].map(c => (
-                      <Card key={c.title} className="p-3 hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleOpenTab(c.title, <div className="p-3">{c.title} — new tab in focused pane</div>)}>
-                        <div className="text-xs font-semibold">{c.title}</div>
-                        <div className="text-xs text-zinc-500">{c.desc}</div>
-                      </Card>
-                    ))}
-                  </div>
-
+                  <HeroSection onOpenTab={handleOpenTab} />
                   <div className="mt-6">
-                    {/* Sticky: en üstte senin mesajın parçası */}
-                    <div id="single-sticky" className="hidden sticky top-0 z-10 -mx-1 mb-3 px-2 py-1.5 rounded-full bg-white dark:bg-[#1E1E21] border border-line shadow-sm items-center gap-2 cursor-pointer hover:border-terracotta/30" onClick={() => document.getElementById("single-msg-aylin")?.scrollIntoView({ behavior: "smooth", block: "center" })}>
-                      <img src="https://i.pravatar.cc/100?img=33" alt="Aylin" className="w-5 h-5 rounded-full object-cover border border-line" />
-                      <span className="text-xs font-medium truncate">Aylin — “Let's refactor the auth…”</span>
-                      <span className="ml-auto text-[11px] text-terracotta">↥ git</span>
-                    </div>
-
-                    {/* Scrollbar ortasında mesajlara git — dikey noktalar */}
-                    <div className="relative flex gap-3">
-                      <div className="flex-1 space-y-5 pr-2">
-                        {/* Today separator */}
-                        <div className="flex items-center gap-3 py-1">
-                          <div className="h-px flex-1 bg-line" />
-                          <span className="text-[11px] tracking-widest uppercase text-zinc-400 bg-muted px-2 py-0.5 rounded-full border border-line">Today · 14:31</span>
-                          <div className="h-px flex-1 bg-line" />
-                        </div>
-
-                        {/* Aylin — user bubble KALSIN */}
-                        <div id="single-msg-aylin" className="flex gap-3 group scroll-mt-16">
-                          <img src="https://i.pravatar.cc/100?img=33" alt="Aylin" className="w-8 h-8 rounded-full object-cover border border-line shrink-0 mt-0.5 shadow-sm" />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-baseline gap-2">
-                              <span className="text-xs font-semibold">Aylin</span>
-                              <span className="text-[11px] text-zinc-400">14:31</span>
-                              <span className="ml-auto hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400"><span className="w-1 h-1 rounded-full bg-emerald-500" /> you</span>
-                            </div>
-                            {editingSingle ? (
-                              <div className="mt-1.5 rounded-2xl bg-white dark:bg-[#1E1E21] border border-terracotta/30 shadow-sm p-2">
-                                <textarea value={singleAylinDraft} onChange={e => setSingleAylinDraft(e.target.value)} rows={3} className="w-full rounded-md border border-line bg-white dark:bg-[#0F0F11] p-2 text-[13px] focus:outline-none focus:border-terracotta/30" />
-                                <div className="mt-2 flex gap-1.5 justify-end">
-                                  <Button variant="ghost" size="sm" className="h-6 text-[11px]" onClick={() => { setEditingSingle(false); setSingleAylinDraft(singleAylinText) }}>Cancel</Button>
-                                  <Button size="sm" className="h-6 text-[11px]" onClick={() => { setSingleAylinText(singleAylinDraft); setEditingSingle(false); window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Prompt güncellendi — rewind ile yeniden gönder" })) }}>Save & rewind</Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="mt-1.5 rounded-2xl rounded-tl-sm bg-white dark:bg-[#1E1E21] border border-line shadow-sm p-3.5 group-hover:border-line-strong group-hover:shadow-md transition">
-                                  <div className="text-[13.5px] leading-[1.6]">{singleAylinText}</div>
-                                  <div className="mt-2 flex items-center gap-1.5">
-                                    <span className="px-1.5 py-0.5 rounded-full bg-[#FDF0E6] border border-[#F2D5C2] text-terracotta text-[11px]">auth.ts</span>
-                                    <span className="px-1.5 py-0.5 rounded-full bg-muted border border-line text-[11px]">+18 lines</span>
-                                  </div>
-                                </div>
-                                <div className="mt-1 flex gap-1 opacity-0 group-hover:opacity-100 transition flex-wrap">
-                                  <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => { setSingleAylinDraft(singleAylinText); setEditingSingle(true) }}>✎ Edit</Button>
-                                  <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => { document.getElementById("single-msg-lokma")?.scrollIntoView({ behavior: "smooth" }); window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Rewind: bu mesaja sarıldı — sonraki mesajlar gizlendi" })) }}>↩ Rewind</Button>
-                                  <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => { navigator.clipboard.writeText(singleAylinText); window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Kopyalandı" })) }}>Copy</Button>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Lokma — BUBBLE YOK, düz metin — image gibi Thought + code block */}
-                        <div id="single-msg-lokma" className="flex gap-3 group scroll-mt-16">
-                          <div className="w-8 h-8 rounded-full bg-[#6C5CE7] dark:bg-[#6C5CE7] text-white grid place-items-center text-xs font-bold border border-line shrink-0 mt-0.5 shadow-sm">◐</div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-baseline gap-2 flex-wrap">
-                              <span className="text-xs font-semibold">Lokma.AI</span>
-                              <span className="px-1.5 py-0.5 rounded-full bg-[#6C5CE7] text-white text-[10px]">Thought ▸</span>
-                              <span className="text-[11px] text-zinc-400">14:31 · 1.2s</span>
-                            </div>
-                            {/* Thought collapsible */}
-                            <details open className="mt-2 rounded-lg border border-line bg-muted/30 dark:bg-[#1E1E21]/50 overflow-hidden">
-                              <summary className="px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-muted/50 list-none flex items-center gap-1.5">
-                                <span className="text-[10px]">▸</span> Thought
-                                <span className="ml-auto text-[11px] text-zinc-400">Ran cat · tail -n 60</span>
-                              </summary>
-                              <div className="px-3 py-2 border-t border-line text-xs leading-[1.6] space-y-1">
-                                <div className="font-mono text-[11px] text-zinc-500">Ran <code className="px-1 py-0.5 rounded bg-white dark:bg-[#0F0F11] border border-line">cat /mnt/apopic/lokma/concept/src/components/layout/Pane.tsx | tail -n 60</code></div>
-                                <div>Verifying <code className="px-1 py-0.5 rounded bg-white dark:bg-[#0F0F11] border border-line text-[11px]">Pane onSend</code> implementation and noting missing edit/rewind buttons — reconciling a partial write that reverted Pane's onSend.</div>
-                              </div>
-                            </details>
-                            {/* düz metin */}
-                            <div className="mt-2 text-[13.5px] leading-[1.6]">Perfect — one hook, one decorator, <span className="underline decoration-terracotta/50 underline-offset-4">zero magic.</span></div>
-                            {/* Code block — image gibi Pane.tsx +12 -1 */}
-                            <div className="mt-3 rounded-lg overflow-hidden border border-line bg-[#0F0F11] dark:bg-[#161618]">
-                              <div className="flex items-center gap-2 px-3 h-7 bg-[#1E1E21] border-b border-white/10 text-xs">
-                                <span className="font-mono text-white">Pane.tsx</span>
-                                <span className="text-emerald-400 text-[11px]">+12</span>
-                                <span className="text-red-400 text-[11px]">-1</span>
-                                <span className="ml-auto w-5 h-5 grid place-items-center rounded hover:bg-white/10 text-white/60 cursor-pointer">×</span>
-                              </div>
-                              <pre className="p-3 text-xs leading-5 font-mono overflow-x-auto text-white/90"><code><span className="text-[#8BE9FD]">const</span> <span className="text-white">Composer</span> <span className="text-[#FF79C6]">=</span> <span className="text-[#8BE9FD]">()</span> <span className="text-[#FF79C6]">=&gt;</span> {"{"}{"\n"}  <span className="text-[#6272A4]">// placeholder + onSend + edit/rewind/fork</span>{"\n"}{"}"}</code></pre>
-                            </div>
-                            <div className="mt-2 text-xs text-zinc-500">Ran 2 commands · <span className="text-emerald-600">✓ built</span></div>
-                            <div className="mt-2 flex gap-1.5 flex-wrap">
-                              <Button variant="secondary" size="sm" className="h-6 text-[11px] gap-1 bg-white text-ink hover:bg-white/90 border border-line" onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Diff kopyalandı" }))}>Copy diff</Button>
-                              <Button variant="ghost" size="sm" className="h-6 text-[11px] gap-1" onClick={() => handleOpenTab("auth.ts", <CodePaneContent />)}>Open in pane</Button>
-                              <Button variant="ghost" size="sm" className="h-6 text-[11px] gap-1" onClick={() => handleForkFrom("Perfect — one hook, one decorator")}>⎇ Fork</Button>
-                              <a href="https://lokma-concept.fermag.com.tr" target="_blank" className="ml-auto text-xs text-terracotta hover:underline">Canlı: https://lokma-concept.fermag.com.tr</a>
-                            </div>
-                            <div className="mt-1.5 flex items-center gap-1 text-[11px] text-zinc-400">
-                              <span>✓ 1 tool · 12k tokens · $0.04</span>
-                              <span className="mx-1">·</span>
-                              <button onClick={() => { navigator.clipboard.writeText("Perfect — one hook, one decorator, zero magic."); window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Kopyalandı" })) }} className="hover:text-ink hover:underline">⎙ Copy</button>
-                              <span className="mx-1">·</span>
-                              <button onClick={() => window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Regenerate" }))} className="hover:text-ink hover:underline">↻ Regenerate</button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Scrollbar ortasında dikey noktalar — sticky, senin mesajlarına hızlı git */}
-                      <div className="sticky top-1/2 self-start -translate-y-1/2 flex flex-col items-center gap-2 py-2 px-1 rounded-full bg-white dark:bg-[#1E1E21] border border-line shadow-sm h-fit">
-                        <button onClick={() => document.getElementById("single-msg-aylin")?.scrollIntoView({ behavior: "smooth", block: "center" })} className="w-2 h-2 rounded-full bg-terracotta hover:scale-[1.4] transition shadow" title="Aylin — 14:31" />
-                        <button onClick={() => document.getElementById("single-msg-lokma")?.scrollIntoView({ behavior: "smooth", block: "center" })} className="w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-600 hover:bg-terracotta transition" title="Lokma — 14:31" />
-                        <span className="w-px h-4 bg-line my-1" />
-                        <button onClick={() => singleScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })} className="w-1.5 h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-400" title="Başa git" />
-                      </div>
-                    </div>
+                    <SingleChatView
+                      scrollRef={singleScrollRef}
+                      aylinText={singleAylinText}
+                      draft={singleAylinDraft}
+                      editing={editingSingle}
+                      onDraftChange={setSingleAylinDraft}
+                      onCancel={() => { setEditingSingle(false); setSingleAylinDraft(singleAylinText) }}
+                      onSave={() => { setSingleAylinText(singleAylinDraft); setEditingSingle(false); window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Prompt güncellendi — rewind ile yeniden gönder" })) }}
+                      onEdit={() => { setSingleAylinDraft(singleAylinText); setEditingSingle(true) }}
+                      onRewind={() => { document.getElementById("single-msg-lokma")?.scrollIntoView({ behavior: "smooth" }); window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Rewind: bu mesaja sarıldı — sonraki mesajlar gizlendi" })) }}
+                      onCopy={() => { navigator.clipboard.writeText(singleAylinText); window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Kopyalandı" })) }}
+                      onOpenTab={handleOpenTab}
+                      onFork={handleForkFrom}
+                      CodePane={<CodePaneContent />}
+                    />
                   </div>
                 </div>
               </div>
@@ -562,83 +384,37 @@ export default function App() {
             </div>
           ) : (
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-              <div className="h-8 flex items-center gap-1.5 px-3 border-b border-line bg-white dark:bg-[#161618] shrink-0 overflow-x-auto">
-                <span className="px-2 py-1 rounded-md bg-[#262624] text-white text-xs hidden sm:inline">Tiling</span>
-                <span className="text-xs text-zinc-500 hidden sm:inline whitespace-nowrap">3 pane · file drop · sola böl · windowed serbest</span>
-                <span className="ml-auto flex gap-1 shrink-0">
-                  <Button variant={windowed ? "ink" : "outline"} size="sm" className="h-6 text-xs gap-1" onClick={() => setWindowed(!windowed)}>
-                    Windowed
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-6 text-xs" onClick={() => { const id = genId(); ensureWindowPos(id); setExtraPanes(p => [...p, { id, title: `Pane ${id.slice(2,6)}`, content: <div className="p-3">Yeni pane — altına/yanına böl</div> }]); setLayout(prev => ({ type: "split", id: "root", dir: "row", sizes: [...(prev.type==="split"?prev.sizes:[]), 50].map((s,i,a)=>s/a.reduce((x,y)=>x+y,0)*100), children: [...(prev.type==="split"?prev.children:[prev]), { type: "pane", id }] } as LayoutNode)) }}>
-                    + Pane
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs hidden lg:inline-flex" onClick={() => handleOpenTab("Terminal", <TerminalPane />)}>
-                    + Terminal
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs hidden lg:inline-flex" onClick={() => handleOpenTab("Orchestration", <OrchestrationPane />)}>
-                    + Agents
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs hidden lg:inline-flex" onClick={() => handleOpenTab("Git", <GitPane />)}>
-                    + Git
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs hidden xl:inline-flex" onClick={() => handleOpenTab("Vault", <VaultPane />)}>
-                    + Vault
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs hidden xl:inline-flex" onClick={() => handleOpenTab("Archify", <ArchifyPane />)}>
-                    + Archify
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs hidden xl:inline-flex" onClick={() => handleOpenTab("Design", <DesignStudioPane />)}>
-                    + Design
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs hidden sm:inline-flex" onClick={saveLayout}>
-                    Save
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs hidden sm:inline-flex" onClick={resetLayout}>
-                    Reset
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setTiling(false)}>
-                    Tekil
-                  </Button>
-                </span>
-              </div>
+              <TilingBar
+                windowed={windowed}
+                onToggleWindowed={() => setWindowed(!windowed)}
+                onAddPane={() => {
+                  const id = genId(); ensureWindowPos(id);
+                  setExtraPanes(p => [...p, { id, title: `Pane ${id.slice(2,6)}`, content: <div className="p-3">Yeni pane — altına/yanına böl</div> }]);
+                  setLayout(prev => ({ type: "split", id: "root", dir: "row", sizes: [...(prev.type==="split"?prev.sizes:[]), 50].map((s,i,a)=>s/a.reduce((x,y)=>x+y,0)*100), children: [...(prev.type==="split"?prev.children:[prev]), { type: "pane", id }] } as LayoutNode))
+                }}
+                onOpenTerminal={() => handleOpenTab("Terminal", <TerminalPane />)}
+                onOpenAgents={() => handleOpenTab("Orchestration", <OrchestrationPane />)}
+                onOpenGit={() => handleOpenTab("Git", <GitPane />)}
+                onOpenVault={() => handleOpenTab("Vault", <VaultPane />)}
+                onOpenArchify={() => handleOpenTab("Archify", <ArchifyPane />)}
+                onOpenDesign={() => handleOpenTab("Design", <DesignStudioPane />)}
+                onSave={saveLayout}
+                onReset={resetLayout}
+                onSingle={() => setTiling(false)}
+              />
               <div className={`flex flex-1 min-h-0 overflow-hidden ${windowed ? "relative bg-[#FAF9F5] dark:bg-[#0F0F11] p-2 gap-2" : ""}`}>
                 {windowed ? (
-                  <div className="relative w-full h-full min-h-[520px]">
-                    {[
-                      { id: "a", node: renderPaneById("a") },
-                      { id: "b", node: renderPaneById("b") },
-                      ...extraPanes.map(p => ({ id: p.id, node: renderPaneById(p.id) })),
-                      ...(showBrowser ? [{ id: "browser", node: <BrowserPane onClose={() => setShowBrowser(false)} /> }] : []),
-                      ...(showMobile ? [{ id: "mobile", node: <MobilePane onClose={() => setShowMobile(false)} /> }] : []),
-                    ].map(({ id, node }) => {
-                      const pos = windowPos[id] || { x: 8, y: 8, w: 420, h: 380 }
-                      return (
-                        <div key={id} style={{ left: pos.x, top: pos.y, width: pos.w, height: pos.h }} className={`absolute bg-white dark:bg-[#161618] border border-line rounded-lg shadow-lg overflow-hidden flex flex-col ${focusedPane === id ? "ring-1 ring-terracotta/30 z-10" : "z-0"}`}>
-                          <div onMouseDown={e => startWindowDrag(e, id)} className="h-7 shrink-0 flex items-center px-2 gap-1 bg-[#FDFCFB] dark:bg-[#1E1E21] border-b border-line cursor-grab active:cursor-grabbing text-xs font-medium">
-                            <span className="w-1.5 h-1.5 rounded-full bg-terracotta" /> {id}
-                            <span className="ml-auto flex gap-1">
-                              <button onClick={() => setWindowPos(prev => ({ ...prev, [id]: { ...prev[id], x: 8, y: 8, w: 480, h: 520 } }))} className="w-5 h-5 grid place-items-center rounded hover:bg-black/5">□</button>
-                              <button onClick={() => closePane(id)} className="w-5 h-5 grid place-items-center rounded hover:bg-black/5">×</button>
-                            </span>
-                          </div>
-                          <div className="flex-1 min-h-0 overflow-hidden flex">{node}</div>
-                          <div onMouseDown={e => {
-                            e.preventDefault()
-                            const startX = e.clientX, startY = e.clientY, startW = pos.w, startH = pos.h
-                            const onMove = (ev: MouseEvent) => {
-                              const dw = Math.max(320, Math.min(900, startW + (ev.clientX - startX)))
-                              const dh = Math.max(240, Math.min(700, startH + (ev.clientY - startY)))
-                              setWindowPos(prev => ({ ...prev, [id]: { ...prev[id], w: dw, h: dh } }))
-                            }
-                            const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp) }
-                            window.addEventListener("mousemove", onMove); window.addEventListener("mouseup", onUp)
-                          }} className="absolute right-0 bottom-0 w-4 h-4 cursor-se-resize grid place-items-center text-zinc-300">◢</div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  <WindowedCanvas
+                    panes={windowedPanes}
+                    windowPos={windowPos}
+                    focusedPane={focusedPane}
+                    onDragStart={startWindowDrag}
+                    onResize={(id, w, h) => setWindowPos(prev => ({ ...prev, [id]: { ...prev[id], w, h } }))}
+                    onMaximize={id => setWindowPos(prev => ({ ...prev, [id]: { ...prev[id], x: 8, y: 8, w: 480, h: 520 } }))}
+                    onClose={closePane}
+                  />
                 ) : (
-                  <RenderSplit node={layout} />
+                  <SplitTree node={layout} renderPane={renderPaneById} onResize={handleResizeLayout} />
                 )}
               </div>
             </div>
@@ -646,19 +422,10 @@ export default function App() {
         </main>
 
         {rightCollapsed ? (
-          <button onClick={() => setRightCollapsed(false)} className="w-6 shrink-0 hidden xl:grid place-items-center bg-[#FDFCFB] dark:bg-[#161618] border-l border-line hover:bg-muted text-zinc-400" title="Sağ paneli aç ]">
-            ‹
-          </button>
+          <CollapseButton side="right" onOpen={() => setRightCollapsed(false)} />
         ) : (
           <>
-            <div
-              onMouseDown={e => startDrag(e, "right")}
-              onDoubleClick={() => setRightCollapsed(true)}
-              className="w-1 bg-line hover:bg-[#CFC9BF] dark:bg-[#232326] dark:hover:bg-[#3A3A3E] cursor-col-resize shrink-0 hidden xl:flex items-center justify-center group"
-              title="Sürükle yeniden boyutlandır · çift tık gizle"
-            >
-              <span className="w-0.5 h-7 bg-zinc-300 dark:bg-zinc-600 rounded-full opacity-0 group-hover:opacity-100 transition" />
-            </div>
+            <ResizeHandle side="right" onMouseDown={e => startDrag(e, "right")} onDoubleClick={() => setRightCollapsed(true)} />
             <div id="pane-right-wrap" style={{ width: rightW }} className="shrink-0 hidden xl:flex">
               <FileBrowser onOpenFile={handleOpenFile} />
             </div>
@@ -666,18 +433,9 @@ export default function App() {
         )}
       </div>
 
-      <div className="h-6 border-t border-line bg-[#FDFCFB] dark:bg-[#161618] flex items-center px-3 text-[11px] text-zinc-500">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> All systems normal · window pane · row/col split · [ / ] · ⌘K
-        <span className="ml-auto">UI Kit — Button, Card, Input, Composer, Pane, FileBrowser · Vite 6 · Tailwind v4</span>
-      </div>
-
+      <FooterBar />
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} onOpenDoc={handleOpenFile} />
-
-      {toast && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-3 py-1.5 rounded-full bg-[#262624] text-white text-xs shadow-lg border border-white/10 animate-pulse">
-          {toast}
-        </div>
-      )}
+      <Toast msg={toast} />
     </div>
   )
 }

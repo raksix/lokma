@@ -212,16 +212,11 @@ export default function App() {
   }
 
   const closePane = (targetId: string) => {
-    if (targetId === "a" || targetId === "b") {
-      window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Ana pane kapatılamaz — tab kapat" }))
-      return
-    }
     const recur = (node: LayoutNode): LayoutNode | null => {
       if (node.type === "pane") return node.id === targetId ? null : node
       const children = node.children.map(recur).filter(Boolean) as LayoutNode[]
       if (children.length === 0) return null
       if (children.length === 1) return children[0]
-      // normalize sizes
       const sizes = node.sizes.slice(0, children.length)
       while (sizes.length < children.length) sizes.push(100 / children.length)
       const sum = sizes.reduce((a, b) => a + b, 0)
@@ -229,9 +224,30 @@ export default function App() {
     }
     setLayout(prev => {
       const next = recur(prev)
-      return (next as LayoutNode) || { type: "split", id: "root", dir: "row", sizes: [50, 50], children: [{ type: "pane", id: "a" }, { type: "pane", id: "b" }] }
+      if (!next) {
+        // en az bir pane kalsın — yeni boş pane oluştur
+        const nid = genId()
+        setExtraPanes(p => [...p, { id: nid, title: `Pane ${nid.slice(2,6)}`, content: <div className="p-6 text-center text-sm text-zinc-500">Yeni pane — kapatılan yerine açıldı</div> }])
+        setFocusedPane(nid)
+        window.dispatchEvent(new CustomEvent("lokma-toast", { detail: "Son pane kapatılamaz — yeni pane açıldı" }))
+        return { type: "pane", id: nid }
+      }
+      return next as LayoutNode
     })
     setExtraPanes(prev => prev.filter(p => p.id !== targetId))
+    setWindowPos(prev => {
+      const n = { ...prev }
+      delete n[targetId]
+      return n
+    })
+    if (focusedPane === targetId) {
+      // focus’u başka pane’e al
+      setTimeout(() => {
+        const allIds = ["a", "b", ...extraPanes.map(p => p.id)].filter(id => id !== targetId)
+        if (allIds.length) setFocusedPane(allIds[0])
+      }, 0)
+    }
+    window.dispatchEvent(new CustomEvent("lokma-toast", { detail: `Pane kapatıldı: ${targetId}` }))
   }
 
   const handleOpenTab = (title: string, content: React.ReactNode) => {
@@ -618,7 +634,7 @@ export default function App() {
                             <span className="w-1.5 h-1.5 rounded-full bg-terracotta" /> {id}
                             <span className="ml-auto flex gap-1">
                               <button onClick={() => setWindowPos(prev => ({ ...prev, [id]: { ...prev[id], x: 8, y: 8, w: 480, h: 520 } }))} className="w-5 h-5 grid place-items-center rounded hover:bg-black/5">□</button>
-                              <button onClick={() => { if (id === "a" || id === "b") return; closePane(id) }} className="w-5 h-5 grid place-items-center rounded hover:bg-black/5">×</button>
+                              <button onClick={() => closePane(id)} className="w-5 h-5 grid place-items-center rounded hover:bg-black/5">×</button>
                             </span>
                           </div>
                           <div className="flex-1 min-h-0 overflow-hidden flex">{node}</div>

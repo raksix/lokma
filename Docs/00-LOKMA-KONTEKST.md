@@ -163,9 +163,12 @@
   - SystemPrompt: vision/roadmap/decisions/orchestration/business + How You Operate 6 adım + Guardrails + Outputs (roadmap slices, ADRs, bot specs)
   - Knowledge: vision (north star, 3 pillars, anti-goals) + roadmap-priorities (Phase 0→3 CEO sequencing 5 rules) + decision-framework (ADR template, 6 decided ADRs, escalation) + business-model (open core MIT + cloud private, 4 revenue levers, TokenLedger discipline)
 
+### 2026-09-02 09:15 UTC — devam (loops 11-15) — Phase 3 extras polish
+- **Loops 11-15:** ObservabilityPane (trace timeline #7, replay/share), CronApprovalsPane (#5 cron + #6 approvals), ExtrasPane (23 ranked, 13/23 done), BrowserPane per-agent tabs (#11), TilingBar +3 (Observe/Cron/Extras). Build 1863 modules 460k JS ✅. Commit 05e1f0e push'landı.
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-02 08:45 UTC
-- **Son işlem:** Lokma CEO bot — **lokma-ceo** 👑 Featured — bot.json + 4 knowledge + SOUL/MEMORY + BotsPane + Docs/37 — concept build pending
+- **Son güncelleme:** 2026-09-02 09:15 UTC
+- **Son işlem:** devam Phase 3 extras (Observability/Cron/Extras) — Commit 05e1f0e + önceki CEO bot — **lokma-ceo** 👑 Featured — bot.json + 4 knowledge + SOUL/MEMORY + BotsPane + Docs/37 — concept build pending
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

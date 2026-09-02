@@ -149,9 +149,12 @@
 - **Eksik (6 ana pane hiç yoktu):** Usage (Docs 22 §3 KPI+chart+session table), Settings→Providers/Models/Config/Appearance/Permissions/MCP (Docs 22 §1-2 + 26 + 11), Skills (27 Use-when/trie/curator), Testing Lab (33 TestSprite 6-stage + video/trace/Shannon), Bots Gallery (35 bot.json + lifecycle), Agent Hub (30 caps/queue/SOUL/memory/budgets — Orchestration'dan ayrı registry).
 - **Yapılan:** `concept/src/components/layout/` altına 6 yeni pane eklendi: `UsagePane.tsx` (8239B), `SettingsPane.tsx` (6 tabs, providers/models/config/appearance/perms/mcp), `SkillsPane.tsx` (registry + skill_view), `TestingPane.tsx` (6-stage + runs + Shannon), `BotsPane.tsx` (Gallery + bot.json), `AgentHubPane.tsx` (caps 20/5/20 + SOUL/MEMORY + queue). TilingBar +6 buton (+ Usage, + Hub, + Settings, + Skills, + Tests, + Bots) + App.tsx wire. Build ✅ 1857 modules, 407k JS, 60k CSS. Commit 9b9b2f5 push'landı.
 
+### 2026-09-02 08:30 UTC — 10-loop polish (Auth, Setup, Vault deep, Usage AreaChart, Plugins, Chat perms, Projects)
+- **Loops 1-10:** AuthPane (RBAC login/JWT/can), SetupWizardPane (init 3-step + doctor 8 checks), VaultPane deep (2D/3D SVG graph + depth slider + wikilink), UsagePane AreaChart (recharts stacked SVG), Settings live theme (4 themes toggle), PluginMarketplacePane (Cordis + marketplace 5 plugins), LokmaMessage permission card + AskUserQuestion, SidebarLeft worktree pill + checkpoints, TilingBar +3 buttons. Build 1860 modules 441k JS ✅. Commit d47eaa2 push'landı.
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-02 08:05 UTC
-- **Son işlem:** Concept gap audit + 6 missing panes (Usage, Settings, Skills, Testing, Bots, Agent Hub) — **Commit 9b9b2f5** push'landı — concept build ✅ 407k JS. Phase 0 scaffold canlı + concept design artık Docs 22-36'ın tüm ana bölümlerini kapsıyor
+- **Son güncelleme:** 2026-09-02 08:30 UTC
+- **Son işlem:** 10-loop polish — Auth/Setup/Vault/Usage/Plugins/Chat/Projects — **Commit d47eaa2** — 24 layout panes + 4 chat/pane components, concept Docs 20-36 %100 kapsıyor, build ✅
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

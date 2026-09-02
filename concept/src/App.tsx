@@ -12,6 +12,12 @@ import { GitPane } from "@/components/layout/GitPane"
 import { VaultPane } from "@/components/layout/VaultPane"
 import { ArchifyPane } from "@/components/layout/ArchifyPane"
 import { DesignStudioPane } from "@/components/layout/DesignStudioPane"
+import { UsagePane } from "@/components/layout/UsagePane"
+import { SettingsPane } from "@/components/layout/SettingsPane"
+import { SkillsPane } from "@/components/layout/SkillsPane"
+import { TestingPane } from "@/components/layout/TestingPane"
+import { BotsPane } from "@/components/layout/BotsPane"
+import { AgentHubPane } from "@/components/layout/AgentHubPane"
 import { Composer } from "@/components/layout/Composer"
 import { FooterBar, Toast, CollapseButton, ResizeHandle } from "@/components/layout/ShellParts"
 import { HeroSection } from "@/components/chat/HeroSection"
@@ -398,6 +404,12 @@ export default function App() {
                 onOpenVault={() => handleOpenTab("Vault", <VaultPane />)}
                 onOpenArchify={() => handleOpenTab("Archify", <ArchifyPane />)}
                 onOpenDesign={() => handleOpenTab("Design", <DesignStudioPane />)}
+                onOpenUsage={() => handleOpenTab("Usage", <UsagePane />)}
+                onOpenSettings={() => handleOpenTab("Settings", <SettingsPane />)}
+                onOpenSkills={() => handleOpenTab("Skills", <SkillsPane />)}
+                onOpenTesting={() => handleOpenTab("Testing Lab", <TestingPane />)}
+                onOpenBots={() => handleOpenTab("Bots", <BotsPane />)}
+                onOpenHub={() => handleOpenTab("Agent Hub", <AgentHubPane />)}
                 onSave={saveLayout}
                 onReset={resetLayout}
                 onSingle={() => setTiling(false)}

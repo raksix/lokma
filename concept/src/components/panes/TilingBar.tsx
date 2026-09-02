@@ -10,6 +10,12 @@ export function TilingBar({
   onOpenVault,
   onOpenArchify,
   onOpenDesign,
+  onOpenUsage,
+  onOpenSettings,
+  onOpenSkills,
+  onOpenTesting,
+  onOpenBots,
+  onOpenHub,
   onSave,
   onReset,
   onSingle,
@@ -23,6 +29,12 @@ export function TilingBar({
   onOpenVault: () => void
   onOpenArchify: () => void
   onOpenDesign: () => void
+  onOpenUsage: () => void
+  onOpenSettings: () => void
+  onOpenSkills: () => void
+  onOpenTesting: () => void
+  onOpenBots: () => void
+  onOpenHub: () => void
   onSave: () => void
   onReset: () => void
   onSingle: () => void
@@ -34,8 +46,14 @@ export function TilingBar({
       <span className="ml-auto flex gap-1 shrink-0">
         <Button variant={windowed ? "ink" : "outline"} size="sm" className="h-6 text-xs gap-1" onClick={onToggleWindowed}>Windowed</Button>
         <Button variant="outline" size="sm" className="h-6 text-xs" onClick={onAddPane}>+ Pane</Button>
-        <Button variant="ghost" size="sm" className="h-6 text-xs hidden lg:inline-flex" onClick={onOpenTerminal}>+ Terminal</Button>
+        <Button variant="ghost" size="sm" className="h-6 text-xs hidden lg:inline-flex" onClick={onOpenUsage}>+ Usage</Button>
+        <Button variant="ghost" size="sm" className="h-6 text-xs hidden lg:inline-flex" onClick={onOpenHub}>+ Hub</Button>
         <Button variant="ghost" size="sm" className="h-6 text-xs hidden lg:inline-flex" onClick={onOpenAgents}>+ Agents</Button>
+        <Button variant="ghost" size="sm" className="h-6 text-xs hidden xl:inline-flex" onClick={onOpenSettings}>+ Settings</Button>
+        <Button variant="ghost" size="sm" className="h-6 text-xs hidden xl:inline-flex" onClick={onOpenSkills}>+ Skills</Button>
+        <Button variant="ghost" size="sm" className="h-6 text-xs hidden xl:inline-flex" onClick={onOpenTesting}>+ Tests</Button>
+        <Button variant="ghost" size="sm" className="h-6 text-xs hidden xl:inline-flex" onClick={onOpenBots}>+ Bots</Button>
+        <Button variant="ghost" size="sm" className="h-6 text-xs hidden lg:inline-flex" onClick={onOpenTerminal}>+ Terminal</Button>
         <Button variant="ghost" size="sm" className="h-6 text-xs hidden lg:inline-flex" onClick={onOpenGit}>+ Git</Button>
         <Button variant="ghost" size="sm" className="h-6 text-xs hidden xl:inline-flex" onClick={onOpenVault}>+ Vault</Button>
         <Button variant="ghost" size="sm" className="h-6 text-xs hidden xl:inline-flex" onClick={onOpenArchify}>+ Archify</Button>

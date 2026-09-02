@@ -19,11 +19,12 @@ export function Pane({
   onClosePane: () => void
   isFocused: boolean
   onFocus: () => void
-  onSplit: (dir: "row" | "col") => void
+  onSplit: (dir: "row" | "col", pos?: "before" | "after") => void
 }) {
   const [tabs, setTabs] = React.useState<Tab[]>(initialTabs)
   const [active, setActive] = React.useState(initialTabs[0]?.id)
   const [dragOver, setDragOver] = React.useState(false)
+  const [dropZone, setDropZone] = React.useState<"center" | "left" | "right" | "top" | "bottom">("center")
   const paneRef = React.useRef<HTMLDivElement>(null)
 
   const activeTab = tabs.find(t => t.id === active)
@@ -91,8 +92,24 @@ export function Pane({
     setDragOver(false)
     const text = e.dataTransfer.getData("text/plain") || (window as unknown as { _dragTitle?: string })._dragTitle || ""
     const title = text ? text.slice(0, 40) : "Dropped"
-    // check if it's a file mention @file
     const isFile = text.startsWith("@") || text.endsWith(".ts") || text.endsWith(".md")
+    // zone-aware: edge drops split, center adds tab
+    if (dropZone !== "center") {
+      const dir = dropZone === "left" || dropZone === "right" ? "row" : "col"
+      const pos = dropZone === "left" || dropZone === "top" ? "before" : "after"
+      // create content for new pane from drop
+      const content = isFile ? (
+        <div className="font-mono text-xs p-3">File dropped: <span className="text-terracotta">{text}</span><pre className="mt-2 p-2 bg-muted rounded border border-line">export const dropped = true;</pre></div>
+      ) : (
+        <div className="p-3"><div className="text-xs font-semibold">{title}</div><div className="text-sm mt-1">Sürükle-bırak ile {dropZone} bölgesine bölündü</div></div>
+      )
+      // we need to split via onSplit but also need to pass title/content — use window event to let App handle
+      // fallback: if App handles split via onSplit, we store pending drop in window
+      ;(window as unknown as { _pendingSplit?: { title: string; content: React.ReactNode } })._pendingSplit = { title, content }
+      onSplit(dir as "row" | "col", pos as "before" | "after")
+      window.dispatchEvent(new CustomEvent("lokma-toast", { detail: `${dropZone === "left" ? "Sola" : dropZone === "right" ? "Sağa" : dropZone === "top" ? "Üste" : "Alta"} bölündü: ${title}` }))
+      return
+    }
     const content = isFile ? (
       <div className="font-mono text-xs p-3">File dropped: <span className="text-terracotta">{text}</span><pre className="mt-2 p-2 bg-muted rounded border border-line">export const dropped = true; // from drag</pre></div>
     ) : (
@@ -100,6 +117,21 @@ export function Pane({
     )
     addTab(title, content)
     window.dispatchEvent(new CustomEvent("lokma-toast", { detail: `Tab eklendi: ${title}` }))
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(true)
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    const w = rect.width, h = rect.height
+    const edge = 0.22
+    if (x < w * edge) setDropZone("left")
+    else if (x > w * (1 - edge)) setDropZone("right")
+    else if (y < h * edge) setDropZone("top")
+    else if (y > h * (1 - edge)) setDropZone("bottom")
+    else setDropZone("center")
   }
 
   return (
@@ -118,8 +150,8 @@ export function Pane({
           }
         }
       }}
-      onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-      onDragLeave={() => setDragOver(false)}
+      onDragOver={handleDragOver}
+      onDragLeave={() => { setDragOver(false); setDropZone("center") }}
       onDrop={handleDrop}
       className={cn("relative flex-1 flex flex-col min-w-[280px] bg-[#FAF9F5] dark:bg-[#0F0F11] overflow-hidden border-r border-line last:border-r-0", isFocused && "ring-1 ring-terracotta/30", dragOver && "pane-drop-ring")}
       title="Sürükle bırak: soldan session/file sürükle · çift tık maximize · köşeden resize"
@@ -203,7 +235,15 @@ export function Pane({
       <div onMouseDown={e => startResize(e, "e")} className="pane-handle pane-handle-e" title="Sağa sürükle genişlet" />
       <div onMouseDown={e => startResize(e, "s")} className="pane-handle pane-handle-s" title="Aşağı sürükle uzat" />
       <div onMouseDown={e => startResize(e, "se")} className="pane-handle pane-handle-se" title="Çapraz sürükle">◢</div>
-      {dragOver && <div className="absolute inset-0 pointer-events-none border-2 border-terracotta/40 bg-terracotta/5 grid place-items-center text-xs font-medium text-terracotta">Bırak → tab olarak ekle</div>}
+      {dragOver && (
+        <div className="absolute inset-0 pointer-events-none grid grid-cols-3 grid-rows-3 gap-1 p-1">
+          <div className={`rounded-md border-2 ${dropZone==="top"?"border-terracotta bg-terracotta/10":"border-transparent"} flex items-center justify-center text-[10px] text-terracotta`}>ÜST</div>
+          <div className={`rounded-md border-2 ${dropZone==="left"?"border-terracotta bg-terracotta/10":dropZone==="right"?"border-terracotta bg-terracotta/10":dropZone==="center"?"border-terracotta bg-terracotta/5":"border-transparent"} col-span-1 row-span-1 flex items-center justify-center text-xs font-medium text-terracotta`}>{dropZone==="center"?"Bırak → tab":dropZone==="left"?"◀ Sola böl":dropZone==="right"?"Sağa böl ▶":dropZone}</div>
+          <div className={`rounded-md border-2 ${dropZone==="bottom"?"border-terracotta bg-terracotta/10":"border-transparent"} flex items-center justify-center text-[10px] text-terracotta`}>ALT</div>
+          {/* subtle center hint */}
+          <div className="absolute inset-0 pointer-events-none border-2 border-terracotta/20 rounded-md" />
+        </div>
+      )}
     </div>
   )
 }

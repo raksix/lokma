@@ -171,16 +171,20 @@ export default function App() {
   }
 
   // ——— layout tree helpers ———
-  const splitPane = (targetId: string, dir: "row" | "col") => {
+  const splitPane = (targetId: string, dir: "row" | "col", pos: "before" | "after" = "after") => {
     const newId = genId()
     ensureWindowPos(newId)
+    const pending = (window as unknown as { _pendingSplit?: { title: string; content: React.ReactNode } })._pendingSplit
+    const title = pending?.title || `Pane ${newId.slice(2, 6)}`
+    const content = pending?.content || <div className="p-3 text-sm">{dir === "row" ? "Yatay bölme" : "Dikey bölme"} — {newId} · {pos === "before" ? "önüne" : "arkasına"} eklendi</div>
+    if (pending) delete (window as unknown as { _pendingSplit?: unknown })._pendingSplit
     const newPane: LayoutNode = { type: "pane", id: newId }
-    // also add to extraPanes for rendering content mapping
-    setExtraPanes(prev => [...prev, { id: newId, title: `Pane ${newId.slice(2, 6)}`, content: <div className="p-3 text-sm">{dir === "row" ? "Yatay bölme" : "Dikey bölme"} — {newId} · sürükle resize et</div> }])
+    setExtraPanes(prev => [...prev, { id: newId, title, content }])
     const recur = (node: LayoutNode): LayoutNode => {
       if (node.type === "pane") {
         if (node.id === targetId) {
-          return { type: "split", id: `s-${Date.now()}`, dir, sizes: [50, 50], children: [node, newPane] }
+          const children = pos === "before" ? [newPane, node] : [node, newPane]
+          return { type: "split", id: `s-${Date.now()}`, dir, sizes: [50, 50], children }
         }
         return node
       }
@@ -188,7 +192,7 @@ export default function App() {
     }
     setLayout(prev => recur(prev))
     setFocusedPane(newId)
-    window.dispatchEvent(new CustomEvent("lokma-toast", { detail: `${dir === "row" ? "Yatay" : "Dikey"} bölündü: ${targetId} → ${newId}` }))
+    window.dispatchEvent(new CustomEvent("lokma-toast", { detail: `${dir === "row" ? "Yatay" : "Dikey"} bölündü (${pos}): ${targetId} → ${title}` }))
   }
 
   const closePane = (targetId: string) => {
@@ -250,10 +254,10 @@ export default function App() {
           <div className="mt-1 rounded-2xl rounded-tl-sm bg-[#262624] dark:bg-[#1E1E21] text-white dark:text-[#EDE9E2] border border-[#262624] dark:border-[#232326] shadow-sm p-3 text-[13px] leading-[1.6]">One hook, one decorator.</div>
         </div>
       </div>
-    </div> }]} isFocused={focusedPane === id} onFocus={() => setFocusedPane(id)} onClosePane={() => closePane(id)} onSplit={dir => splitPane(id, dir)} />
-    if (id === "b") return <Pane key={id} id={id} initialTabs={[{ id: "tab-b-1", title: "auth.ts", content: <CodePaneContent /> }]} isFocused={focusedPane === id} onFocus={() => setFocusedPane(id)} onClosePane={() => closePane(id)} onSplit={dir => splitPane(id, dir)} />
+    </div> }]} isFocused={focusedPane === id} onFocus={() => setFocusedPane(id)} onClosePane={() => closePane(id)} onSplit={(dir, pos) => splitPane(id, dir, pos)} />
+    if (id === "b") return <Pane key={id} id={id} initialTabs={[{ id: "tab-b-1", title: "auth.ts", content: <CodePaneContent /> }]} isFocused={focusedPane === id} onFocus={() => setFocusedPane(id)} onClosePane={() => closePane(id)} onSplit={(dir, pos) => splitPane(id, dir, pos)} />
     const extra = extraPanes.find(p => p.id === id)
-    if (extra) return <Pane key={id} id={id} initialTabs={[{ id: `tab-${id}-1`, title: extra.title, content: extra.content }]} isFocused={focusedPane === id} onFocus={() => setFocusedPane(id)} onClosePane={() => closePane(id)} onSplit={dir => splitPane(id, dir)} />
+    if (extra) return <Pane key={id} id={id} initialTabs={[{ id: `tab-${id}-1`, title: extra.title, content: extra.content }]} isFocused={focusedPane === id} onFocus={() => setFocusedPane(id)} onClosePane={() => closePane(id)} onSplit={(dir, pos) => splitPane(id, dir, pos)} />
     if (id === "browser") return <BrowserPane key={id} onClose={() => setShowBrowser(false)} />
     if (id === "mobile") return <MobilePane key={id} onClose={() => setShowMobile(false)} />
     return <div key={id} className="p-3 text-xs">Pane {id} not found</div>

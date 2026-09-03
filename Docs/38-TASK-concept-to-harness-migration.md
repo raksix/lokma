@@ -1240,6 +1240,61 @@ everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
   |  rule). Both processes online (`lokma-server` pid 2137883,
   |  `lokma-web` pid 2137915).
   |
+  - 2026-09-03 — W5-19 TestingPane DONE
+    (server commit cf46263 + web commit 49e1428, both pushed).
+    Server (`lokma-core/src/testing/` new: `types.ts` + `store.ts` (~360
+    lines) + `index.ts`; `core/index.ts` export; `server/src/routes/tests.ts`
+    new; `app.ts` registration): every target becomes one real `GET` check
+    executed through `app.inject` (status + body against the REAL handlers —
+    never a stub) + a Shannon secret scan over the plan + response bodies
+    (pattern name + location only, matched secrets never echoed); storage
+    `~/.lokma/test-runs/<id>/` (`plan.json` + `report.json` + `junit.xml`).
+    NOTE: the core store was found as uncommitted WIP in the dirty tree
+    (orphaned run, same pattern as W2-6/W4-15) — adopted as this run's ONE
+    piece, reviewed fresh, verified untouched (zero changes needed to the
+    orphaned files; only the export line + routes are this run's typing).
+    Routes `POST /api/tests/run` (plan 1-120 chars, targets relative-path
+    only — absolute URLs/`..`/whitespace rejected, no SSRF surface, 20 max,
+    timeout capped 30s, Shannon on by default), `GET /api/tests/list`
+    (newest first), `GET /api/tests/:id` (stored plan + classified report),
+    `GET /api/tests/:id/junit` (attachment download); all failures
+    `{code,message}` (`bad_plan/bad_targets/bad_target/bad_timeout/
+    bad_id/test_not_found`).
+    Web (`components/testing/` new: `testing.ts` helpers +
+    `testing-pane.tsx` + `testing.test.ts` 35/35 PASS + barrel; `api.ts`
+    test types + 4 fns; 15th Inspector tab `Testing`): concept layout 1:1 —
+    6-stage strip (Sandbox/Heal copy adapted to the real in-process model),
+    New-run form (labeled plan + targets textarea + Shannon toggle, client
+    mirrors the server rules), all/fail/flaky filters + live search, run
+    cards (dot tone, pass/fail/flaky chips, shannon badge, `when`·`dur`),
+    expandable real per-test rows (kind/status/ms/detail/classification) +
+    Shannon findings + classify counts + real `junit.xml` download.
+    Concept mock RUNS rows + toast-only New-run + fake `.webm`/`trace.zip`
+    thumbnails NOT ported (honest footer: no Playwright dep here;
+    `flaky` stays 0 until rerun history lands — server never invents it).
+    Gates: root `tsc --noEmit` 0 errors · web build green (1681
+    modules, 603k JS/gzip 162k) · core (emit) + server `tsc -p` clean ·
+    all 23 probe files PASS (testing 35/35) · mock grep clean (3 hits =
+    labeled input `placeholder` attrs) · LIVE probe (in-process createApp
+    + inject, temp HOME) 34/34: empty list → mixed run (2 pass + 1
+    `contract` fail + clean Shannon) → list/detail/junit (attachment +
+    `<testsuite>`) → Shannon leak flagged (`1 secret`, secret text never
+    echoed) → defaults (3 http, no Shannon) → 8 validation 400/404s →
+    artifacts on disk → real `~/.lokma` untouched.
+    Probe lesson: `ls /root/.lokma/test-runs` throws when the dir is
+    absent — treat ENOENT as pass (nothing was written).
+    Honest scope: no video/trace (no headless browser dep), no auto-heal
+    loop (re-run is one click), no `DELETE /api/tests/:id` (concept has no
+    delete button — follow-up).
+    Deploy 2026-09-03: server rebuilt (`tsc -p` emit clean) + `pm2 restart
+    lokma-server` → `/health` 200 + `/api/tests/list` 200 with REAL
+    `{"items":[],"count":0}` on the domain (server LIVE serves this run's
+    code); web `web/dist` rebuilt (1681 modules) + `pm2 restart lokma-web`
+    → `/` 200 BUT still stale `/_next/` HTML — DEPLOY BLOCKER persists
+    (PM2 runs `next start` 15.5.24, needs foreground delete+start, not done
+    per rule). Both processes online.
+    Next piece: W5-20 BotsPane (`GET /api/bots` registry + playground
+    `POST /api/bots/:id/run` + fork/publish).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

@@ -694,6 +694,28 @@ export type ProjectMutationRes = { ok: boolean; project: AuthProject };
 export type MembersRes = { members: ProjectMember[] };
 export type MemberMutationRes = { ok: boolean; member: ProjectMember };
 
+// ─── Plugins (kernel registry + hot toggle + add-from-URL, W6-23) ───
+
+export type PluginSource = 'bundled' | 'url';
+export type PluginCategory = 'core' | 'diagram' | 'tool' | 'skill';
+export type Plugin = {
+  id: string;
+  name: string;
+  version: string;
+  author: string;
+  description: string;
+  category: PluginCategory;
+  source: PluginSource;
+  installed: true;
+  enabled: boolean;
+  routes: string[];
+  endpoints: string[];
+  url?: string;
+};
+export type PluginsRes = { plugins: Plugin[]; count: number };
+export type PluginDetailRes = { ok: boolean; plugin: Plugin };
+export type PluginMutationRes = { ok: boolean; plugin: Plugin };
+
 // ─── One function per endpoint group ────────────────────────────────────────
 
 export const api = {
@@ -1058,4 +1080,18 @@ export const api = {
   initSetup: (body: SetupInitBody = {}) => post<SetupInitRes>('/api/setup/init', body),
   /** 8 subsystem probes (+ SOUL when `agents` is true) — all measured live. */
   getDoctor: (agents = false) => get<DoctorRes>(agents ? '/api/doctor?agents=1' : '/api/doctor'),
+
+  // Plugins — kernel registry + hot toggle + add-from-URL (W6-23, Docs/23).
+  // Toggle suspends the plugin's routes server-side (503), no restart.
+  /** Bundled manifests (real endpoint lists) + URL-installed records. */
+  listPlugins: () => get<PluginsRes>('/api/plugins'),
+  /** Manifest detail (same record, re-read live for the Kernel expander). */
+  getPlugin: (id: string) => get<PluginDetailRes>(`/api/plugins/${encodeURIComponent(id)}`),
+  /** Hot enable/disable (suspends/resumes the plugin's routes instantly). */
+  setPluginEnabled: (id: string, enabled: boolean) =>
+    patch<PluginMutationRes>(`/api/plugins/${encodeURIComponent(id)}`, { enabled }),
+  /** Strict https validation; stored suspended until explicitly enabled. */
+  installPlugin: (url: string) => post<PluginMutationRes>('/api/plugins/install', { url }),
+  /** URL records only — bundled rows answer 400 `bundled_readonly`. */
+  deletePlugin: (id: string) => del<{ ok: boolean; id: string }>(`/api/plugins/${encodeURIComponent(id)}`),
 };

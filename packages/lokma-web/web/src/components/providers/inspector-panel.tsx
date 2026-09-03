@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { BarChart3, Beaker, Bot, Cpu, Folder, GitBranch, Globe, HardDrive, Info, Layers, Paintbrush, Plug2, Puzzle, Settings, Shield, Terminal, Users, Workflow } from 'lucide-react';
+import { BarChart3, Beaker, Bot, Cpu, Folder, GitBranch, Globe, HardDrive, Info, Layers, Package, Paintbrush, Plug2, Puzzle, Settings, Shield, Terminal, Users, Workflow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
@@ -19,6 +19,7 @@ import { TestingPane } from '@/components/testing';
 import { BotsPane } from '@/components/bots';
 import { AuthPane } from '@/components/auth';
 import { SetupPane } from '@/components/setup';
+import { PluginsPane } from '@/components/plugins';
 import { UsagePane } from '@/components/usage/usage-pane';
 
 /**
@@ -58,7 +59,10 @@ import { UsagePane } from '@/components/usage/usage-pane';
  * `GET/POST/PATCH/DELETE /api/projects/*`, invite accept + copyable
  * link, viewer-403 gates enforced server-side), Setup the real W6-22
  * pane (`lokma init` + optional-stack flags + `lokma doctor` probes over
- * `GET/POST /api/setup*` + `GET /api/doctor`).
+ * `GET/POST /api/setup*` + `GET /api/doctor`), Plugins the real W6-23
+ * pane (kernel registry + hot toggle + add-from-URL over
+ * `GET/PATCH /api/plugins/*` + `POST/DELETE`, suspended routes answer
+ * 503 with no restart).
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
  */
@@ -71,7 +75,7 @@ export function InspectorPanel({
   sessionId?: string;
   ws?: UseWs;
 }) {
-  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault' | 'skills' | 'archify' | 'design' | 'testing' | 'bots' | 'auth' | 'setup'>(
+  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault' | 'skills' | 'archify' | 'design' | 'testing' | 'bots' | 'auth' | 'setup' | 'plugins'>(
     'info',
   );
 
@@ -240,9 +244,20 @@ export function InspectorPanel({
           <HardDrive className="h-3 w-3" />
           Setup
         </Button>
+        <Button
+          variant={tab === 'plugins' ? 'default' : 'ghost'}
+          size="sm"
+          className="h-6 flex-1 gap-1.5 text-[11px]"
+          onClick={() => setTab('plugins')}
+        >
+          <Package className="h-3 w-3" />
+          Plugins
+        </Button>
       </div>
       {tab === 'info' ? (
         <InfoPanel />
+      ) : tab === 'plugins' ? (
+        <PluginsPane />
       ) : tab === 'setup' ? (
         <SetupPane />
       ) : tab === 'auth' ? (

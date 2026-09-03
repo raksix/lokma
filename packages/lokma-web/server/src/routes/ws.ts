@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { SessionStore, TerminalError, UsageLedger, estimateCost, estimateTokens, onAgentEvent, resolveInRoot, terminalManager } from 'lokma-core';
+import { SessionStore, TerminalError, UsageLedger, estimateCost, estimateTokens, onAgentEvent, recordApprovalDecision, resolveInRoot, terminalManager } from 'lokma-core';
 import { stream as aiStream } from 'lokma-ai';
 import { decodeClientMessage, encodeServerMessage } from 'lokma-shared';
 
@@ -171,7 +171,29 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
       } else if (msg.type === 'permission_response' || msg.type === 'ask_response') {
         // No tool-approval loop runs server-side yet (lands with W1-2/W4) —
         // acknowledge instead of dropping silently so the client can unblock.
+        // The answer is still real evidence: append it to the approvals
+        // decision log (powers GET /api/approvals), best-effort so logging
+        // never breaks chat.
         app.log.info(`[ws] ${msg.type} ${msg.requestId} (no pending gate yet)`);
+        try {
+          if (msg.type === 'permission_response') {
+            await recordApprovalDecision({
+              sessionId,
+              kind: 'permission',
+              requestId: msg.requestId,
+              decision: msg.decision,
+            });
+          } else {
+            await recordApprovalDecision({
+              sessionId,
+              kind: 'question',
+              requestId: msg.requestId,
+              answer: msg.answer,
+            });
+          }
+        } catch (e) {
+          app.log.warn(`[ws] approvals record failed session=${sessionId}: ${String(e)}`);
+        }
       } else if (msg.type === 'terminal/input') {
         // Stdin for a live shell — errors come back as `error` frames so the
         // pane can toast instead of hanging on a dead terminal.

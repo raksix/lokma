@@ -67,5 +67,9 @@ export * from './plugins/index.js';
 // Observability pane)
 export * from './observability/index.js';
 
+// Cron + approvals (per-agent cron jobs + WS decision log for the
+// CronApprovals pane, Docs/30 §5 + §6)
+export * from './cron/index.js';
+
 // Utils (DRY — reuse from here, don't duplicate)
 export * from './utils/index.js';

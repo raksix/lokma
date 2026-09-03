@@ -12,6 +12,7 @@ export * from './schemas/lock.js';
 export * from './schemas/memory.js';
 export * from './schemas/skill.js';
 export * from './schemas/plugin.js';
+export * from './schemas/cron.js';
 export * from './schemas/config.js';
 export * from './schemas/vault.js';
 

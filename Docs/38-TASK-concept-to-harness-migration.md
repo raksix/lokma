@@ -843,6 +843,42 @@ drag, tiling toggle, save/reset layout — all against live data, zero mock cont
   Next piece: W3-11 GitPane (real `git status` + commit/push +
   3-layer safe banner from locks/worktree state).
 
+- 2026-09-03 — W3-11 GitPane DONE
+  (server commit 4350ff9 + web commit 71cace5, both pushed).
+  Server: new `lokma-core/src/git/` (`RepoGit`: branch + upstream +
+  ahead/behind + staged-vs-unstaged files, `\x1f`/`\x1e`-parsed `log`,
+  `add -A` + `commit` with 400 `bad_message`/`nothing_to_commit`
+  (stdout AND stderr checked — clean-tree output lands on stdout on some
+  git versions), `push` with output tail, `worktree prune` gc;
+  non-repos answer `{ repo: false }` on status, 400 `not_a_repo`
+  elsewhere) + new `GET /api/git/status|/log|/locks` +
+  `POST /api/git/commit|/push|/gc` (`{code,message}` errors) + core
+  `listLocks()` + plan-literal `GET /api/agents/:id/locks`
+  (owner locks + worktrees, `agent:null` + empty on unknown — W4-ready).
+  Status also carries `worktrees` (banner + filter).
+  Web: new `components/git/` (`git.ts` pure helpers + `git-pane.tsx`
+  concept layout 1:1 + `git.test.ts` 25/25 PASS) as 7th Inspector tab;
+  per-file live owner pills over `GET /api/git/locks`, 3-layer banner
+  from REAL lock/worktree counts, labeled commit input + real
+  Commit/Push/GC (concept mock `FILES`/`COMMITS` + toast-only buttons
+  NOT ported — no dead buttons). Web `ui/button` has no `ink`
+  variant → active filter uses `default`. `api.ts` gains git + locks
+  types/fns.
+  Gates: root `tsc --noEmit` 0 errors · web build green (1656
+  modules, 464k JS/gzip 132k) · server `tsc -p` clean · all 14
+  probes PASS · mock grep: git clean (2 hits = input `placeholder`
+  attr + tailwind class, visible `<label>` present) · LIVE probe on
+  :3467 with temp HOME 16/16: status → log → bad-max 400 →
+  non-repo `repo:false` → real lock acquire → locks + agent-locks →
+  commit (hash) → clean tree → empty-message 400 →
+  `nothing_to_commit` → gc → push-no-remote 500, all green.
+  Probe lessons: (1) locks live GLOBAL in `~/.agentlocks`
+  (`expandHome` ignores `$HOME`) → assertions use `.some()`, probe
+  cleans its own /tmp locks; (2) Fastify bodyless+JSON-catch lesson
+  from W3-10 still applies.
+  Next piece: W3-12 BrowserPane (per-agent tabs +
+  `POST /api/browser/open` + live screenshots).
+
 - (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 
 ---

@@ -1003,6 +1003,47 @@ everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
   SOUL.md + clone config.json verified (real `~/.lokma` untouched).
   Next piece: W4-14 OrchestrationPane (live tree from
   `agent/start|delta|end` frames + fan-out controls).
+  |- 2026-09-03 — W4-14 OrchestrationPane DONE
+  |  (server commit 03defc6 + web commit dc08deb, both pushed).
+  |  Server: new `lokma-core/src/agents/events.ts` (in-process
+  |  `onAgentEvent`/`emitAgentEvent` pub/sub, guarded dispatch) +
+  |  `registry.ts` broadcasts on every mutation (create/pause/resume/
+  |  kill/fork/clone/delete; delete emits state `deleted`) + `ws.ts`
+  |  fans out each event as an `agent_state` frame to every live socket
+  |  (unsubscribed on close; agents are global, no session scoping).
+  |  No new REST routes — all existing registry endpoints.
+  |  Web: new `components/orchestration/` (`orchestration.ts` pure
+  |  helpers: groupByState/filterTree/countLive/elapsedSince/lineageOf/
+  |  lineageGroups/killableIds/validateFanoutForm/buildFanoutBodies,
+  |  `orchestration.test.ts` 43/43 PASS) + `orchestration-pane.tsx`
+  |  (concept layout 1:1 — live `N running · M total` badge, caps/queue
+  |  strip, state-grouped tree with expandable real detail
+  |  [config+locks+budgets+kill], fan-out form with real progress bar,
+  |  lineage section from real `createdBy`; concept mock AGENTS rows +
+  |  BUS feed + heartbeat pill + toast-only buttons NOT ported) +
+  |  barrel, wired as 10th Inspector tab; `hooks/use-ws.ts` forwards
+  |  every decoded frame into `agentStore.applyWsEvent` (store drops
+  |  rows on `deleted`); `api.ts` `CreateAgentBody` gains `createdBy`
+  |  (server already accepted it); row colors/persona reused from the
+  |  Hub (DRY).
+  |  Honest deviations from the plan card: (1) the plan names
+  |  `agent/start|delta|end` frames but `lokma-shared` only ships
+  |  `agent_state` — no names invented, `agent_state` goes live;
+  |  (2) row-expand shows real config/locks, not a transcript (no
+  |  per-agent transcript store exists); (3) "pipeline view" is the
+  |  real `createdBy` lineage list; (4) no bus section (no bus in
+  |  core); (5) cross-process (CLI create → pane <2s) NOT met —
+  |  broadcast is in-process, CLI rows arrive via Refresh.
+  |  Gates: root `tsc --noEmit` 0 errors · web build green (1666
+  |  modules, 517k JS/gzip 143k) · core+server `tsc -p` clean · all 18
+  |  probes PASS · mock grep: orchestration clean (3 hits = labeled
+  |  input `placeholder` attrs) · LIVE probe on :3469 with temp HOME
+  |  8/8: create → WS connect → pause/resume/kill frames → fork frame
+  |  for the copy → delete `deleted` frame → registry empty again
+  |  (real `~/.lokma` untouched).
+  |  Next piece: W4-15 VaultPane (`GET /api/vault/graph` FTS5 + real
+  |  graph + wikilink + ingest).
+  |
 
 ---
 

@@ -384,9 +384,17 @@
   - **Dürüst kapsam:** canlı token-harcama yok (ledger'da agentId yok — orchestration dalgasında), queue pozisyonu registry sırasından, WS ile <2s canlı yansıma yok (W4-14 Orchestration'da).
 - **Sıradaki parça:** W4-14 OrchestrationPane (canlı ağaç + fan-out kontrolleri).
 
+### 2026-09-03 — TASK-38 W4-14 OrchestrationPane DONE (server 03defc6 + web dc08deb)
+- **Executor run:** W4-14 tamamlandı — Inspector'da 10. sekme olarak gerçek orchestration paneli canlı (canlı ağaç + fan-out + cancel-all).
+  - **Server:** yeni `lokma-core/src/agents/events.ts` (in-process `onAgentEvent`/`emitAgentEvent` pub/sub, listener hatası registry write'ı asla bozmaz) + `registry.ts` her mutasyonda broadcast (create/pause/resume/kill/fork-clone/delete, delete `deleted` state'iyle) + `ws.ts` her socket'e `agent_state` frame fan-out (close'da unsubscribe; agent'lar global, session scope yok). Yeni REST endpoint YOK — hepsi mevcut registry endpoint'leri.
+  - **Web:** yeni `components/orchestration/` (saf helper'lar `orchestration.ts` + `orchestration.test.ts` 43/43: groupByState/filterTree/countLive/elapsedSince/lineageOf/lineageGroups/killableIds/validateFanoutForm/buildFanoutBodies) + `orchestration-pane.tsx` (concept düzeni 1:1 — header canlı badge, caps/queue strip, state-gruplu ağaç, satır-detay, fan-out formu, lineage bölümü; concept mock satırları + BUS feed + heartbeat pill + toast-only Logs/Resume/Bus taşınmadı — ölü buton yok) + barrel; 10. Inspector sekmesi. `use-ws.ts` her decode frame'i agentStore'a forward'lıyor (chat/terminal trafiği etkilenmez), store `deleted` state'inde satırı düşürüyor, `api.ts` `CreateAgentBody`'ye `createdBy` eklendi (server zaten destekliyordu). Satır normalizasyonu/renkler/persona Hub'dan reuse (DRY).
+  - **Gates:** root tsc 0 · web build green (1666 modül, 517k JS/gzip 143k) · core+server clean · 18 probun hepsi PASS · mock grep temiz (3 hit = etiketli input `placeholder`'ı) · CANLI prob (:3469, temp HOME) 8/8: create → WS bağlı → pause/resume/kill frame'leri → fork (kopya id'ye frame) → delete (`deleted` frame) → registry tekrar boş.
+  - **Dürüst kapsam / plan sapması:** plan `agent/start|delta|end` diyordu ama `lokma-shared` protokolünde sadece `agent_state` var — uydurma frame icat edilmedi, `agent_state` canlı yayınlanıyor. Satır-detay "transcript" değil gerçek config+locks+bütçe (agent transcript store'u yok). "Pipeline view" yerine gerçek `createdBy`'dan türetilen lineage bölümü. Bus yok (core'da bus yok). Cross-process (CLI'da create → web'e <2s) yok — in-process broadcast; CLI işleri Refresh ile gelir. Runner (running/queued çalıştırma) sonraki dalga.
+- **Sıradaki parça:** W4-15 VaultPane (`GET /api/vault/graph` FTS5 + gerçek graf + wikilink + ingest).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W4-13 AgentHubPane DONE — server 228434c + web 68bb528)
-- **Son işlem:** TASK-38 W4-13 DONE — gerçek agent registry canlı (CRUD + pause/resume/kill/fork/clone/delete + SOUL/MEMORY editörleri + bütçeler, 9. Inspector sekmesi); sırada W4-14 OrchestrationPane
+- **Son güncelleme:** 2026-09-03 (TASK-38 W4-14 OrchestrationPane DONE — server 03defc6 + web dc08deb)
+- **Son işlem:** TASK-38 W4-14 DONE — gerçek orchestration paneli canlı (10. Inspector sekmesi: canlı state-ağacı + fan-out batch create + cancel-all + lineage, WS `agent_state` broadcast ile); sırada W4-15 VaultPane
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

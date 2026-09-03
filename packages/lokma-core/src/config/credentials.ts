@@ -71,3 +71,21 @@ export async function getMaskedCredentials(): Promise<Record<string, { keySet: b
   }
   return out;
 }
+
+/**
+ * Delete a provider credential entry (used when a custom provider is removed).
+ * No-op when the provider has no stored key. Persists with 0600 like save.
+ */
+export async function removeCredentials(provider: string): Promise<boolean> {
+  const cur = await loadCredentials();
+  if (!cur.providers[provider]) return false;
+  const next: Credentials = {
+    ...cur,
+    providers: Object.fromEntries(Object.entries(cur.providers).filter(([id]) => id !== provider)),
+  };
+  const json = JSON.stringify(CredentialsSchema.parse(next), null, 2);
+  const key = getEncryptionKey();
+  const payload = key ? encrypt(json, key) : json;
+  await writeAtomic(CRED_PATH, payload, 0o600);
+  return true;
+}

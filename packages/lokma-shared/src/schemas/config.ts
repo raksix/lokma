@@ -8,6 +8,10 @@ export const ProviderConfigSchema = z.object({
   id: z.string().min(1),
   enabled: z.boolean().default(true),
   priority: z.number().int().default(0),
+  /** Display name for custom providers (built-ins resolve it server-side). */
+  name: z.string().min(1).max(80).optional(),
+  /** OpenAI-compatible base URL for custom providers (built-ins use defaults). */
+  baseUrl: z.string().url().optional(),
 });
 
 export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;

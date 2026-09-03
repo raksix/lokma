@@ -451,6 +451,54 @@ export type DesignGuard = {
 export type DesignGuardRes = { ok: boolean; guard: DesignGuard };
 export type DesignExportFormat = 'html' | 'zip' | 'json';
 
+// ─── Testing Lab (Plan→Run→Classify→Report over live handlers, W5-19) ───
+
+export type TestClassification = 'contract' | 'env' | 'fragility';
+export type TestResult = {
+  name: string;
+  kind: 'http' | 'shannon';
+  status: 'pass' | 'fail';
+  ms: number;
+  detail: string;
+  classification?: TestClassification;
+};
+export type ShannonFinding = { pattern: string; location: string };
+export type TestReport = {
+  id: string;
+  plan: string;
+  createdAt: string;
+  durationMs: number;
+  tests: TestResult[];
+  pass: number;
+  fail: number;
+  /** Rerun-history diffing is a follow-up — always 0, never invented. */
+  flaky: number;
+  shannon: string;
+  shannonFindings: ShannonFinding[];
+};
+export type TestPlanDoc = {
+  id: string;
+  plan: string;
+  targets: string[];
+  includeShannon: boolean;
+  createdAt: string;
+};
+export type TestSummary = {
+  id: string;
+  plan: string;
+  tests: number;
+  pass: number;
+  fail: number;
+  flaky: number;
+  dur: string;
+  shannon: string;
+  createdAt: string;
+};
+export type TestsRes = { items: TestSummary[]; count: number };
+export type RunTestBody = { plan: string; targets?: string[]; includeShannon?: boolean; timeoutMs?: number };
+export type RunTestRes = { ok: boolean; id: string; report: TestReport };
+export type TestDetailRes = { ok: boolean; plan: TestPlanDoc | null; report: TestReport };
+
 // ─── Repo git (real status/log/commit/push behind the GitPane, W3-11) ─────
 
 export type GitFileChange = { path: string; staged: string | null; worktree: string | null };
@@ -759,6 +807,22 @@ export const api = {
   ): Promise<{ filename: string; blob: Blob }> => {
     const fallback = `${id}.${format}`;
     const res = await authedFetch(`/api/design/${encodeURIComponent(id)}/export?format=${format}`);
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') ?? '';
+    const match = disposition.match(/filename="([^"]+)"/);
+    return { filename: match?.[1] ?? fallback, blob };
+  },
+
+  // Testing Lab — Plan→Run→Classify→Report (W5-19). The server owns
+  // execution (one real GET per target) + classification + junit; the pane
+  // lists runs, starts new ones, and downloads the Report-stage XML.
+  listTestRuns: () => get<TestsRes>('/api/tests/list'),
+  runTestPlan: (body: RunTestBody) => post<RunTestRes>('/api/tests/run', body),
+  getTestRun: (id: string) => get<TestDetailRes>(`/api/tests/${encodeURIComponent(id)}`),
+  /** Report-stage `junit.xml` — blob + server filename, auth via `authedFetch`. */
+  downloadTestJunit: async (id: string): Promise<{ filename: string; blob: Blob }> => {
+    const fallback = `${id}.junit.xml`;
+    const res = await authedFetch(`/api/tests/${encodeURIComponent(id)}/junit`);
     const blob = await res.blob();
     const disposition = res.headers.get('Content-Disposition') ?? '';
     const match = disposition.match(/filename="([^"]+)"/);

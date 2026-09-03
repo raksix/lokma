@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { BarChart3, Cpu, Folder, GitBranch, Globe, Info, Layers, Paintbrush, Plug2, Puzzle, Settings, Terminal, Users, Workflow } from 'lucide-react';
+import { BarChart3, Beaker, Cpu, Folder, GitBranch, Globe, Info, Layers, Paintbrush, Plug2, Puzzle, Settings, Terminal, Users, Workflow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
@@ -15,6 +15,7 @@ import { VaultPane } from '@/components/vault';
 import { SkillsPane } from '@/components/skills';
 import { ArchifyPane } from '@/components/archify';
 import { DesignPane } from '@/components/design';
+import { TestingPane } from '@/components/testing';
 import { UsagePane } from '@/components/usage/usage-pane';
 
 /**
@@ -43,7 +44,10 @@ import { UsagePane } from '@/components/usage/usage-pane';
  * viewer + receipt + Before/Delta/After + real file exports), Design the
  * real W5-18 pane (6 artifact types over bundled systems + a real
  * `.lokma/DESIGN.md` guard over `GET/POST/PUT /api/design/*`, sandboxed
- * viewer + Code/Critique/Export tabs + real file downloads).
+ * viewer + Code/Critique/Export tabs + real file downloads), Testing the
+ * real W5-19 pane (Plan→Run→Classify→Report over live handlers +
+ * Shannon scan over `GET/POST /api/tests/*`, per-test rows + real
+ * `junit.xml` download).
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
  */
@@ -56,7 +60,7 @@ export function InspectorPanel({
   sessionId?: string;
   ws?: UseWs;
 }) {
-  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault' | 'skills' | 'archify' | 'design'>(
+  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault' | 'skills' | 'archify' | 'design' | 'testing'>(
     'info',
   );
 
@@ -189,9 +193,20 @@ export function InspectorPanel({
           <Paintbrush className="h-3 w-3" />
           Design
         </Button>
+        <Button
+          variant={tab === 'testing' ? 'default' : 'ghost'}
+          size="sm"
+          className="h-6 flex-1 gap-1.5 text-[11px]"
+          onClick={() => setTab('testing')}
+        >
+          <Beaker className="h-3 w-3" />
+          Testing
+        </Button>
       </div>
       {tab === 'info' ? (
         <InfoPanel />
+      ) : tab === 'testing' ? (
+        <TestingPane />
       ) : tab === 'design' ? (
         <DesignPane />
       ) : tab === 'archify' ? (

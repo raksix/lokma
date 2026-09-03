@@ -930,6 +930,23 @@ everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
   forward → reload → close → re-get 404 → `javascript:` 400 `bad_url`
   (probe tab deleted after).
   W3 Files/Terminal/Git/Browser COMPLETE (W3-9 + W3-10 + W3-11 + W3-12).
+- 2026-09-03 — DEPLOY BLOCKER (web, needs foreground/user decision — NOT fixed
+  this run per the no-delete+start rule). `pm2 describe lokma-web` shows it
+  runs `next start -p 3457` (script `/mnt/apopic/lokma/node_modules/next/...`,
+  cwd `packages/lokma-web/web`) — but the web package is Vite-only
+  (`dev/build/preview` = vite, no next dep, no next.config). It serves a
+  STALE `.next/` build from 2026-08-31 (Phase-0 scaffold; live `/` returns
+  `/_next/static/...` HTML, not our Vite `dist/index.html`). So `pm2 restart
+  lokma-web` (done this run, new pid, homepage still 200) does NOT serve this
+  run's — or any W0-W3 run's — web code. Plan §9's "vite preview on :3457"
+  line is STALE and must be corrected. Server side is UNAFFECTED and live
+  (`/health` 200, `/api/browser` 200, 9/9 probe green). Web code is committed
+  (ea76e10) + built (`web/dist` fresh, 1659 modules) and will go live as soon
+  as PM2 is repointed. Remediation (foreground only):
+  `pm2 delete lokma-web && pm2 start bun --name lokma-web -- vite preview
+  --host 127.0.0.1 --port 3457` from `packages/lokma-web/web`
+  (or an ecosystem file), then `curl https://lokma.fermag.com.tr/` must return
+  the Vite `Lokma — harness` HTML instead of `/_next/`.
 
 - (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 

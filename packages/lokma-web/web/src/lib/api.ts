@@ -781,6 +781,38 @@ export type ShareDetailRes = {
   };
 };
 
+// Cron + approvals — per-agent jobs + WS decision history (W6-25, Docs/30
+// §5 + §6). Schedules are server-validated 5-field cron; `nextRunAt` is
+// computed server-side (null when disabled); `lastRunAt` stays null until
+// the agent runner wave fires jobs. Decisions fill as real WS answers arrive.
+export type CronJobView = {
+  id: string;
+  agentId: string;
+  schedule: string;
+  task: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+};
+export type CronListRes = { jobs: CronJobView[]; count: number };
+export type AgentCronRes = { jobs: CronJobView[]; count: number; agentId: string };
+export type CronCreateBody = { schedule: string; task: string; enabled?: boolean };
+export type CronPatchBody = { schedule?: string; task?: string; enabled?: boolean };
+export type CronMutateRes = { ok: boolean; job: CronJobView };
+export type ApprovalDecisionView = {
+  id: string;
+  at: string;
+  source: 'ws' | 'manual';
+  sessionId: string;
+  kind: 'permission' | 'question';
+  requestId: string;
+  decision?: 'allow' | 'deny' | 'always';
+  answer?: string;
+};
+export type ApprovalsRes = { decisions: ApprovalDecisionView[]; count: number };
+
 // ─── One function per endpoint group ────────────────────────────────────────
 
 export const api = {
@@ -1177,4 +1209,24 @@ export const api = {
   getShare: (token: string) => get<ShareDetailRes>(`/api/share/${encodeURIComponent(token)}`),
   /** Drop a share (source agent/session untouched). */
   deleteShare: (token: string) => del<{ ok: boolean; token: string }>(`/api/share/${encodeURIComponent(token)}`),
+
+  // Cron + approvals — per-agent jobs + WS decision history (W6-25).
+  // Toggle/delete/create hit live routes; the Allow/Deny/Always RULES live
+  // in `getConfig`/`patchConfig` permissions (same store the chat card
+  // writes — one store, two views); history is read-only and real.
+  /** All jobs, newest first (pane header counts + list). */
+  listCronJobs: () => get<CronListRes>('/api/cron'),
+  /** One agent's jobs (404 `agent_not_found`). */
+  listAgentCron: (agentId: string) => get<AgentCronRes>(`/api/agents/${encodeURIComponent(agentId)}/cron`),
+  /** Create a job (server mints the id; 400 `bad_schedule`/`bad_task`). */
+  createCronJob: (agentId: string, body: CronCreateBody) =>
+    post<CronMutateRes>(`/api/agents/${encodeURIComponent(agentId)}/cron`, body),
+  /** Edit schedule/task/enabled (empty → 400 `empty_patch`). */
+  patchCronJob: (agentId: string, jobId: string, body: CronPatchBody) =>
+    patch<CronMutateRes>(`/api/agents/${encodeURIComponent(agentId)}/cron/${encodeURIComponent(jobId)}`, body),
+  /** Delete a job (unknown → 404, never silent). */
+  deleteCronJob: (agentId: string, jobId: string) =>
+    del<{ ok: boolean; id: string }>(`/api/agents/${encodeURIComponent(agentId)}/cron/${encodeURIComponent(jobId)}`),
+  /** Newest-first WS decision history (fills as real answers arrive). */
+  listApprovals: () => get<ApprovalsRes>('/api/approvals'),
 };

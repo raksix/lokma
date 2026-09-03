@@ -312,9 +312,15 @@
 - **Gates:** root tsc 0 · web build green (1630 modül) · server clean · tüm problar PASS · mock grep temiz · CANLI prob (:3459, temp HOME): create→rename→400 validation→merge→self-merge 400→delete→404→liste doğrulandı, hepsi green.
 - **Sıradaki parça:** W1-4 HeroSection/empty states (starter kartları gerçek session açacak).
 
+### 2026-09-03 — TASK-38 W1-4 HeroSection/empty states DONE (web ef172c7 — W1 chat core COMPLETE)
+- **Executor run:** W1-4 tamamlandı (web-only; server işi yok — `POST /api/sessions` + initial-prompt handoff W1-1/W1-3'ten zaten gerçek) — yeni `chat/hero-section.tsx` (concept `HeroSection.tsx`'ten port: aynı cream/terracotta token'lar + serif başlık + 3 starter kart; `onStart(prompt)` GERÇEK session açıyor, sahte `onOpenTab` yok; saate göre selamlama — concept'teki sabit kişi adı taşınmadı) + `single-chat-view.tsx` sadeleşti (`<HeroSection onStart/>`, ölü `Card` import'u silindi) + `chat.test.ts` §6 hero kabul testleri (4 selamlama sınırı, benzersiz başlıklar, başlık+açıklama mevcut, sabit kişi adı yok).
+- **Gates:** root tsc 0 · web build green (1631 modül) · server clean · chat probu PASS (7 yeni hero kontrolü dahil) · mock grep temiz.
+- **W1 chat core TAMAMLANDI** (W1-1 chat+composer + W1-2 message + W1-3 sessions + W1-4 hero).
+- **Sıradaki parça:** W2-5 Providers tab (`GET/POST/PATCH/DELETE /api/providers` + canlı `POST /:id/test`).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W1-3 Sessions SidebarLeft DONE)
-- **Son işlem:** TASK-38 W1-3 DONE (server 879094c + web d2a91b9) — gerçek Sessions sidebar: gruplu liste (Today/Yesterday/Earlier + projeye göre), canlı arama, create/rename/fork/merge/delete + click-resume, §9'da, sırada W1-4 HeroSection
+- **Son güncelleme:** 2026-09-03 (TASK-38 W1-4 HeroSection DONE — W1 chat core COMPLETE)
+- **Son işlem:** TASK-38 W1-4 DONE (web ef172c7) — `chat/hero-section.tsx` concept'ten portlandı: 3 starter kartın her biri GERÇEK session açıyor (sahte `onOpenTab` yok), saate göre selamlama (concept'teki sabit kişi adı yok); W1 chat core TAMAMLANDI (W1-1 chat+composer + W1-2 message + W1-3 sessions + W1-4 hero), sırada W2-5 Providers tab
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

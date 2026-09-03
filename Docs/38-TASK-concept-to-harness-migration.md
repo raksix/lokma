@@ -579,7 +579,26 @@ drag, tiling toggle, save/reset layout — all against live data, zero mock cont
 |    delete → re-delete 404 → list shows renamed target (kept:2), all green
 |    (real `~/.lokma` untouched).
 |    Next piece: W1-4 HeroSection/empty states (starter cards create real sessions).
-- (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
+|- 2026-09-03 — W1-4 HeroSection/empty states DONE (web commit ef172c7, pushed).
+|    Web-only piece (no server work — `POST /api/sessions` + initial-prompt
+|    handoff already real from W1-1/W1-3): new `chat/hero-section.tsx`
+|    (ported from concept `HeroSection.tsx`, same cream/terracotta tokens +
+|    serif headline + 3 starter cards; `onStart(prompt)` creates a REAL
+|    session, never a fake `onOpenTab` tab; time-based greeting — the
+|    concept hardcodes a persona name we must not invent) +
+|    `single-chat-view.tsx` slimmed to `<HeroSection onStart={onStart}/>`
+|    (dead `Card` import dropped) + `chat.test.ts` §6 hero acceptance
+|    (4 greeting boundaries, unique titles, title+desc present, no
+|    hardcoded persona name).
+|    Gates: root `tsc --noEmit` 0 errors · web build green (1631 modules,
+|    361k JS/gzip 107k) · server `tsc -p` clean · chat probe all PASS
+|    (incl. 7 new hero checks) · mock grep: chat+sessions clean (1 hit =
+|    own anti-mock comment in hero-section.tsx).
+|    W1 chat core COMPLETE (W1-1 chat+composer + W1-2 message +
+|    W1-3 sessions + W1-4 hero).
+|    Next piece: W2-5 Providers tab (`GET/POST/PATCH/DELETE /api/providers` +
+|    live `POST /:id/test`).
+|- (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 
 ---
 

@@ -119,6 +119,20 @@ export async function fetchJson<T>(path: string, init?: RequestInit): Promise<T>
   return request<T>(path, init);
 }
 
+/**
+ * Authenticated fetch for non-JSON payloads (file downloads like usage
+ * export). Applies the same cookie + Bearer auth as `request`, throws
+ * ApiError on non-2xx. Keeps auth logic DRY — panes never hand-roll it.
+ */
+export async function authedFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers);
+  const token = readToken();
+  if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
+  const res = await fetch(path, { ...init, headers, credentials: 'include' });
+  if (!res.ok) throw await toApiError(res);
+  return res;
+}
+
 // ─── Response types (mirror live server route shapes) ───────────────────────
 
 export type HealthRes = { ok: boolean; service: string; version: string };
@@ -188,6 +202,42 @@ export type AgentsRes = { agents: AgentInfo[] };
 export type SkillInfo = { id: string; [k: string]: unknown };
 export type SkillsRes = { skills: SkillInfo[] };
 export type VaultGraphRes = { nodes: unknown[]; links: unknown[]; note?: string };
+export type UsageModelRow = {
+  model: string;
+  family: string;
+  runs: number;
+  tokens: number;
+  costUsd: number;
+  share: number;
+};
+export type UsageDayPoint = { day: string; total: number; byModel: Record<string, number> };
+export type UsageSummary = {
+  rangeDays: number;
+  runs: number;
+  sessions: number;
+  inputTokens: number;
+  outputTokens: number;
+  tokens: number;
+  costUsd: number;
+  avgPerSession: number;
+  topModel: string | null;
+  byModel: UsageModelRow[];
+  series: UsageDayPoint[];
+  unpricedTokens: number;
+};
+export type UsageSummaryRes = { ok: boolean; range: string; summary: UsageSummary };
+export type UsageSessionRow = {
+  sessionId: string;
+  title: string;
+  model: string;
+  runs: number;
+  tokens: number;
+  costUsd: number;
+  lastActive: string;
+};
+export type UsageSessionsRes = { ok: boolean; range: string; sessions: UsageSessionRow[]; count: number };
+export type UsageRange = '7d' | '30d' | '90d';
+export type UsageExportFormat = 'csv' | 'jsonl';
 
 // ─── One function per endpoint group ────────────────────────────────────────
 
@@ -247,4 +297,33 @@ export const api = {
   // Vault (real graph lands in W4; the client already hits the real URL)
   getVaultGraph: (query?: string) =>
     get<VaultGraphRes>(query ? `/api/vault/graph?q=${encodeURIComponent(query)}` : '/api/vault/graph'),
+
+  // Usage — real token/cost accounting (W2-7). The ledger fills from WS runs.
+  getUsageSummary: (range: UsageRange = '7d', cwd?: string) =>
+    get<UsageSummaryRes>(
+      cwd
+        ? `/api/usage/summary?range=${range}&cwd=${encodeURIComponent(cwd)}`
+        : `/api/usage/summary?range=${range}`,
+    ),
+  getUsageSessions: (range: UsageRange = '7d', cwd?: string) =>
+    get<UsageSessionsRes>(
+      cwd
+        ? `/api/usage/sessions?range=${range}&cwd=${encodeURIComponent(cwd)}`
+        : `/api/usage/sessions?range=${range}`,
+    ),
+  /** Export download path — fetch it as a blob (keeps Bearer auth), not a plain link. */
+  usageExportUrl: (format: UsageExportFormat, range: UsageRange = '7d') =>
+    `/api/usage/export?format=${format}&range=${range}`,
+  /** Real file download — blob + server filename, auth via `authedFetch`. */
+  downloadUsageExport: async (
+    format: UsageExportFormat,
+    range: UsageRange = '7d',
+  ): Promise<{ filename: string; blob: Blob }> => {
+    const fallback = `lokma-usage-${range}.${format}`;
+    const res = await authedFetch(`/api/usage/export?format=${format}&range=${range}`);
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') ?? '';
+    const match = disposition.match(/filename="([^"]+)"/);
+    return { filename: match?.[1] ?? fallback, blob };
+  },
 };

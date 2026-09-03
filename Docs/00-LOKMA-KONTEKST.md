@@ -271,9 +271,16 @@
   - **Gates:** root `tsc --noEmit` 0 · web build 46 modules green · server `tsc -p` clean · mock grep'te F1 dışı 1 pre-existing hit (`chat/input.tsx` "mock WS" placeholder yazısı — F2/W1'de temizlenecek).
 - **Sıradaki parça:** W0-F2 ws client (`web/src/lib/ws.ts` + `hooks/use-ws.ts` — proxy-relative URL, reconnect backoff, typed frame'ler).
 
+### 2026-09-03 — TASK-38 W0-F2 ws client DONE (commits 8dc7554 + 915b42d)
+- **Executor run:** W0-F2 tamamlandı — `web/src/lib/ws.ts` proxy-relative URL'ye çevrildi + `hooks/use-ws.ts` typed frame'ler + reconnect backoff + `ws.test.ts` 28/28 PASS.
+  - `wsUrl()` artık serving origin üzerinden (`/ws` proxy; `:3456` hardcode'u `directWsUrl()` fallback'ine indi, geç reconnect denemelerinde kullanılır). `withAuthToken()` ile `?token=` (server bugün yok sayıyor, ileri-uyumlu). Tüm frame şekilleri `lokma-shared` Zod'dan (decode + builder'lar schema-validated). Saf `applyServerFrame()` reducer (stream/tool-call/cost/permission/question/done) + hook'ta capped backoff (500ms→10s, max 10) + `sendText`/`answerPermission`/`answerQuestion`/`interrupt` API'si (`sendPrompt` back-compat korundu, Chat dokunulmadı).
+  - **Engel + fix:** `lokma-shared` kök importu `utils→node:crypto` çekip vite build'i patlattı → `package.json`'a `./protocol/*` subpath export eklendi (8dc7554), web sadece zod-only `dist/protocol/ws.js`'i import ediyor.
+  - **Gates:** root `tsc` 0 · web build 57 modules green · server `tsc -p` clean · mock grep temiz (2 "placeholder" ismi: React prop + tailwind class, mock data yok).
+- **Sıradaki parça:** W0-F3 stores (`sessionStore`, `paneStore`, `providerStore`, `agentStore`).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W0-F1)
-- **Son işlem:** TASK-38 W0-F1 api client DONE (23dcca4) — typed wrapper + 401 redirect + per-group fns + 10/10 probe green, §9'da, sırada W0-F2 ws client
+- **Son güncelleme:** 2026-09-03 (TASK-38 W0-F2)
+- **Son işlem:** TASK-38 W0-F2 ws client DONE (8dc7554 + 915b42d) — proxy URL + reconnect + typed frames + 28/28 probe green, §9'da, sırada W0-F3 stores
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

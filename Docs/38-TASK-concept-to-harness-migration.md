@@ -398,6 +398,30 @@ drag, tiling toggle, save/reset layout — all against live data, zero mock cont
   server `tsc -p` clean · mock grep: 1 pre-existing hit left for F2/W1
   (`components/chat/input.tsx` placeholder text mentions "mock WS" — chat scope, not F1).
   Next piece: W0-F2 ws client (`web/src/lib/ws.ts` + `hooks/use-ws.ts`).
+- 2026-09-03 — W0-F2 ws client DONE (`web/src/lib/ws.ts` + `hooks/use-ws.ts` +
+  `web/src/lib/ws.test.ts` + 1-line `chat/input.tsx` placeholder cleanup,
+  commits 8dc7554 + 915b42d).
+  `wsUrl()` now rides the serving origin (`ws(s)://<host>/ws/:id` → vite `/ws`
+  proxy in dev, nginx in prod; the `:3456` hardcode is demoted to an explicit
+  `directWsUrl()` fallback used on later reconnect retries). Token attach via
+  `withAuthToken()` (`?token=` from `localStorage["lokma-token"]`, forward-compat —
+  server ignores it today). All frame shapes come from `lokma-shared` Zod
+  (`ServerMessageSchema` decode, `ClientMessageSchema`-checked builders:
+  prompt/abort/permission_response/ask_response) — zero hand-duplicated names.
+  Pure `applyServerFrame()` reducer (stream append, tool-call map, cost
+  accumulator, permission/question queues, done/error) drives the hook; hook adds
+  auto-reconnect (capped backoff 500ms→10s, max 10 attempts) and exposes
+  `sendText` (=`sendPrompt`, back-compat with Chat), `answerPermission`,
+  `answerQuestion`, `interrupt` (abort, keeps partial stream).
+  Shared fix required for the web build: root `lokma-shared` import pulls
+  `utils/index.js` → `node:crypto` (browser-externalized, vite build FAILED);
+  `packages/lokma-shared/package.json` now exposes `./protocol/*` subpath so the
+  browser imports only the zod-only `dist/protocol/ws.js` (commit 8dc7554).
+  28/28 probe PASS (`bun src/lib/ws.test.ts`).
+  Gates: root `tsc --noEmit` 0 errors · web build 57 modules green ·
+  server `tsc -p` clean · mock grep: 2 hits, both the legit word "placeholder"
+  (React prop + tailwind class) — no mock data.
+  Next piece: W0-F3 stores (`sessionStore`, `paneStore`, `providerStore`, `agentStore`).
 - (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 
 ---

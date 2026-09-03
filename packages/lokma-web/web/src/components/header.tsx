@@ -4,6 +4,7 @@ import type { CostTotal, WsStatus } from '@/lib/ws';
 import { api } from '@/lib/api';
 import { useProviderStore } from '@/stores';
 import { applyTheme, emitToast, getTheme, type ShellTheme } from '@/components/shell';
+import { enabledModels } from '@/components/providers/models';
 
 /**
  * Header — harness top bar ported from the concept shell (same cream/
@@ -81,6 +82,15 @@ export function Header({
   };
 
   const effectiveModel = model ?? models[0]?.id ?? '';
+  // Single source (W2-6): the Models tab owns enable/disable — the header
+  // select offers enabled models, keeping the persisted choice visible even
+  // when it was disabled after the fact (so the select never blanks).
+  const visibleModels = React.useMemo(() => {
+    const enabled = enabledModels(models);
+    if (!effectiveModel || enabled.some((m) => m.id === effectiveModel)) return enabled;
+    const current = models.find((m) => m.id === effectiveModel);
+    return current ? [...enabled, current] : enabled;
+  }, [models, effectiveModel]);
   const live = wsStatus === 'open';
 
   return (
@@ -133,10 +143,10 @@ export function Header({
             title="Model (Ctrl+M)"
             className="hidden h-7 max-w-[180px] rounded-md border border-[#E8E4DE] bg-white px-1.5 text-xs text-zinc-700 outline-none focus:ring-1 focus:ring-[#C96442] md:block"
           >
-            {models.length === 0 ? (
+            {visibleModels.length === 0 ? (
               <option value="">No models</option>
             ) : (
-              models.map((m) => (
+              visibleModels.map((m) => (
                 <option key={`${m.provider}::${m.id}`} value={m.id}>
                   {m.label || m.id}
                 </option>

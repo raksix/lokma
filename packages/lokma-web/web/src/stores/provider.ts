@@ -47,6 +47,10 @@ export type ProviderStore = {
   deleteProvider: (id: string) => Promise<void>;
   /** Persist a new priority order, then force-refresh. */
   reorderProviders: (order: string[]) => Promise<void>;
+  /** Enable/disable one model (optimistic, rolls back on failure). */
+  setModelEnabled: (id: string, enabled: boolean) => Promise<void>;
+  /** Bulk enable/disable (one PATCH; optimistic, rolls back on failure). */
+  setModelsBulk: (flags: Record<string, boolean>) => Promise<void>;
 };
 
 const initial = {
@@ -128,5 +132,29 @@ export const useProviderStore = create<ProviderStore>()((set, get) => ({
   reorderProviders: async (order: string[]) => {
     await api.reorderProviders(order);
     await get().refresh(true);
+  },
+
+  setModelEnabled: async (id: string, enabled: boolean) => {
+    const previous = get().models;
+    set({ models: previous.map((m) => (m.id === id ? { ...m, enabled } : m)) });
+    try {
+      const res = await api.setModelEnabled(id, enabled);
+      set({ models: res.models, fetchedAt: Date.now() });
+    } catch (e) {
+      set({ models: previous, lastError: e instanceof Error ? e.message : 'model update failed' });
+      throw e;
+    }
+  },
+
+  setModelsBulk: async (flags: Record<string, boolean>) => {
+    const previous = get().models;
+    set({ models: previous.map((m) => (flags[m.id] === undefined ? m : { ...m, enabled: flags[m.id] as boolean })) });
+    try {
+      const res = await api.setModelsBulk(flags);
+      set({ models: res.models, fetchedAt: Date.now() });
+    } catch (e) {
+      set({ models: previous, lastError: e instanceof Error ? e.message : 'model update failed' });
+      throw e;
+    }
   },
 }));

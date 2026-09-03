@@ -17,6 +17,7 @@ import { api, type SlashCommandInfo } from '@/lib/api';
 import { useProviderStore } from '@/stores';
 import { emitToast } from '@/components/shell';
 import { isSlashPrefix, parseMentions, parseSlashCommand, removeMention } from './composer-utils';
+import { enabledModels } from '@/components/providers/models';
 
 /**
  * Composer — chat input ported from the concept shell into the harness.
@@ -124,7 +125,10 @@ export function Composer({
   const groupedModels = React.useMemo(() => {
     const q = modelQuery.trim().toLowerCase();
     const groups = new Map<string, { id: string; label: string; provider: string }[]>();
-    for (const m of storeModels) {
+    // Single source: the Models tab owns enable/disable — only enabled
+    // models are offered here (concept note: "Only enabled models appear
+    // in Composer + Ctrl+M").
+    for (const m of enabledModels(storeModels)) {
       if (q && !`${m.label} ${m.id}`.toLowerCase().includes(q)) continue;
       const list = groups.get(m.provider) ?? [];
       list.push(m);

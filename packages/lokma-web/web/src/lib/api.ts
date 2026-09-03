@@ -149,8 +149,15 @@ export type ProviderTestRes = {
 export type ProviderMutationRes = { ok: boolean; provider: ProviderInfo };
 export type CreateProviderBody = { id: string; name: string; baseUrl: string; apiKey?: string; enabled?: boolean };
 export type PatchProviderBody = { name?: string; baseUrl?: string; enabled?: boolean; priority?: number; apiKey?: string };
-export type ModelInfo = { id: string; label: string; provider: string };
-export type ModelsRes = { models: ModelInfo[]; count: number; cached: boolean };
+export type ModelInfo = { id: string; label: string; provider: string; enabled: boolean };
+export type ModelsRes = { models: ModelInfo[]; count: number; enabledCount: number; cached: boolean };
+export type ModelsMutationRes = {
+  ok: boolean;
+  updated: number;
+  models: ModelInfo[];
+  count: number;
+  enabledCount: number;
+};
 export type SessionSummary = {
   id: string;
   cwd?: string;
@@ -192,7 +199,7 @@ export const api = {
   patchConfig: (patchBody: Record<string, unknown>) =>
     patch<{ ok: boolean; patched: string[] }>('/api/config', patchBody),
 
-  // Providers + models — full CRUD lands with the W2 Providers tab (server real).
+  // Providers + models — CRUD + enable/disable are live server endpoints (W2).
   listProviders: () => get<ProvidersRes>('/api/providers'),
   providers: () => get<ProvidersRes>('/api/providers'),
   createProvider: (body: CreateProviderBody) => post<ProviderMutationRes>('/api/providers', body),
@@ -204,6 +211,12 @@ export const api = {
   testProvider: (id: string) => post<ProviderTestRes>(`/api/providers/${encodeURIComponent(id)}/test`),
   listModels: () => get<ModelsRes>('/api/models'),
   models: () => get<ModelsRes>('/api/models'),
+  /** Enable/disable one model — server persists the flag to ~/.lokma/config.json. */
+  setModelEnabled: (id: string, enabled: boolean) =>
+    patch<ModelsMutationRes>('/api/models', { id, enabled }),
+  /** Bulk enable/disable — one PATCH for Allow All / Disable All. */
+  setModelsBulk: (models: Record<string, boolean>) =>
+    patch<ModelsMutationRes>('/api/models', { models }),
 
   // Sessions — fork/patch/rewind are live server endpoints (W1 chat core).
   listSessions: (cwd?: string) =>

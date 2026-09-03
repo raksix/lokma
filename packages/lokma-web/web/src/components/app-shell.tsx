@@ -135,7 +135,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
 
         <main className="flex flex-1 flex-col overflow-hidden p-3">
           <PaneErrorBoundary paneName="Chat">
-            <Chat key={activeId} sessionId={activeId} ws={ws} />
+            <Chat key={activeId} sessionId={activeId} ws={ws} onOpenSession={switchSession} />
           </PaneErrorBoundary>
           <div className="mt-2 text-center text-[11px] text-muted-foreground">
             Sessions persist to <code className="rounded bg-muted px-1">~/.lokma/projects/&lt;hash&gt;/sessions/*.jsonl</code> (CLI + Web share)

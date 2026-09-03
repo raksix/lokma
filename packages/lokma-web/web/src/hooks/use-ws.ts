@@ -30,6 +30,8 @@ import {
  * Single hook, reused by Chat and every future pane (no duplication).
  */
 
+export type SendOpts = { model?: string; contextPaths?: string[] };
+
 export type UseWs = {
   status: WsStatus;
   messages: ServerMessage[];
@@ -40,8 +42,8 @@ export type UseWs = {
   questions: QuestionRequest[];
   done: boolean;
   lastError: string | null;
-  sendText: (prompt: string) => void;
-  sendPrompt: (prompt: string) => void;
+  sendText: (prompt: string, opts?: SendOpts) => void;
+  sendPrompt: (prompt: string, opts?: SendOpts) => void;
   answerPermission: (requestId: string, decision: 'allow' | 'deny' | 'always') => void;
   answerQuestion: (requestId: string, answer: string) => void;
   interrupt: () => void;
@@ -170,11 +172,11 @@ export function useWs(sessionId: string): UseWs {
     };
   }, [connect, sessionId]);
 
-  const sendText = useCallback((prompt: string) => {
+  const sendText = useCallback((prompt: string, opts: SendOpts = {}) => {
     const text = prompt.trim();
     if (!text) return;
     setUi((prev) => ({ ...prev, stream: '', done: false, doneReason: null }));
-    socketSend(wsRef.current, promptMessage(text, sessionRef.current));
+    socketSend(wsRef.current, promptMessage(text, sessionRef.current, opts));
   }, []);
 
   const answerPermission = useCallback(

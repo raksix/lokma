@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Moon, PanelLeft, PanelRight, Search, Sun } from 'lucide-react';
 import type { CostTotal, WsStatus } from '@/lib/ws';
+import { api } from '@/lib/api';
 import { useProviderStore } from '@/stores';
 import { applyTheme, emitToast, getTheme, type ShellTheme } from '@/components/shell';
 
@@ -74,8 +75,8 @@ export function Header({
     } catch {
       // Selection still applies for this tab without persistence.
     }
-    // Server-side per-session model (PATCH /api/sessions/:id) lands in W1;
-    // until then the choice applies to the next prompt sent from this tab.
+    // Persist per-session server-side (W1 chat core); failures only toast.
+    api.patchSession(sessionId, { model: id }).catch(() => undefined);
     emitToast(`Model ${id} selected`);
   };
 

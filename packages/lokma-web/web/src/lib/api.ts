@@ -129,9 +129,13 @@ export type ModelInfo = { id: string; label: string; provider: string };
 export type ModelsRes = { models: ModelInfo[]; count: number; cached: boolean };
 export type SessionSummary = { id: string; cwd?: string };
 export type SessionsRes = { sessions: SessionSummary[]; count: number };
-export type SessionDetail = { id: string; cwd: string; messages: unknown[]; count: number };
+export type SessionDetail = { id: string; cwd: string; model: string | null; messages: unknown[]; count: number };
 export type CreateSessionRes = { ok: boolean; id: string; cwd: string };
-export type ForkSessionRes = { ok: boolean; id: string; from: string };
+export type ForkSessionRes = { ok: boolean; id: string; from: string; copied?: number };
+export type PatchSessionRes = { ok: boolean; id: string; model: string };
+export type RewindSessionRes = { ok: boolean; id: string; kept: number };
+export type SlashCommandInfo = { id: string; name: string; hint: string; usage: string };
+export type CommandsRes = { commands: SlashCommandInfo[]; count: number };
 export type AgentInfo = { id: string; [k: string]: unknown };
 export type AgentsRes = { agents: AgentInfo[] };
 export type SkillInfo = { id: string; [k: string]: unknown };
@@ -155,13 +159,20 @@ export const api = {
   listModels: () => get<ModelsRes>('/api/models'),
   models: () => get<ModelsRes>('/api/models'),
 
-  // Sessions — fork lands server-side in W1; the client already hits the real URL.
+  // Sessions — fork/patch/rewind are live server endpoints (W1 chat core).
   listSessions: (cwd?: string) =>
     get<SessionsRes>(cwd ? `/api/sessions?cwd=${encodeURIComponent(cwd)}` : '/api/sessions'),
   sessions: () => get<SessionsRes>('/api/sessions'),
   getSession: (id: string) => get<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
   createSession: (body?: { cwd?: string; model?: string }) => post<CreateSessionRes>('/api/sessions', body ?? {}),
   forkSession: (id: string) => post<ForkSessionRes>(`/api/sessions/${encodeURIComponent(id)}/fork`),
+  patchSession: (id: string, body: { model: string }) =>
+    patch<PatchSessionRes>(`/api/sessions/${encodeURIComponent(id)}`, body),
+  rewindSession: (id: string, keepMessages: number) =>
+    post<RewindSessionRes>(`/api/sessions/${encodeURIComponent(id)}/rewind`, { keepMessages }),
+
+  // Slash commands — server-owned registry behind the Composer `/` palette.
+  listCommands: () => get<CommandsRes>('/api/commands'),
 
   // Agents + skills (read-only on the server today; mutations land in W4)
   listAgents: () => get<AgentsRes>('/api/agents'),

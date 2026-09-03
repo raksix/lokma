@@ -112,8 +112,12 @@ function checked(msg: ClientMessage): string {
 }
 
 /** Start/continue the transcript with a user prompt. */
-export function promptMessage(prompt: string, sessionId?: string): string {
-  return checked({ type: 'prompt', prompt, sessionId });
+export function promptMessage(
+  prompt: string,
+  sessionId?: string,
+  opts: { model?: string; contextPaths?: string[] } = {},
+): string {
+  return checked({ type: 'prompt', prompt, sessionId, model: opts.model, contextPaths: opts.contextPaths });
 }
 
 /** Stop the running stream (server answers with `done/aborted`). */

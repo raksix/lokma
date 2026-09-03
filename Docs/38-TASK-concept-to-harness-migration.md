@@ -1231,6 +1231,14 @@ everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
   |  (concept has no delete button — follow-up).
   |  Next piece: W5-19 TestingPane (Test Lab Plan→Run→Report +
   |  `POST /api/tests/run` + Shannon suite + junit.xml).
+  |  Deploy 2026-09-03: server rebuilt (`tsc -p` clean) + `pm2 restart
+  |  lokma-server` → `/health` 200, `/api/design/systems` 200 with REAL
+  |  W5-18 data (server LIVE serves this run's code); web `web/dist`
+  |  rebuilt (1678 modules) + `pm2 restart lokma-web` → `/` 200 BUT
+  |  still stale `/_next/` HTML — DEPLOY BLOCKER persists (PM2 runs
+  |  `next start` 15.5.24, needs foreground delete+start, not done per
+  |  rule). Both processes online (`lokma-server` pid 2137883,
+  |  `lokma-web` pid 2137915).
   |
 ---
 

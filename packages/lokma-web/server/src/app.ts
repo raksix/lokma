@@ -5,6 +5,7 @@ import { configRoutes } from './routes/config.js';
 import { providerRoutes } from './routes/providers.js';
 import { modelRoutes } from './routes/models.js';
 import { sessionRoutes } from './routes/sessions.js';
+import { commandRoutes } from './routes/commands.js';
 import { agentRoutes } from './routes/agents.js';
 import { skillRoutes } from './routes/skills.js';
 import { vaultRoutes } from './routes/vault.js';
@@ -25,6 +26,7 @@ export async function createApp(): Promise<ReturnType<typeof Fastify>> {
   await providerRoutes(app);
   await modelRoutes(app);
   await sessionRoutes(app);
+  await commandRoutes(app);
   await agentRoutes(app);
   await skillRoutes(app);
   await vaultRoutes(app);

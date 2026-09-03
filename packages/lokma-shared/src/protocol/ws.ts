@@ -8,7 +8,15 @@ import { z } from 'zod';
 
 // ─── Client → Server ───────────────────────────────────────────────────────
 export const ClientMessageSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('prompt'), prompt: z.string(), sessionId: z.string().optional() }),
+  z.object({
+    type: z.literal('prompt'),
+    prompt: z.string(),
+    sessionId: z.string().optional(),
+    // Mid-session model override (persisted via PATCH /api/sessions/:id).
+    model: z.string().optional(),
+    // Workspace-relative `@file` mentions — the server reads these into context.
+    contextPaths: z.array(z.string()).max(5).optional(),
+  }),
   z.object({ type: z.literal('abort'), sessionId: z.string() }),
   z.object({ type: z.literal('permission_response'), requestId: z.string(), decision: z.enum(['allow', 'deny', 'always']) }),
   z.object({ type: z.literal('ask_response'), requestId: z.string(), answer: z.string() }),

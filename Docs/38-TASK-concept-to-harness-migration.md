@@ -376,12 +376,16 @@ Per-run deploy procedure (only restart what you touched):
    rebuild server dist → `pm2 restart lokma-server` →
    `curl -s https://lokma.fermag.com.tr/health` must be 200/`{ok:true}`.
 3. Touched neither → skip restarts (no pointless churn every 5 min).
-4. End of run: `pm2 list | grep lokma` must show BOTH online. Report both HTTP
-   codes in the run report.
+4. End of run: `pm2 list | grep lokma` must show BOTH online + `pm2 show lokma-web`
+   `script path` must be bun/vite (NOT `next/dist/bin/next` — a stale Next.js
+   process once served this domain; if you see next-server, the process was
+   rewired outside ecosystem). Report both HTTP codes in the run report.
 
-FORBIDDEN: `pm2 kill`, `pm2 delete` (shared daemon, ~20 projects — a kill takes
-everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
-§10 log + report instead of delete+start on your own.
+FORBIDDEN: `pm2 kill` (shared daemon, ~20 projects — a kill takes everyone down).
+Single-proc recovery is allowed ONLY as `pm2 delete lokma-web|lokma-server` +
+`pm2 start /mnt/apopic/lokma/ecosystem.config.cjs --only <same-name>` (daemon
+survives; never delete both at once). If even that serves stale code, escalate in
+§10 log + report.
 
 ## 10. Execution log (fill as waves land — newest at bottom)
 

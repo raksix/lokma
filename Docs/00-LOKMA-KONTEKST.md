@@ -318,9 +318,16 @@
 - **W1 chat core TAMAMLANDI** (W1-1 chat+composer + W1-2 message + W1-3 sessions + W1-4 hero).
 - **Sıradaki parça:** W2-5 Providers tab (`GET/POST/PATCH/DELETE /api/providers` + canlı `POST /:id/test`).
 
+### 2026-09-03 — TASK-38 W2-5 Providers tab DONE (server 9b40be5 + web 099e9d1)
+- **Executor run:** W2-5 tamamlandı — server'da provider CRUD + canlı bağlantı testi, web'de gerçek Providers sekmesi (sağ Inspector panelinde Info/Providers tab'leri).
+  - **Server:** `GET /api/providers` artık 6 built-in + custom kayıtları birleştirip priority-sıralı dönüyor (`name/baseUrl/enabled/keySet/last4/priority/custom`); yeni `POST` (slug+URL validasyonu, 409 duplicate, key AES-GCM 0600), `PATCH /:id` (built-in'e config override), `DELETE /:id` (sadece custom, built-in 400, credential silinir), `POST /reorder` (sıralama `~/.lokma/config.json`'a persist), `POST /:id/test` CANLI (gerçek `/v1/models` probu: Anthropic x-api-key, Google v1beta, OpenAI-uyumlu Bearer, 10s timeout; key asla dönülmez). Paylaşılan `ProviderConfig`'e opsiyonel `name`/`baseUrl`, core'a `removeCredentials()` eklendi.
+  - **Web:** yeni `components/providers/` (gerçek liste + keySet rozetleri + canlı Test sonucu + enable toggle + yukarı/aşağı sıralama + custom'da iki-tıklı silme; add/edit diyaloğu görünür label'lı + write-only key; server kurallarını yansıtan validasyon; 25/25 prob). providerStore'a test/create/patch/delete/reorder aksiyonları. Concept'teki sahte key önizlemesi (`sk-ant-***-visible-mock`) ve toast-only butonlar taşınmadı.
+  - **Gates:** root tsc 0 · web build green (376k JS) · server clean · tüm problar PASS · mock grep temiz · CANLI prob (:3461, temp HOME): create→409→400'ler→reorder→no-key testi→gerçek HTTP probu (example.com 404, 116ms)→delete→404/400'ler→diskte config+creds doğrulandı, hepsi green.
+- **Sıradaki parça:** W2-6 Models tab (`GET /api/models` enable/disable + Composer tek-kaynak store).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W1-4 HeroSection DONE — W1 chat core COMPLETE)
-- **Son işlem:** TASK-38 W1-4 DONE (web ef172c7) — `chat/hero-section.tsx` concept'ten portlandı: 3 starter kartın her biri GERÇEK session açıyor (sahte `onOpenTab` yok), saate göre selamlama (concept'teki sabit kişi adı yok); W1 chat core TAMAMLANDI (W1-1 chat+composer + W1-2 message + W1-3 sessions + W1-4 hero), sırada W2-5 Providers tab
+- **Son güncelleme:** 2026-09-03 (TASK-38 W2-5 Providers tab DONE — server 9b40be5 + web 099e9d1)
+- **Son işlem:** TASK-38 W2-5 DONE — provider CRUD + canlı `/v1/models` bağlantı testi server'da gerçek, web'de Inspector panelinde gerçek Providers sekmesi (ekle/düzenle/sil/sırala/test hepsi canlı endpoint'li), sırada W2-6 Models tab
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

@@ -598,7 +598,41 @@ drag, tiling toggle, save/reset layout — all against live data, zero mock cont
 |    W1-3 sessions + W1-4 hero).
 |    Next piece: W2-5 Providers tab (`GET/POST/PATCH/DELETE /api/providers` +
 |    live `POST /:id/test`).
-|- (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
+|- 2026-09-03 — W2-5 Providers tab DONE
+  (server commit 9b40be5 + web commit 099e9d1, both pushed).
+  Server: `GET /api/providers` now returns merged built-ins + custom
+  entries (`{id,name,baseUrl,enabled,keySet,last4,priority,custom}`,
+  priority-sorted); new `POST /api/providers` (slug/url validation,
+  409 on duplicates incl. built-in ids, key stored AES-GCM 0600),
+  `PATCH /api/providers/:id` (name/baseUrl/enabled/priority/key;
+  built-ins gain a config override entry), `DELETE /api/providers/:id`
+  (custom only — built-ins 400, unknown 404, credentials removed),
+  `POST /api/providers/reorder` (exact-set order → priorities
+  persisted to `~/.lokma/config.json`), `POST /api/providers/:id/test`
+  is LIVE (Anthropic x-api-key / Google v1beta / OpenAI-compatible
+  Bearer, 10s timeout, `{ok,modelCount,models[0..20],latencyMs}`,
+  keys never echoed). Shared `ProviderConfig` gains optional
+  `name`/`baseUrl`; core gains `removeCredentials()`.
+  Web: new `components/providers/` (`providers-pane.tsx` real list +
+  keySet badges + live Test + enable toggle + up/down reorder +
+  two-click custom delete, `provider-dialog.tsx` add/edit with visible
+  labels + write-only key, `validation.ts` mirroring server rules,
+  `inspector-panel.tsx` Info/Providers tabs in the right sidebar,
+  `providers.test.ts` 25/25 PASS); providerStore gains
+  test/create/patch/delete/reorder actions; concept mock key preview
+  (`sk-ant-***-visible-mock`) and toast-only buttons NOT ported.
+  Gates: root `tsc --noEmit` 0 errors · web build green (376k
+  JS/gzip 110k) · server `tsc -p` clean · all probes PASS (providers
+  25/25 + api + ws + stores + shell + theme + chat + lokma-message +
+  sessions) · mock grep: providers clean (1 hit = comment documenting
+  the excluded mock) · LIVE probe on :3461 with temp HOME: create →
+  dup 409 → bad id/url 400 → patch disable → reorder → no-key test
+  `ok:false` → live example.com probe `HTTP 404` 116ms → delete →
+  re-delete 404 → builtin delete 400 → config + creds verified on
+  disk, all green (real `~/.lokma` untouched).
+  Next piece: W2-6 Models tab (`GET /api/models` enable/disable +
+  Composer single-source store).
+- (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 
 ---
 

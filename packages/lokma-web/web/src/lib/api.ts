@@ -716,6 +716,71 @@ export type PluginsRes = { plugins: Plugin[]; count: number };
 export type PluginDetailRes = { ok: boolean; plugin: Plugin };
 export type PluginMutationRes = { ok: boolean; plugin: Plugin };
 
+// ─── Observability (agent trace timeline + frozen share snapshots, W6-24) ───
+
+export type TraceEventKind =
+  | 'agent_created'
+  | 'spawned'
+  | 'agent_state'
+  | 'soul_write'
+  | 'memory_write'
+  | 'lock_acquired';
+export type TraceEventView = { ts: string; kind: TraceEventKind; label: string; detail?: string };
+export type TraceLockView = {
+  path: string;
+  acquiredAt: string;
+  leaseUntil: string;
+  live: boolean;
+  reason?: string;
+};
+export type TraceDocView = { exists: boolean; bytes: number; mtime: string | null };
+/** `GET /api/agents/:id/trace` — the server spreads the trace at top level. */
+export type AgentTraceRes = {
+  agent: AgentInfo;
+  events: TraceEventView[];
+  locks: TraceLockView[];
+  docs: { soul: TraceDocView; memory: TraceDocView };
+  worktree: string | null;
+  generatedAt: string;
+};
+export type ShareKind = 'agent' | 'session';
+export type ShareSummaryView = {
+  token: string;
+  kind: ShareKind;
+  refId: string;
+  title: string;
+  createdAt: string;
+  /** Trace events (agent shares) or transcript rows (session shares). */
+  size: number;
+};
+export type SharesRes = { shares: ShareSummaryView[]; count: number };
+export type ShareCreateRes = { ok: boolean; token: string; url: string };
+/** Transcript row as the Replay view renders it (narrowed from `unknown`). */
+export type ReplayMessage = {
+  role: 'user' | 'assistant' | 'tool';
+  content: string;
+  timestamp: string;
+  toolName?: string;
+};
+export type ShareSessionSnapshot = {
+  id: string;
+  cwd: string;
+  model: string | null;
+  title: string;
+  messages: ReplayMessage[];
+  count: number;
+};
+export type ShareDetailRes = {
+  share: {
+    token: string;
+    kind: ShareKind;
+    refId: string;
+    title: string;
+    createdAt: string;
+    snapshot: unknown;
+  };
+};
+
 // ─── One function per endpoint group ────────────────────────────────────────
 
 export const api = {
@@ -1094,4 +1159,22 @@ export const api = {
   installPlugin: (url: string) => post<PluginMutationRes>('/api/plugins/install', { url }),
   /** URL records only — bundled rows answer 400 `bundled_readonly`. */
   deletePlugin: (id: string) => del<{ ok: boolean; id: string }>(`/api/plugins/${encodeURIComponent(id)}`),
+
+  // Observability — agent trace timeline + frozen share snapshots (W6-24).
+  // Trace events are derived from durable state server-side (registry +
+  // doc mtimes + locks + lineage); shares freeze the trace/transcript so
+  // later edits never rewrite shared history.
+  /** Live timeline for one agent (404 `agent_not_found`, 400 `bad_agent_id`). */
+  getAgentTrace: (id: string) => get<AgentTraceRes>(`/api/agents/${encodeURIComponent(id)}/trace`),
+  /** Share metadata list (no snapshot bytes — loaded per share). */
+  listShares: () => get<SharesRes>('/api/share'),
+  /** Freeze an agent trace — returns the copyable `/share/agent/<token>` URL. */
+  shareAgent: (agentId: string) => post<ShareCreateRes>('/api/share/agent', { agentId }),
+  /** Freeze a session transcript — returns `/share/session/<token>`. */
+  shareSession: (sessionId: string, cwd?: string) =>
+    post<ShareCreateRes>('/api/share/session', cwd ? { sessionId, cwd } : { sessionId }),
+  /** Read one frozen snapshot (serves the copy, never re-derives). */
+  getShare: (token: string) => get<ShareDetailRes>(`/api/share/${encodeURIComponent(token)}`),
+  /** Drop a share (source agent/session untouched). */
+  deleteShare: (token: string) => del<{ ok: boolean; token: string }>(`/api/share/${encodeURIComponent(token)}`),
 };

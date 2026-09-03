@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { BarChart3, Beaker, Bot, Cpu, Folder, GitBranch, Globe, HardDrive, Info, Layers, Package, Paintbrush, Plug2, Puzzle, Settings, Shield, Terminal, Users, Workflow } from 'lucide-react';
+import { Activity, BarChart3, Beaker, Bot, Cpu, Folder, GitBranch, Globe, HardDrive, Info, Layers, Package, Paintbrush, Plug2, Puzzle, Settings, Shield, Terminal, Users, Workflow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
@@ -20,6 +20,7 @@ import { BotsPane } from '@/components/bots';
 import { AuthPane } from '@/components/auth';
 import { SetupPane } from '@/components/setup';
 import { PluginsPane } from '@/components/plugins';
+import { ObservabilityPane } from '@/components/observability';
 import { UsagePane } from '@/components/usage/usage-pane';
 
 /**
@@ -62,7 +63,10 @@ import { UsagePane } from '@/components/usage/usage-pane';
  * `GET/POST /api/setup*` + `GET /api/doctor`), Plugins the real W6-23
  * pane (kernel registry + hot toggle + add-from-URL over
  * `GET/PATCH /api/plugins/*` + `POST/DELETE`, suspended routes answer
- * 503 with no restart).
+ * 503 with no restart), Observability the real W6-24 pane (agent trace
+ * timeline from durable state + session replay from JSONL + frozen share
+ * snapshots over `GET /api/agents/:id/trace` + `GET/POST/DELETE`
+ * `/api/share/*`).
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
  */
@@ -75,7 +79,7 @@ export function InspectorPanel({
   sessionId?: string;
   ws?: UseWs;
 }) {
-  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault' | 'skills' | 'archify' | 'design' | 'testing' | 'bots' | 'auth' | 'setup' | 'plugins'>(
+  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault' | 'skills' | 'archify' | 'design' | 'testing' | 'bots' | 'auth' | 'setup' | 'plugins' | 'observability'>(
     'info',
   );
 
@@ -253,9 +257,20 @@ export function InspectorPanel({
           <Package className="h-3 w-3" />
           Plugins
         </Button>
+        <Button
+          variant={tab === 'observability' ? 'default' : 'ghost'}
+          size="sm"
+          className="h-6 flex-1 gap-1.5 text-[11px]"
+          onClick={() => setTab('observability')}
+        >
+          <Activity className="h-3 w-3" />
+          Observability
+        </Button>
       </div>
       {tab === 'info' ? (
         <InfoPanel />
+      ) : tab === 'observability' ? (
+        <ObservabilityPane />
       ) : tab === 'plugins' ? (
         <PluginsPane />
       ) : tab === 'setup' ? (

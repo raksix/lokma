@@ -1357,6 +1357,78 @@ everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
     3326967).
     Next piece: W6-21 AuthPane (login + RBAC matrix + members/invite +
     visibility toggle).
+  - 2026-09-03 — W6-21 AuthPane DONE
+    (server commit 5a01549 + web commit e3ae68e, both pushed).
+    NOTE: the core/shared/server/web implementation was found as
+    uncommitted WIP in the dirty tree (orphaned run, same pattern as
+    W2-6/W4-15/W5-19/W5-20) — adopted as this run's ONE piece, reviewed
+    fresh file-by-file, one small inefficiency fixed (`GET /api/users`
+    double-read → single), all gates + the full live probe re-run before
+    the atomic commits (server + web separate).
+    Server (`lokma-core/src/auth/` new: `store.ts` 738 lines + `index.ts`;
+    shared `schemas/auth.ts`; `server/src/routes/auth.ts`; `app.ts`
+    registration): file-backed store under `~/.lokma/auth/` (users.json
+    0600 scrypt hashes, projects/members/invites/settings, HMAC secret),
+    stateless v1 HMAC session tokens (7d TTL, httpOnly cookie + Bearer
+    fallback), first-admin seed closes after bootstrap (403
+    `auth_already_bootstrapped`), one-time expiring copyable invite links,
+    last-admin demote/delete 409, `can()` matrix per Docs/36
+    (admin/member/viewer, `project:create` policy, public-visibility read,
+    owner/member edit). Routes `POST /api/auth/register|login|logout|`
+    `accept-invite`, `GET /api/auth/me`, `GET/PATCH /api/auth/settings`
+    (public read, admin write, viewer 403), `GET /api/users` + invite/
+    patch/delete/reset-password (admin only), `GET/POST /api/projects` +
+    `GET/PATCH/DELETE /:id` + members add/remove (can-gated); all
+    failures `{code,message}`, hashes never cross the wire.
+    Web (`components/auth/` new: `auth.ts` helpers + `auth-pane.tsx`
+    1014 lines + `auth.test.ts` 49/49 PASS + barrel; `api.ts` auth/user/
+    project types + 17 fns + `request()` `redirect401` opt-out; 17th
+    Inspector tab `Auth`): concept layout 1:1 — role cards, visibility-
+    badged projects, invite-row members, flow footer — but every control
+    hits a live endpoint (register/login/accept-invite, quiet `/me`,
+    settings policy, user search + invite link + role/status edit +
+    disable + two-click delete + reset-password, project search + create
+    + visibility toggle + member add/remove). Concept mock
+    PROJECTS/MEMBERS rows + pravatar avatars + toast-only can()/Invite/
+    Manage buttons NOT ported (initial squares from real names instead;
+    concept `lk_...` token box became real email+password login per
+    Docs/36 §6.2 local auth — no dead buttons, no fake data).
+    Gates: root `tsc --noEmit` 0 errors · web build green (1688
+    modules, 651k JS/gzip 172k) · shared+core+server dist emit clean ·
+    all 25 probe files PASS (auth 49/49) · mock grep clean · LIVE probe
+    (in-process createApp + inject, startup-env temp HOME) 35/35:
+    unbootstrapped → register → re-register 403 → me/me-401 → login
+    wrong/right 401/200 → users + bad-email 400 → invite → accept →
+    one-time 404 → member settings/users 403s → admin patch →
+    bad-settings 400 → empty-name 400 → member create → visibility flip
+    → viewer invite/accept/add/list/remove/re-remove 404 → viewer
+    settings 403 → unknown/evil-id 404/400s → disk 3 users + no hash on
+    wire → real `~/.lokma/auth` absent (untouched).
+    REAL incident + permanent probe lesson: bun snapshots env at
+    startup — a runtime `process.env.HOME=` assignment does NOT move
+    `os.homedir()`, so the first probe run polluted the REAL
+    `/root/.lokma/auth/` (3 test users + secret). Polluted dir deleted
+    in full (6 files, all this run's timestamps — nothing pre-existed,
+    pre-run state restored), probe fixed to `HOME=$(mktemp -d)` startup
+    env + `/tmp/` refuse-guard, re-run 35/35 with the real tree verified
+    absent. Temp-HOME probes under bun MUST use startup env, never
+    runtime assignment (same trap threatens agents/vault/archify stores —
+    all use `homedir()`; prior waves' temp-HOME claims are suspect).
+    Honest scope: pane `can()` mirror gates buttons only, server
+    re-checks every write; project cwd optional (server default when
+    empty, consistent with bot runs); no session-inheritance UI (server
+    `memberOf` enforced, pane shows membership rows).
+    Deploy 2026-09-03: server dist rebuilt (shared+core+server emit
+    clean) + `pm2 restart lokma-server` → `/health` 200 (fresh uptime)
+    + `/api/auth/settings` 200 with REAL W6-21 data
+    (`{"projectCreation":"members",...,"bootstrapped":false}` on the
+    domain — server LIVE serves this run's code); web `web/dist`
+    rebuilt (1688 modules) + `pm2 restart lokma-web` → `/` 200 BUT
+    still stale `/_next/` HTML — DEPLOY BLOCKER persists (PM2 runs
+    `next start` 15.5.24, needs foreground delete+start, not done per
+    rule). Both processes online (server pid 3785085, web pid 3785173).
+    Next piece: W6-22 SetupWizardPane (`lokma init` 3-step + Doctor 8
+    checks = `GET /api/doctor`).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

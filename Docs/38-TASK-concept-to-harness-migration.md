@@ -366,12 +366,18 @@ Each loop run MUST end with the live site serving that run's code. Infrastructur
 - PM2 `lokma-web` (:3457) runs `vite preview` in `packages/lokma-web/web`
   → serves freshly built `web/dist`. Rebuild with `bun run build` BEFORE restart.
 - nginx vhost `lokma.fermag.com.tr`: `/` → :3457, `/health` + `/api/` + `/ws/` → :3456.
+- **nginx basic auth (2026-09-03):** `/`, `/api/`, `/ws/` behind `auth_basic`
+  (`/etc/nginx/.htpasswd-lokma`, user `raksix`). `/health` stays OPEN (liveness).
+  Deploy curl checks MUST use creds from root-only `/root/.lokma-basic-auth`
+  (`curl -u "$(cat /root/.lokma-basic-auth)" …`) — NEVER write user/password into
+  Docs, prompts, commits, or chat logs (only the file path).
 
 Per-run deploy procedure (only restart what you touched):
 
 1. Touched `packages/lokma-web/web/**` → rebuild web (already a gate) →
    `pm2 restart lokma-web` → `curl -s -o /dev/null -w '%{http_code}'
-   https://lokma.fermag.com.tr/` must print `200`.
+   https://lokma.fermag.com.tr/` must print `200`;
+   WITHOUT creds it must print `401` (auth gate check).
 2. Touched `packages/lokma-web/server/**` or `lokma-core|ai|shared/**` →
    rebuild server dist → `pm2 restart lokma-server` →
    `curl -s https://lokma.fermag.com.tr/health` must be 200/`{ok:true}`.

@@ -1126,6 +1126,12 @@ everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
   |  counts (no curator re-rank algorithm yet).
   |  W4 Agents/Orchestration/Vault/Skills COMPLETE (W4-13 + W4-14 +
   |  W4-15 + W4-16).
+  |  Deploy: server live (`/health` 200 fresh uptime, `/api/skills`
+  |  serves REAL repo skills on the domain); web rebuilt + `pm2 restart
+  |  lokma-web` done (homepage 200) BUT the known DEPLOY BLOCKER above
+  |  persists — PM2 still runs `next start` (stale 08-31 `.next`,
+  |  `/` returns `/_next/` HTML, not `web/dist`). Needs the foreground
+  |  delete+start repoint, still not done by this run per the rule.
   |  Next piece: W5-17 ArchifyPane (5 diagram types via REAL `archify`
   |  tool + IR JSON preview + Before/Delta/After + share export).
   |

@@ -632,7 +632,45 @@ drag, tiling toggle, save/reset layout — all against live data, zero mock cont
   disk, all green (real `~/.lokma` untouched).
   Next piece: W2-6 Models tab (`GET /api/models` enable/disable +
   Composer single-source store).
-- (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
+|- 2026-09-03 — W2-6 Models tab DONE
+  (server commit 6d8e0d9 + web commit a4f4ca2, both pushed).
+  NOTE: the implementation was found as uncommitted work in the tree
+  (written ~04:00-04:31 UTC, idle 14 min — orphaned run, never verified
+  or committed). This run adopted it as its ONE piece: reviewed every
+  diff fresh, ran all gates, ran the live probe, then committed
+  atomically (server + web separate) per the task rules.
+  Server (`lokma-ai` + `modelRoutes`): pure `applyModelFlags()` overlay
+  (`GlobalConfig.models[id] = { enabled }`, unknown ids ignored,
+  unmapped default enabled) + `invalidateCatalog()`; `GET /api/models`
+  now overlays persisted flags (adds `enabledCount`); new
+  `PATCH /api/models` single `{id,enabled}` or bulk
+  `{models:{id:bool}}` (500-key cap, 400 `bad_models`/`too_many_models`/
+  `bad_id`/`bad_enabled`/`empty_patch`/`unknown_model`), persists via
+  `saveGlobal()` to `~/.lokma/config.json` (schema field already
+  existed), invalidates the 5m catalog cache, returns the full catalog.
+  Web: new `components/providers/` helpers (`models.ts`: `filterModels`,
+  `countEnabled`, `buildBulkMap`, `enabledModels` single-source picker,
+  `models.test.ts` 13 checks PASS) + `ModelsPane` (live search, row
+  checkbox toggles with optimistic rollback, Allow All / Disable All =
+  one PATCH, Refresh, `enabled/total` counter, provider badges, lucide
+  only; concept mock columns Ctx/badge + toast-only Fallback button NOT
+  ported — fake data forbidden, no dead buttons) wired as a third
+  Inspector tab; providerStore gains optimistic `setModelEnabled` /
+  `setModelsBulk` (rollback + `lastError` on failure); `api.ts` gains
+  `setModelEnabled`/`setModelsBulk` + `ModelInfo.enabled` /
+  `enabledCount`; Composer dropdown + header Ctrl+M select read ONLY
+  enabled models (header keeps the persisted choice visible even if
+  disabled after the fact, so the select never blanks).
+  Gates: root `tsc --noEmit` 0 errors · web build green (382k
+  JS/gzip 112k) · server `tsc -p` clean · all probes PASS (models 13 +
+  stores + api 401-path + ws) · mock grep: providers clean (2 hits =
+  comments documenting the excluded mocks) · LIVE probe on :3462 with
+  temp HOME: GET 7/7 → disable one (updated:1, 6 left) → GET reflects
+  → bulk re-enable (updated:1) → unknown 400 → bad-shape 400 →
+  `models` flags verified on disk, all green (real `~/.lokma` untouched).
+  Next piece: W2-7 Usage (`GET /api/usage/summary|sessions|export` +
+  AreaChart + CSV/JSONL download).
+|- (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 
 ---
 

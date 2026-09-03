@@ -325,9 +325,15 @@
   - **Gates:** root tsc 0 · web build green (376k JS) · server clean · tüm problar PASS · mock grep temiz · CANLI prob (:3461, temp HOME): create→409→400'ler→reorder→no-key testi→gerçek HTTP probu (example.com 404, 116ms)→delete→404/400'ler→diskte config+creds doğrulandı, hepsi green.
 - **Sıradaki parça:** W2-6 Models tab (`GET /api/models` enable/disable + Composer tek-kaynak store).
 
+### 2026-09-03 — TASK-38 W2-6 Models tab DONE (server 6d8e0d9 + web a4f4ca2)
+- **Executor run:** W2-6 tamamlandı — server'da `PATCH /api/models` (tek + bulk enable/disable, `~/.lokma/config.json`'a persist, 400 validasyonları), web'de gerçek Models sekmesi (arama + satır toggle'ları + Allow All/Disable All tek PATCH + Refresh, iyimser güncelleme + rollback); Composer dropdown + header Ctrl+M artık SADECE enabled modelleri gösteriyor (tek kaynak: Models tab).
+- **Not:** implementasyon ağaçta commit'siz yetim iş olarak bulundu (önceki run doğrulamadan ölmüş) — bu run tüm diff'leri taze inceledi, kapıları + canlı prob'u koştu, sonra atomik commitledi (server + web ayrı).
+- **Gates:** root tsc 0 · web build green (382k JS) · server clean · problar PASS (models 13 + stores + api + ws) · mock grep temiz · CANLI prob (:3462, temp HOME): 7/7 → disable → GET yansıdı → bulk re-enable → unknown/bad-shape 400 → diskte flags doğrulandı, hepsi green.
+- **Sıradaki parça:** W2-7 Usage (`GET /api/usage/summary|sessions|export` + AreaChart + CSV/JSONL download).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W2-5 Providers tab DONE — server 9b40be5 + web 099e9d1)
-- **Son işlem:** TASK-38 W2-5 DONE — provider CRUD + canlı `/v1/models` bağlantı testi server'da gerçek, web'de Inspector panelinde gerçek Providers sekmesi (ekle/düzenle/sil/sırala/test hepsi canlı endpoint'li), sırada W2-6 Models tab
+- **Son güncelleme:** 2026-09-03 (TASK-38 W2-6 Models tab DONE — server 6d8e0d9 + web a4f4ca2)
+- **Son işlem:** TASK-38 W2-6 DONE — model enable/disable bayrakları server'da gerçek (`PATCH /api/models` tek+bulk, config'e persist), web'de Inspector'da gerçek Models sekmesi (ara/değiştir/toplu aç-kapat/yenile), Composer + header tek-kaynak enabled listesi okuyor, sırada W2-7 Usage
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

@@ -1044,6 +1044,40 @@ everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
   |  Next piece: W4-15 VaultPane (`GET /api/vault/graph` FTS5 + real
   |  graph + wikilink + ingest).
   |
+|- 2026-09-03 — W4-15 VaultPane DONE
+  (server commit 469685b + web commit 21a98fc, both pushed).
+  Server (`lokma-core/src/vault/` new: `vault.ts` 511 lines + `index.ts`;
+  `core/index.ts` export; `memory/vaultPort.ts` `VaultNote`→`VaultPortNote`
+  rename; `server/src/routes/vault.ts` rewritten from the Phase-0 stub):
+  jailed `resolveInVault`, ranked substring search (path+title+body),
+  wikilink resolution (exact path → `.md` → basename → title → suffix),
+  `buildGraph` (seed budget `10+depth*5` + BFS depth 1-3, 80-node/300-link
+  caps), `readTree`, `readNote` (256KB cap), `ingestNote` (frontmatter
+  `provenance:` merge, 512KB cap). Adopted dirty-tree WIP from the prior
+  run as this run's ONE piece + fixed 3 real bugs the live probe caught:
+  (1) `{1, 64}` regex space silently dropped every provenance,
+  (2) graph nodes omitted `provenance`, (3) `[[Title]]` form never
+  resolved (title index added).
+  Web (`components/vault/` new: `vault.ts` helpers + `vault-pane.tsx` +
+  `vault.test.ts` 40/40 PASS + barrel; `api.ts` vault fns extended;
+  11th Inspector tab `Vault`; SearchModal stale "lands in W4" strings
+  updated): concept layout 1:1 — debounced search + folder filter +
+  depth slider, provenance-badged rows, deterministic SVG graph
+  (degree-sized, click-to-open), note reader with clickable
+  `[[wikilink]]` navigation, validated New-note ingest form.
+  Concept mock NOTES/EDGES + toast-only Full + 3D star-map NOT ported
+  (honest 3D notice, no dead buttons).
+  Gates: root `tsc --noEmit` 0 errors · web build green (532k
+  JS/gzip 147k) · core+server `tsc -p` clean · all 19 probe files PASS
+  (vault 40/40) · mock grep clean (5 hits = labeled input
+  `placeholder` attrs) · LIVE probe on :3470 with temp HOME 24/24
+  (empty → ingest×3 → graph/edges/provenance → folder/search/depth →
+  400s → tree → note+resolved links → 404/400s → ingest validation →
+  re-ingest provenance swap, real `~/.lokma` untouched).
+  Honest scope: ranked-substring search (FTS5 follow-up), circle layout
+  (no force lib), 3D follow-up, no Obsidian daemon (Docs/29: file wins).
+  Next piece: W4-16 SkillsPane (`GET /api/skills` registry +
+  `skill_view` trie + `PATCH /api/skills/:id` curator + telemetry).
 
 ---
 

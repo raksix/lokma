@@ -295,9 +295,15 @@
 - **W0 foundation TAMAMLANDI** (pre-flight + F1 api + F2 ws + F3 stores + F4 shell + F5 theme).
 - **Sıradaki parça:** W1-1 SingleChatView + Composer (ilk chat-core pane'i).
 
+### 2026-09-03 — TASK-38 W1-1 SingleChatView + Composer DONE (server 6a169bd + web 8bdca5c)
+- **Executor run:** W1-1 tamamlandı — server: SessionStore meta sidecar + fork + rewind, yeni endpoint'ler (fork / PATCH model / rewind / GET /api/commands), WS prompt'a `model` + `contextPaths` (paylaşılan Zod, geriye uyumlu), `@file` mention'ları server gerçek dosya içeriği olarak context'e katıyor, replay-as-text_delta KALDIRILDI (istemci transcript'i REST'ten çekiyor). Web: gerçek Composer (model picker `GET /api/models` + PATCH persist, `@path` chip'leri, `/` paleti server registry'sini çalıştırıyor, steer/queue + kuyruk boşaltma, dosya eki, stop = WS interrupt) + SingleChatView (gerçek transcript + canlı stream, edit = server-side rewind, hero kartları gerçek session açıyor). Header model seçimi server'a persist ediliyor. Ölü `input.tsx`/`message.tsx` silindi.
+- **Gates:** root tsc 0 · web build green (1625 modül) · server clean (lokma-core + lokma-ai dist rebuild sonrası) · problar PASS (chat 18/18 + ws + api) · mock grep temiz · CANLI prob (:3459): create → patch → fork → rewind → 400/404 + WS error frame, hepsi green.
+- **Dürüst maliyet notu:** `cost` frame artık gerçek karakter sayıları + costUsd 0 gönderiyor (fiyat tablosu yok — gerçek fiyatlandırma W2 Usage ile gelecek).
+- **Sıradaki parça:** W1-2 LokmaMessage (thought trace, permission card, AskUserQuestion, cost footer).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W0-F5, W0 foundation COMPLETE)
-- **Son işlem:** TASK-38 W0-F5 theme port DONE (24a845e) — concept token'ları 1:1 harness'ta, §9'da, sırada W1-1 SingleChatView + Composer
+- **Son güncelleme:** 2026-09-03 (TASK-38 W1-1 SingleChatView + Composer DONE)
+- **Son işlem:** TASK-38 W1-1 DONE (server 6a169bd + web 8bdca5c) — gerçek chat çekirdeği: transcript + Composer + fork/rewind/model-persist + slash komutları, §9'da, sırada W1-2 LokmaMessage
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

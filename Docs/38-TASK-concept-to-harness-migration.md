@@ -476,6 +476,35 @@ drag, tiling toggle, save/reset layout — all against live data, zero mock cont
   mock grep clean (1 hit = "never mock data" comment in api.ts).
   W0 foundation COMPLETE (pre-flight + F1 api + F2 ws + F3 stores + F4 shell + F5 theme).
   Next piece: W1-1 SingleChatView + Composer (first chat-core pane).
+- 2026-09-03 — W1-1 SingleChatView + Composer DONE
+    (server commit 6a169bd + web commit 8bdca5c, both pushed).
+    Server: SessionStore meta sidecar (`<id>.meta.json`) + `fork()` (on-disk copy)
+    + `rewind()` (truncate); new `POST /api/sessions/:id/fork`,
+    `PATCH /api/sessions/:id {model}`, `POST /api/sessions/:id/rewind
+    {keepMessages}`, `GET /api/commands` (5 slash commands, server-owned
+    registry); WS prompt gains optional `model` + `contextPaths` (shared Zod,
+    backward compatible), resolves model message > meta > default, reads `@file`
+    mentions into context (cwd-scoped, 20KB/file, max 5), replay-as-`text_delta`
+    REMOVED (client loads transcript via REST — no stream pollution).
+    Web: `chat/composer.tsx` (real model picker from `GET /api/models` +
+    PATCH persist, `@path` chips, `/` palette executing the server registry,
+    steer/queue with client-side queue drain, text-file attach inlined, stop =
+    WS interrupt, mic progressive enhancement) + `chat/single-chat-view.tsx`
+    (REST transcript + live stream, edit = save-and-rewind via server, copy,
+    rewind, fork, hero cards create real sessions) + `chat/index.tsx` rewrite
+    (optimistic pending, done → refetch, slash exec, per-session model,
+    initial-prompt handoff via sessionStorage); header model select persists
+    server-side; AppShell passes session switching; dead `input.tsx`/`message.tsx`
+    deleted. Honest cost: `cost` frame now sends real char counts + costUsd 0
+    (no price table yet — real pricing lands with W2 Usage).
+    Gates: root `tsc --noEmit` 0 errors · web build green (1625 modules,
+    JS 338k/gzip 101k) · server `tsc -p` clean (after rebuilding lokma-core +
+    lokma-ai dist — server resolves workspace deps via dist) · probes PASS
+    (chat 18/18 + ws + api) · mock grep clean (1 hit = legit "never mock data"
+    comment) · LIVE probe on :3459: create → patch model → get (meta) → fork
+    (copied:1) → rewind (kept:0) → 400/404 validation + WS invalid-shape error
+    frame, all green.
+    Next piece: W1-2 LokmaMessage (thought trace, permission card, AskUserQuestion, cost footer).
 - (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 
 ---

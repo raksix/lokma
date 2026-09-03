@@ -221,8 +221,28 @@ export type CreateAgentBody = {
 export type PatchAgentBody = { name?: string; model?: string; budgets?: { tokens?: number; usd?: number } };
 export type AgentDocRes = { ok: boolean; id: string; doc: string; content: string };
 export type AgentDocWriteRes = { ok: boolean; id: string; doc: string; bytes: number };
-export type SkillInfo = { id: string; [k: string]: unknown };
-export type SkillsRes = { skills: SkillInfo[] };
+export type SkillInfo = {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  path: string;
+  linked_files: string[];
+  [k: string]: unknown;
+};
+/** Per-skill curator counters (`~/.lokma/skills/.usage.json`, Hermes shape). */
+export type SkillUsage = {
+  use_count: number;
+  view_count: number;
+  patch_count: number;
+  last_used?: string;
+};
+export type SkillsRes = { skills: SkillInfo[]; count?: number; usage?: Record<string, SkillUsage> };
+export type SkillDetailRes = { ok: boolean; skill: SkillInfo; content: string };
+export type SkillFileRes = { ok: boolean; path: string; content: string };
+export type SkillPatchRes = { ok: boolean; skill: SkillInfo; bytes: number };
+export type SkillUseRes = { ok: boolean; id: string };
+export type SkillPatchBody = { old_string: string; new_string: string };
 export type VaultGraphRes = { nodes: unknown[]; links: unknown[]; count?: number; note?: string };
 export type VaultTreeEntry = { name: string; path: string; type: 'dir' | 'note'; children?: VaultTreeEntry[] };
 export type VaultTreeRes = { ok: boolean; tree: VaultTreeEntry[] };
@@ -461,7 +481,16 @@ export const api = {
   saveAgentDoc: (id: string, doc: 'soul' | 'memory', content: string) =>
     put<AgentDocWriteRes>(`/api/agents/${encodeURIComponent(id)}/${doc}`, { content }),
   listSkills: () => get<SkillsRes>('/api/skills'),
-  getSkill: (id: string) => get<SkillInfo>(`/api/skills/${encodeURIComponent(id)}`),
+  /** skill_view parity — full SKILL.md body + linked_files (records a view). */
+  getSkill: (id: string) => get<SkillDetailRes>(`/api/skills/${encodeURIComponent(id)}`),
+  /** Single reference load (progressive disclosure, jailed to the skill dir). */
+  getSkillFile: (id: string, path: string) =>
+    get<SkillFileRes>(`/api/skills/${encodeURIComponent(id)}/file?path=${encodeURIComponent(path)}`),
+  /** Curator patch — exact old_string → new_string (single-occurrence guard). */
+  patchSkill: (id: string, body: SkillPatchBody) =>
+    patch<SkillPatchRes>(`/api/skills/${encodeURIComponent(id)}`, body),
+  /** Record a use event (web parity of the agent loop's use event). */
+  recordSkillUse: (id: string) => post<SkillUseRes>(`/api/skills/${encodeURIComponent(id)}/use`, {}),
 
   // Vault — live file graph + note reads + ingest (W4-15).
   getVaultGraph: (query?: string, opts?: { folder?: string; depth?: number }) => {

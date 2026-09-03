@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { BarChart3, Cpu, Folder, GitBranch, Globe, Info, Layers, Plug2, Settings, Terminal, Users } from 'lucide-react';
+import { BarChart3, Cpu, Folder, GitBranch, Globe, Info, Layers, Plug2, Puzzle, Settings, Terminal, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
@@ -12,6 +12,7 @@ import { BrowserPane } from '@/components/browser';
 import { AgentsPane } from '@/components/agents';
 import { OrchestrationPane } from '@/components/orchestration';
 import { VaultPane } from '@/components/vault';
+import { SkillsPane } from '@/components/skills';
 import { UsagePane } from '@/components/usage/usage-pane';
 
 /**
@@ -32,7 +33,10 @@ import { UsagePane } from '@/components/usage/usage-pane';
  * `agent_state` frames), Vault the real W4-15 pane (live file graph +
  * note reader with `[[wikilink]]` navigation + ingest over
  * `GET /api/vault/graph|tree`, `GET /api/vault/note`,
- * `POST /api/vault/ingest`).
+ * `POST /api/vault/ingest`), Skills the real W4-16 pane (live registry
+ * over `GET /api/skills`, skill_view preview over `GET /api/skills/:id`,
+ * reference loads over `GET /api/skills/:id/file`, curator patches over
+ * `PATCH /api/skills/:id`, telemetry over `.usage.json`).
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
  */
@@ -45,7 +49,7 @@ export function InspectorPanel({
   sessionId?: string;
   ws?: UseWs;
 }) {
-  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault'>(
+  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault' | 'skills'>(
     'info',
   );
 
@@ -151,9 +155,20 @@ export function InspectorPanel({
           <Folder className="h-3 w-3" />
           Vault
         </Button>
+        <Button
+          variant={tab === 'skills' ? 'default' : 'ghost'}
+          size="sm"
+          className="h-6 flex-1 gap-1.5 text-[11px]"
+          onClick={() => setTab('skills')}
+        >
+          <Puzzle className="h-3 w-3" />
+          Skills
+        </Button>
       </div>
       {tab === 'info' ? (
         <InfoPanel />
+      ) : tab === 'skills' ? (
+        <SkillsPane />
       ) : tab === 'vault' ? (
         <VaultPane />
       ) : tab === 'orchestration' ? (

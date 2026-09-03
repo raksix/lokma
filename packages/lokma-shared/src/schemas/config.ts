@@ -24,6 +24,25 @@ export const PermissionsSchema = z.object({
 
 export type Permissions = z.infer<typeof PermissionsSchema>;
 
+/**
+ * MCP server entry — one entry per key in `mcp.servers`.
+ * Transports match Docs/26 + the concept SettingsPane MCP tab
+ * (stdio/http/sse/ws). `.passthrough()` keeps forward-compat keys
+ * (args, env, cwd, …) instead of failing old configs on parse.
+ */
+export const McpServerSchema = z
+  .object({
+    transport: z.enum(['stdio', 'http', 'sse', 'ws']).default('stdio'),
+    /** Command for stdio (e.g. `npx @modelcontextprotocol/server-filesystem`). */
+    command: z.string().min(1).max(500).optional(),
+    /** Endpoint URL for http/sse/ws transports. */
+    url: z.string().url().max(500).optional(),
+    enabled: z.boolean().default(true),
+  })
+  .passthrough();
+
+export type McpServer = z.infer<typeof McpServerSchema>;
+
 export const AgentsConfigSchema = z.object({
   maxAgents: z.number().int().min(1).max(100).default(20),
   maxConcurrent: z.number().int().min(1).max(20).default(5),
@@ -44,7 +63,7 @@ export const GlobalConfigSchema = z.object({
   providers: z.array(ProviderConfigSchema).default([]),
   models: z.record(z.object({ enabled: z.boolean() })).default({}),
   permissions: PermissionsSchema.default({ allow: [], deny: [], defaultMode: 'auto' }),
-  mcp: z.object({ servers: z.record(z.unknown()).default({}) }).default({ servers: {} }),
+  mcp: z.object({ servers: z.record(McpServerSchema).default({}) }).default({ servers: {} }),
   hooks: z.record(z.array(z.unknown())).default({}),
   agents: AgentsConfigSchema.default({
     maxAgents: 20,
@@ -70,7 +89,7 @@ export const ProjectSettingsSchema = z.object({
   defaultModel: z.string().optional(),
   permissions: PermissionsSchema.partial().optional(),
   hooks: z.record(z.array(z.unknown())).optional(),
-  mcp: z.object({ servers: z.record(z.unknown()) }).optional(),
+  mcp: z.object({ servers: z.record(McpServerSchema) }).optional(),
   plugins: z.array(z.string()).optional(),
   agents: AgentsConfigSchema.partial().optional(),
 });

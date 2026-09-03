@@ -20,6 +20,7 @@ import { testsRoutes } from './routes/tests.js';
 import { botsRoutes } from './routes/bots.js';
 import { wsRoutes } from './routes/ws.js';
 import { authRoutes } from './routes/auth.js';
+import { setupRoutes } from './routes/setup.js';
 
 /**
  * Create Fastify app — registers all plugins + routes.
@@ -50,6 +51,7 @@ export async function createApp(): Promise<ReturnType<typeof Fastify>> {
   await testsRoutes(app);
   await botsRoutes(app);
   await authRoutes(app);
+  await setupRoutes(app);
   await wsRoutes(app);
 
   return app;

@@ -62,6 +62,13 @@ export const GlobalConfigSchema = z.object({
   theme: z.enum(['claude', 'omp', 'midnight', 'paper']).default('omp'),
   providers: z.array(ProviderConfigSchema).default([]),
   models: z.record(z.object({ enabled: z.boolean() })).default({}),
+  /**
+   * Optional-stack feature flags (`browser`, `search`, `gateway`, `mcp`,
+   * `vault`) — written by `lokma init` / the SetupPane (`POST /api/setup`),
+   * read by the agent loop to decide which tool groups to inject.
+   * Unknown keys are tolerated (forward-compat with future flags).
+   */
+  features: z.record(z.boolean()).default({}),
   permissions: PermissionsSchema.default({ allow: [], deny: [], defaultMode: 'auto' }),
   mcp: z.object({ servers: z.record(McpServerSchema).default({}) }).default({ servers: {} }),
   hooks: z.record(z.array(z.unknown())).default({}),

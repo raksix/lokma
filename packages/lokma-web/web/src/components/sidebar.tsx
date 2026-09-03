@@ -18,7 +18,7 @@ export function Sidebar({ side, title, children }: { side: 'left' | 'right'; tit
   );
 }
 
-export function SessionsPanel({ sessions }: { sessions: string[] }) {
+export function SessionsPanel({ sessions, onSelect }: { sessions: string[]; onSelect?: (id: string) => void }) {
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -29,7 +29,14 @@ export function SessionsPanel({ sessions }: { sessions: string[] }) {
           <p className="text-xs text-muted-foreground">No sessions yet — send a prompt to create one.</p>
         ) : (
           sessions.map((id) => (
-            <div key={id} className="rounded border px-2 py-1.5 text-xs font-mono">{id.slice(0, 18)}…</div>
+            <button
+              key={id}
+              onClick={() => onSelect?.(id)}
+              title={id}
+              className="block w-full truncate rounded border px-2 py-1.5 text-left font-mono text-xs hover:border-[#C96442] hover:bg-[#FDF0E6]"
+            >
+              {id.slice(0, 18)}…
+            </button>
           ))
         )}
       </CardContent>

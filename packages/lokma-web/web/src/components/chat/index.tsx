@@ -2,16 +2,17 @@
 import * as React from 'react';
 import { ChatMessage, StreamingMessage, type ChatRole } from './message';
 import { ChatInput } from './input';
-import { useWs } from '@/hooks/use-ws';
+import { useWs, type UseWs } from '@/hooks/use-ws';
 import { Card } from '@/components/ui/card';
 
 /**
- * Chat — wires useWs (DRY hook) to message list + streaming.
- * This is the Phase 0 "mock WS chat" that proves browser → server → lokma-ai → JSONL.
+ * Chat — renders one session transcript from an already-open `useWs` socket.
+ * The socket lives here or lifted in AppShell (so shell chrome can show
+ * status/cost); either way exactly one socket exists per rendered Chat.
  */
 
-export function Chat({ sessionId }: { sessionId: string }) {
-  const { status, messages, stream, sendPrompt } = useWs(sessionId);
+export function Chat({ sessionId, ws }: { sessionId: string; ws: UseWs }) {
+  const { status, messages, stream, sendPrompt } = ws;
   const [history, setHistory] = React.useState<{ role: ChatRole; content: string }[]>([]);
 
   // Convert WS messages to chat history
@@ -41,7 +42,7 @@ export function Chat({ sessionId }: { sessionId: string }) {
       <div className="flex flex-1 flex-col gap-3 overflow-auto p-3">
         {history.length === 0 && !stream ? (
           <div className="rounded border border-dashed p-4 text-center text-sm text-muted-foreground">
-            No messages yet — type below to stream via <code className="rounded bg-muted px-1">lokma-ai</code> mock.
+            No messages yet — type below to stream via the harness server.
             <br />
             <span className="text-xs">Check <code className="rounded bg-muted px-1">~/.lokma/projects/&lt;hash&gt;/sessions/{sessionId}.jsonl</code> after sending — CLI and Web share it.</span>
           </div>
@@ -54,4 +55,10 @@ export function Chat({ sessionId }: { sessionId: string }) {
       <ChatInput onSend={handleSend} disabled={status !== 'open'} />
     </Card>
   );
+}
+
+/** Standalone Chat — owns its socket (used outside AppShell). */
+export function ChatWithSocket({ sessionId }: { sessionId: string }) {
+  const ws = useWs(sessionId);
+  return <Chat sessionId={sessionId} ws={ws} />;
 }

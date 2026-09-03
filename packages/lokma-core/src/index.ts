@@ -63,5 +63,9 @@ export * from './setup/index.js';
 // Plugins (kernel registry + hot toggle + add-from-URL for the Plugins pane)
 export * from './plugins/index.js';
 
+// Observability (agent trace timeline + frozen share snapshots for the
+// Observability pane)
+export * from './observability/index.js';
+
 // Utils (DRY — reuse from here, don't duplicate)
 export * from './utils/index.js';

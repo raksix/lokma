@@ -406,6 +406,51 @@ export type DiagramDeltaRes = { ok: boolean; diff: DiagramDiff; deltaHtml: strin
 export type ArchifyGuideRes = { ok: boolean; id: string; starter: string };
 export type ArchifyExportFormat = 'svg' | 'html' | 'json' | 'card';
 
+// ─── Design Studio (6 artifact types over bundled systems + DESIGN.md guard, W5-18) ───
+
+export type DesignManifest = {
+  id: string;
+  type: string;
+  brief: string;
+  system: string;
+  createdAt: string;
+  updatedAt: string;
+};
+export type DesignSummary = DesignManifest & { bytes: number; overall: number | null };
+export type DesignsRes = { items: DesignSummary[]; count: number };
+export type CritiqueScore = { dim: string; score: number; fixes: string[] };
+export type CritiqueResult = { overall: number; scores: CritiqueScore[] };
+export type DesignDetailRes = { ok: boolean; id: string; manifest: DesignManifest; html: string; critique: CritiqueResult | null };
+export type GenerateDesignBody = { type: string; brief: string; system?: string };
+export type GenerateDesignRes = { ok: boolean; id: string; manifest: DesignManifest; critique: CritiqueResult };
+export type SaveDesignRes = { ok: boolean; id: string; manifest: DesignManifest; critique: CritiqueResult };
+export type CritiqueDesignRes = { ok: boolean; id: string; critique: CritiqueResult };
+export type DesignSystemMeta = {
+  id: string;
+  name: string;
+  preset: string;
+  tokens: string;
+  bg: string;
+  surface: string;
+  ink: string;
+  muted: string;
+  accent: string;
+  accentSoft: string;
+  line: string;
+  font: string;
+};
+export type DesignSystemsRes = { ok: boolean; systems: DesignSystemMeta[] };
+export type DesignGuard = {
+  cwd: string;
+  present: boolean;
+  h2Count: number;
+  sections: string[];
+  ok: boolean;
+  message: string;
+};
+export type DesignGuardRes = { ok: boolean; guard: DesignGuard };
+export type DesignExportFormat = 'html' | 'zip' | 'json';
+
 // ─── Repo git (real status/log/commit/push behind the GitPane, W3-11) ─────
 
 export type GitFileChange = { path: string; staged: string | null; worktree: string | null };
@@ -681,6 +726,39 @@ export const api = {
   ): Promise<{ filename: string; blob: Blob }> => {
     const fallback = `${id}.${format === 'card' ? 'card.svg' : format}`;
     const res = await authedFetch(`/api/archify/${encodeURIComponent(id)}/export?format=${format}`);
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') ?? '';
+    const match = disposition.match(/filename="([^"]+)"/);
+    return { filename: match?.[1] ?? fallback, blob };
+  },
+
+  // Design Studio — 6 artifact types over bundled systems (W5-18). The
+  // server owns generation + guard + critique + rendering; the pane lists,
+  // previews, edits HTML and downloads artifacts.
+  listDesigns: () => get<DesignsRes>('/api/design/list'),
+  generateDesign: (body: GenerateDesignBody) => post<GenerateDesignRes>('/api/design/generate', body),
+  getDesign: (id: string) => get<DesignDetailRes>(`/api/design/${encodeURIComponent(id)}`),
+  /** Persist an edited HTML document — server validates + re-critiques. */
+  saveDesignHtml: (id: string, html: string) =>
+    request<SaveDesignRes>(`/api/design/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ html }),
+    }),
+  /** Re-run the 5D heuristic critique over the stored HTML. */
+  critiqueDesign: (id: string) => post<CritiqueDesignRes>(`/api/design/${encodeURIComponent(id)}/critique`, {}),
+  /** 4 bundled system cards (name/preset/tokens for the picker). */
+  getDesignSystems: () => get<DesignSystemsRes>('/api/design/systems'),
+  /** Real `.lokma/DESIGN.md` guard for the server working dir. */
+  getDesignGuard: () => get<DesignGuardRes>('/api/design/guard'),
+  /** Stable viewer URL (sandboxed iframe, self-contained HTML, no CDN). */
+  designViewUrl: (id: string) => `/api/design/${encodeURIComponent(id)}/view`,
+  /** Real file download — blob + server filename, auth via `authedFetch`. */
+  downloadDesignExport: async (
+    id: string,
+    format: DesignExportFormat,
+  ): Promise<{ filename: string; blob: Blob }> => {
+    const fallback = `${id}.${format}`;
+    const res = await authedFetch(`/api/design/${encodeURIComponent(id)}/export?format=${format}`);
     const blob = await res.blob();
     const disposition = res.headers.get('Content-Disposition') ?? '';
     const match = disposition.match(/filename="([^"]+)"/);

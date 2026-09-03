@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
-import { normalize, relative, resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { SessionStore, UsageLedger, estimateCost, estimateTokens } from 'lokma-core';
+import { SessionStore, UsageLedger, estimateCost, estimateTokens, resolveInRoot } from 'lokma-core';
 import { stream as aiStream } from 'lokma-ai';
 import { decodeClientMessage, encodeServerMessage } from 'lokma-shared';
 
@@ -25,10 +25,14 @@ async function readContextBlocks(cwd: string, paths: string[] | undefined): Prom
   const root = resolve(cwd);
   const blocks: string[] = [];
   for (const raw of paths.slice(0, MAX_CONTEXT_FILES)) {
-    if (typeof raw !== 'string' || !raw.trim() || raw.includes('\0')) continue;
-    const abs = resolve(root, normalize(raw.trim().replace(/^@/, '')));
-    // Escape hatch: never read outside the session workspace.
-    if (relative(root, abs).startsWith('..')) continue;
+    if (typeof raw !== 'string' || !raw.trim()) continue;
+    // Jailed by the shared core guard (outside escapes throw, skipped here).
+    let abs: string;
+    try {
+      abs = resolveInRoot(root, raw.trim().replace(/^@/, ''));
+    } catch {
+      continue;
+    }
     try {
       const info = await stat(abs);
       if (!info.isFile() || info.size > MAX_CONTEXT_BYTES) continue;

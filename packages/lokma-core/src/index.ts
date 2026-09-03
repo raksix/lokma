@@ -27,5 +27,8 @@ export * from './agents/index.js';
 // Usage (per-run token/cost ledger + model pricing)
 export * from './usage/index.js';
 
+// Workspace files (jailed tree/read/write/search + git overlay)
+export * from './files/index.js';
+
 // Utils (DRY — reuse from here, don't duplicate)
 export * from './utils/index.js';

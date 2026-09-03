@@ -175,7 +175,8 @@ export function useWs(sessionId: string): UseWs {
   const sendText = useCallback((prompt: string, opts: SendOpts = {}) => {
     const text = prompt.trim();
     if (!text) return;
-    setUi((prev) => ({ ...prev, stream: '', done: false, doneReason: null }));
+    // A new prompt starts a new run — clear the previous run's trace with it.
+    setUi((prev) => ({ ...prev, stream: '', done: false, doneReason: null, toolCalls: {} }));
     socketSend(wsRef.current, promptMessage(text, sessionRef.current, opts));
   }, []);
 

@@ -58,9 +58,10 @@ export function Chat({
   const storeModels = useProviderStore((s) => s.models);
   const refreshProviders = useProviderStore((s) => s.refresh);
 
-  const { status, stream, cost, done, sendText, interrupt } = ws;
+  const { status, stream, cost, done, toolCalls, permissions, questions, sendText, interrupt, answerPermission, answerQuestion } = ws;
   const socketOpen = status === 'open';
   const streaming = socketOpen && !done && stream.length > 0;
+  const [answerBusy, setAnswerBusy] = React.useState<string | null>(null);
 
   // Transcript + session model (server meta wins, tab storage is fallback).
   React.useEffect(() => {
@@ -225,6 +226,48 @@ export function Chat({
     [model, openSession, pickModel, reloadTranscript, sessionId, storeModels],
   );
 
+  // Permission answers travel over WS; `always` additionally persists the tool
+  // as an allow-rule via PATCH /api/config (same store the Settings pane edits).
+  // The answer is always sent — a failed persist only toasts, never blocks.
+  const handleAnswerPermission = React.useCallback(
+    (requestId: string, decision: 'allow' | 'deny' | 'always') => {
+      if (decision !== 'always') {
+        answerPermission(requestId, decision);
+        return;
+      }
+      const pending = permissions.find((p) => p.requestId === requestId);
+      setAnswerBusy(requestId);
+      const persist = pending
+        ? api
+            .getConfig()
+            .then((res) => {
+              const perms = (res.config as { permissions?: { allow?: string[]; deny?: string[]; defaultMode?: string } })
+                .permissions ?? { allow: [] as string[], deny: [] as string[], defaultMode: 'auto' as const };
+              const allow = perms.allow ?? [];
+              const rule = pending.tool;
+              const next = allow.includes(rule) ? allow : [...allow, rule];
+              return api.patchConfig({
+                permissions: { allow: next, deny: perms.deny ?? [], defaultMode: perms.defaultMode ?? 'auto' },
+              });
+            })
+            .then(() => emitToast(`Always allowing ${pending.tool}`))
+            .catch((e: Error) => emitToast(`Rule not saved: ${e.message}`))
+        : Promise.resolve();
+      void persist.finally(() => {
+        setAnswerBusy(null);
+        answerPermission(requestId, decision);
+      });
+    },
+    [answerPermission, permissions],
+  );
+
+  const handleAnswerQuestion = React.useCallback(
+    (requestId: string, answer: string) => {
+      answerQuestion(requestId, answer);
+    },
+    [answerQuestion],
+  );
+
   const copyText = React.useCallback((text: string) => {
     try {
       void navigator.clipboard.writeText(text).then(
@@ -317,11 +360,17 @@ export function Chat({
           stream={streamVisible ? stream : ''}
           streaming={streaming}
           costLabel={costLabel}
+          toolCalls={toolCalls}
+          permissions={permissions}
+          questions={questions}
+          answerBusy={answerBusy}
           onEditSave={editSave}
           onRewindTo={rewindTo}
           onCopy={copyText}
           onFork={forkHere}
           onStart={startStarter}
+          onAnswerPermission={handleAnswerPermission}
+          onAnswerQuestion={handleAnswerQuestion}
         />
       </div>
       <div className="p-3 pt-0">

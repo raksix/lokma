@@ -4,6 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { STARTER_PROMPTS, timeGreeting } from './composer-utils';
+import {
+  AssistantBody,
+  PermissionCard,
+  QuestionCard,
+  ThoughtTrace,
+} from './lokma-message';
+import type { PermissionRequest, QuestionRequest, ToolCallEntry } from '@/lib/ws';
 
 /**
  * SingleChatView — transcript ported from the concept chat shell.
@@ -120,7 +127,7 @@ function AssistantRow({
           <span className="text-xs font-semibold">Lokma</span>
           <span className="text-[11px] text-zinc-400">{formatTime(message.timestamp)}</span>
         </div>
-        <div className="mt-1.5 text-[13.5px] leading-[1.6] whitespace-pre-wrap">{message.content}</div>
+        <AssistantBody content={message.content} onCopy={onCopy} />
         <div className="mt-1 flex flex-wrap gap-1 opacity-0 transition group-hover:opacity-100">
           <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={() => onCopy(message.content)}>
             <Copy className="mr-1 h-3 w-3" /> Copy
@@ -169,11 +176,17 @@ export function SingleChatView({
   stream,
   streaming,
   costLabel,
+  toolCalls,
+  permissions,
+  questions,
+  answerBusy,
   onEditSave,
   onRewindTo,
   onCopy,
   onFork,
   onStart,
+  onAnswerPermission,
+  onAnswerQuestion,
 }: {
   scrollRef: React.RefObject<HTMLDivElement | null>;
   transcript: TranscriptMessage[];
@@ -181,11 +194,17 @@ export function SingleChatView({
   stream: string;
   streaming: boolean;
   costLabel: string | null;
+  toolCalls: Record<string, ToolCallEntry>;
+  permissions: PermissionRequest[];
+  questions: QuestionRequest[];
+  answerBusy: string | null;
   onEditSave: (index: number, text: string) => void;
   onRewindTo: (index: number) => void;
   onCopy: (text: string) => void;
   onFork: () => void;
   onStart: (prompt: string) => void;
+  onAnswerPermission: (requestId: string, decision: 'allow' | 'deny' | 'always') => void;
+  onAnswerQuestion: (requestId: string, answer: string) => void;
 }) {
   const empty = transcript.length === 0 && pending.length === 0 && !stream;
 
@@ -248,6 +267,7 @@ export function SingleChatView({
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-semibold">Lokma</div>
+                  <ThoughtTrace toolCalls={toolCalls} />
                   <div className="mt-1.5 text-[13.5px] leading-[1.6] whitespace-pre-wrap">
                     {stream}
                     {streaming && <span className="ml-1 inline-block h-4 w-0.5 animate-pulse bg-foreground align-middle" />}
@@ -255,6 +275,17 @@ export function SingleChatView({
                 </div>
               </div>
             )}
+            {permissions.map((p) => (
+              <PermissionCard
+                key={p.requestId}
+                req={p}
+                busy={answerBusy === p.requestId}
+                onAnswer={onAnswerPermission}
+              />
+            ))}
+            {questions.map((q) => (
+              <QuestionCard key={q.requestId} req={q} onAnswer={onAnswerQuestion} />
+            ))}
             {costLabel && <div className="text-[11px] text-zinc-400">{costLabel}</div>}
           </>
         )}

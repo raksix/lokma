@@ -301,9 +301,15 @@
 - **Dürüst maliyet notu:** `cost` frame artık gerçek karakter sayıları + costUsd 0 gönderiyor (fiyat tablosu yok — gerçek fiyatlandırma W2 Usage ile gelecek).
 - **Sıradaki parça:** W1-2 LokmaMessage (thought trace, permission card, AskUserQuestion, cost footer).
 
+### 2026-09-03 — TASK-38 W1-2 LokmaMessage DONE (server c343949 + web c74ec7e)
+- **Executor run:** W1-2 tamamlandı — `PATCH /api/config` artık GERÇEK persist (Zod validate + `saveGlobal()` → `~/.lokma/config.json`, 400 validation) + web'de yeni `chat/lokma-message.tsx` (ThoughtTrace gerçek tool frame'lerinden, AssistantBody gerçek kod-fence'leri, PermissionCard Allow/Deny/Always → WS + `always` kuralı PATCH ile persist, QuestionCard seçenekli/serbest cevaplı → WS, lucide only, concept token'ları 1:1) + `lokma-message.test.ts` 19/19 PASS + `use-ws.ts` trace-per-run fix.
+- **Gates:** root tsc 0 · web build green (348k JS) · server clean · tüm problar PASS · mock grep chat'te temiz (kalan: W2 providers test + W4 vault stub'ları) · CANLI prob (:3459, temp HOME): PATCH → GET `allow:["bash"]` → 400 validation → dosya diskte, hepsi green.
+- **Dürüst kapsam notları (§9'da):** server henüz tool/permission/ask frame'i üretmiyor (tool loop agent işiyle gelecek) — kartlar frame gelince görünür, cevap yolu uçtan uca gerçek; kod bloğunda "Open in pane" yok (W7'ye kadar ölü buton yok); soru-cevap stream-block server tarafı iş (gelecek tool loop); geçmiş satırlarda thought/cost yok (JSONL sadece role/content tutuyor).
+- **Sıradaki parça:** W1-3 Sessions SidebarLeft (liste/virtualized/CRUD/arama/fork/merge).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W1-1 SingleChatView + Composer DONE)
-- **Son işlem:** TASK-38 W1-1 DONE (server 6a169bd + web 8bdca5c) — gerçek chat çekirdeği: transcript + Composer + fork/rewind/model-persist + slash komutları, §9'da, sırada W1-2 LokmaMessage
+- **Son güncelleme:** 2026-09-03 (TASK-38 W1-2 LokmaMessage DONE)
+- **Son işlem:** TASK-38 W1-2 DONE (server c343949 + web c74ec7e) — gerçek LokmaMessage blokları: thought trace + kod blokları + permission kartı (Always persist'li) + soru kartı + canlı cost footer, §9'da, sırada W1-3 Sessions SidebarLeft
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

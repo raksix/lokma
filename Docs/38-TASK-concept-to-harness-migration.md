@@ -505,7 +505,38 @@ drag, tiling toggle, save/reset layout — all against live data, zero mock cont
     (copied:1) → rewind (kept:0) → 400/404 validation + WS invalid-shape error
     frame, all green.
     Next piece: W1-2 LokmaMessage (thought trace, permission card, AskUserQuestion, cost footer).
-- (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
+|- 2026-09-03 — W1-2 LokmaMessage DONE
+|    (server commit c343949 + web commit c74ec7e, both pushed).
+|    Server: `PATCH /api/config` is REAL now (was echo stub) — validates the
+|    patch against `GlobalConfigSchema.partial()` (400 + `{code,message}` on
+|    invalid), persists via existing `saveGlobal()` to `~/.lokma/config.json`
+|    (same file the CLI reads). Unblocks the chat "Always allow" rule persist.
+|    Web: new `chat/lokma-message.tsx` (ThoughtTrace + AssistantBody/CodeBlock +
+|    PermissionCard + QuestionCard, concept tokens 1:1, lucide only) +
+|    `lokma-message.test.ts` 19/19 PASS. `single-chat-view.tsx`: assistant rows
+|    render real code fences with copy; live run shows the real tool-call trace
+|    (`tool_start/tool_result` frames, hidden when the run has none — never
+|    faked), pending permission/question cards, and the real cost footer.
+|    `chat/index.tsx`: Allow/Deny/Always answers travel over WS (`always`
+|    reads GET /api/config, appends the exact tool name to `permissions.allow`,
+|    PATCHes back — full allow array sent so the shallow merge never wipes
+|    deny/mode; answer is always sent, persist failure only toasts).
+|    `hooks/use-ws.ts` 1-liner: `sendText` clears `toolCalls` so each run owns
+|    its trace. Honest scope notes: (1) server emits no tool/permission/ask
+|    frames yet (no tool loop — lands with agent work) so cards appear only
+|    when frames arrive; the answer path is real end-to-end. (2) Code-block
+|    "Open in pane" omitted — no pane system until W7, no dead buttons.
+|    (3) Stream-blocking on unanswered questions is server-side behavior for
+|    the future tool loop. (4) Historical transcript rows show no thought/cost
+|    (session JSONL stores role/content only — trace persistence is a later wave).
+|    Gates: root `tsc --noEmit` 0 errors · web build green (348k JS/gzip 103k) ·
+|    server `tsc -p` clean · all probes PASS (lokma-message 19/19 + ws + api +
+|    stores + shell + theme + chat) · mock grep: chat clean, remaining hits are
+|    later-wave stubs (providers test W2, vault W4) · LIVE probe on :3459 with
+|    temp HOME: PATCH permissions → `{ok:true}` → GET shows `allow:["bash"]`
+|    → invalid theme → 400 → file on disk, all green (real `~/.lokma` untouched).
+|    Next piece: W1-3 Sessions SidebarLeft (list/virtualized/CRUD/search/fork/merge).
+|- (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 
 ---
 

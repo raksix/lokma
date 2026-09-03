@@ -30,5 +30,8 @@ export * from './usage/index.js';
 // Workspace files (jailed tree/read/write/search + git overlay)
 export * from './files/index.js';
 
+// Terminals (live shell processes + scrollback, piped stdio over WS)
+export * from './terminal/index.js';
+
 // Utils (DRY — reuse from here, don't duplicate)
 export * from './utils/index.js';

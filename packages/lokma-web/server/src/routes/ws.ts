@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { SessionStore, UsageLedger, estimateCost, estimateTokens, resolveInRoot } from 'lokma-core';
+import { SessionStore, TerminalError, UsageLedger, estimateCost, estimateTokens, resolveInRoot, terminalManager } from 'lokma-core';
 import { stream as aiStream } from 'lokma-ai';
 import { decodeClientMessage, encodeServerMessage } from 'lokma-shared';
 
@@ -53,6 +53,30 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
     const store = new SessionStore(cwd);
 
     app.log.info(`[ws] client connected session=${sessionId} cwd=${cwd}`);
+
+    // Terminal fan-out: process output reaches only this session's sockets.
+    // Terminals spawned without a session tag (CLI) fan out to every socket.
+    const matchesSession = (terminalId: string): boolean => {
+      const record = terminalManager.peek(terminalId);
+      if (!record) return false;
+      return record.sessionId === '' || record.sessionId === sessionId;
+    };
+    const offData = terminalManager.onData((terminalId, data) => {
+      if (!matchesSession(terminalId)) return;
+      socket.send(encodeServerMessage({ type: 'terminal/data', terminalId, data, sessionId }));
+    });
+    const offExit = terminalManager.onExit((record) => {
+      if (record.sessionId !== '' && record.sessionId !== sessionId) return;
+      socket.send(
+        encodeServerMessage({
+          type: 'terminal/exit',
+          terminalId: record.id,
+          exitCode: record.exitCode,
+          signal: record.signal,
+          sessionId,
+        }),
+      );
+    });
 
     socket.on('message', async (raw: Buffer) => {
       const msg = decodeClientMessage(raw.toString());
@@ -137,10 +161,54 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
         // No tool-approval loop runs server-side yet (lands with W1-2/W4) —
         // acknowledge instead of dropping silently so the client can unblock.
         app.log.info(`[ws] ${msg.type} ${msg.requestId} (no pending gate yet)`);
+      } else if (msg.type === 'terminal/input') {
+        // Stdin for a live shell — errors come back as `error` frames so the
+        // pane can toast instead of hanging on a dead terminal.
+        try {
+          terminalManager.write(msg.terminalId, msg.data);
+        } catch (e) {
+          const code = e instanceof TerminalError ? e.code : 'terminal_write_failed';
+          socket.send(
+            encodeServerMessage({ type: 'error', message: String(e), code, sessionId }),
+          );
+        }
+      } else if (msg.type === 'terminal/resize') {
+        try {
+          terminalManager.resize(msg.terminalId, msg.cols, msg.rows);
+        } catch (e) {
+          const code = e instanceof TerminalError ? e.code : 'terminal_resize_failed';
+          socket.send(
+            encodeServerMessage({ type: 'error', message: String(e), code, sessionId }),
+          );
+        }
+      } else if (msg.type === 'terminal/kill') {
+        // The `terminal/exit` frame (via the exit listener above) confirms.
+        try {
+          const result = await terminalManager.kill(msg.terminalId);
+          if (!result.killed) {
+            const record = terminalManager.peek(msg.terminalId);
+            socket.send(
+              encodeServerMessage({
+                type: 'terminal/exit',
+                terminalId: msg.terminalId,
+                exitCode: record?.exitCode ?? result.exitCode,
+                signal: record?.signal ?? result.signal,
+                sessionId,
+              }),
+            );
+          }
+        } catch (e) {
+          const code = e instanceof TerminalError ? e.code : 'terminal_kill_failed';
+          socket.send(
+            encodeServerMessage({ type: 'error', message: String(e), code, sessionId }),
+          );
+        }
       }
     });
 
     socket.on('close', () => {
+      offData();
+      offExit();
       app.log.info(`[ws] client disconnected session=${sessionId}`);
     });
   });

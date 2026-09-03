@@ -11,6 +11,7 @@ import { agentRoutes } from './routes/agents.js';
 import { skillRoutes } from './routes/skills.js';
 import { vaultRoutes } from './routes/vault.js';
 import { fileRoutes } from './routes/files.js';
+import { terminalRoutes } from './routes/terminal.js';
 import { wsRoutes } from './routes/ws.js';
 
 /**
@@ -34,6 +35,7 @@ export async function createApp(): Promise<ReturnType<typeof Fastify>> {
   await skillRoutes(app);
   await vaultRoutes(app);
   await fileRoutes(app);
+  await terminalRoutes(app);
   await wsRoutes(app);
 
   return app;

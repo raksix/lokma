@@ -438,6 +438,23 @@ drag, tiling toggle, save/reset layout — all against live data, zero mock cont
   Gates: root `tsc --noEmit` 0 errors · web build 57 modules green ·
   server `tsc -p` clean · mock grep in `stores/`: 0 hits.
   Next piece: W0-F4 shell chrome (Header/Toast/SearchModal/Footer/error boundary).
+- 2026-09-03 — W0-F4 shell chrome DONE (`components/shell/` 8 files: `theme.ts` +
+  `toast.tsx` + `search-modal.tsx` + `footer-bar.tsx` + `pane-error-boundary.tsx` +
+  `offline-banner.tsx` + `index.ts` + `shell.test.ts`; rewrote `header.tsx`,
+  `app-shell.tsx`; `chat/index.tsx` split `Chat({ws})` + `ChatWithSocket`;
+  `sidebar.tsx` `SessionsPanel onSelect`; commit 484f113).
+  Header ported from concept (cream/terracotta, serif wordmark, lucide only):
+  model dropdown reads providerStore `GET /api/models` (persists
+  `lokma-model`; server PATCH lands W1), live cost badge from WS `cost`
+  frames, `lokma-theme` toggle, Ctrl+K search button, `[`/`]` toggles.
+  SearchModal is REAL (sessionStore + `GET /api/vault/graph?q=`, debounced,
+  no DOCS array). AppShell owns the single WS socket (Chat takes it as a
+  prop — no duplicate sockets), adds session switching (remount per id),
+  30s `/api/health` poll, global shortcuts (Ctrl+K/Ctrl+M/`[`/`]`/Esc).
+  Gates: root `tsc --noEmit` 0 errors · web build green (311k JS, gzip 93k) ·
+  server `tsc -p` clean · shell.test.ts 10/10 + api/ws/stores probes PASS ·
+  mock grep clean (1 hit = "never mock data" comment in api.ts).
+  Next piece: W0-F5 theme port (`concept/src/index.css` → `web/src/index.css`).
 - (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 
 ---

@@ -283,9 +283,14 @@
 - **Gates:** root `tsc --noEmit` 0 · web build 57 modules green · server `tsc -p` clean · stores'ta mock grep 0 hit. Yeni paket yok (zustand zaten bağımlılıktı).
 - **Sıradaki parça:** W0-F4 shell chrome (Header/Toast/SearchModal/Footer/error boundary).
 
+### 2026-09-03 — TASK-38 W0-F4 shell chrome DONE (commit 484f113)
+- **Executor run:** W0-F4 tamamlandı — `components/shell/` altında 8 dosya (theme/toast/search-modal/footer-bar/pane-error-boundary/offline-banner/index/shell.test.ts 10/10 PASS) + `header.tsx` concept'ten portlandı (model dropdown gerçek `GET /api/models`, canlı cost badge, `lokma-theme` toggle, Ctrl+K) + `app-shell.tsx` tek WS socket + session switching + 30s health poll + global kısayollar (Ctrl+K/Ctrl+M/`[`/`]`/Esc) + `Chat({ws})`/`ChatWithSocket` ayrımı + `SessionsPanel onSelect`.
+- **Gates:** root `tsc --noEmit` 0 · web build green (311k JS/gzip 93k) · server `tsc -p` clean · mock grep temiz.
+- **Sıradaki parça:** W0-F5 theme port (`concept/src/index.css` → `web/src/index.css` — 4 tema değil, F4'teki light/dark toggle'ın görsel karşılığı + concept token'ları 1:1).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W0-F3)
-- **Son işlem:** TASK-38 W0-F3 stores DONE (5fe3941) — session/pane/provider/agent zustand store'ları + 44/44 probe green, §9'da, sırada W0-F4 shell chrome
+- **Son güncelleme:** 2026-09-03 (TASK-38 W0-F4)
+- **Son işlem:** TASK-38 W0-F4 shell chrome DONE (484f113) — Header/Toast/SearchModal/Footer/error boundary/offline banner canlı, §9'da, sırada W0-F5 theme port
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

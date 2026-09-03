@@ -1135,6 +1135,56 @@ everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
   |  Next piece: W5-17 ArchifyPane (5 diagram types via REAL `archify`
   |  tool + IR JSON preview + Before/Delta/After + share export).
   |
+  |- 2026-09-03 — W5-17 ArchifyPane DONE
+  |  (server commit 6941f04 + web commit a13a2e6, both pushed).
+  |  Server (`lokma-core/src/archify/` new: `ir.ts` 5-gate
+  |  `validateIr()` schema/layout/route/label/share + deterministic
+  |  `layoutColumns` shared with the renderer; `render.ts`
+  |  `buildSvg()` column layout + 4 preset styles + `buildStandaloneHtml()`
+  |  self-contained viewer (`?`/`R`/`L`/`F`/`/`/`+`-`/`0` +
+  |  `#focus/#route/#lens` deep links, no CDN) + `buildShareCard()`
+  |  1200x630 SVG; `store.ts` `~/.lokma/archify/<id>/`
+  |  ir.json/index.html/diagram.svg/share.svg/receipt.json/delta.html +
+  |  `generateDiagram()` (deterministic `a -> b -> c` chain derivation,
+  |  fails closed) + `updateDiagram()` + `compareDiagrams()` +
+  |  `exportDiagram()` + `guideStarter()`; routes
+  |  `POST /api/archify/generate|validate`, `GET /api/archify/list`,
+  |  `GET|PUT /api/archify/:id`, `POST /:id/delta`,
+  |  `GET /:id/export?format=svg|html|json|card`,
+  |  `GET /:id/view` (stable viewer URL — srcDoc cannot carry a hash),
+  |  `GET /:id/guide`; all failures `{code,message}`.
+  |  Web (`components/archify/` new: `archify.ts` helpers +
+  |  `archify-pane.tsx` + `archify.test.ts` 33/33 PASS + barrel; `api.ts`
+  |  archify types + 9 fns; 13th Inspector tab `Archify`): concept
+  |  layout 1:1 — New Diagram form (type + prompt + preset/theme),
+  |  type-filtered list with live badges, sandboxed viewer iframe over
+  |  the real `/view` URL, working `#focus/#route/#lens` deep links,
+  |  live preset/theme re-apply (PUT + rebuild), editable IR with
+  |  validate-before-save (broken edits never wipe the last-good build),
+  |  real 5-gate receipt table, real Before/Delta/After + diff chips,
+  |  4 real file downloads + footer Card/Export shortcuts, Guide loads
+  |  a starter chain into the form. Concept mock ITEMS/IR/receipt +
+  |  toast-only buttons + PNG/WebM NOT ported (no dead buttons; pane
+  |  says PNG/WebM need headless Chromium).
+  |  Contract fix caught mid-run: `POST /validate` returns validity in
+  |  `ok` (never 4xx) — the first draft hardcoded `ok:true`, the pane
+  |  would have saved broken IRs.
+  |  Gates: root `tsc --noEmit` 0 errors · web build green (1675
+  |  modules, 570k JS/gzip 155k) · core+server `tsc -p` clean · all 21
+  |  probe files PASS (archify 33/33) · mock grep clean (1 anti-mock
+  |  comment + 2 labeled input `placeholder` attrs) · LIVE probe on
+  |  :3472 with temp HOME 38/38 (generate → list → get + 5/5 receipt
+  |  → validate bad/good → PUT edit + rebuild + invalid 400 → second
+  |  diagram + delta + diff + 3-col HTML → 4 exports + png 400 → view
+  |  + guide → 404/400s → all 5 artifacts + delta.html on disk, real
+  |  `~/.lokma` untouched).
+  |  Honest scope: Lokma-native deterministic renderer (no vendored
+  |  `tt-a1i/archify` CLI dep — the IR contract + gates + viewer keys
+  |  + storage paths follow Docs/31); no `DELETE /api/archify/:id`
+  |  (concept has no delete button — follow-up); PNG/WebM follow-up.
+  |  Next piece: W5-18 DesignStudioPane (6 artifact types via REAL
+  |  design pipeline + DESIGN.md guard + sandbox preview + exports).
+  |
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

@@ -409,9 +409,18 @@
   - **W4 Agents/Orchestration/Vault/Skills TAMAMLANDI** (W4-13 + W4-14 + W4-15 + W4-16).
 - **Sıradaki parça:** W5-17 ArchifyPane (GERÇEK `archify` tool ile 5 diyagram tipi + IR JSON önizleme + Before/Delta/After + share export).
 
+### 2026-09-03 — TASK-38 W5-17 ArchifyPane DONE (server 6941f04 + web a13a2e6)
+- **Executor run:** W5-17 tamamlandı — Inspector'da 13. sekme olarak gerçek archify paneli canlı (generate + viewer + receipt + delta + export).
+  - **Server:** yeni `lokma-core/src/archify/` (`ir.ts` 5-gate `validateIr()` schema/layout/route/label/share + renderer'la paylaşılan deterministik `layoutColumns`; `render.ts` `buildSvg()` kolon yerleşimi + 4 preset stili + harici CDN'siz self-contained `buildStandaloneHtml()` viewer (`?`/`R`/`L`/`F`/`/`/`+`-`/`0` + `#focus/#route/#lens` deep link) + 1200×630 `buildShareCard()` SVG; `store.ts` `~/.lokma/archify/<id>/` ir.json/index.html/diagram.svg/share.svg/receipt.json/delta.html + deterministik `generateDiagram()` (`a -> b -> c` zincir türetme, fails closed) + `updateDiagram()` + `compareDiagrams()` + `exportDiagram()` + `guideStarter()`); route'lar `POST /api/archify/generate|validate`, `GET /list`, `GET|PUT /:id`, `POST /:id/delta`, `GET /:id/export?format=svg|html|json|card`, `GET /:id/view` (stabil viewer URL — srcDoc hash taşıyamıyor), `GET /:id/guide`; tüm hatalar `{code,message}`.
+  - **Web:** yeni `components/archify/` (saf helper'lar + `archify.test.ts` 33/33 PASS) + `archify-pane.tsx` (concept düzeni 1:1 — New Diagram formu, tipli liste, gerçek `/view` URL'li sandbox viewer, çalışan `#focus/#route/#lens` linkleri, canlı preset/theme uygulama, validate-before-save IR editörü, gerçek 5-gate receipt tablosu, gerçek Before/Delta/After + diff chip'leri, 4 gerçek dosya indirme, Guide starter zinciri; concept mock satırlar + toast-only butonlar + PNG/WebM taşınmadı — ölü buton yok) + barrel; 13. Inspector sekmesi. `api.ts`'e archify tipleri + 9 fonksiyon.
+  - **Tur içinde yakalanan sözleşme bug'ı:** `POST /validate` ilk taslakta hep `ok:true` dönüyordu, pane bozuk IR'leri kaydedecekti → `ok` geçerliliği taşır (asla 4xx yok).
+  - **Gates:** root tsc 0 · web build green (1675 modül, 570k JS/gzip 155k) · core+server clean · 21 probun hepsi PASS (archify 33 dahil) · mock grep temiz · CANLI prob (:3472, temp HOME) 38/38.
+  - **Dürüst kapsam:** Lokma-native deterministik renderer (vendored `tt-a1i/archify` CLI bağımlılığı yok — IR sözleşmesi + gate'ler + viewer tuşları + disk yolları Docs/31'e uygun); `DELETE /api/archify/:id` yok (concept'te delete butonu yok — follow-up); PNG/WebM follow-up (headless Chromium ister).
+- **Sıradaki parça:** W5-18 DesignStudioPane (GERÇEK design pipeline ile 6 artifact tipi + DESIGN.md guard + sandbox önizleme + export).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W4-16 SkillsPane DONE — server 16ec050 + web b56b898)
-- **Son işlem:** TASK-38 W4-16 DONE — gerçek skills paneli canlı (12. Inspector sekmesi: canlı registry + skill_view önizleme + linked_files + curator patch + `.usage.json` telemetri, `GET /api/skills` + `GET /api/skills/:id` + `GET /:id/file` + `PATCH /:id` + `POST /:id/use` ile; W4 Agents/Orchestration/Vault/Skills TAMAMLANDI); sırada W5-17 ArchifyPane
+- **Son güncelleme:** 2026-09-03 (TASK-38 W5-17 ArchifyPane DONE — server 6941f04 + web a13a2e6)
+- **Son işlem:** TASK-38 W5-17 DONE — gerçek archify paneli canlı (13. Inspector sekmesi: New Diagram + sandbox viewer + 5-gate receipt + Before/Delta/After + 4 gerçek export, `GET/POST /api/archify/*` 9 endpoint ile; concept mock satırlar taşınmadı); sırada W5-18 DesignStudioPane
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

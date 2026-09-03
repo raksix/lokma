@@ -73,13 +73,13 @@ in one atomic commit set), never "UI now, API later".
 ### 1.3 Pre-flight checklist (do this FIRST, one commit max, no UI yet)
 
 1. `read_file` every `server/src/routes/*.ts` + `plugins/*.ts` and mark each endpoint
-   REAL vs STUB in a table inside this file's §9 execution log.
+   REAL vs STUB in a table inside this file's §10 execution log.
 2. `read_file` `web/src/lib/api.ts`, `lib/ws.ts`, `hooks/use-ws.ts` — keep if usable,
    rewrite if stub.
 3. Run `bun install` at root, then per-package `tsc --noEmit` (root `bun x tsc --noEmit`
    per TUI guard) + `bun run build` in `concept/` (baseline must stay green).
 4. Decide server port (default `:3456` per Docs/25) and set `web/vite.config.ts` proxy.
-   Record the decision in §9.
+   Record the decision in §10.
 
 ---
 
@@ -351,11 +351,39 @@ drag, tiling toggle, save/reset layout — all against live data, zero mock cont
 - **Scope creep**: a pane is DONE when its card acceptance passes — polish goes to
   a follow-up task, not this migration.
 - **concept/ edits**: FORBIDDEN during migration (it is the reference screenshots +
-  behavior spec). If concept has a bug, file it in §9 and fix AFTER migration.
+  behavior spec). If concept has a bug, file it in §10 and fix AFTER migration.
 
 ---
 
-## 9. Execution log (fill as waves land — newest at bottom)
+## 9. Live deploy — lokma.fermag.com.tr (EVERY run, after push)
+
+Each loop run MUST end with the live site serving that run's code. Infrastructure
+(running on this host, verified 2026-09-03):
+
+- PM2 `lokma-server` (:3456) runs `bun packages/lokma-web/server/dist/index.js`
+  → serves `/health`, `/api/*`, `/ws/*`. Rebuild with `bun run build`
+  (`tsc -p`) in `packages/lokma-web/server` BEFORE restart (PM2 runs dist, not src).
+- PM2 `lokma-web` (:3457) runs `vite preview` in `packages/lokma-web/web`
+  → serves freshly built `web/dist`. Rebuild with `bun run build` BEFORE restart.
+- nginx vhost `lokma.fermag.com.tr`: `/` → :3457, `/health` + `/api/` + `/ws/` → :3456.
+
+Per-run deploy procedure (only restart what you touched):
+
+1. Touched `packages/lokma-web/web/**` → rebuild web (already a gate) →
+   `pm2 restart lokma-web` → `curl -s -o /dev/null -w '%{http_code}'
+   https://lokma.fermag.com.tr/` must print `200`.
+2. Touched `packages/lokma-web/server/**` or `lokma-core|ai|shared/**` →
+   rebuild server dist → `pm2 restart lokma-server` →
+   `curl -s https://lokma.fermag.com.tr/health` must be 200/`{ok:true}`.
+3. Touched neither → skip restarts (no pointless churn every 5 min).
+4. End of run: `pm2 list | grep lokma` must show BOTH online. Report both HTTP
+   codes in the run report.
+
+FORBIDDEN: `pm2 kill`, `pm2 delete` (shared daemon, ~20 projects — a kill takes
+everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
+§10 log + report instead of delete+start on your own.
+
+## 10. Execution log (fill as waves land — newest at bottom)
 
 - 2026-09-03 — TASK-38 created (this file). Pre-flight (§1.3) not yet run.
 - 2026-09-03 — W0 pre-flight DONE (audit + baseline only, zero code changes).

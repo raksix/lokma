@@ -6,6 +6,7 @@
 
 // Schemas
 export * from './schemas/agent.js';
+export * from './schemas/bot.js';
 export * from './schemas/lock.js';
 export * from './schemas/memory.js';
 export * from './schemas/skill.js';

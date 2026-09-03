@@ -51,5 +51,8 @@ export * from './design/index.js';
 // Testing Lab (plan → run → classify → junit over live handlers)
 export * from './testing/index.js';
 
+// Bots (shareable bot.json packages + run-as-agent for the BotsPane)
+export * from './bots/index.js';
+
 // Utils (DRY — reuse from here, don't duplicate)
 export * from './utils/index.js';

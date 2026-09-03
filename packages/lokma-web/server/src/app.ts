@@ -17,6 +17,7 @@ import { browserRoutes } from './routes/browser.js';
 import { archifyRoutes } from './routes/archify.js';
 import { designRoutes } from './routes/design.js';
 import { testsRoutes } from './routes/tests.js';
+import { botsRoutes } from './routes/bots.js';
 import { wsRoutes } from './routes/ws.js';
 
 /**
@@ -46,6 +47,7 @@ export async function createApp(): Promise<ReturnType<typeof Fastify>> {
   await archifyRoutes(app);
   await designRoutes(app);
   await testsRoutes(app);
+  await botsRoutes(app);
   await wsRoutes(app);
 
   return app;

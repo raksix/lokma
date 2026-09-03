@@ -307,9 +307,14 @@
 - **Dürüst kapsam notları (§9'da):** server henüz tool/permission/ask frame'i üretmiyor (tool loop agent işiyle gelecek) — kartlar frame gelince görünür, cevap yolu uçtan uca gerçek; kod bloğunda "Open in pane" yok (W7'ye kadar ölü buton yok); soru-cevap stream-block server tarafı iş (gelecek tool loop); geçmiş satırlarda thought/cost yok (JSONL sadece role/content tutuyor).
 - **Sıradaki parça:** W1-3 Sessions SidebarLeft (liste/virtualized/CRUD/arama/fork/merge).
 
+### 2026-09-03 — TASK-38 W1-3 Sessions SidebarLeft DONE (server 879094c + web d2a91b9)
+- **Executor run:** W1-3 tamamlandı — server'da `SessionStore`'a `rename`/`remove`/`merge`/`summary`/`listSummaries` + `SessionMeta.title` eklendi; `GET /api/sessions` artık zengin özet dönüyor (title/model/messageCount/createdAt/updatedAt, geriye uyumlu), `PATCH` title da kabul ediyor, yeni `DELETE` + `POST /:id/merge` endpoint'leri canlı. Web'de yeni `components/sessions/` (gruplama/search/sidebar, 21/21 prob) — Today/Yesterday/Earlier veya projeye göre grup, canlı arama, New Session, click-resume, inline rename, iki-tıklı delete, fork footer, merge-into diyaloğu; satırlar gerçek session id ile sürüklenebilir (drop W7'de). Ölü `SessionsPanel` silindi, `SearchModal` başlık/model de eşleştiriyor. `.gitignore` `sessions/` kuralı yeni kaynak dizini yutuyordu → istisna eklendi.
+- **Gates:** root tsc 0 · web build green (1630 modül) · server clean · tüm problar PASS · mock grep temiz · CANLI prob (:3459, temp HOME): create→rename→400 validation→merge→self-merge 400→delete→404→liste doğrulandı, hepsi green.
+- **Sıradaki parça:** W1-4 HeroSection/empty states (starter kartları gerçek session açacak).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W1-2 LokmaMessage DONE)
-- **Son işlem:** TASK-38 W1-2 DONE (server c343949 + web c74ec7e) — gerçek LokmaMessage blokları: thought trace + kod blokları + permission kartı (Always persist'li) + soru kartı + canlı cost footer, §9'da, sırada W1-3 Sessions SidebarLeft
+- **Son güncelleme:** 2026-09-03 (TASK-38 W1-3 Sessions SidebarLeft DONE)
+- **Son işlem:** TASK-38 W1-3 DONE (server 879094c + web d2a91b9) — gerçek Sessions sidebar: gruplu liste (Today/Yesterday/Earlier + projeye göre), canlı arama, create/rename/fork/merge/delete + click-resume, §9'da, sırada W1-4 HeroSection
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

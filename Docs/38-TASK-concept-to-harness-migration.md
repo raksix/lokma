@@ -536,7 +536,50 @@ drag, tiling toggle, save/reset layout — all against live data, zero mock cont
 |    temp HOME: PATCH permissions → `{ok:true}` → GET shows `allow:["bash"]`
 |    → invalid theme → 400 → file on disk, all green (real `~/.lokma` untouched).
 |    Next piece: W1-3 Sessions SidebarLeft (list/virtualized/CRUD/search/fork/merge).
-|- (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
+|- 2026-09-03 — W1-3 Sessions SidebarLeft DONE
+|    (server commit 879094c + web commit d2a91b9, both pushed).
+|    Server: `SessionStore` gains `rename()` (title sidecar) + `remove()`
+|    (unlinks JSONL + meta) + `merge()` (appends source transcript into the
+|    target, 400 on self-merge, 404 on missing) + `summary()`/`listSummaries()`
+|    (title/model/messageCount/createdAt/updatedAt, newest first);
+|    `SessionMeta` gains optional `title` (shared type, backward compatible).
+|    Routes: `GET /api/sessions` returns enriched `SessionSummary[]` (same
+|    response shape, more fields — old `id`-only clients keep working);
+|    `PATCH /api/sessions/:id` accepts `{model}` and/or `{title}` (1-120 chars,
+|    400 `bad_title`/`bad_patch` on invalid); new `DELETE /api/sessions/:id`
+|    (404 when nothing on disk) + `POST /api/sessions/:id/merge {from}`
+|    (400/404 mapped from store errors). Fork copies the title too.
+|    Web: new `components/sessions/` (`grouping.ts` pure helpers +
+|    `sessions-sidebar.tsx` + `sessions.test.ts` 21/21 PASS + barrel) —
+|    Today/Yesterday/Earlier or by-project groups, live search over
+|    title/id/model, New Session (real POST), click-to-resume, inline rename,
+|    two-click delete, fork-open-session footer (real POST /fork), merge-into
+|    dialog (real POST /merge, source kept, target selected after); rows are
+|    draggable with the real session id (`application/x-lokma-session`, drop
+|    side lands with W7 — no fake tabs). `api.ts` gains
+|    rename/delete/merge fns + enriched `SessionSummary` (new fields optional
+|    so old fixtures typecheck); `sessionStore` gains
+|    create/fork/rename/delete/merge actions (server source of truth, caches
+|    pruned); `SearchModal` matches title/model too; dead `SessionsPanel`
+|    deleted; `AppShell` left pane renders the real sidebar.
+|    `.gitignore` fix: bare `sessions/` runtime rule swallowed the new source
+|    dir → added `!packages/lokma-web/web/src/components/sessions/` exception.
+|    Honest scope notes: (1) no status dots from the server (no presence feed
+|    yet) — the only live dot marks the open session; (2) no virtualized
+|    windowing lib — incremental render caps at 120 rows + Show-all (session
+|    lists are dozens of rows; full windowing deferred until needed);
+|    (3) merge keeps the source (explicit delete is one click away);
+|    (4) drag-to-pane split/fork/merge dialog is W7 pane-system work.
+|    Gates: root `tsc --noEmit` 0 errors · web build green (1630 modules,
+|    361k JS/gzip 107k) · server `tsc -p` clean · all probes PASS (sessions
+|    21/21 + shell 10/10 + api + ws + stores + theme 11/11 + lokma-message +
+|    chat) · mock grep: sessions clean (1 hit = input `placeholder` attr) ·
+|    LIVE probe on :3459 with temp HOME: create×2 → enriched list →
+|    rename → empty-title 400 → merge (appended:1) → self-merge 400 →
+|    delete → re-delete 404 → list shows renamed target (kept:2), all green
+|    (real `~/.lokma` untouched).
+|    Next piece: W1-4 HeroSection/empty states (starter cards create real sessions).
+- (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 
 ---
 

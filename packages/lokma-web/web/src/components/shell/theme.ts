@@ -3,9 +3,10 @@
  * Light is the default; dark toggles the `dark` class on <html> (same key
  * the concept shell uses, so concept-saved preferences keep working).
  * F5 ported the concept token set 1:1 into `web/src/index.css`, so this
- * file only owns the light/dark switch — the `themes/*.json`
- * (claude/omp/midnight/paper) palettes stay CLI-side until a web theme
- * picker wave wires them to CSS vars.
+ * file only owns the light/dark switch. The W2-8 Appearance pane maps the
+ * four named server themes (`themes/*.json`: claude/omp/midnight/paper)
+ * onto this switch (claude/paper → light, omp/midnight → dark) and
+ * persists the named theme via PATCH /api/config.
  */
 
 const THEME_KEY = 'lokma-theme';

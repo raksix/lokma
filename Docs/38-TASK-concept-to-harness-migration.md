@@ -1528,6 +1528,55 @@ everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
 |    delete+start, not done per rule); both processes online.
 |    Next piece: W6-24 ObservabilityPane (TokenLedger + bus-log trace
 |    timeline + Replay + Share).
+|- 2026-09-03 — W6-24 ObservabilityPane DONE
+|    (server commit 9861132 + web commit a3ee703, both pushed).
+|    Server (`lokma-core/src/observability/` new: `trace.ts`
+|    `buildAgentTrace()` — every event derived from durable state
+|    (registry createdAt/state + SOUL/MEMORY mtimes with a 1s seed grace
+|    + live advisory locks + `createdBy` lineage, ascending by `ts`; a
+|    fresh agent honestly shows a 1-event timeline) + `share.ts` frozen
+|    snapshots under `~/.lokma/shares/<token>.json` (0700, `sh_`+128-bit
+|    hex, agent-trace or session-transcript bytes, later edits never
+|    rewrite shared history) + `index.ts`; `core/index.ts` export; new
+|    `server/src/routes/observability.ts` (`app.ts` registration):
+|    `GET /api/agents/:id/trace`, `GET /api/share`,
+|    `POST /api/share/agent|session`, `GET|DELETE /api/share/:token`;
+|    all failures `{code,message}` (`AgentError` + new `ShareError`).
+|    Web (`components/observability/` new: `observability.ts` helpers +
+|    `observability-pane.tsx` + `observability.test.ts` 45/45 PASS +
+|    barrel; `api.ts` trace/share types + 6 fns; 20th Inspector tab
+|    `Observability`, Activity icon): concept layout 1:1 — agent picker
+|    + state badge, all/agent/tool filters, dark timeline with relative
+|    `0.0s` stamps (per-agent hashed badges, no invented costs),
+|    TokenLedger card from the real 7d usage summary (project scope
+|    captioned), Bus card honestly stating no bus exists in core (WS
+|    `agent_state` carries lifecycle), 3-layer safe card from real
+|    locks + worktree, Replay (session picker → read-only JSONL render,
+|    click-to-expand, 200-row cap), Share (freeze trace/session →
+|    copyable `/share/<kind>/<token>` link + shares list + frozen
+|    snapshot viewer + two-click delete). Concept hardcoded TRACES +
+|    `$0.04` costs + persona colors + BUS copy + toast-only Replay/Share
+|    NOT ported (no dead buttons, no fake data).
+|    Gates: root `tsc --noEmit` 0 errors · web build green (1697
+|    modules, 689k JS/gzip 181k) · shared+core+server dist emit clean ·
+|    all 28 probe files PASS (observability 45/45) · mock grep zero hits
+|    on all new files · LIVE probe (in-process createApp + inject,
+|    startup-env temp HOME + refuse-guard) 43/43: unknown 404 + evil
+|    400 → create → fresh 1-event trace → pause adds `agent_state` →
+|    1.2s + SOUL PUT adds `soul_write` → real global lock adds
+|    `lock_acquired` (released in finally) → share agent (token shape +
+|    url) → frozen copy ≥3 events → 400/404 validations → session
+|    create + share + byte-identical snapshot → list 2 → delete flow →
+|    frozen agent snapshot survives source delete → real
+|    `~/.lokma/shares` absent (untouched).
+|    Deploy 2026-09-03: server dist rebuilt + `pm2 restart lokma-server`
+|    → `/health` 200 + live `/api/share` on the domain (server LIVE
+|    serves this run's code); `web/dist` rebuilt (1697 modules) +
+|    `pm2 restart lokma-web` → `/` 200 BUT still stale `/_next/` HTML —
+|    DEPLOY BLOCKER persists (PM2 runs `next start` 15.5.24, needs
+|    foreground delete+start, not done per rule). Both processes online.
+|    Next piece: W6-25 CronApprovalsPane (per-agent cron CRUD + approvals
+|    queue on the SAME rule store as the chat permission card).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

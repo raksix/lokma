@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
-import { loadConfig } from 'lokma-core';
+import { loadConfig, saveGlobal } from 'lokma-core';
 import { getMaskedCredentials } from 'lokma-core';
+import { GlobalConfigSchema } from 'lokma-shared';
 
 /**
  * Config routes — masked, same files as CLI.
@@ -24,13 +25,19 @@ export async function configRoutes(app: FastifyInstance): Promise<void> {
     return { effective: { ...cfg, _credentials: creds } };
   });
 
-  // PATCH /api/config — writes to ~/.lokma/config.json (stub, full in Phase 1)
-  app.patch('/api/config', async (req) => {
+  // PATCH /api/config — validates against GlobalConfigSchema, persists to
+  // ~/.lokma/config.json via saveGlobal (same file the CLI reads).
+  app.patch('/api/config', async (req, reply) => {
     const patch = req.body as Record<string, unknown>;
-    if (!patch || typeof patch !== 'object') {
-      return { ok: false, error: 'Invalid patch body' };
+    if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+      return reply.code(400).send({ ok: false, code: 'bad_request', message: 'Invalid patch body' });
     }
-    // Phase 0: echo back — real save in Phase 1 via saveGlobal()
-    return { ok: true, patched: Object.keys(patch), note: 'Phase 0 stub — save lands in Phase 1' };
+    const parsed = GlobalConfigSchema.partial().safeParse(patch);
+    if (!parsed.success) {
+      const detail = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+      return reply.code(400).send({ ok: false, code: 'validation_error', message: detail });
+    }
+    await saveGlobal(parsed.data);
+    return { ok: true, patched: Object.keys(patch) };
   });
 }

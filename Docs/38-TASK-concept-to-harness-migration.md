@@ -879,6 +879,8 @@ drag, tiling toggle, save/reset layout — all against live data, zero mock cont
   Next piece: W3-12 BrowserPane (per-agent tabs +
   `POST /api/browser/open` + live screenshots).
 
+- 2026-09-03 — run 50/50 hit repeat cap mid-W3-12: browser server-side (core registry + routes + api.ts client) rescued from dirty tree, committed as WIP — web pane side still open.
+
 - (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 
 ---

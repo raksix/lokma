@@ -5,7 +5,7 @@
  * for the HUD. Orchestration (live tree) vs Hub (registry) split per Docs/30.
  */
 import { create } from 'zustand';
-import { api, type AgentInfo } from '@/lib/api';
+import { api, type AgentCaps, type AgentInfo, type CreateAgentBody, type PatchAgentBody } from '@/lib/api';
 import type { ServerMessage } from 'lokma-shared/protocol/ws';
 
 export type AgentLock = { owner: string; path?: string; since?: string };
@@ -13,6 +13,8 @@ export type AgentLock = { owner: string; path?: string; since?: string };
 export type AgentStore = {
   agents: AgentInfo[];
   selectedAgentId: string | null;
+  /** Registry caps from the server (429 past maxAgents — Hub shows the banner). */
+  caps: AgentCaps;
   /** Advisory file locks per agent id (3-layer safe banner reads this). */
   locks: Record<string, AgentLock[]>;
   loading: boolean;
@@ -24,18 +26,30 @@ export type AgentStore = {
   applyWsEvent: (msg: ServerMessage) => void;
   /** Clear one agent's locks (e.g. after it was killed). */
   clearLocks: (agentId: string) => void;
+  /** Run one registry mutation, then refresh the cache from the server. */
+  mutate: (fn: () => Promise<AgentInfo>) => Promise<AgentInfo>;
+  create: (body: CreateAgentBody) => Promise<AgentInfo>;
+  /** Edit name/model/budgets of one agent. */
+  update: (id: string, body: PatchAgentBody) => Promise<AgentInfo>;
+  /** Lifecycle move: pause | resume | kill (server guards the transition). */
+  move: (id: string, action: 'pause' | 'resume' | 'kill') => Promise<AgentInfo>;
+  /** Copy an agent into a fresh id (fork | clone, state idle). */
+  copy: (id: string, action: 'fork' | 'clone') => Promise<AgentInfo>;
+  /** Delete an agent (prunes the cache selection when it pointed at it). */
+  remove: (id: string) => Promise<void>;
   reset: () => void;
 };
 
 const initial = {
   agents: [] as AgentInfo[],
   selectedAgentId: null as string | null,
+  caps: { maxAgents: 20, maxConcurrent: 5, maxQueue: 20 } as AgentCaps,
   locks: {} as Record<string, AgentLock[]>,
   loading: false,
   lastError: null as string | null,
 };
 
-export const useAgentStore = create<AgentStore>()((set) => ({
+export const useAgentStore = create<AgentStore>()((set, get) => ({
   ...initial,
 
   refresh: async () => {
@@ -44,6 +58,7 @@ export const useAgentStore = create<AgentStore>()((set) => ({
       const res = await api.listAgents();
       set((prev) => ({
         agents: res.agents,
+        caps: res.caps ?? prev.caps,
         selectedAgentId:
           prev.selectedAgentId && res.agents.some((a) => a.id === prev.selectedAgentId)
             ? prev.selectedAgentId
@@ -76,6 +91,48 @@ export const useAgentStore = create<AgentStore>()((set) => ({
       delete locks[agentId];
       return { locks };
     });
+  },
+
+  /** Run one registry mutation, then refresh the cache from the server. */
+  mutate: async (fn: () => Promise<AgentInfo>): Promise<AgentInfo> => {
+    set({ lastError: null });
+    try {
+      const agent = await fn();
+      await get().refresh();
+      return agent;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'agent mutation failed';
+      set({ lastError: message });
+      throw e;
+    }
+  },
+
+  create: async (body) => get().mutate(() => api.createAgent(body).then((r) => r.agent)),
+
+  update: async (id, body) => get().mutate(() => api.patchAgent(id, body).then((r) => r.agent)),
+
+  move: async (id, action) => get().mutate(() => api.moveAgent(id, action).then((r) => r.agent)),
+
+  copy: async (id, action) => {
+    const agent = await get().mutate(() => api.copyAgent(id, action).then((r) => r.agent));
+    // A fork/clone is a new agent — select it so the detail view follows.
+    set({ selectedAgentId: agent.id });
+    return agent;
+  },
+
+  remove: async (id) => {
+    set({ lastError: null });
+    try {
+      await api.deleteAgent(id);
+      set((prev) => ({
+        agents: prev.agents.filter((a) => a.id !== id),
+        selectedAgentId: prev.selectedAgentId === id ? null : prev.selectedAgentId,
+      }));
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'agent delete failed';
+      set({ lastError: message });
+      throw e;
+    }
   },
 
   reset: () => {

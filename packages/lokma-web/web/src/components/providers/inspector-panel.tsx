@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { BarChart3, GitBranch, Globe, Info, Layers, Plug2, Settings, Terminal } from 'lucide-react';
+import { BarChart3, GitBranch, Globe, Info, Layers, Plug2, Settings, Terminal, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
@@ -9,6 +9,7 @@ import { SettingsPane } from '@/components/settings';
 import { TerminalPane } from '@/components/terminal';
 import { GitPane } from '@/components/git';
 import { BrowserPane } from '@/components/browser';
+import { AgentsPane } from '@/components/agents';
 import { UsagePane } from '@/components/usage/usage-pane';
 
 /**
@@ -21,7 +22,9 @@ import { UsagePane } from '@/components/usage/usage-pane';
  * `POST /api/terminal` + WS `terminal/*` frames), Git the real W3-11 pane
  * (branch/status/log/commit/push over `GET/POST /api/git/*` + live locks),
  * Browser the real W3-12 pane (per-agent live tabs + server-owned history
- * over `GET/POST /api/browser/*`, pages in a sandboxed iframe).
+ * over `GET/POST /api/browser/*`, pages in a sandboxed iframe), Agents the
+ * real W4-13 pane (registry CRUD + pause/resume/kill/fork/clone +
+ * SOUL.md/MEMORY.md editors over `GET/POST/PATCH/DELETE /api/agents/*`).
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
  */
@@ -34,7 +37,7 @@ export function InspectorPanel({
   sessionId?: string;
   ws?: UseWs;
 }) {
-  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser'>(
+  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents'>(
     'info',
   );
 
@@ -113,9 +116,20 @@ export function InspectorPanel({
           <Globe className="h-3 w-3" />
           Browser
         </Button>
+        <Button
+          variant={tab === 'agents' ? 'default' : 'ghost'}
+          size="sm"
+          className="h-6 flex-1 gap-1.5 text-[11px]"
+          onClick={() => setTab('agents')}
+        >
+          <Users className="h-3 w-3" />
+          Agents
+        </Button>
       </div>
       {tab === 'info' ? (
         <InfoPanel />
+      ) : tab === 'agents' ? (
+        <AgentsPane />
       ) : tab === 'providers' ? (
         <ProvidersPane />
       ) : tab === 'models' ? (

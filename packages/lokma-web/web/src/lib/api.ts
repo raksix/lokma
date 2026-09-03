@@ -110,6 +110,10 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
   return request<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
 }
 
+async function put<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, { method: 'PUT', body: JSON.stringify(body) });
+}
+
 async function del<T>(path: string): Promise<T> {
   return request<T>(path, { method: 'DELETE' });
 }
@@ -198,7 +202,23 @@ export type RewindSessionRes = { ok: boolean; id: string; kept: number };
 export type SlashCommandInfo = { id: string; name: string; hint: string; usage: string };
 export type CommandsRes = { commands: SlashCommandInfo[]; count: number };
 export type AgentInfo = { id: string; [k: string]: unknown };
-export type AgentsRes = { agents: AgentInfo[] };
+export type AgentCaps = { maxAgents: number; maxConcurrent: number; maxQueue: number };
+export type AgentsRes = { agents: AgentInfo[]; count: number; caps: AgentCaps };
+export type AgentMutationRes = { ok: boolean; agent: AgentInfo; action?: string; from?: string };
+export type DeleteAgentRes = { ok: boolean; id: string };
+export type CreateAgentBody = {
+  id?: string;
+  name: string;
+  persona?: string;
+  model?: string;
+  cwd?: string;
+  budgets?: { tokens?: number; usd?: number };
+  soul?: string;
+  memory?: string;
+};
+export type PatchAgentBody = { name?: string; model?: string; budgets?: { tokens?: number; usd?: number } };
+export type AgentDocRes = { ok: boolean; id: string; doc: string; content: string };
+export type AgentDocWriteRes = { ok: boolean; id: string; doc: string; bytes: number };
 export type SkillInfo = { id: string; [k: string]: unknown };
 export type SkillsRes = { skills: SkillInfo[] };
 export type VaultGraphRes = { nodes: unknown[]; links: unknown[]; note?: string };
@@ -402,9 +422,26 @@ export const api = {
   // Slash commands — server-owned registry behind the Composer `/` palette.
   listCommands: () => get<CommandsRes>('/api/commands'),
 
-  // Agents + skills (read-only on the server today; mutations land in W4)
+  // Agents — full registry CRUD + lifecycle (W4-13). The server owns
+  // caps/queue/locks (429 when full); this store mirrors them for the HUD.
   listAgents: () => get<AgentsRes>('/api/agents'),
   getAgent: (id: string) => get<AgentInfo>(`/api/agents/${encodeURIComponent(id)}`),
+  createAgent: (body: CreateAgentBody) => post<AgentMutationRes>('/api/agents', body),
+  patchAgent: (id: string, body: PatchAgentBody) =>
+    patch<AgentMutationRes>(`/api/agents/${encodeURIComponent(id)}`, body),
+  deleteAgent: (id: string) => del<DeleteAgentRes>(`/api/agents/${encodeURIComponent(id)}`),
+  /** Lifecycle move: pause | resume | kill (409 on illegal transitions). */
+  moveAgent: (id: string, action: 'pause' | 'resume' | 'kill') =>
+    post<AgentMutationRes>(`/api/agents/${encodeURIComponent(id)}/${action}`, {}),
+  /** Copy the agent dir into a fresh id (state idle, same SOUL/MEMORY). */
+  copyAgent: (id: string, action: 'fork' | 'clone') =>
+    post<AgentMutationRes>(`/api/agents/${encodeURIComponent(id)}/${action}`, {}),
+  /** Read the real SOUL.md / MEMORY.md file (`doc` = 'soul' | 'memory'). */
+  getAgentDoc: (id: string, doc: 'soul' | 'memory') =>
+    get<AgentDocRes>(`/api/agents/${encodeURIComponent(id)}/${doc}`),
+  /** Persist SOUL.md / MEMORY.md (real file write under the agent dir). */
+  saveAgentDoc: (id: string, doc: 'soul' | 'memory', content: string) =>
+    put<AgentDocWriteRes>(`/api/agents/${encodeURIComponent(id)}/${doc}`, { content }),
   listSkills: () => get<SkillsRes>('/api/skills'),
   getSkill: (id: string) => get<SkillInfo>(`/api/skills/${encodeURIComponent(id)}`),
 

@@ -54,5 +54,8 @@ export * from './testing/index.js';
 // Bots (shareable bot.json packages + run-as-agent for the BotsPane)
 export * from './bots/index.js';
 
+// Auth (users + projects + invites + RBAC can() for the AuthPane)
+export * from './auth/index.js';
+
 // Utils (DRY — reuse from here, don't duplicate)
 export * from './utils/index.js';

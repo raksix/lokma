@@ -253,9 +253,13 @@
   - Build: `bun run build` 1863 modules 497.03k JS gzip 130.83k CSS 62.32k ✅ (tsc -b + vite 8.2.2, 456ms, 0 errors, sourcemap warning only).
   - Git: no concept file writes this run — docs chronology update only.
 
+### 2026-09-03 — TASK-38 created (concept → real harness migration plan)
+- **Furkan:** "concept designi gerçek web harness design kısmına aktarma ve çalışır hale getirme olacak, önce task hazırla detaylı ama aşırı detaylı"
+- **Hermes:** `Docs/38-TASK-concept-to-harness-migration.md` yazıldı (22KB) — concept/ (mock, 21 pane + shell) → `packages/lokma-web/web/` (real Vite SPA) + `packages/lokma-web/server/` (Fastify) tam göç planı: W0 foundation (api/ws client, stores, shell chrome, theme) + W1 chat core + W2 providers/models/usage/config + W3 files/terminal/git/browser + W4 agents/orchestration/vault/skills + W5 archify/design/testing/bots + W6 auth/setup/marketplace/observability/cron/extras + W7 pane system port; per-pane migration card template, verification gates, commit plan, risks, execution log. Sıradaki adım: W0 pre-flight (§1.3: server route audit + vite proxy kararı).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (loop sync run)
-- **Son işlem:** loop sync — no missing — all 27 Docs + 24 panes spec-complete, build 1863 modules 497k JS ✅ — commit docs chronology only (no concept writes)
+- **Son güncelleme:** 2026-09-03 (TASK-38)
+- **Son işlem:** TASK-38 migration plan yazıldı (`Docs/38-TASK-*.md`, 22KB) — loop 20/20 bitti, concept eksiksiz, sırada W0 pre-flight + foundation
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

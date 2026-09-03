@@ -797,7 +797,53 @@ drag, tiling toggle, save/reset layout — all against live data, zero mock cont
   real-null binary 400, all green (real `~/.lokma` untouched).
   Next piece: W3-10 TerminalPane (xterm + `terminal/data|exit` WS
   frames + per-tool-call tabs + kill).
-|- (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
+|- 2026-09-03 — W3-10 TerminalPane DONE
+  (server commit 79a2e48 + web commit 3b10494, both pushed).
+  Server: new `lokma-core/src/terminal/` (`TerminalManager`: live `$SHELL`
+  children with piped stdio, `spawn` in an existing-dir `cwd` else 400
+  `bad_cwd`, `write` 64KB cap, `resize` stored, `kill` SIGTERM→SIGKILL
+  grace, 10-live cap 429 `terminal_limit`, 64KB scrollback tail per
+  terminal, records kept after exit until DELETE) + new
+  `POST /api/terminal` (optional `sessionId` tag for WS scoping) +
+  `GET /api/terminal` + `GET /api/terminal/:id` (record + `tail` for
+  late-joining panes) + `POST /api/terminal/:id/input` +
+  `DELETE /api/terminal/:id` (`{code,message}` errors: bad_cwd/
+  terminal_not_found/terminal_exited/bad_data/too_large/bad_terminal_id).
+  Shared protocol gains `terminal/input|resize|kill` (client) +
+  `terminal/data|exit` (server, plan §2 slash names, session-scoped).
+  `ws.ts` multiplexes terminals over the existing `/ws/:sessionId`
+  socket (per-connection fan-out filtered by the spawn tag, unsubscribed
+  on close; kill confirms via `terminal/exit`, errors as `error` frames).
+  Web: new `components/terminal/` (`terminal.ts` pure helpers: label/
+  status/exit/appendCapped/stripAnsi/filterLines/copyText +
+  `terminal.test.ts` 24/24 PASS) + `terminal-pane.tsx` (concept dark
+  styling 1:1, lucide only, visible labels on every field; live tabs,
+  search filter, Follow toggle, stdin line with `$`-echo, two-click Kill,
+  Forget for exited, Copy/Clear/Refresh, New-shell form with session cwd
+  + agent attach from agentStore, exit banner, honest pipes footer) as
+  6th Inspector tab; `lib/ws.ts` gains terminal builders + chat-ignores
+  reducer cases; `useWs` gains sendTerminal/resizeTerminal/killTerminal
+  (WS-down kill falls back to REST DELETE); `api.ts` gains terminal
+  types + 5 fns; AppShell threads `sessionId` + `ws` into the Inspector.
+  Concept toast-only buttons (Run/Maximize) NOT ported — no dead
+  buttons. No xterm.js dep (plain scrollback + stdin, honest scope note
+  in pane + footer; full-screen TUIs do not work on pipes — pty is the
+  follow-up, same precedent as the W3-9 Monaco skip).
+  Gates: root `tsc --noEmit` 0 errors · shared+core+ai+server builds
+  clean · web build green (1653 modules, 451k JS/gzip 129k) ·
+  all probes PASS (terminal 24/24 + ws + api + stores + shell 10/10) ·
+  mock grep: terminal clean (1 hit = own anti-mock comment) · LIVE
+  probe on :3466 with temp HOME 18/18: spawn → list → bad-cwd 400 →
+  missing 404 → REST echo → tail catch-up → empty-data 400 → WS
+  echo via `terminal/data` → WS kill → `terminal/exit` (SIGTERM) →
+  write-after-exit 409 → delete → re-delete 404 → evil-id 400, all
+  green (real `~/.lokma` untouched). Probe-script lesson: Fastify
+  rejects bodyless requests carrying `Content-Type: application/json`
+  with 400 — the probe now omits the header when there is no body.
+  Next piece: W3-11 GitPane (real `git status` + commit/push +
+  3-layer safe banner from locks/worktree state).
+
+- (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 
 ---
 

@@ -353,9 +353,16 @@
 - **Gates:** root tsc 0 · web build green (1650 modül, 437k JS) · server clean · 13 probun hepsi PASS · mock grep temiz · CANLI prob (:3465, temp HOME): list → read+sha → write → stale 409 → create → escape 400 → missing 404 → search → binary 400, hepsi green.
 - **Sıradaki parça:** W3-10 TerminalPane (xterm + `terminal/data|exit` WS frame'leri + sekme + kill).
 
+### 2026-09-03 — TASK-38 W3-10 TerminalPane DONE (server 79a2e48 + web 3b10494)
+- **Executor run:** W3-10 tamamlandı — Inspector'da 6. sekme olarak gerçek shell sekmeleri canlı.
+  - **Server:** yeni `lokma-core/src/terminal/` (`TerminalManager`: canlı `$SHELL` child'ları, piped stdio; `spawn` var-olmayan cwd'de 400 `bad_cwd`; 64KB input cap; 10 canlı cap'inde 429; kill SIGTERM→SIGKILL; 64KB scrollback tail; exit sonrası kayıt DELETE'e kadar durur) + yeni `POST /api/terminal` (opsiyonel `sessionId` etiketi) + `GET /api/terminal` + `GET /:id` (record + `tail`) + `POST /:id/input` + `DELETE /:id`. Paylaşılan protokole `terminal/input|resize|kill` + `terminal/data|exit` eklendi (plan §2 slash isimleri, session-scoped); mevcut `/ws/:sessionId` soketi üzerinden multiplex (bağlantı başına fan-out, close'da unsubscribe).
+  - **Web:** yeni `components/terminal/` (saf helper'lar + `terminal.test.ts` 24/24 PASS) + `terminal-pane.tsx` (concept koyu stil 1:1, lucide only, her alanda görünür label; canlı sekmeler, arama filtresi, Follow, `$`-echo'lu stdin satırı, iki-tıklı Kill, exited'da Forget, Copy/Clear/Refresh, session cwd + agent attach'li New-shell formu, exit banner, dürüst pipes altbilgisi). Concept'in toast-only Run/Maximize butonları taşınmadı (ölü buton yok). xterm.js bağımlılığı yok (düz scrollback — W3-9 Monaco skip ile aynı precedent; full-screen TUI'lar pipes'ta çalışmaz, pty follow-up).
+  - **Gates:** root tsc 0 · shared+core+ai+server clean · web green (1653 modül, 451k JS) · tüm problar PASS · mock grep temiz · CANLI prob (:3466, temp HOME) 18/18: spawn→list→400'ler→REST echo→tail→WS echo→WS kill→`terminal/exit` (SIGTERM)→exit-sonrası-write 409→delete→404'ler, hepsi green. Prob dersi: Fastify, gövdesiz isteğe `Content-Type: application/json` gelirse 400 verir — prob header'ı koşullu gönderiyor.
+- **Sıradaki parça:** W3-11 GitPane (gerçek `git status` + commit/push + lock/worktree'tan 3-layer safe banner).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W3-9 FileBrowser DONE — server caa66d3 + web 93862eb)
-- **Son işlem:** TASK-38 W3-9 DONE — gerçek workspace explorer canlı (ağaç + git overlay M/A/D/R/? + preview/edit/save `expectedSha` guard + 409 conflict UI + fuzzy quick-open + drag/drop `@mention` → Composer → model context), sırada W3-10 TerminalPane
+- **Son güncelleme:** 2026-09-03 (TASK-38 W3-10 TerminalPane DONE — server 79a2e48 + web 3b10494)
+- **Son işlem:** TASK-38 W3-10 DONE — gerçek shell sekmeleri canlı (spawn/input/kill + WS `terminal/data|exit`, scrollback + stdin + two-click Kill + agent attach, 6. Inspector sekmesi), sırada W3-11 GitPane
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

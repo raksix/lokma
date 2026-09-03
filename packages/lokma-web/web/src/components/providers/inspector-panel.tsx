@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { BarChart3, Beaker, Bot, Cpu, Folder, GitBranch, Globe, Info, Layers, Paintbrush, Plug2, Puzzle, Settings, Terminal, Users, Workflow } from 'lucide-react';
+import { BarChart3, Beaker, Bot, Cpu, Folder, GitBranch, Globe, Info, Layers, Paintbrush, Plug2, Puzzle, Settings, Shield, Terminal, Users, Workflow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
@@ -17,6 +17,7 @@ import { ArchifyPane } from '@/components/archify';
 import { DesignPane } from '@/components/design';
 import { TestingPane } from '@/components/testing';
 import { BotsPane } from '@/components/bots';
+import { AuthPane } from '@/components/auth';
 import { UsagePane } from '@/components/usage/usage-pane';
 
 /**
@@ -50,7 +51,11 @@ import { UsagePane } from '@/components/usage/usage-pane';
  * Shannon scan over `GET/POST /api/tests/*`, per-test rows + real
  * `junit.xml` download), Bots the real W5-20 pane (Bot Gallery over
  * `GET /api/bots` + create/fork/publish/run over `POST/PATCH`
- * `/api/bots/*`, playground runs spawn a real agent + session).
+ * `/api/bots/*`, playground runs spawn a real agent + session), Auth the
+ * real W6-21 pane (login + RBAC matrix + projects + members over
+ * `POST/GET/PATCH /api/auth/*`, `GET/POST/PATCH/DELETE /api/users/*`,
+ * `GET/POST/PATCH/DELETE /api/projects/*`, invite accept + copyable
+ * link, viewer-403 gates enforced server-side).
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
  */
@@ -63,7 +68,7 @@ export function InspectorPanel({
   sessionId?: string;
   ws?: UseWs;
 }) {
-  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault' | 'skills' | 'archify' | 'design' | 'testing' | 'bots'>(
+  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault' | 'skills' | 'archify' | 'design' | 'testing' | 'bots' | 'auth'>(
     'info',
   );
 
@@ -214,9 +219,20 @@ export function InspectorPanel({
           <Bot className="h-3 w-3" />
           Bots
         </Button>
+        <Button
+          variant={tab === 'auth' ? 'default' : 'ghost'}
+          size="sm"
+          className="h-6 flex-1 gap-1.5 text-[11px]"
+          onClick={() => setTab('auth')}
+        >
+          <Shield className="h-3 w-3" />
+          Auth
+        </Button>
       </div>
       {tab === 'info' ? (
         <InfoPanel />
+      ) : tab === 'auth' ? (
+        <AuthPane />
       ) : tab === 'bots' ? (
         <BotsPane onOpenSession={onOpenSession} />
       ) : tab === 'testing' ? (

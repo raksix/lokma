@@ -46,10 +46,10 @@ function redirectToLogin(): void {
 }
 
 /** Normalize every server failure shape into `{ code, message }`. */
-async function toApiError(res: Response): Promise<ApiError> {
+async function toApiError(res: Response, redirect = true): Promise<ApiError> {
   const status = res.status;
   if (status === 401) {
-    redirectToLogin();
+    if (redirect) redirectToLogin();
     return new ApiError('unauthorized', 'Not signed in — redirected to login', 401);
   }
   let code = 'http_error';
@@ -83,9 +83,15 @@ async function toApiError(res: Response): Promise<ApiError> {
 
 /**
  * Core request helper — GET/POST/PATCH/DELETE with auth + 401 handling.
- * Throws ApiError on any non-2xx response.
+ * Throws ApiError on any non-2xx response. Pass `{ redirect401: false }`
+ * for expected-401 probes (e.g. the AuthPane logged-out check) so the
+ * global login bounce does not fire.
  */
-export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  opts: { redirect401?: boolean } = {},
+): Promise<T> {
   const headers = new Headers(init.headers);
   const token = readToken();
   if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
@@ -93,7 +99,7 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
     headers.set('Content-Type', 'application/json');
   }
   const res = await fetch(path, { ...init, headers, credentials: 'include' });
-  if (!res.ok) throw await toApiError(res);
+  if (!res.ok) throw await toApiError(res, opts.redirect401 !== false);
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
@@ -621,6 +627,56 @@ export type RunBotRes = {
   sessionId: string;
 };
 
+// Auth + users + projects — RBAC matrix + visibility (W6-21, Docs/36).
+// Roles mirror `lokma-shared` (admin/member/viewer); the server enforces
+// every gate, the pane only mirrors the matrix for gating buttons.
+export type AuthRole = 'admin' | 'member' | 'viewer';
+export type UserStatus = 'active' | 'invited' | 'disabled';
+export type AuthUser = {
+  id: string;
+  email: string;
+  name: string;
+  role: AuthRole;
+  status: UserStatus;
+  permissions: string[];
+  createdAt: string;
+  lastActiveAt: string | null;
+};
+export type ProjectVisibility = 'private' | 'public';
+export type AuthProject = {
+  id: string;
+  name: string;
+  cwd: string;
+  visibility: ProjectVisibility;
+  ownerId: string;
+  createdAt: string;
+};
+export type ProjectMember = {
+  projectId: string;
+  userId: string;
+  role: 'member' | 'viewer';
+  permissions: string[];
+  addedAt: string;
+  addedBy: string;
+};
+export type AuthSettings = {
+  projectCreation: 'admin-only' | 'members' | 'open';
+  projectVisibilityDefault: ProjectVisibility;
+  inviteExpiryDays: number;
+  sessionRetentionDays: number | null;
+};
+export type AuthSessionRes = { ok: boolean; user: AuthUser; token: string };
+export type AuthMeRes = { ok: boolean; user: AuthUser };
+export type AuthSettingsRes = { ok: boolean; settings: AuthSettings; bootstrapped: boolean };
+export type UsersRes = { users: AuthUser[]; count: number };
+export type InviteRes = { ok: boolean; user: AuthUser; inviteLink: string };
+export type ResetPasswordRes = { ok: boolean; user: AuthUser; tempPassword: string };
+export type ProjectsRes = { projects: AuthProject[] };
+export type ProjectDetailRes = { ok: boolean; project: AuthProject; members: ProjectMember[] };
+export type ProjectMutationRes = { ok: boolean; project: AuthProject };
+export type MembersRes = { members: ProjectMember[] };
+export type MemberMutationRes = { ok: boolean; member: ProjectMember };
+
 // ─── One function per endpoint group ────────────────────────────────────────
 
 export const api = {
@@ -928,4 +984,48 @@ export const api = {
   /** Spawn a real agent + session from the bot (playground run). */
   runBot: (id: string, body: RunBotBody) =>
     post<RunBotRes>(`/api/bots/${encodeURIComponent(id)}/run`, body),
+
+  // Auth + users + projects — RBAC matrix + visibility (W6-21, Docs/36).
+  // Login/register return the token twice: httpOnly cookie (set by the
+  // server) + JSON body (stored in `localStorage["lokma-token"]` for the
+  // Bearer path the CLI also uses).
+  registerFirstAdmin: (body: { email: string; name: string; password: string }) =>
+    post<AuthSessionRes>('/api/auth/register', body),
+  login: (body: { email: string; password: string }) => post<AuthSessionRes>('/api/auth/login', body),
+  logout: () => post<{ ok: boolean }>('/api/auth/logout', {}),
+  authMe: () => get<AuthMeRes>('/api/auth/me'),
+  /** Logged-out check — 401 expected, never bounces to /login. */
+  authMeQuiet: () => request<AuthMeRes>('/api/auth/me', { method: 'GET' }, { redirect401: false }),
+  acceptInvite: (body: { token: string; name: string; password: string }) =>
+    post<AuthSessionRes>('/api/auth/accept-invite', body),
+  /** Instance policy — public read (bootstrapped flag included), admin write. */
+  getAuthSettings: () => get<AuthSettingsRes>('/api/auth/settings'),
+  patchAuthSettings: (body: Partial<AuthSettings>) =>
+    patch<AuthSettingsRes>('/api/auth/settings', body),
+  /** Admin user table (403 for member/viewer). */
+  listUsers: () => get<UsersRes>('/api/users'),
+  inviteUser: (body: { email: string; role?: AuthRole; projectIds?: string[] }) =>
+    post<InviteRes>('/api/users/invite', body),
+  patchUser: (id: string, body: Record<string, unknown>) =>
+    patch<AuthMeRes>(`/api/users/${encodeURIComponent(id)}`, body),
+  deleteUser: (id: string) => del<{ ok: boolean; id: string }>(`/api/users/${encodeURIComponent(id)}`),
+  resetUserPassword: (id: string) =>
+    post<ResetPasswordRes>(`/api/users/${encodeURIComponent(id)}/reset-password`, {}),
+  /** Projects — visibility-filtered list; create/delete per RBAC policy. */
+  listProjects: () => get<ProjectsRes>('/api/projects'),
+  createProject: (body: { name: string; cwd?: string; visibility?: ProjectVisibility }) =>
+    post<ProjectMutationRes>('/api/projects', body),
+  getProject: (id: string) => get<ProjectDetailRes>(`/api/projects/${encodeURIComponent(id)}`),
+  patchProject: (id: string, body: Record<string, unknown>) =>
+    patch<ProjectMutationRes>(`/api/projects/${encodeURIComponent(id)}`, body),
+  deleteProject: (id: string) => del<{ ok: boolean; id: string }>(`/api/projects/${encodeURIComponent(id)}`),
+  /** Project members — invite/add/remove (requires `project:edit`). */
+  listMembers: (projectId: string) =>
+    get<MembersRes>(`/api/projects/${encodeURIComponent(projectId)}/members`),
+  addMember: (projectId: string, body: { userId: string; role?: 'member' | 'viewer' }) =>
+    post<MemberMutationRes>(`/api/projects/${encodeURIComponent(projectId)}/members`, body),
+  removeMember: (projectId: string, userId: string) =>
+    del<{ ok: boolean; id: string }>(
+      `/api/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(userId)}`,
+    ),
 };

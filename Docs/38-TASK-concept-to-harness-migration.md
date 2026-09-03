@@ -1638,6 +1638,17 @@ survives; never delete both at once). If even that serves stale code, escalate i
 |    queue (no tool loop yet — decisions log the moment answers arrive);
 |    no `DELETE /api/cron` global clear (concept has no such button —
 |    follow-up).
+|    Deploy 2026-09-03: server dist rebuilt + `pm2 restart lokma-server`
+|    → `/health` 200 + `/api/cron` 200 with REAL `{"jobs":[],"count":0}`
+|    on the domain (server LIVE serves this run's code); web `web/dist`
+|    rebuilt (1700 modules) + `pm2 restart lokma-web` → `/` 200 WITH
+|    creds serving the fresh Vite build (`assets/index-BknigIUR.js`,
+|    same hash as this run's build, zero `_next/` refs, title `Lokma —
+|    harness`), 401 without creds. DEPLOY BLOCKER RESOLVED: `pm2 show
+|    lokma-web` now runs `bun x vite preview --host 127.0.0.1 --port
+|    3457` from `packages/lokma-web/web` (repointed outside this run,
+|    presumably foreground) — plan §9 is accurate again. Both processes
+|    online (server pid 1422833, web pid 1423300).
 |    Next piece: W6-26 ExtrasPane (23 ranked ideas as a REAL feature-flag
 |    board over `GET/PATCH /api/config` flags).
 ---

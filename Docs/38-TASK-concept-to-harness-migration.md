@@ -1520,6 +1520,12 @@ everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
 |    guard cache is in-process (sole writer is this server — no CLI
 |    plugin commands yet); suspending vault also 503s its search
 |    (real consequence, pane warns).
+|    Deploy 2026-09-03: server dist rebuilt + `pm2 restart lokma-server` →
+|    `/health` 200 + `/api/plugins` 200 with REAL W6-23 registry on domain
+|    (server LIVE serves this run's code); `web/dist` rebuilt (1694 modules)
+|    + `pm2 restart lokma-web` → `/` 200 BUT still stale `/_next/` HTML —
+|    DEPLOY BLOCKER persists (PM2 runs `next start` 15.5.24, needs foreground
+|    delete+start, not done per rule); both processes online.
 |    Next piece: W6-24 ObservabilityPane (TokenLedger + bus-log trace
 |    timeline + Replay + Share).
 ---

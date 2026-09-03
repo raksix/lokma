@@ -1424,11 +1424,55 @@ everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
     (`{"projectCreation":"members",...,"bootstrapped":false}` on the
     domain — server LIVE serves this run's code); web `web/dist`
     rebuilt (1688 modules) + `pm2 restart lokma-web` → `/` 200 BUT
-    still stale `/_next/` HTML — DEPLOY BLOCKER persists (PM2 runs
-    `next start` 15.5.24, needs foreground delete+start, not done per
-    rule). Both processes online (server pid 3785085, web pid 3785173).
-    Next piece: W6-22 SetupWizardPane (`lokma init` 3-step + Doctor 8
-    checks = `GET /api/doctor`).
+    |  |  still stale `/_next/` HTML — DEPLOY BLOCKER persists (PM2 runs
+    |  |  `next start` 15.5.24, needs foreground delete+start, not done per
+    |  |  rule). Both processes online (server pid 3785085, web pid 3785173).
+    |  |  Next piece: W6-22 SetupWizardPane (`lokma init` 3-step + Doctor 8
+    |  |  checks = `GET /api/doctor`).
+      - 2026-09-03 — W6-22 SetupWizardPane DONE
+        (server commit ea6ec5a + web commit bbe3a17, both pushed).
+        Server (shared `GlobalConfig.features` Zod map + new
+        `lokma-core/src/setup/` + new `server/src/routes/setup.ts`, `app.ts`
+        registration): `SETUP_FEATURES` registry mirrors the concept checkboxes
+        1:1 (browser/search/gateway/mcp/vault + docs pointers); `GET
+        /api/setup` (registry + resolved flags, stored wins); `POST
+        /api/setup {features}` (unknown ids 400 `unknown_feature`, non-bool
+        400 `bad_feature`, empty 400 `empty_patch`); `POST /api/setup/init
+        {cwd?}` (ensures global config + 6 data dirs + optional project
+        `.lokma/settings.json` scaffold exist — reports created/existed, never
+        wipes; bad cwd 400 `bad_cwd`); `GET /api/doctor[?agents=1]` (8
+        measured probes — config/credentials/providers/models/sessions/
+        agents/skills/locks — + a 9th SOUL probe counting agents with
+        SOUL.md content; every probe timed, throws become `ok:false` rows).
+        All failures `{code,message}`.
+        Web (`components/setup/` new: `setup.ts` helpers + `setup-pane.tsx` +
+        `setup.test.ts` 22/22 PASS + barrel; `api.ts` setup/doctor types + 4
+        fns; 18th Inspector tab `Setup`): concept layout 1:1 — Init card with
+        a REAL Run-init button (created/existed banner), Stack checkboxes from
+        the live registry (Save = real POST + server-truth reload, Turn-all-off
+        + Reset-to-defaults), Doctor terminal with live rows + pass footer +
+        real `--agents` toggle + Run + Copy. Concept hardcoded `doctorLines` +
+        toast-only Docs-32/Watcher buttons NOT ported (no dead buttons).
+        Gates: root `tsc --noEmit` 0 errors · web build green (1691
+        modules, 662k JS/gzip 175k) · shared+core+ai+server builds clean ·
+        all 26 probe files PASS (setup 22/22) · mock grep CLEAN (zero hits
+        on all new files) · LIVE probe (in-process createApp + inject,
+        startup-env temp HOME + refuse-guard) 40/40: registry defaults →
+        save → persist → 4 validation 400s → init (6 subdirs, config kept
+        from the save step) → rerun idempotent → cwd scaffold (+rerun) →
+        bad-cwd 400s → doctor 8/8 shape+content → agents=1 9th soul row →
+        create seeds default SOUL.md (1/1 pass) → rm SOUL.md (0/1 fail) →
+        disk features under temp HOME → real `~/.lokma/config.json`
+        untouched.
+        Honest scope: `features` is a plain boolean map (Docs/32 §2.1 full
+        key space — terminal.backend/browser.*/webSearch.*/gateway.* — stays
+        CLI-side until the agent loop reads it; the pane copy says MCP rows
+        live in Settings); init creates the 6 dirs the harness stores bind
+        to (sessions/auth/vault are caller-scoped, not created); the soul
+        probe caps at 20 agents.
+        W6 System panes continue (W6-21 auth + W6-22 setup done).
+        Next piece: W6-23 PluginMarketplacePane (Cordis list + enable/disable
+        without restart + install-from-URL).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

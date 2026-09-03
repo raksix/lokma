@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { BarChart3, GitBranch, Info, Layers, Plug2, Settings, Terminal } from 'lucide-react';
+import { BarChart3, GitBranch, Globe, Info, Layers, Plug2, Settings, Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
@@ -8,6 +8,7 @@ import { ProvidersPane } from './providers-pane';
 import { SettingsPane } from '@/components/settings';
 import { TerminalPane } from '@/components/terminal';
 import { GitPane } from '@/components/git';
+import { BrowserPane } from '@/components/browser';
 import { UsagePane } from '@/components/usage/usage-pane';
 
 /**
@@ -18,7 +19,9 @@ import { UsagePane } from '@/components/usage/usage-pane';
  * Settings the real W2-8 pane (Config/Appearance/Permissions/MCP over
  * `GET/PATCH /api/config`), Terminal the real W3-10 pane (live shells over
  * `POST /api/terminal` + WS `terminal/*` frames), Git the real W3-11 pane
- * (branch/status/log/commit/push over `GET/POST /api/git/*` + live locks).
+ * (branch/status/log/commit/push over `GET/POST /api/git/*` + live locks),
+ * Browser the real W3-12 pane (per-agent live tabs + server-owned history
+ * over `GET/POST /api/browser/*`, pages in a sandboxed iframe).
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
  */
@@ -31,7 +34,7 @@ export function InspectorPanel({
   sessionId?: string;
   ws?: UseWs;
 }) {
-  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git'>(
+  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser'>(
     'info',
   );
 
@@ -101,6 +104,15 @@ export function InspectorPanel({
           <GitBranch className="h-3 w-3" />
           Git
         </Button>
+        <Button
+          variant={tab === 'browser' ? 'default' : 'ghost'}
+          size="sm"
+          className="h-6 flex-1 gap-1.5 text-[11px]"
+          onClick={() => setTab('browser')}
+        >
+          <Globe className="h-3 w-3" />
+          Browser
+        </Button>
       </div>
       {tab === 'info' ? (
         <InfoPanel />
@@ -114,6 +126,14 @@ export function InspectorPanel({
         <SettingsPane />
       ) : tab === 'git' ? (
         <GitPane key={sessionId ?? 'no-session'} sessionId={sessionId} />
+      ) : tab === 'browser' ? (
+        sessionId ? (
+          <BrowserPane key={sessionId} sessionId={sessionId} />
+        ) : (
+          <div className="rounded border border-dashed p-3 text-xs text-muted-foreground">
+            Open a session to use the browser.
+          </div>
+        )
       ) : sessionId && ws ? (
         <TerminalPane key={sessionId} sessionId={sessionId} ws={ws} />
       ) : (

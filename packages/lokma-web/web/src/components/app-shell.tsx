@@ -1,7 +1,8 @@
 
 import * as React from 'react';
 import { Header } from '@/components/header';
-import { Sidebar, InfoPanel } from '@/components/sidebar';
+import { Sidebar } from '@/components/sidebar';
+import { InspectorPanel } from '@/components/providers';
 import { SessionsSidebar } from '@/components/sessions';
 import { Chat } from '@/components/chat';
 import { HealthBadge } from '@/components/status/health-badge';
@@ -143,7 +144,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         {rightVisible ? (
           <PaneErrorBoundary paneName="Inspector">
             <Sidebar side="right" title="Inspector">
-              <InfoPanel />
+              <InspectorPanel />
             </Sidebar>
           </PaneErrorBoundary>
         ) : null}

@@ -126,9 +126,29 @@ export type ConfigRes = {
   config: unknown;
   credentials: Record<string, { keySet: boolean; last4: string | null }>;
 };
-export type ProviderInfo = { id: string; enabled: boolean; keySet: boolean; last4: string | null };
+export type ProviderInfo = {
+  id: string;
+  name: string;
+  baseUrl: string;
+  enabled: boolean;
+  keySet: boolean;
+  last4: string | null;
+  priority: number;
+  custom: boolean;
+};
 export type ProvidersRes = { providers: ProviderInfo[] };
-export type ProviderTestRes = { ok: boolean; provider: string; error?: string; note?: string };
+export type ProviderTestRes = {
+  ok: boolean;
+  provider: string;
+  modelCount?: number;
+  models?: string[];
+  latencyMs?: number;
+  error?: string;
+  note?: string;
+};
+export type ProviderMutationRes = { ok: boolean; provider: ProviderInfo };
+export type CreateProviderBody = { id: string; name: string; baseUrl: string; apiKey?: string; enabled?: boolean };
+export type PatchProviderBody = { name?: string; baseUrl?: string; enabled?: boolean; priority?: number; apiKey?: string };
 export type ModelInfo = { id: string; label: string; provider: string };
 export type ModelsRes = { models: ModelInfo[]; count: number; cached: boolean };
 export type SessionSummary = {
@@ -172,9 +192,15 @@ export const api = {
   patchConfig: (patchBody: Record<string, unknown>) =>
     patch<{ ok: boolean; patched: string[] }>('/api/config', patchBody),
 
-  // Providers + models
+  // Providers + models — full CRUD lands with the W2 Providers tab (server real).
   listProviders: () => get<ProvidersRes>('/api/providers'),
   providers: () => get<ProvidersRes>('/api/providers'),
+  createProvider: (body: CreateProviderBody) => post<ProviderMutationRes>('/api/providers', body),
+  patchProvider: (id: string, body: PatchProviderBody) =>
+    patch<ProviderMutationRes>(`/api/providers/${encodeURIComponent(id)}`, body),
+  deleteProvider: (id: string) => del<{ ok: boolean; id: string }>(`/api/providers/${encodeURIComponent(id)}`),
+  reorderProviders: (order: string[]) =>
+    post<{ ok: boolean; providers: ProviderInfo[] }>('/api/providers/reorder', { order }),
   testProvider: (id: string) => post<ProviderTestRes>(`/api/providers/${encodeURIComponent(id)}/test`),
   listModels: () => get<ModelsRes>('/api/models'),
   models: () => get<ModelsRes>('/api/models'),

@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { SessionStore, TerminalError, UsageLedger, estimateCost, estimateTokens, resolveInRoot, terminalManager } from 'lokma-core';
+import { SessionStore, TerminalError, UsageLedger, estimateCost, estimateTokens, onAgentEvent, resolveInRoot, terminalManager } from 'lokma-core';
 import { stream as aiStream } from 'lokma-ai';
 import { decodeClientMessage, encodeServerMessage } from 'lokma-shared';
 
@@ -75,6 +75,17 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
           signal: record.signal,
           sessionId,
         }),
+      );
+    });
+
+    // Orchestration (W4-14): registry lifecycle transitions
+    // (create/pause/resume/kill/fork/clone/delete) fan out to every live
+    // socket as `agent_state` frames, so the Hub + Orchestration panes go
+    // live without polling. Agents are global (homedir registry), so unlike
+    // terminal traffic no session scoping applies here.
+    const offAgent = onAgentEvent((ev) => {
+      socket.send(
+        encodeServerMessage({ type: 'agent_state', agentId: ev.agentId, state: ev.state }),
       );
     });
 
@@ -209,6 +220,7 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
     socket.on('close', () => {
       offData();
       offExit();
+      offAgent();
       app.log.info(`[ws] client disconnected session=${sessionId}`);
     });
   });

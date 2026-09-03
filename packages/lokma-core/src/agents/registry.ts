@@ -2,13 +2,17 @@ import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promi
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { AgentSchema, PersonaSchema, type Agent, type AgentState } from 'lokma-shared';
+import { emitAgentEvent } from './events.js';
 
 /**
  * Agent registry — durable entities under ~/.lokma/agents/<id>/.
  * Each agent owns config.json (+ SOUL.md + MEMORY.md + IDENTITY.json).
- * The registry is the Hub's source of truth; live runs/queue drain land
- * with the orchestration wave (W4-14) — until then states are registry
- * writes (pause/resume/kill) with guarded transitions, never invented.
+ * The registry is the Hub's source of truth. Every mutation broadcasts an
+ * `AgentLifecycleEvent` (create/pause/resume/kill/fork/clone/delete) that
+ * the server fans out as WS `agent_state` frames — panes stay live without
+ * polling. States are registry writes with guarded transitions, never
+ * invented (no runner sets running/queued yet — that lands with run
+ * execution, a later wave).
  * See Docs/30-AGENT-SYSTEM §2, §5, §12
  */
 
@@ -200,6 +204,7 @@ export async function createAgent(opts: CreateAgentOpts): Promise<Agent> {
   });
 
   await saveAgent(agent);
+  emitAgentEvent({ agentId: id, state: 'idle', action: 'created' });
   const soul = opts.soul ?? `# SOUL — ${agent.name}\n\nPersona: ${agent.persona}\nModel: ${agent.model}\n`;
   await writeFile(join(dir, 'SOUL.md'), soul, 'utf-8');
   await writeFile(join(dir, 'MEMORY.md'), opts.memory ?? '', 'utf-8');
@@ -247,6 +252,7 @@ export async function deleteAgent(id: string): Promise<void> {
   // requireAgent validates the id shape first (no path traversal into rm).
   await requireAgent(id);
   await rm(agentDir(id), { recursive: true, force: true });
+  emitAgentEvent({ agentId: id, state: 'deleted', action: 'deleted' });
 }
 
 export type UpdateAgentPatch = {
@@ -297,6 +303,7 @@ export async function pauseAgent(id: string): Promise<Agent> {
   }
   agent.state = 'paused';
   await saveAgent(agent);
+  emitAgentEvent({ agentId: id, state: 'paused', action: 'paused' });
   return agent;
 }
 
@@ -308,6 +315,7 @@ export async function resumeAgent(id: string): Promise<Agent> {
   }
   agent.state = 'idle';
   await saveAgent(agent);
+  emitAgentEvent({ agentId: id, state: 'idle', action: 'resumed' });
   return agent;
 }
 
@@ -319,6 +327,7 @@ export async function killAgent(id: string): Promise<Agent> {
   }
   agent.state = 'killed';
   await saveAgent(agent);
+  emitAgentEvent({ agentId: id, state: 'killed', action: 'killed' });
   return agent;
 }
 
@@ -342,6 +351,7 @@ async function copyAgentDir(fromId: string, createdBy: string): Promise<Agent> {
     createdAt: new Date().toISOString(),
   };
   await saveAgent(agent);
+  emitAgentEvent({ agentId: id, state: 'idle', action: createdBy.startsWith('fork:') ? 'forked' : 'cloned' });
   // The copied IDENTITY.json still names the source — rewrite it for the copy.
   await writeFile(
     join(agentDir(id), 'IDENTITY.json'),

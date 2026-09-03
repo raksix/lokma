@@ -28,6 +28,8 @@ export default defineConfig({
   preview: {
     port: 3457,
     host: '127.0.0.1',
+    // Served behind nginx as lokma.fermag.com.tr — Vite blocks unknown Host headers.
+    allowedHosts: ['lokma.fermag.com.tr', '127.0.0.1', 'localhost'],
   },
   build: {
     outDir: 'dist',

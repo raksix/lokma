@@ -1295,6 +1295,68 @@ everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
     per rule). Both processes online.
     Next piece: W5-20 BotsPane (`GET /api/bots` registry + playground
     `POST /api/bots/:id/run` + fork/publish).
+  - 2026-09-03 — W5-20 BotsPane DONE
+    (server commit 27feaf2 + web commit e598c39, both pushed).
+    NOTE: the core/shared/server/web implementation was found as
+    uncommitted WIP in the dirty tree (orphaned run, same pattern as
+    W2-6/W4-15/W5-19) — adopted as this run's ONE piece, reviewed
+    fresh file-by-file, all gates + the full live probe re-run before
+    the atomic commits (server + web separate).
+    Server (`lokma-core/src/bots/` new: `store.ts` + `bundled.ts` +
+    `index.ts`; shared `schemas/bot.ts`; `server/src/routes/bots.ts`;
+    `app.ts` registration): bundled lokma-ceo template (mirrors
+    `.lokma/bots/lokma-ceo/bot.json` per Docs/37, parsed through
+    `BotSchema` so drift fails closed, read-only) + global
+    `~/.lokma/bots/<id>/bot.json` store + project overlay (`?cwd=`
+    shadows global shadows bundled, featured-first sort); routes
+    `GET /api/bots|/:id`, `POST /api/bots` (409 `bot_exists`),
+    `PATCH /api/bots/:id` (partial budgets merge — the W4-13 clobber
+    class fixed by construction, 400 `empty_patch`, bundled 400
+    `bundled_readonly`), `POST /:id/fork` (knowledge copy best-effort,
+    512KB/file cap, `createdFrom: bot:<src>`), `POST /:id/publish`
+    (visibility flip), `POST /:id/run {task}` (spawns a REAL agent
+    `createdBy: bot:<id>`, SOUL = systemPrompt, budgets mapped, plus a
+    REAL session for playground chat); all failures `{code,message}`.
+    Web (`components/bots/` new: `bots.ts` helpers + `bots-pane.tsx` +
+    `bot-dialog.tsx` + `bots.test.ts` 46/46 PASS + barrel; `api.ts`
+    bot types + 7 fns; 16th Inspector tab `Bots`): concept layout 1:1 —
+    Featured/Mine/Shared tabs derived from the real
+    featured/visibility/source + live counts + search, Create dialog
+    (visible labels, client mirrors server rules), detail with real Run
+    (labeled task form + result banner + Open session), Fork (optional
+    as-id), Publish (visibility select, disabled on bundled), bot.json
+    copy of the LOADED record, lifecycle strip + stored-record preview
+    + honest idle-agent footer. Concept mock BOTS rows + invented run
+    counts + toast-only Create/Hub buttons NOT ported (pane counts live
+    agents instead, labeled as such).
+    Gates: root `tsc --noEmit` 0 errors · web build green (1685
+    modules, 622k JS/gzip 166k) · shared+core+ai+server builds clean ·
+    all 23 probe files PASS (bots 46/46) · mock grep clean (hits =
+    labeled input `placeholder` attrs only, every one with a visible
+    `<label>`) · LIVE probe (in-process createApp + inject, temp HOME)
+    38/38: bundled list/get → create → dup 409 → bad-name/bad-id 400s →
+    patch (budgets kept) → empty/bundled 400s → fork (+dup 409) →
+    publish + reflected + bad/bundled 400s → run (agent `createdBy`
+    tag + session with ≥1 message) → blank-task/unknown 400/404s →
+    get unknown/evil-id 404/400s → bot.json + agent dir verified under
+    temp HOME → real `~/.lokma` untouched.
+    Honest scope: run agents start idle (execution lands with the agent
+    runner, a later wave — the pane says so); no `DELETE /api/bots/:id`
+    (concept has no delete button — follow-up); no Hub/marketplace
+    sharing (Docs/35 §6 follow-up); run sessions default to the server
+    cwd unless a cwd is passed (same default on read, consistent).
+    W5 Builder tools COMPLETE (W5-17 archify + W5-18 design + W5-19
+    testing + W5-20 bots).
+    Deploy 2026-09-03: server rebuilt (`build:server` clean) + `pm2
+    restart lokma-server` → `/health` 200 + `/api/bots` 200 with REAL
+    lokma-ceo JSON on the domain (server LIVE serves this run's code);
+    web `web/dist` rebuilt (1685 modules) + `pm2 restart lokma-web` →
+    `/` 200 BUT still stale `/_next/` HTML — DEPLOY BLOCKER persists
+    (PM2 runs `next start` 15.5.24, needs foreground delete+start, not
+    done per rule). Both processes online (server pid 3326814, web pid
+    3326967).
+    Next piece: W6-21 AuthPane (login + RBAC matrix + members/invite +
+    visibility toggle).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

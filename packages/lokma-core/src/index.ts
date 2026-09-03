@@ -45,5 +45,8 @@ export * from './browser/index.js';
 // Archify (typed IR → validated deterministic HTML/SVG + share cards)
 export * from './archify/index.js';
 
+// Design Studio (6 artifact types over bundled systems + DESIGN.md guard)
+export * from './design/index.js';
+
 // Utils (DRY — reuse from here, don't duplicate)
 export * from './utils/index.js';

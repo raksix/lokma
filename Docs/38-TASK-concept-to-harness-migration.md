@@ -719,6 +719,43 @@ drag, tiling toggle, save/reset layout — all against live data, zero mock cont
   W2 Settings/usage COMPLETE (W2-5 providers + W2-6 models + W2-7 usage).
   Next piece: W2-8 Config + Appearance + Permissions + MCP tabs
   (`GET/PATCH /api/config` layered merge UI + theme persist + MCP servers).
+|- 2026-09-03 — W2-8 Config + Appearance + Permissions + MCP DONE
+  (server commit b1f9622 + web commit e6369d1, both pushed).
+  Server: NO new routes (GET/PATCH /api/config already real) — shared
+  touch only: new `McpServerSchema` (transport enum stdio|http|sse|ws,
+  command/url, enabled default true, `.passthrough()` so old configs
+  with extra keys still parse) now validates `mcp.servers` in
+  GlobalConfig + ProjectSettings (was `record(unknown)`); bad
+  transports 400 instead of silently persisting garbage.
+  Web: new `components/settings/` (`settings.ts` pure helpers:
+  THEME_CARDS, serverThemeToMode, normalizeConfig/McpEntry/Hooks,
+  validateMcpForm, full-object PATCH builders; `settings.test.ts`
+  50/50 PASS) + 4 panes wired as a 5th Inspector tab `Settings`
+  (single GET load, remount-on-reload, lucide only, concept tokens
+  1:1): Config (effective merged values + editable defaultModel +
+  masked credentials status), Appearance (4 theme cards → instant
+  light/dark + PATCH persist, same value the CLI reads), Permissions
+  (allow/deny add/remove + defaultMode select + hooks add/remove —
+  SAME rule store the chat card writes), MCP (add/edit dialog with
+  visible labels, transport select, enable toggle, two-click delete).
+  Concept mock rows + toast-only buttons (Test, Add Provider dialog,
+  key preview, tool counts) NOT ported — no dead buttons.
+  Gates: root `tsc --noEmit` 0 errors · web build green (1647
+  modules, 421k JS/gzip 121k) · server `tsc -p` clean · all probes
+  PASS (settings 50/50 + api + ws + stores + shell 10/10 + theme
+  11/11 + sessions 21/21 + providers 25/25 + models 13 + usage 26/26
+  + chat + lokma-message) · mock grep: settings clean (2 hits =
+  own anti-mock comments) · LIVE probe on :3464 with temp HOME:
+  GET defaults → PATCH theme/hooks/permissions/MCP → GET reflects
+  → bad theme/transport 400 → disk `config.json` verified (real
+  `~/.lokma` untouched). Honest note: PATCH writes global, but the
+  repo's own `.lokma/settings.json` project layer wins for
+  defaultModel in the merge (Docs/26 design) — Config tab shows the
+  effective value, verified via `?cwd=/tmp`.
+  W2 FULLY COMPLETE (W2-5 providers + W2-6 models + W2-7 usage +
+  W2-8 config/appearance/permissions/MCP).
+  Next piece: W3-9 FileBrowser (`GET /api/files` tree + read/save +
+  `@mention`).
 - (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 
 ---

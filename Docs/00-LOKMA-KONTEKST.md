@@ -340,9 +340,16 @@
 - **W2 TAMAMLANDI** (W2-5 providers + W2-6 models + W2-7 usage).
 - **Sıradaki parça:** W2-8 Config + Appearance + Permissions + MCP sekmeleri.
 
+### 2026-09-03 — TASK-38 W2-8 Config + Appearance + Permissions + MCP DONE (server b1f9622 + web e6369d1 — W2 FULLY COMPLETE)
+- **Executor run:** W2-8 tamamlandı — server'da yeni route YOK (GET/PATCH /api/config zaten gerçekti), tek shared dokunuş: `McpServerSchema` (transport enum stdio|http|sse|ws + command/url + enabled, `.passthrough()` ile eski config'ler parse edilir, hatalı transport 400).
+- **Web:** yeni `components/settings/` (settings.ts saf helper'lar + settings.test.ts 50/50 PASS) + Inspector'da 5. sekme Settings (tek GET, reload'da remount): Config (efektif merge değerler + defaultModel düzenleme + masked credentials), Appearance (4 tema kartı → anlık light/dark + PATCH persist, CLI ile aynı değer), Permissions (allow/deny/mode/hooks — chat kartıyla AYNI store), MCP (add/edit diyaloğu + enable toggle + iki-tıklı silme). Concept mock satırları + toast-only butonlar taşınmadı (ölü buton yok).
+- **Gates:** root tsc 0 · web build green (1647 modül) · server clean · tüm problar PASS · mock grep temiz · CANLI prob (:3464, temp HOME): GET → PATCH theme/permissions/MCP/hooks → GET yansıdı → bad theme/transport 400 → diskte config.json doğrulandı. Dürüst not: PATCH global'e yazar ama projenin `.lokma/settings.json` layer'ı defaultModel'de kazanır (Docs/26 tasarımı) — sekme efektif değeri gösterir (`?cwd=/tmp` ile doğrulandı).
+- **W2 TAMAMEN BİTTİ** (W2-5 providers + W2-6 models + W2-7 usage + W2-8 settings).
+- **Sıradaki parça:** W3-9 FileBrowser (`GET /api/files` ağacı + okuma/kaydetme + `@mention`).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W2-7 Usage DONE — server c51f8e6 + web f637bfc, W2 COMPLETE)
-- **Son işlem:** TASK-38 W2-7 DONE — gerçek kullanım muhasebesi (ledger + fiyat tablosu + summary/sessions/export endpoint'leri, WS cost frame'leri gerçek), web'de Inspector'da gerçek Usage sekmesi (KPI + grafik + oturumlar + indirme), sırada W2-8 Config/MCP
+- **Son güncelleme:** 2026-09-03 (TASK-38 W2-8 Config/Appearance/Permissions/MCP DONE — server b1f9622 + web e6369d1, W2 FULLY COMPLETE)
+- **Son işlem:** TASK-38 W2-8 DONE — Inspector'da 5. sekme Settings (Config: efektif merge + defaultModel düzenleme + masked credentials; Appearance: 4 tema kartı anlık light/dark + PATCH persist; Permissions: allow/deny/mode/hooks — chat kartıyla aynı store; MCP: CRUD + enable toggle, McpServerSchema validasyonlu), sırada W3-9 FileBrowser
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

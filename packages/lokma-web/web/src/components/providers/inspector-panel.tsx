@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { BarChart3, Beaker, Bot, Cpu, Folder, GitBranch, Globe, Info, Layers, Paintbrush, Plug2, Puzzle, Settings, Shield, Terminal, Users, Workflow } from 'lucide-react';
+import { BarChart3, Beaker, Bot, Cpu, Folder, GitBranch, Globe, HardDrive, Info, Layers, Paintbrush, Plug2, Puzzle, Settings, Shield, Terminal, Users, Workflow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
@@ -18,6 +18,7 @@ import { DesignPane } from '@/components/design';
 import { TestingPane } from '@/components/testing';
 import { BotsPane } from '@/components/bots';
 import { AuthPane } from '@/components/auth';
+import { SetupPane } from '@/components/setup';
 import { UsagePane } from '@/components/usage/usage-pane';
 
 /**
@@ -55,7 +56,9 @@ import { UsagePane } from '@/components/usage/usage-pane';
  * real W6-21 pane (login + RBAC matrix + projects + members over
  * `POST/GET/PATCH /api/auth/*`, `GET/POST/PATCH/DELETE /api/users/*`,
  * `GET/POST/PATCH/DELETE /api/projects/*`, invite accept + copyable
- * link, viewer-403 gates enforced server-side).
+ * link, viewer-403 gates enforced server-side), Setup the real W6-22
+ * pane (`lokma init` + optional-stack flags + `lokma doctor` probes over
+ * `GET/POST /api/setup*` + `GET /api/doctor`).
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
  */
@@ -68,7 +71,7 @@ export function InspectorPanel({
   sessionId?: string;
   ws?: UseWs;
 }) {
-  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault' | 'skills' | 'archify' | 'design' | 'testing' | 'bots' | 'auth'>(
+  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault' | 'skills' | 'archify' | 'design' | 'testing' | 'bots' | 'auth' | 'setup'>(
     'info',
   );
 
@@ -228,9 +231,20 @@ export function InspectorPanel({
           <Shield className="h-3 w-3" />
           Auth
         </Button>
+        <Button
+          variant={tab === 'setup' ? 'default' : 'ghost'}
+          size="sm"
+          className="h-6 flex-1 gap-1.5 text-[11px]"
+          onClick={() => setTab('setup')}
+        >
+          <HardDrive className="h-3 w-3" />
+          Setup
+        </Button>
       </div>
       {tab === 'info' ? (
         <InfoPanel />
+      ) : tab === 'setup' ? (
+        <SetupPane />
       ) : tab === 'auth' ? (
         <AuthPane />
       ) : tab === 'bots' ? (

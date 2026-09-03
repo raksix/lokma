@@ -376,6 +376,23 @@ export type OpenBrowserTabBody = { url?: string; agentId?: string; sessionId?: s
 export type OpenBrowserTabRes = { ok: boolean; tabId: string; tab: BrowserTab };
 export type CloseBrowserTabRes = { ok: boolean; id: string; closed: boolean };
 
+// ─── Setup + doctor (optional stack + init + probes behind the SetupPane, W6-22) ───
+
+export type SetupFeatureView = {
+  id: string;
+  label: string;
+  desc: string;
+  docs: string;
+  defaultOn: boolean;
+  enabled: boolean;
+};
+export type SetupRes = { features: SetupFeatureView[]; applied: Record<string, boolean>; count: number };
+export type SetupSaveRes = { ok: boolean; applied: Record<string, boolean> };
+export type SetupInitBody = { cwd?: string };
+export type SetupInitRes = { ok: boolean; created: string[]; existed: string[] };
+export type DoctorCheckView = { name: string; ok: boolean; latencyMs: number; detail: string };
+export type DoctorRes = { checks: DoctorCheckView[]; passed: number; total: number };
+
 // ─── Archify diagrams (typed IR → validated HTML/SVG behind the ArchifyPane, W5-17) ───
 
 export type ArchifyNode = { id: string; label: string; kind?: string };
@@ -1028,4 +1045,17 @@ export const api = {
     del<{ ok: boolean; id: string }>(
       `/api/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(userId)}`,
     ),
+
+  // Setup + doctor — optional stack + init + subsystem probes (W6-22,
+  // Docs/32 §8). The server owns the registry, the flags, init and every
+  // probe; the pane only renders and persists.
+  /** Feature registry + resolved flags (stored flags win over defaults). */
+  getSetup: () => get<SetupRes>('/api/setup'),
+  /** Persist the checkbox map (unknown ids answer 400 `unknown_feature`). */
+  saveSetupFeatures: (features: Record<string, boolean>) =>
+    post<SetupSaveRes>('/api/setup', { features }),
+  /** Ensure global config + data dirs exist (missing ones are created). */
+  initSetup: (body: SetupInitBody = {}) => post<SetupInitRes>('/api/setup/init', body),
+  /** 8 subsystem probes (+ SOUL when `agents` is true) — all measured live. */
+  getDoctor: (agents = false) => get<DoctorRes>(agents ? '/api/doctor?agents=1' : '/api/doctor'),
 };

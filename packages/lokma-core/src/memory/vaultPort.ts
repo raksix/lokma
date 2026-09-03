@@ -3,11 +3,11 @@
  * See Docs/28 §5.1 and Docs/29.
  */
 
-export type VaultNote = { path: string; title: string; content: string };
+export type VaultPortNote = { path: string; title: string; content: string };
 
 export interface VaultPort {
   ingest(path: string, content: string, opts?: { append_to?: string }): Promise<{ ok: true; path: string }>;
-  search(q: string): Promise<VaultNote[]>;
+  search(q: string): Promise<VaultPortNote[]>;
   graph(): Promise<{ nodes: unknown[]; links: unknown[] }>;
   tree(): Promise<unknown>;
 }
@@ -17,7 +17,7 @@ export class NoopVault implements VaultPort {
   async ingest(): Promise<{ ok: true; path: string }> {
     return { ok: true, path: '' };
   }
-  async search(): Promise<VaultNote[]> {
+  async search(): Promise<VaultPortNote[]> {
     return [];
   }
   async graph(): Promise<{ nodes: unknown[]; links: unknown[] }> {

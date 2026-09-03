@@ -21,6 +21,9 @@ export * from './skills/index.js';
 // Memory (infinite + vault)
 export * from './memory/index.js';
 
+// Vault (file-backed markdown graph + search + ingest for the VaultPane)
+export * from './vault/index.js';
+
 // Agents (per-agent SOUL/MEMORY/model + caps + locks + worktree)
 export * from './agents/index.js';
 

@@ -288,9 +288,16 @@
 - **Gates:** root `tsc --noEmit` 0 · web build green (311k JS/gzip 93k) · server `tsc -p` clean · mock grep temiz.
 - **Sıradaki parça:** W0-F5 theme port (`concept/src/index.css` → `web/src/index.css` — 4 tema değil, F4'teki light/dark toggle'ın görsel karşılığı + concept token'ları 1:1).
 
+### 2026-09-03 — TASK-38 W0-F5 theme port DONE (commit 24a845e, W0 foundation COMPLETE)
+- **Executor run:** W0-F5 tamamlandı — `web/src/index.css` concept'tekiyle byte-identical değiştirildi (diff temiz, 189 satır) + `web/index.html` (sabit `class="dark"` silindi, Inter/Instrument Serif/JetBrains Mono font linkleri + ilk boyamadan önce `lokma-theme` uygulayan guard script eklendi) + `shell/theme.ts` kontrat yorumu + `shell/theme.test.ts` 11/11 PASS.
+- **Kapsam notu:** plan §F5 "4 tema" diyordu ama concept referansı sadece light/dark sunuyor (`themes/*.json` CLI tarafı paletler, concept'te web seçici yok) — F5 light/dark'ı 1:1 taşıdı, JSON paletler CLI'da kaldı; 4-tema web seçici ayrı bir wave'in işi (§9'a işlendi).
+- **Gates:** root `tsc --noEmit` 0 · web build green (CSS 28.77kB, JS 311k) · server `tsc -p` clean · tüm problar PASS (theme 11/11 + shell 10/10 + api + ws + stores) · mock grep temiz.
+- **W0 foundation TAMAMLANDI** (pre-flight + F1 api + F2 ws + F3 stores + F4 shell + F5 theme).
+- **Sıradaki parça:** W1-1 SingleChatView + Composer (ilk chat-core pane'i).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W0-F4)
-- **Son işlem:** TASK-38 W0-F4 shell chrome DONE (484f113) — Header/Toast/SearchModal/Footer/error boundary/offline banner canlı, §9'da, sırada W0-F5 theme port
+- **Son güncelleme:** 2026-09-03 (TASK-38 W0-F5, W0 foundation COMPLETE)
+- **Son işlem:** TASK-38 W0-F5 theme port DONE (24a845e) — concept token'ları 1:1 harness'ta, §9'da, sırada W1-1 SingleChatView + Composer
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

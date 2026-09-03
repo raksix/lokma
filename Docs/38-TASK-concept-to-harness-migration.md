@@ -455,6 +455,27 @@ drag, tiling toggle, save/reset layout — all against live data, zero mock cont
   server `tsc -p` clean · shell.test.ts 10/10 + api/ws/stores probes PASS ·
   mock grep clean (1 hit = "never mock data" comment in api.ts).
   Next piece: W0-F5 theme port (`concept/src/index.css` → `web/src/index.css`).
+- 2026-09-03 — W0-F5 theme port DONE (`web/src/index.css` replaced byte-identical
+  with `concept/src/index.css` (diff clean, 189 lines) + `web/index.html` (dropped
+  hardcoded `class="dark"`, added Inter/Instrument Serif/JetBrains Mono font links
+  + pre-paint `lokma-theme` guard script) + `shell/theme.ts` contract comment fix +
+  `shell/theme.test.ts` 11/11 PASS, commit 24a845e).
+  Web now renders on the real concept tokens: cream `#FAF9F5` light default,
+  terracotta `#C96442`, ink `#262624`, `@theme` cream/paper/ink/terracotta/line +
+  font stacks (fixes `font-serif`/`font-mono` fallbacks), `@custom-variant dark`,
+  shadcn vars intact (`bg-card/bg-background/bg-muted/bg-primary` keep working —
+  same var names in both files), pane/scrollbar/hover utilities, `.dark` hex
+  overrides (previously the header toggle added a class no CSS answered).
+  Scope note: plan §F5 said "4 themes (claude/omp/midnight/paper)" — the concept
+  reference only ships light/dark (`themes/*.json` are CLI-side palettes, no web
+  picker exists in concept), so F5 ports light/dark 1:1 and leaves the JSON
+  palettes CLI-side; a 4-theme web picker is a follow-up wave, not this piece.
+  Gates: root `tsc --noEmit` 0 errors · web build green (1625 modules,
+  CSS 28.77kB/gzip 6.78kB, JS 311k/gzip 93k) · server `tsc -p` clean ·
+  all probes PASS (theme 11/11 + shell 10/10 + api + ws 28/28 + stores 44/44) ·
+  mock grep clean (1 hit = "never mock data" comment in api.ts).
+  W0 foundation COMPLETE (pre-flight + F1 api + F2 ws + F3 stores + F4 shell + F5 theme).
+  Next piece: W1-1 SingleChatView + Composer (first chat-core pane).
 - (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 
 ---

@@ -756,7 +756,48 @@ drag, tiling toggle, save/reset layout — all against live data, zero mock cont
   W2-8 config/appearance/permissions/MCP).
   Next piece: W3-9 FileBrowser (`GET /api/files` tree + read/save +
   `@mention`).
-- (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
+|- 2026-09-03 — W3-9 FileBrowser DONE
+  (server commit caa66d3 + web commit 93862eb, both pushed).
+  Server: new `lokma-core/src/files/` (`WorkspaceFiles`: jailed
+  `resolveInRoot` guard, `list` one-level dirs-first + git overlay
+  M/A/D/R/? per file with dirty-descendant aggregation for dirs,
+  `read` 256KB cap + binary sniff + full-file sha, `write` atomic via
+  `writeAtomic` with `expectedSha` 409 guard + create-if-missing,
+  `search` server-ranked fuzzy capped 20k visits; skips
+  node_modules/.git/dist/.next/build/target) + new
+  `GET /api/files|/read|/search` + `POST /api/files/write`
+  (`{code,message}` errors: bad_path/outside_root/not_a_*/binary_file/
+  too_large/stale_file/file_not_found/bad_query).
+  `ws.ts` `@file` reader now reuses the shared `resolveInRoot` (DRY,
+  same jail behavior).
+  Web: new `components/files/` (`files.ts` pure helpers: basename/
+  parentDir/joinRel/formatSize/gitLabel/filterLoaded/appendMention +
+  `files.test.ts` 28/28 PASS) + `file-browser.tsx` (session-scoped cwd
+  via `GET /api/sessions/:id`, lazy tree, labeled search + debounced
+  server quick-open, preview → edit → save with 409 conflict UI
+  [Use server version / Overwrite with mine], right-click menu Copy
+  path/filename + Insert @mention + Open, drag rows with
+  `application/x-lokma-file` + `@path` fallback) wired under
+  SessionsSidebar in the left Explorer; `api.ts` gains
+  list/read/search/write fns + types; Chat Card accepts drops +
+  `lokma-insert-mention` events → Composer `dropSignal` splices
+  `@path` (existing parser → `contextPaths`, server reads bytes into
+  model context); AppShell Ctrl+P reveals the left pane + focuses
+  search. Concept toast-only buttons (New file/Reveal/Terminal-here)
+  NOT ported — no dead buttons. No Monaco dep (plain textarea,
+  honest scope note).
+  Gates: root `tsc --noEmit` 0 errors · web build green (1650
+  modules, 437k JS/gzip 125k) · server `tsc -p` clean · all 13
+  probes PASS (files 28/28 + chat + api + ws + stores + shell +
+  theme + sessions + providers + models + usage + settings) ·
+  mock grep: files clean (1 hit = Input `placeholder` attr, visible
+  `<label>` present) · LIVE probe on :3465 with temp HOME: list
+  (M/? + dir aggregation) → read+sha → write → stale 409 →
+  create → escape 400 → missing 404 → search → bad-query 400 →
+  real-null binary 400, all green (real `~/.lokma` untouched).
+  Next piece: W3-10 TerminalPane (xterm + `terminal/data|exit` WS
+  frames + per-tool-call tabs + kill).
+|- (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 
 ---
 

@@ -347,9 +347,15 @@
 - **W2 TAMAMEN BİTTİ** (W2-5 providers + W2-6 models + W2-7 usage + W2-8 settings).
 - **Sıradaki parça:** W3-9 FileBrowser (`GET /api/files` ağacı + okuma/kaydetme + `@mention`).
 
+### 2026-09-03 — TASK-38 W3-9 FileBrowser DONE (server caa66d3 + web 93862eb)
+- **Executor run:** W3-9 tamamlandı — server'da yeni `lokma-core/src/files/` (`WorkspaceFiles`: workspace'e hapis `resolveInRoot` guard, tek-seviye dirs-first `list` + dosya başına M/A/D/R/? git overlay + kirli-torun aggregation ile dizin rozetleri, 256KB cap + binary sniff + full-file sha ile `read`, `writeAtomic` ile atomik `write` + `expectedSha` 409 guard + yoksa-oluştur, 20k ziyaret cap'li server-sıralı fuzzy `search`; node_modules/.git/dist/.next/build/target atlanır) + yeni `GET /api/files|/read|/search` + `POST /api/files/write` (`{code,message}` hataları) + `ws.ts` `@file` okuyucu artık paylaşılan guard'ı kullanıyor (DRY).
+- **Web:** yeni `components/files/` (saf helper'lar + `files.test.ts` 28/28 PASS) + `file-browser.tsx` (session-scoped cwd, lazy ağaç, etiketli arama + debounced server quick-open, preview → edit → 409 conflict UI [Use server version / Overwrite with mine], sağ-tık menü, drag ile `@path`) sol Explorer'da SessionsSidebar altında; Chat drop kabul ediyor + Composer `dropSignal` ile `@path` ekliyor (mevcut parser → `contextPaths`, server dosya baytlarını modele katıyor); AppShell Ctrl+P sol paneyi açıp aramaya odaklıyor. Concept'in toast-only butonları taşınmadı (ölü buton yok). Monaco bağımlılığı yok (düz textarea — dürüst kapsam notu).
+- **Gates:** root tsc 0 · web build green (1650 modül, 437k JS) · server clean · 13 probun hepsi PASS · mock grep temiz · CANLI prob (:3465, temp HOME): list → read+sha → write → stale 409 → create → escape 400 → missing 404 → search → binary 400, hepsi green.
+- **Sıradaki parça:** W3-10 TerminalPane (xterm + `terminal/data|exit` WS frame'leri + sekme + kill).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W2-8 Config/Appearance/Permissions/MCP DONE — server b1f9622 + web e6369d1, W2 FULLY COMPLETE)
-- **Son işlem:** TASK-38 W2-8 DONE — Inspector'da 5. sekme Settings (Config: efektif merge + defaultModel düzenleme + masked credentials; Appearance: 4 tema kartı anlık light/dark + PATCH persist; Permissions: allow/deny/mode/hooks — chat kartıyla aynı store; MCP: CRUD + enable toggle, McpServerSchema validasyonlu), sırada W3-9 FileBrowser
+- **Son güncelleme:** 2026-09-03 (TASK-38 W3-9 FileBrowser DONE — server caa66d3 + web 93862eb)
+- **Son işlem:** TASK-38 W3-9 DONE — gerçek workspace explorer canlı (ağaç + git overlay M/A/D/R/? + preview/edit/save `expectedSha` guard + 409 conflict UI + fuzzy quick-open + drag/drop `@mention` → Composer → model context), sırada W3-10 TerminalPane
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

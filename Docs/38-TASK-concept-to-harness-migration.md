@@ -1693,6 +1693,47 @@ survives; never delete both at once). If even that serves stale code, escalate i
     W6-24 observability + W6-25 cron + W6-26 extras).
     Next piece: W7-27 Pane system port (`Pane.tsx` + `SplitTree.tsx` +
     `WindowedCanvas.tsx` + `TilingBar.tsx` + `App.tsx` shell state).
+
+- 2026-09-03 — TASK-38 W7-27 Pane system port DONE (web 239708d —
+  server commit NONE, all endpoints reused: sessions fork/merge,
+  files read, config untouched).
+  - **Executor run:** W7-27 done — real tiling workspace live in the
+    harness center column (split/windowed panes + 5-zone drag split +
+    session drop chooser + tab picker + file previews).
+  - **Web:** new `components/panes/` (`panes.ts` pure helpers +
+    `panes.test.ts` 66/66 PASS + `pane.tsx` WorkspacePane/tab-bar/
+    chooser/picker/file-preview + `split-tree.tsx` + `windowed-canvas.tsx`
+    + `tiling-bar.tsx` 19 open actions + `inspector-host.tsx` 22 real
+    panes + `workspace.tsx` tab-state owner + barrel; `app-shell.tsx`
+    gains the Tiling toggle + tiling/windowed center;
+    `sessions-sidebar.tsx` drop copy updated to W7-live). Session tabs render ChatWithSocket (own socket +
+    Composer); tool tabs render the SAME panes as the Inspector;
+    file tabs read real bytes (cwd via GET session + GET files/read,
+    read-only + Copy/Mention/Retry, honest cwd-missing states).
+    Concept mock tabs + toast-only buttons + `handleOpenTab("Yeni
+    mesaj")` fake-Composer path NOT ported (no dead buttons).
+  - **Gates:** root `tsc --noEmit` 0 errors · web build green (1711
+    modules, 746k JS/gzip 197k) · server `tsc -p` untouched-clean (no
+    server files changed) · all 31 probe files PASS (panes 66/66) ·
+    mock grep clean (anti-mock comments + labeled input placeholder +
+    negative `{kind:"mock"}` fixtures only) · dist bundle contains
+    `Tiling workspace`, zero `_next/` refs.
+  - **Deploy:** web-only piece — `web/dist` rebuilt (pre-commit) +
+    `pm2 restart lokma-web` → `/` 200 WITH creds serving the FRESH
+    Vite build, 401 without creds; `/health` 200 (server untouched).
+    Both processes online (`bun x vite preview` — stale-stack check
+    PASS).
+  - **Honest scope:** tool panes (terminal/git/browser) bind to the
+    workspace session with a real New-session gate when absent;
+    tab snapshots persist to `lokma:tiling-tabs:v1` (validated load);
+    layout persists via `lokma:layout:v1`; merge target = pane's own
+    session tab (chooser says so when absent).
+  - TASK-38 ALL WAVES COMPLETE (W0 foundation + W1 chat + W2
+    settings/usage + W3 workspaces + W4 agents/orchestration/vault/
+    skills + W5 builder tools + W6 system panes + W7 pane system).
+    Next: Phase 1/2/3 follow-ups (agent runner daemon, FTS5 vault,
+    remote marketplace, firing cron daemon, 3D vault, PNG/WebM
+    exports, `DELETE` endpoints).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

@@ -491,16 +491,25 @@
   - **Web:** yeni `components/extras/` (`extras.ts` 23'lük katalog + saf helper'lar + `extras-pane.tsx` + `extras.test.ts` 49 check PASS + barrel; 22. Inspector sekmesi `Extras`, Star ikonu): concept düzeni 1:1. Shipped satırlar gerçek tab'i açar (bots/agents/cron/observability/skills/setup/vault/browser/git) veya gerçek yüzeyi yazar (Sessions sidebar → Fork, Composer mic); roadmap satırlar GERÇEK flag toggle'lar (full-map PATCH — SetupPane stack flag'leri shallow-merge tuzağından korunur) veya gerçek milestone gösterir (#20 drag-handoff milestone-only, W7'yi bekler). Concept `done` kolonundan dürüst sapmalar: #11 browser-per-agent shipped (W3-12 per-agent tab'leri), #16 worktree GC shipped (W3-11 Git GC butonu — manuel prune; TTL sweeper Phase 3) — ikisi de testte notlu. Concept toast-only Open/Plan taşınmadı — ölü buton/sahte veri yok.
   - **Gates:** root tsc 0 · web build green (5.51sn) · server'a dokunulmadı · extras probu 49/49 · mock grep temiz (`todo` filtre label'ları hariç) · CANLI prob (in-process createApp + inject, temp HOME + refuse-guard) 8/8: setup seed → PATCH extras flag → GET yansıtır + sibling'ler korunur → toggle off → non-bool 400 → gerçek `~/.lokma` yok (dokunulmadı).
   - **Deploy:** web-only — dist + `pm2 restart lokma-web` → `/` creds'le 200 TAZE Vite build (`assets/index-D7SI_RkA.js`, sıfır `_next/` ref'i, bundle'da `Extras — 23 ranked`), creds'siz 401; `/health` 200 (server'a dokunulmadı). İki süreç online (server pid 1422833, web pid 1914651, `bun x vite preview` — stale-stack PASS). **W6 System COMPLETE** (auth+setup+plugins+observability+cron+extras).
-- **Sıradaki parça:** W7-27 Pane system port (`Pane.tsx` + `SplitTree.tsx` + `WindowedCanvas.tsx` + `TilingBar.tsx` + `App.tsx` shell state).
+- **Sıradaki parça:** TASK-38 TAMAMLANDI (W0-W7 tüm dalgalar bitti) — sıradaki iş Phase 1/2/3 follow-up'ları (agent runner daemon, FTS5 vault, remote marketplace, firing cron daemon, 3D vault, PNG/WebM exportları, `DELETE` endpoint'leri).
+
+### 2026-09-03 — TASK-38 W7-27 Pane system port DONE (web 239708d — server commit YOK, tüm endpoint'ler yeniden kullanıldı)
+- **Executor run:** W7-27 tamamlandı — harness center column'da gerçek tiling workspace canlı (split/windowed pane'ler + 5-zone drag split + session drop chooser + tab picker + dosya önizlemeleri).
+  - **Web:** yeni `components/panes/` (`panes.ts` saf helper'lar + `panes.test.ts` 66/66 PASS + `pane.tsx` WorkspacePane/sekme çubuğu/chooser/picker/dosya-önizleme + `split-tree.tsx` + `windowed-canvas.tsx` + `tiling-bar.tsx` 19 açma aksiyonu + `inspector-host.tsx` 22 gerçek pane + `workspace.tsx` sekme-durum sahibi + barrel; `app-shell.tsx`'e Tiling düğmesi + tiling/windowed merkez; `sessions-sidebar.tsx` drop yazısı W7-canlı). Session sekmeleri ChatWithSocket render eder (kendi socket+Composer'ı); araç sekmeleri Inspector'la AYNI gerçek pane'leri render eder; dosya sekmeleri gerçek bayt okur (GET session→cwd + GET files/read, salt-okunur + Kopyala/Mention/Tekrar-dene, dürüst cwd-yok halleri). Concept mock sekmeleri + toast-only butonlar + `handleOpenTab("Yeni mesaj")` sahte-Composer yolu TAŞINMADI (ölü buton yok).
+  - **Gates:** root tsc 0 · web build green (1711 modül, 746k JS/gzip 197k) · server'a dokunulmadı · 31 prob dosyasının hepsi PASS (panes 66/66) · mock grep temiz · dist bundle'da `Tiling workspace` var, sıfır `_next/` ref'i.
+  - **Deploy:** web-only — dist + `pm2 restart lokma-web` → `/` creds'le 200 TAZE Vite build, creds'siz 401; `/health` 200. İkisi de online (`bun x vite preview` — stale-stack PASS).
+  - **Dürüst kapsam:** araç pane'leri (terminal/git/browser) workspace session'ına bağlı, session yoksa gerçek New-session geçidi; sekme anlık görüntüleri `lokma:tiling-tabs:v1`'de (doğrulamalı yükleme); layout `lokma:layout:v1`'de; merge hedefi pane'in kendi session sekmesi (yoksa chooser'da yazıyor).
+- **TASK-38 TÜM DALGALAR TAMAMLANDI** (W0 temel + W1 chat + W2 settings/usage + W3 workspace'ler + W4 agents/orchestration/vault/skills + W5 builder araçları + W6 sistem pane'leri + W7 pane sistemi).
 
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W6-26 ExtrasPane DONE — web 37236f5, W6 COMPLETE)
-- **Son işlem:** TASK-38 W6-26 DONE — Inspector'da 22. sekme olarak gerçek feature-flag board canlı (14/23 · 61% + shipped satırlarda gerçek tab'e Open + roadmap satırlarda `features.extras.*` toggle + milestone; toast-only butonlar taşınmadı); sırada W7-27 Pane system port
+- **Son güncelleme:** 2026-09-03 (TASK-38 W7-27 Pane system port DONE — web 239708d, TASK-38 COMPLETE)
+- **Son işlem:** TASK-38 W7-27 DONE — harness merkezinde gerçek tiling workspace canlı (split/windowed pane'ler, 5-zone drop, session chooser, tab picker, dosya önizleme); 31/31 prob PASS; dist'te `Tiling workspace`, canlıda TAZE Vite build.
+
+## Sıradaki adım (Phase 1/2/3 follow-up'ları)
 - **Sıradaki adım:**
-  1. W7-27 Pane system port — `Pane.tsx` + `SplitTree.tsx` + `WindowedCanvas.tsx` + `TilingBar.tsx` + `App.tsx` shell state (canlı veriye drag/split/fork/merge)
-  2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**
-  3. Phase 2: MCP+hooks+skills+plugins+git+terminal+browser + **memory deep+vault graph + agents parallel+safe+communication+orchestration + archify/design/testing/bots deep + panes v2**
-  4. Phase 3: themes+sharing+cloud + **extras (marketplace, cron per agent, approvals, observability, handoff, browser per agent, adversarial review, … 23 ranked)** + mobile+perf+a11y
+  1. Phase 1: core loop + agent runner daemon (cron firing, `lastRunAt` canlanması) + `DELETE` endpoint'leri
+  2. Phase 2: FTS5 vault araması + 3D vault grafiği + remote plugin marketplace + memory deep
+  3. Phase 3: PNG/WebM export'ları (archify/design) + themes + sharing + cloud + mobile + perf + a11y
 
 ---
 *Bu dosya otomatik yönetilir. Elle silme.*

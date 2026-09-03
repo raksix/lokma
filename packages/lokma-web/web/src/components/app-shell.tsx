@@ -6,6 +6,10 @@ import { InspectorPanel } from '@/components/providers';
 import { SessionsSidebar } from '@/components/sessions';
 import { FileBrowser, FOCUS_FILES_EVENT } from '@/components/files';
 import { Chat } from '@/components/chat';
+import { TilingWorkspace } from '@/components/panes';
+import { LayoutGrid } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { usePaneStore } from '@/stores/pane';
 import { HealthBadge } from '@/components/status/health-badge';
 import { useWs } from '@/hooks/use-ws';
 import { api } from '@/lib/api';
@@ -27,6 +31,7 @@ import {
  */
 export function AppShell({ sessionId }: { sessionId: string }) {
   const [activeId, setActiveId] = React.useState(sessionId);
+  const tiling = usePaneStore((s) => s.tiling);
   const [leftVisible, setLeftVisible] = React.useState(true);
   const [rightVisible, setRightVisible] = React.useState(true);
   const [searchOpen, setSearchOpen] = React.useState(false);
@@ -141,8 +146,13 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         ) : null}
 
         <main className="flex flex-1 flex-col overflow-hidden p-3">
+          <TilingToggle />
           <PaneErrorBoundary paneName="Chat">
-            <Chat key={activeId} sessionId={activeId} ws={ws} onOpenSession={switchSession} />
+            {tiling ? (
+              <TilingWorkspace sessionId={activeId} ws={ws} onOpenSession={switchSession} />
+            ) : (
+              <Chat key={activeId} sessionId={activeId} ws={ws} onOpenSession={switchSession} />
+            )}
           </PaneErrorBoundary>
           <div className="mt-2 text-center text-[11px] text-muted-foreground">
             Sessions persist to <code className="rounded bg-muted px-1">~/.lokma/projects/&lt;hash&gt;/sessions/*.jsonl</code> (CLI + Web share)
@@ -167,6 +177,29 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         }}
       />
       <ToastHost />
+    </div>
+  );
+}
+
+// TilingToggle — enters the W7 tiling workspace (split/windowed panes over
+// live sessions and Inspector tools). Hidden once tiling (the TilingBar's
+// Single button exits); layout and tabs restore from the persisted stores.
+function TilingToggle() {
+  const tiling = usePaneStore((s) => s.tiling);
+  const setTiling = usePaneStore((s) => s.setTiling);
+  if (tiling) return null;
+  return (
+    <div className="mb-2 flex shrink-0 justify-end">
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-7 gap-1.5 text-xs"
+        title="Open the tiling workspace (split panes, floating windows, drag sessions and files)"
+        onClick={() => setTiling(true)}
+      >
+        <LayoutGrid className="h-3 w-3" />
+        Tiling workspace
+      </Button>
     </div>
   );
 }

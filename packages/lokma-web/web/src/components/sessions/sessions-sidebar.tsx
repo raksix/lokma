@@ -33,8 +33,8 @@ import {
  * row below comes from the server (CLI + Web share the same JSONL files).
  *
  * Dragging a row carries the real session id
- * (`application/x-lokma-session`); the drop side (split/fork/merge dialog)
- * lands with the W7 pane system — no fake tabs are created here.
+ * (`application/x-lokma-session`); drops land in the W7 tiling workspace
+ * (open / side-by-side split / fork / merge chooser) — no fake tabs here.
  */
 
 const RENDER_CAP = 120;
@@ -80,7 +80,7 @@ function SessionRow({
         e.dataTransfer.setData('text/plain', title);
         e.dataTransfer.effectAllowed = 'copy';
       }}
-      title={`Drag into a pane (split/fork/merge lands in W7) — ${session.id}`}
+      title={`Drag into a tiling pane (open, split, fork, merge) — ${session.id}`}
       className={cn(
         'group rounded-md border bg-white dark:bg-[#1E1E21] transition cursor-grab active:cursor-grabbing',
         active

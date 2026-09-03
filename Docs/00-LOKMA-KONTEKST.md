@@ -257,9 +257,17 @@
 - **Furkan:** "concept designi gerçek web harness design kısmına aktarma ve çalışır hale getirme olacak, önce task hazırla detaylı ama aşırı detaylı"
 - **Hermes:** `Docs/38-TASK-concept-to-harness-migration.md` yazıldı (22KB) — concept/ (mock, 21 pane + shell) → `packages/lokma-web/web/` (real Vite SPA) + `packages/lokma-web/server/` (Fastify) tam göç planı: W0 foundation (api/ws client, stores, shell chrome, theme) + W1 chat core + W2 providers/models/usage/config + W3 files/terminal/git/browser + W4 agents/orchestration/vault/skills + W5 archify/design/testing/bots + W6 auth/setup/marketplace/observability/cron/extras + W7 pane system port; per-pane migration card template, verification gates, commit plan, risks, execution log. Sıradaki adım: W0 pre-flight (§1.3: server route audit + vite proxy kararı).
 
+### 2026-09-03 — TASK-38 W0 pre-flight DONE (audit + baseline, sıfır kod değişikliği)
+- **Executor run:** Docs/38 §1.3 pre-flight tamamlandı — sonuç §9 execution log'a tablo olarak işlendi.
+  - **Server audit:** health REAL · config GET REAL / PATCH STUB · providers GET REAL / test STUB · models REAL · sessions REAL (thin create) · agents read-only REAL · skills read-only REAL · vault STUB · WS PARTIAL (gerçek SessionStore + lokma-ai stream, ama model hardcoded, cost hardcoded $0.002, permission/ask/tool frame'leri yok) · usage/files/terminal/browser/git/auth/bots/tests/archify/design/cron/observability rotaları hiç yok (sonraki wave'ler).
+  - **Web audit:** `lib/api.ts` KEEP+F1'de genişlet · `lib/ws.ts` KEEP+F2'de proxy fix (`:3456` hardcode) · `hooks/use-ws.ts` KEEP+F2'de reconnect + typed frame'ler.
+  - **Vite proxy kararı:** KEEP — server `:3456`, web `:3457` + `/api`+`/ws` proxy zaten bağlı, değişiklik yok.
+  - **Baseline:** root `tsc --noEmit` 0 hata · concept 1863 modules green · web 46 modules green · server `tsc -p` clean · tree clean.
+- **Sıradaki parça:** W0-F1 api client (`web/src/lib/api.ts` — typed wrapper, 401→login, `{code,message}`, endpoint-grup fonksiyonları).
+
 ## Son Durum
 - **Son güncelleme:** 2026-09-03 (TASK-38)
-- **Son işlem:** TASK-38 migration plan yazıldı (`Docs/38-TASK-*.md`, 22KB) — loop 20/20 bitti, concept eksiksiz, sırada W0 pre-flight + foundation
+- **Son işlem:** TASK-38 W0 pre-flight DONE — server REAL-vs-STUB tablosu + vite proxy kararı (KEEP :3456) §9'da, baseline green (tsc 0, concept 1863, web 46, server clean), sırada W0-F1 api client
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

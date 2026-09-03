@@ -13,11 +13,13 @@ import { useSessionStore } from '@/stores';
 
 export type NoteHit = { id: string; title: string };
 
-/** Case-insensitive substring match over session ids (pure, unit-tested). */
+/** Case-insensitive substring match over session title + id + model (pure, unit-tested). */
 export function filterSessionHits(sessions: SessionSummary[], query: string): SessionSummary[] {
   const q = query.trim().toLowerCase();
   if (!q) return sessions.slice(0, 8);
-  return sessions.filter((s) => s.id.toLowerCase().includes(q)).slice(0, 8);
+  return sessions
+    .filter((s) => `${s.title ?? ''} ${s.id} ${s.model ?? ''}`.toLowerCase().includes(q))
+    .slice(0, 8);
 }
 
 /** Coerce unknown vault graph nodes into displayable hits (pure, unit-tested). */

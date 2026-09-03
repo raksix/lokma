@@ -18,32 +18,6 @@ export function Sidebar({ side, title, children }: { side: 'left' | 'right'; tit
   );
 }
 
-export function SessionsPanel({ sessions, onSelect }: { sessions: string[]; onSelect?: (id: string) => void }) {
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm">Sessions</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-1">
-        {sessions.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No sessions yet — send a prompt to create one.</p>
-        ) : (
-          sessions.map((id) => (
-            <button
-              key={id}
-              onClick={() => onSelect?.(id)}
-              title={id}
-              className="block w-full truncate rounded border px-2 py-1.5 text-left font-mono text-xs hover:border-[#C96442] hover:bg-[#FDF0E6]"
-            >
-              {id.slice(0, 18)}…
-            </button>
-          ))
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 export function InfoPanel() {
   return (
     <div className="space-y-3">

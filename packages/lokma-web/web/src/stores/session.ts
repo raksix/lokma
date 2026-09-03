@@ -23,6 +23,16 @@ export type SessionStore = {
   loadTranscript: (id: string) => Promise<void>;
   /** Drop one cached transcript so the next view refetches it. */
   invalidateSession: (id: string) => void;
+  /** Create a session on the server, refresh the list, and select it. */
+  createSession: (opts?: { cwd?: string; model?: string }) => Promise<string | null>;
+  /** Fork a session on the server, refresh, and return the new id. */
+  forkSession: (id: string) => Promise<string | null>;
+  /** Rename a session (title sidecar) and refresh the list. */
+  renameSession: (id: string, title: string) => Promise<boolean>;
+  /** Delete a session on the server and prune every local cache for it. */
+  deleteSession: (id: string) => Promise<boolean>;
+  /** Merge `fromId` into `intoId` on the server; the target goes stale. */
+  mergeSessions: (intoId: string, fromId: string) => Promise<number | null>;
   /** Fold WS lifecycle frames into cache state (stream frames stay in use-ws). */
   applyWsEvent: (msg: ServerMessage) => void;
   reset: () => void;
@@ -85,6 +95,74 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
       delete transcripts[id];
       return { transcripts, stale };
     });
+  },
+
+  createSession: async (opts?: { cwd?: string; model?: string }) => {
+    try {
+      const res = await api.createSession(opts ?? {});
+      await get().refreshSessions(opts?.cwd);
+      get().selectSession(res.id);
+      return res.id;
+    } catch (e) {
+      set({ lastError: e instanceof Error ? e.message : 'session create failed' });
+      return null;
+    }
+  },
+
+  forkSession: async (id: string) => {
+    try {
+      const res = await api.forkSession(id);
+      await get().refreshSessions();
+      return res.id;
+    } catch (e) {
+      set({ lastError: e instanceof Error ? e.message : 'session fork failed' });
+      return null;
+    }
+  },
+
+  renameSession: async (id: string, title: string) => {
+    try {
+      await api.renameSession(id, title);
+      await get().refreshSessions();
+      return true;
+    } catch (e) {
+      set({ lastError: e instanceof Error ? e.message : 'session rename failed' });
+      return false;
+    }
+  },
+
+  deleteSession: async (id: string) => {
+    try {
+      await api.deleteSession(id);
+      set((prev) => {
+        const transcripts = { ...prev.transcripts };
+        const stale = { ...prev.stale };
+        delete transcripts[id];
+        delete stale[id];
+        return {
+          sessions: prev.sessions.filter((s) => s.id !== id),
+          transcripts,
+          stale,
+          activeSessionId: prev.activeSessionId === id ? null : prev.activeSessionId,
+        };
+      });
+      return true;
+    } catch (e) {
+      set({ lastError: e instanceof Error ? e.message : 'session delete failed' });
+      return false;
+    }
+  },
+
+  mergeSessions: async (intoId: string, fromId: string) => {
+    try {
+      const res = await api.mergeSessions(intoId, fromId);
+      get().invalidateSession(intoId);
+      await get().refreshSessions();
+      return res.appended;
+    } catch (e) {
+      set({ lastError: e instanceof Error ? e.message : 'session merge failed' });
+      return null;
+    }
   },
 
   applyWsEvent: (msg: ServerMessage) => {

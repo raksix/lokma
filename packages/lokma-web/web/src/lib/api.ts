@@ -110,6 +110,10 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
   return request<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
 }
 
+async function del<T>(path: string): Promise<T> {
+  return request<T>(path, { method: 'DELETE' });
+}
+
 /** Back-compat thin wrapper — kept for existing callers, now with auth + 401 handling. */
 export async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   return request<T>(path, init);
@@ -127,12 +131,28 @@ export type ProvidersRes = { providers: ProviderInfo[] };
 export type ProviderTestRes = { ok: boolean; provider: string; error?: string; note?: string };
 export type ModelInfo = { id: string; label: string; provider: string };
 export type ModelsRes = { models: ModelInfo[]; count: number; cached: boolean };
-export type SessionSummary = { id: string; cwd?: string };
+export type SessionSummary = {
+  id: string;
+  cwd?: string;
+  /** Display title (server derives it from the first user line when never renamed). */
+  title?: string;
+  /** True when the title was set via rename. */
+  renamed?: boolean;
+  /** Per-session model from the meta sidecar (null when never set). */
+  model?: string | null;
+  messageCount?: number;
+  /** ISO timestamps for Today/Yesterday/Earlier grouping. */
+  createdAt?: string;
+  updatedAt?: string;
+};
 export type SessionsRes = { sessions: SessionSummary[]; count: number };
 export type SessionDetail = { id: string; cwd: string; model: string | null; messages: unknown[]; count: number };
 export type CreateSessionRes = { ok: boolean; id: string; cwd: string };
 export type ForkSessionRes = { ok: boolean; id: string; from: string; copied?: number };
-export type PatchSessionRes = { ok: boolean; id: string; model: string };
+export type PatchSessionRes = { ok: boolean; id: string; model: string; title?: string | null };
+export type RenameSessionRes = { ok: boolean; id: string; model: string; title: string | null };
+export type DeleteSessionRes = { ok: boolean; id: string };
+export type MergeSessionRes = { ok: boolean; id: string; from: string; appended: number };
 export type RewindSessionRes = { ok: boolean; id: string; kept: number };
 export type SlashCommandInfo = { id: string; name: string; hint: string; usage: string };
 export type CommandsRes = { commands: SlashCommandInfo[]; count: number };
@@ -168,6 +188,11 @@ export const api = {
   forkSession: (id: string) => post<ForkSessionRes>(`/api/sessions/${encodeURIComponent(id)}/fork`),
   patchSession: (id: string, body: { model: string }) =>
     patch<PatchSessionRes>(`/api/sessions/${encodeURIComponent(id)}`, body),
+  renameSession: (id: string, title: string) =>
+    patch<RenameSessionRes>(`/api/sessions/${encodeURIComponent(id)}`, { title }),
+  deleteSession: (id: string) => del<DeleteSessionRes>(`/api/sessions/${encodeURIComponent(id)}`),
+  mergeSessions: (intoId: string, fromId: string) =>
+    post<MergeSessionRes>(`/api/sessions/${encodeURIComponent(intoId)}/merge`, { from: fromId }),
   rewindSession: (id: string, keepMessages: number) =>
     post<RewindSessionRes>(`/api/sessions/${encodeURIComponent(id)}/rewind`, { keepMessages }),
 

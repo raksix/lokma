@@ -1,7 +1,8 @@
 
 import * as React from 'react';
 import { Header } from '@/components/header';
-import { Sidebar, SessionsPanel, InfoPanel } from '@/components/sidebar';
+import { Sidebar, InfoPanel } from '@/components/sidebar';
+import { SessionsSidebar } from '@/components/sessions';
 import { Chat } from '@/components/chat';
 import { HealthBadge } from '@/components/status/health-badge';
 import { useWs } from '@/hooks/use-ws';
@@ -30,7 +31,6 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   const [serverUp, setServerUp] = React.useState<boolean | null>(null);
 
   const ws = useWs(activeId);
-  const sessions = useSessionStore((s) => s.sessions);
   const refreshSessions = useSessionStore((s) => s.refreshSessions);
   const selectSession = useSessionStore((s) => s.selectSession);
 
@@ -101,8 +101,6 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const sessionIds = sessions.map((s) => s.id);
-
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <Header
@@ -120,7 +118,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           <PaneErrorBoundary paneName="Explorer">
             <Sidebar side="left" title="Explorer">
               <div className="space-y-4">
-                <SessionsPanel sessions={sessionIds} onSelect={switchSession} />
+                <SessionsSidebar activeId={activeId} onSelect={switchSession} />
                 <div className="rounded border border-dashed p-3 text-xs text-muted-foreground">
                   <div className="font-medium text-foreground">Server</div>
                   <div className="mt-1 flex items-center gap-2">

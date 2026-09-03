@@ -34,6 +34,8 @@ secrets.json
 ~/.lokma/
 sessions/
 checkpoints/
+# ...except the web Sessions sidebar source (feature dir, not runtime data)
+!packages/lokma-web/web/src/components/sessions/
 *.jsonl
 
 # OS

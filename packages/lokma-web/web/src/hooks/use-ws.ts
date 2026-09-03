@@ -1,61 +1,219 @@
-
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { wsUrl, type WsStatus } from '@/lib/ws';
+import {
+  MAX_RECONNECT_ATTEMPTS,
+  abortMessage,
+  applyServerFrame,
+  decodeServerFrame,
+  directWsUrl,
+  dropRequest,
+  initialWsUiState,
+  permissionAnswer,
+  promptMessage,
+  questionAnswer,
+  reconnectDelay,
+  withAuthToken,
+  wsUrl,
+  type CostTotal,
+  type PermissionRequest,
+  type QuestionRequest,
+  type ServerMessage,
+  type ToolCallEntry,
+  type WsStatus,
+  type WsUiState,
+} from '@/lib/ws';
 
 /**
- * useWs — DRY WS hook for chat streaming.
- * Handles connect / text_delta accumulation / done / error / reconnect.
- * Single hook, reused by Chat (no duplication).
+ * useWs — typed WS hook for harness chat streaming.
+ * Connects `/ws/:sessionId` (vite proxy first, direct `:3456` fallback),
+ * auto-reconnects with capped backoff, and folds every validated server frame
+ * into React state via the pure `applyServerFrame` reducer.
+ * Single hook, reused by Chat and every future pane (no duplication).
  */
 
-export type WsMessage = { type: string; delta?: string; sessionId?: string; [k: string]: unknown };
+export type UseWs = {
+  status: WsStatus;
+  messages: ServerMessage[];
+  stream: string;
+  toolCalls: Record<string, ToolCallEntry>;
+  cost: CostTotal;
+  permissions: PermissionRequest[];
+  questions: QuestionRequest[];
+  done: boolean;
+  lastError: string | null;
+  sendText: (prompt: string) => void;
+  sendPrompt: (prompt: string) => void;
+  answerPermission: (requestId: string, decision: 'allow' | 'deny' | 'always') => void;
+  answerQuestion: (requestId: string, answer: string) => void;
+  interrupt: () => void;
+  reconnect: () => void;
+  disconnect: () => void;
+  connect: () => void;
+};
 
-export function useWs(sessionId: string) {
+function socketSend(ws: WebSocket | null, payload: string): void {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(payload);
+}
+
+export function useWs(sessionId: string): UseWs {
   const wsRef = useRef<WebSocket | null>(null);
+  const attemptRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const manualRef = useRef(false);
+  const sessionRef = useRef(sessionId);
+  sessionRef.current = sessionId;
+
   const [status, setStatus] = useState<WsStatus>('idle');
-  const [messages, setMessages] = useState<WsMessage[]>([]);
-  const [stream, setStream] = useState('');
+  const [messages, setMessages] = useState<ServerMessage[]>([]);
+  const [ui, setUi] = useState<WsUiState>(() => initialWsUiState());
 
-  const connect = useCallback(() => {
-    if (!sessionId) return;
-    setStatus('connecting');
-    const ws = new WebSocket(wsUrl(sessionId));
-    wsRef.current = ws;
+  const clearTimer = useCallback(() => {
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
 
-    ws.onopen = () => setStatus('open');
-    ws.onclose = () => setStatus('closed');
-    ws.onerror = () => setStatus('error');
-    ws.onmessage = (ev) => {
-      try {
-        const msg = JSON.parse(ev.data) as WsMessage;
-        setMessages((m) => [...m, msg]);
-        if (msg.type === 'text_delta' && typeof msg.delta === 'string') {
-          setStream((s) => s + msg.delta);
+  const openSocket = useCallback(
+    (url: string) => {
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        attemptRef.current = 0;
+        setStatus('open');
+      };
+      ws.onmessage = (ev: MessageEvent) => {
+        const msg = decodeServerFrame(ev.data);
+        if (!msg) return;
+        setMessages((prev) => [...prev, msg]);
+        setUi((prev) => applyServerFrame(prev, msg));
+      };
+      ws.onerror = () => {
+        // Error details arrive via onclose; just make sure a dead socket closes.
+        if (ws.readyState !== WebSocket.CLOSED) {
+          try {
+            ws.close();
+          } catch {
+            // Already gone — onclose handles the rest.
+          }
         }
-        if (msg.type === 'done') {
-          // Stream complete — keep full text in messages, clear live stream after a tick
+      };
+      ws.onclose = () => {
+        if (manualRef.current) {
+          setStatus('closed');
+          return;
         }
-      } catch {}
-    };
-
-    return () => ws.close();
-  }, [sessionId]);
-
-  useEffect(() => {
-    const cleanup = connect();
-    return () => {
-      cleanup?.();
-      wsRef.current?.close();
-    };
-  }, [connect]);
-
-  const sendPrompt = useCallback(
-    (prompt: string) => {
-      setStream('');
-      wsRef.current?.send(JSON.stringify({ type: 'prompt', prompt, sessionId }));
+        const attempt = attemptRef.current;
+        if (attempt >= MAX_RECONNECT_ATTEMPTS) {
+          setStatus('error');
+          return;
+        }
+        attemptRef.current = attempt + 1;
+        setStatus('connecting');
+        clearTimer();
+        const proxied = attempt === 0;
+        timerRef.current = setTimeout(() => {
+          if (manualRef.current) return;
+          // First retry keeps the proxy path; later retries try the direct port.
+          const retryUrl = proxied
+            ? wsUrl(sessionRef.current)
+            : directWsUrl(sessionRef.current);
+          openSocket(withAuthToken(retryUrl));
+        }, reconnectDelay(attempt));
+      };
     },
-    [sessionId],
+    [clearTimer],
   );
 
-  return { status, messages, stream, sendPrompt, connect };
+  const connect = useCallback(() => {
+    if (!sessionRef.current || typeof WebSocket === 'undefined') return;
+    manualRef.current = false;
+    attemptRef.current = 0;
+    clearTimer();
+    try {
+      wsRef.current?.close();
+    } catch {
+      // No live socket — opening a fresh one below.
+    }
+    setStatus('connecting');
+    openSocket(withAuthToken(wsUrl(sessionRef.current)));
+  }, [clearTimer, openSocket]);
+
+  const disconnect = useCallback(() => {
+    manualRef.current = true;
+    clearTimer();
+    try {
+      wsRef.current?.close();
+    } catch {
+      // Socket already gone.
+    }
+    wsRef.current = null;
+    setStatus('closed');
+  }, [clearTimer]);
+
+  useEffect(() => {
+    manualRef.current = false;
+    connect();
+    return () => {
+      manualRef.current = true;
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      try {
+        wsRef.current?.close();
+      } catch {
+        // Socket already gone.
+      }
+      wsRef.current = null;
+    };
+  }, [connect, sessionId]);
+
+  const sendText = useCallback((prompt: string) => {
+    const text = prompt.trim();
+    if (!text) return;
+    setUi((prev) => ({ ...prev, stream: '', done: false, doneReason: null }));
+    socketSend(wsRef.current, promptMessage(text, sessionRef.current));
+  }, []);
+
+  const answerPermission = useCallback(
+    (requestId: string, decision: 'allow' | 'deny' | 'always') => {
+      socketSend(wsRef.current, permissionAnswer(requestId, decision));
+      setUi((prev) => ({ ...prev, permissions: dropRequest(prev.permissions, requestId) }));
+    },
+    [],
+  );
+
+  const answerQuestion = useCallback((requestId: string, answer: string) => {
+    socketSend(wsRef.current, questionAnswer(requestId, answer));
+    setUi((prev) => ({ ...prev, questions: dropRequest(prev.questions, requestId) }));
+  }, []);
+
+  const interrupt = useCallback(() => {
+    // Keep the partial stream visible — stopping preserves what arrived so far.
+    socketSend(wsRef.current, abortMessage(sessionRef.current));
+  }, []);
+
+  return {
+    status,
+    messages,
+    stream: ui.stream,
+    toolCalls: ui.toolCalls,
+    cost: ui.cost,
+    permissions: ui.permissions,
+    questions: ui.questions,
+    done: ui.done,
+    lastError: ui.lastError,
+    sendText,
+    sendPrompt: sendText,
+    answerPermission,
+    answerQuestion,
+    interrupt,
+    reconnect: connect,
+    disconnect,
+    connect,
+  };
 }
+
+export type { QuestionRequest };

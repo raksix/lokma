@@ -20,7 +20,7 @@ export function ChatInput({ onSend, disabled }: { onSend: (text: string) => void
   return (
     <div className="flex gap-2 border-t bg-card p-3">
       <Input
-        placeholder={disabled ? 'Connecting…' : 'Ask Lokma… (mock WS → lokma-ai)'}
+        placeholder={disabled ? 'Connecting…' : 'Ask Lokma…'}
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {

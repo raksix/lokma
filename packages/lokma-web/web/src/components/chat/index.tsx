@@ -8,6 +8,7 @@ import { useWs, type UseWs } from '@/hooks/use-ws';
 import { api } from '@/lib/api';
 import { useProviderStore, useSessionStore } from '@/stores';
 import { emitToast } from '@/components/shell';
+import { FILE_DRAG_MIME, INSERT_MENTION_EVENT } from '@/components/files';
 import { formatCostBadge } from '@/components/header';
 
 /**
@@ -49,6 +50,7 @@ export function Chat({
   const [pending, setPending] = React.useState<PendingMessage[]>([]);
   const [streamVisible, setStreamVisible] = React.useState(true);
   const [paletteSignal, setPaletteSignal] = React.useState(0);
+  const [dropSignal, setDropSignal] = React.useState<{ path: string; key: number } | null>(null);
   const keySeq = React.useRef(0);
   const doneSeen = React.useRef(false);
 
@@ -333,13 +335,51 @@ export function Chat({
     [transcript.length, pending.length, stream, send, model, openSession],
   );
 
+  // Explorer drops + context-menu "Insert @mention" land here as a signal
+  // the Composer splices into its draft (existing mention → contextPaths).
+  const insertMention = React.useCallback((path: string) => {
+    const clean = path.trim().replace(/^@/, '');
+    if (!clean) return;
+    keySeq.current += 1;
+    setDropSignal({ path: clean, key: keySeq.current });
+  }, []);
+
+  React.useEffect(() => {
+    const onMention = (e: Event): void => {
+      insertMention((e as CustomEvent<string>).detail ?? '');
+    };
+    window.addEventListener(INSERT_MENTION_EVENT, onMention);
+    return () => window.removeEventListener(INSERT_MENTION_EVENT, onMention);
+  }, [insertMention]);
+
+  const onChatDrop = React.useCallback(
+    (e: React.DragEvent) => {
+      const direct = e.dataTransfer.getData(FILE_DRAG_MIME);
+      const plain = e.dataTransfer.getData('text/plain');
+      const path = (direct || (plain.startsWith('@') ? plain : '')).trim().replace(/^@/, '');
+      if (!path) return;
+      e.preventDefault();
+      insertMention(path);
+      emitToast(`Attached @${path}`);
+    },
+    [insertMention],
+  );
+
   const costLabel =
     cost.inputTokens + cost.outputTokens > 0
       ? `${formatCostBadge(cost)}${cost.model ? ` · ${cost.model}` : ''}`
       : null;
 
   return (
-    <Card className="flex flex-1 flex-col overflow-hidden">
+    <Card
+      className="flex flex-1 flex-col overflow-hidden"
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes(FILE_DRAG_MIME) || e.dataTransfer.types.includes('text/plain')) {
+          e.preventDefault();
+        }
+      }}
+      onDrop={onChatDrop}
+    >
       <div className="flex h-9 items-center gap-2 border-b px-3 text-xs text-muted-foreground">
         <span className="font-mono">{sessionId}</span>
         <span className="ml-auto flex items-center gap-1">
@@ -379,6 +419,7 @@ export function Chat({
           streaming={streaming}
           socketOpen={socketOpen}
           paletteSignal={paletteSignal}
+          dropSignal={dropSignal}
           onSend={send}
           onStop={interrupt}
           onSlash={runSlash}

@@ -4,6 +4,7 @@ import { Header } from '@/components/header';
 import { Sidebar } from '@/components/sidebar';
 import { InspectorPanel } from '@/components/providers';
 import { SessionsSidebar } from '@/components/sessions';
+import { FileBrowser, FOCUS_FILES_EVENT } from '@/components/files';
 import { Chat } from '@/components/chat';
 import { HealthBadge } from '@/components/status/health-badge';
 import { useWs } from '@/hooks/use-ws';
@@ -87,6 +88,12 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         document.getElementById('lokma-model-select')?.focus();
         return;
       }
+      if (mod && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        setLeftVisible(true);
+        window.dispatchEvent(new Event(FOCUS_FILES_EVENT));
+        return;
+      }
       if (e.key === 'Escape') {
         setSearchOpen(false);
         return;
@@ -120,6 +127,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
             <Sidebar side="left" title="Explorer">
               <div className="space-y-4">
                 <SessionsSidebar activeId={activeId} onSelect={switchSession} />
+                <FileBrowser key={activeId} sessionId={activeId} />
                 <div className="rounded border border-dashed p-3 text-xs text-muted-foreground">
                   <div className="font-medium text-foreground">Server</div>
                   <div className="mt-1 flex items-center gap-2">

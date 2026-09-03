@@ -17,6 +17,7 @@ import { api, type SlashCommandInfo } from '@/lib/api';
 import { useProviderStore } from '@/stores';
 import { emitToast } from '@/components/shell';
 import { isSlashPrefix, parseMentions, parseSlashCommand, removeMention } from './composer-utils';
+import { appendMention } from '@/components/files';
 import { enabledModels } from '@/components/providers/models';
 
 /**
@@ -69,6 +70,7 @@ export function Composer({
   streaming,
   socketOpen,
   paletteSignal,
+  dropSignal,
   onSend,
   onStop,
   onSlash,
@@ -79,6 +81,8 @@ export function Composer({
   socketOpen: boolean;
   /** Increment to force-open the `/` palette (the `/help` command). */
   paletteSignal: number;
+  /** File dropped from the explorer (or its context menu) — spliced as `@path`. */
+  dropSignal?: { path: string; key: number } | null;
   onSend: (send: ComposerSend) => void;
   onStop: () => void;
   onSlash: (id: string, args: string, fullText: string) => void;
@@ -115,6 +119,18 @@ export function Composer({
       taRef.current?.focus();
     }
   }, [paletteSignal]);
+
+  // File dropped from the explorer — splice `@path` into the draft (the
+  // existing mention parser turns it into `contextPaths` on send).
+  const dropKey = dropSignal?.key ?? 0;
+  const dropPath = dropSignal?.path ?? '';
+  React.useEffect(() => {
+    if (dropKey > 0 && dropPath) {
+      setText((prev) => appendMention(prev, dropPath));
+      taRef.current?.focus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dropKey]);
 
   const mentions = React.useMemo(() => parseMentions(text), [text]);
   const contextPaths = React.useMemo(

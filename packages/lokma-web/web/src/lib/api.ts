@@ -239,6 +239,33 @@ export type UsageSessionsRes = { ok: boolean; range: string; sessions: UsageSess
 export type UsageRange = '7d' | '30d' | '90d';
 export type UsageExportFormat = 'csv' | 'jsonl';
 
+// ─── Workspace files (real FS behind the FileBrowser pane, W3-9) ────────────
+
+export type GitState = 'M' | 'A' | 'D' | 'R' | '?';
+export type FileEntry = {
+  name: string;
+  /** Workspace-relative `/`-separated path (matches `@mention` syntax). */
+  path: string;
+  type: 'file' | 'dir';
+  size: number;
+  mtimeMs: number;
+  /** Null = clean (or not a repo) — never faked, straight from git status. */
+  git: GitState | null;
+};
+export type FilesRes = { ok: boolean; path: string; entries: FileEntry[] };
+export type FileContentRes = {
+  ok: boolean;
+  path: string;
+  content: string;
+  /** sha256 of the FULL file — pass back as `expectedSha` on save. */
+  sha: string;
+  size: number;
+  truncated: boolean;
+};
+export type FileWriteRes = { ok: boolean; path: string; sha: string; size: number; created: boolean };
+export type FileSearchHit = { path: string; type: 'file' | 'dir'; score: number };
+export type FileSearchRes = { ok: boolean; q: string; hits: FileSearchHit[] };
+
 // ─── One function per endpoint group ────────────────────────────────────────
 
 export const api = {
@@ -326,4 +353,22 @@ export const api = {
     const match = disposition.match(/filename="([^"]+)"/);
     return { filename: match?.[1] ?? fallback, blob };
   },
+
+  // Workspace files — real FS behind the FileBrowser pane (W3-9).
+  listFiles: (cwd: string, path = '.') =>
+    get<FilesRes>(`/api/files?cwd=${encodeURIComponent(cwd)}&path=${encodeURIComponent(path)}`),
+  readWorkspaceFile: (cwd: string, path: string) =>
+    get<FileContentRes>(`/api/files/read?cwd=${encodeURIComponent(cwd)}&path=${encodeURIComponent(path)}`),
+  searchWorkspaceFiles: (cwd: string, q: string, max = 50) =>
+    get<FileSearchRes>(
+      `/api/files/search?cwd=${encodeURIComponent(cwd)}&q=${encodeURIComponent(q)}&max=${max}`,
+    ),
+  /** Save with the `expectedSha` lost-update guard (409 `stale_file` on conflict). */
+  writeWorkspaceFile: (cwd: string, path: string, content: string, expectedSha?: string) =>
+    post<FileWriteRes>('/api/files/write', {
+      cwd,
+      path,
+      content,
+      ...(expectedSha ? { expectedSha } : {}),
+    }),
 };

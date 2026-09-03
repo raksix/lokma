@@ -331,9 +331,18 @@
 - **Gates:** root tsc 0 · web build green (382k JS) · server clean · problar PASS (models 13 + stores + api + ws) · mock grep temiz · CANLI prob (:3462, temp HOME): 7/7 → disable → GET yansıdı → bulk re-enable → unknown/bad-shape 400 → diskte flags doğrulandı, hepsi green.
 - **Sıradaki parça:** W2-7 Usage (`GET /api/usage/summary|sessions|export` + AreaChart + CSV/JSONL download).
 
+### 2026-09-03 — TASK-38 W2-7 Usage DONE (server c51f8e6 + web f637bfc — W2 COMPLETE)
+- **Executor run:** W2-7 tamamlandı — gerçek token/maliyet muhasebesi canlı.
+  - **Server:** yeni `lokma-core/src/usage/` (fiyat tablosu $/1M + `usage.jsonl` ledger: record/read/summarize, sıfır-dolgulu gün serisi, model-kırılımı; bilinmeyen model `priced:false`/0 maliyet — oran uydurulmaz) + yeni `GET /api/usage/summary|sessions|export` (csv|jsonl gerçek indirme, 400 validasyonları). WS her tamamlanan run'da 1 ledger satırı yazar + `cost` frame'i artık gerçek tahmini token + fiyatlı costUsd taşıyor (W1-1'deki `costUsd: 0` stub'u kalktı — header rozeti + mesaj maliyet altbilgisi gerçek sayılarla çalışıyor).
+  - **Web:** yeni `components/usage/` (concept düzeni 1:1 — aralık seçici, 4 KPI kartı, canlı seriden SVG yığılı grafik, oturum tablosu tıklayınca açar, CSV/JSONL gerçek indirme, dürüst boş/hata durumları; concept mock dizileri taşınmadı) + `usage.test.ts` 26/26 PASS; Inspector'da 4. sekme (Usage); `api.ts`'e usage fonksiyonları + blob indirme için `authedFetch`.
+  - **Gates:** root tsc 0 · web build green (1640 modül) · server clean · tüm problar PASS · mock grep temiz · CANLI prob (:3463, temp HOME) 22/22: create→boş özet→WS run→cost frame (token>0, maliyet>0)→özet eşleşti→oturum satırı→CSV/JSONL→400'ler→diskte `usage.jsonl` doğrulandı.
+  - **Dürüst notlar:** token'lar `ceil(karakter/4)` tahmini (adaptörler sayaç vermiyor — pane altbilgide yazıyor); header kabulü canlı `cost` frame'leriyle karşılandı (60s poll eklenmedi); presence feed yok — zümrüt nokta sadece bugünkü oturumlar.
+- **W2 TAMAMLANDI** (W2-5 providers + W2-6 models + W2-7 usage).
+- **Sıradaki parça:** W2-8 Config + Appearance + Permissions + MCP sekmeleri.
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W2-6 Models tab DONE — server 6d8e0d9 + web a4f4ca2)
-- **Son işlem:** TASK-38 W2-6 DONE — model enable/disable bayrakları server'da gerçek (`PATCH /api/models` tek+bulk, config'e persist), web'de Inspector'da gerçek Models sekmesi (ara/değiştir/toplu aç-kapat/yenile), Composer + header tek-kaynak enabled listesi okuyor, sırada W2-7 Usage
+- **Son güncelleme:** 2026-09-03 (TASK-38 W2-7 Usage DONE — server c51f8e6 + web f637bfc, W2 COMPLETE)
+- **Son işlem:** TASK-38 W2-7 DONE — gerçek kullanım muhasebesi (ledger + fiyat tablosu + summary/sessions/export endpoint'leri, WS cost frame'leri gerçek), web'de Inspector'da gerçek Usage sekmesi (KPI + grafik + oturumlar + indirme), sırada W2-8 Config/MCP
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

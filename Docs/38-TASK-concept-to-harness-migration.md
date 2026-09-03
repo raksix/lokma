@@ -670,7 +670,56 @@ drag, tiling toggle, save/reset layout — all against live data, zero mock cont
   `models` flags verified on disk, all green (real `~/.lokma` untouched).
   Next piece: W2-7 Usage (`GET /api/usage/summary|sessions|export` +
   AreaChart + CSV/JSONL download).
-|- (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
+|- 2026-09-03 — W2-7 Usage DONE
+  (server commit c51f8e6 + web commit f637bfc, both pushed).
+  Server: new `lokma-core/src/usage/` (`pricing.ts` public list-price
+  table $/1M with family fallback for dated variants + ollama-local at
+  zero; unknown models `priced:false`/cost 0, never guessed;
+  `ledger.ts` UsageLedger per-project `usage.jsonl` beside sessions —
+  record/read/summarize with zero-filled day series, per-model split,
+  unpriced-token flag) + new `GET /api/usage/summary?range=`
+  (KPIs + stacked series + byModel) + `GET /api/usage/sessions`
+  (per-session rows joined with session titles) +
+  `GET /api/usage/export?format=csv|jsonl` (real attachment
+  downloads, 400 `bad_range`/`bad_format`); WS handler records one
+  ledger line per completed run (best-effort, never breaks chat) and
+  the `cost` frame now carries real estimated tokens + priced costUsd
+  (replaces the W1-1 `costUsd: 0` stub — header badge + message cost
+  footer go live with real numbers).
+  Web: new `components/usage/` (`usage.ts` pure helpers: formatTokens/
+  formatUsd/shortModel/chartKeys/collapseSeries/buildStackedPaths/
+  axisLabels/formatLastActive/downloadBlob, `usage.test.ts` 26/26 PASS)
+  + `usage-pane.tsx` (concept layout 1:1 — range toggle, 4 KPI cards,
+  stacked SVG chart from the live series, sessions table click →
+  session, CSV/JSONL real blob downloads, honest empty/error states;
+  concept mock KPI/CHART/SESSIONS arrays + toast-only exports NOT
+  ported) wired as 4th Inspector tab; `api.ts` gains usage types +
+  getUsageSummary/getUsageSessions/downloadUsageExport + `authedFetch`
+  (auth stays DRY for blob downloads); AppShell passes
+  `onOpenSession={switchSession}` into the Inspector.
+  Honest scope notes: (1) tokens are `ceil(chars/4)` estimates
+  (adapters report no counts in Phase 0) — pane footer says so;
+  (2) header badge acceptance met via live `cost` frames (no 60s
+  poll added — the "or" leg of the plan); (3) session rows show no
+  live presence dot (no presence feed yet) — emerald dot marks
+  today's sessions only.
+  Gates: root `tsc --noEmit` 0 errors · web build green (1640
+  modules, 394k JS/gzip 115k) · server `tsc -p` clean (after core
+  dist rebuild) · all probes PASS (usage 26/26 + api + ws + stores
+  + shell 10/10 + theme 11/11 + sessions 21/21 + providers 25/25 +
+  chat + lokma-message + models 13) · mock grep: usage clean (1 hit
+  = own anti-mock comment) · LIVE probe on :3463 with temp HOME
+  22/22: create → empty summary (0 runs, x7 zero series) → WS run →
+  cost frame (in/out > 0, costUsd > 0, default sonnet) → summary
+  (1 run, tokens == frame sum, cost matches, topModel, byModel x1,
+  unpriced 0) → sessions row (joined title/model/cost) → CSV
+  (header + 1 priced row) → JSONL (parses, priced:true) → bad
+  range/format 400 → `usage.jsonl` verified on disk under temp
+  HOME (real `~/.lokma` untouched).
+  W2 Settings/usage COMPLETE (W2-5 providers + W2-6 models + W2-7 usage).
+  Next piece: W2-8 Config + Appearance + Permissions + MCP tabs
+  (`GET/PATCH /api/config` layered merge UI + theme persist + MCP servers).
+- (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 
 ---
 

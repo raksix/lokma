@@ -422,6 +422,22 @@ drag, tiling toggle, save/reset layout — all against live data, zero mock cont
   server `tsc -p` clean · mock grep: 2 hits, both the legit word "placeholder"
   (React prop + tailwind class) — no mock data.
   Next piece: W0-F3 stores (`sessionStore`, `paneStore`, `providerStore`, `agentStore`).
+- 2026-09-03 — W0-F3 stores DONE (`web/src/stores/` 8 files: `layout.ts` +
+  `storage.ts` + `session.ts` + `pane.ts` + `provider.ts` + `agent.ts` +
+  `index.ts` + `stores.test.ts`, commit 5fe3941).
+  Zustand v5 (already a dependency, no new packages). Server stays source of
+  truth; stores are caches with explicit WS invalidation:
+  `sessionStore` (list/active/transcript cache, `done` frame → stale+refetch,
+  dead-selection prune on refresh), `paneStore` (LayoutNode ported 1:1 from
+  concept `App.tsx`, same `lokma:layout:v1` key, schema `version: 1` +
+  `migrate` shape guard, chrome-only partialize), `providerStore`
+  (providers/models shared cache, 5m TTL mirroring the server catalog),
+  `agentStore` (registry + `agent_state` live merge, per-agent locks map).
+  `safeStorage` (localStorage with memory fallback) keeps bun probes green.
+  44/44 probe PASS (`bun src/stores/stores.test.ts`).
+  Gates: root `tsc --noEmit` 0 errors · web build 57 modules green ·
+  server `tsc -p` clean · mock grep in `stores/`: 0 hits.
+  Next piece: W0-F4 shell chrome (Header/Toast/SearchModal/Footer/error boundary).
 - (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 
 ---

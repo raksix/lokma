@@ -278,9 +278,14 @@
   - **Gates:** root `tsc` 0 · web build 57 modules green · server `tsc -p` clean · mock grep temiz (2 "placeholder" ismi: React prop + tailwind class, mock data yok).
 - **Sıradaki parça:** W0-F3 stores (`sessionStore`, `paneStore`, `providerStore`, `agentStore`).
 
+### 2026-09-03 — TASK-38 W0-F3 stores DONE (commit 5fe3941)
+- **Executor run:** W0-F3 tamamlandı — `packages/lokma-web/web/src/stores/` altında 8 dosya: `layout.ts` (LayoutNode concept'ten 1:1, aynı `lokma:layout:v1` key, version guard) + `storage.ts` (localStorage/memory fallback) + `session.ts` (liste/aktif/transkript cache, `done` frame → stale+refetch) + `pane.ts` (persist'li layout/tabs/chrome) + `provider.ts` (5m TTL'li providers/models cache) + `agent.ts` (registry + `agent_state` live merge + locks) + `index.ts` barrel + `stores.test.ts` 44/44 PASS.
+- **Gates:** root `tsc --noEmit` 0 · web build 57 modules green · server `tsc -p` clean · stores'ta mock grep 0 hit. Yeni paket yok (zustand zaten bağımlılıktı).
+- **Sıradaki parça:** W0-F4 shell chrome (Header/Toast/SearchModal/Footer/error boundary).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W0-F2)
-- **Son işlem:** TASK-38 W0-F2 ws client DONE (8dc7554 + 915b42d) — proxy URL + reconnect + typed frames + 28/28 probe green, §9'da, sırada W0-F3 stores
+- **Son güncelleme:** 2026-09-03 (TASK-38 W0-F3)
+- **Son işlem:** TASK-38 W0-F3 stores DONE (5fe3941) — session/pane/provider/agent zustand store'ları + 44/44 probe green, §9'da, sırada W0-F4 shell chrome
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

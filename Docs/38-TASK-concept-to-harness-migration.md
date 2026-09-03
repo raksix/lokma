@@ -904,10 +904,32 @@ everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
   (`expandHome` ignores `$HOME`) → assertions use `.some()`, probe
   cleans its own /tmp locks; (2) Fastify bodyless+JSON-catch lesson
   from W3-10 still applies.
-  Next piece: W3-12 BrowserPane (per-agent tabs +
-  `POST /api/browser/open` + live screenshots).
+  Next piece: W4-13 AgentHubPane (`GET/POST /api/agents` create/pause/kill +
+  SOUL/MEMORY editors + budgets).
 
 - 2026-09-03 — run 50/50 hit repeat cap mid-W3-12: browser server-side (core registry + routes + api.ts client) rescued from dirty tree, committed as WIP — web pane side still open.
+- 2026-09-03 — W3-12 BrowserPane DONE (web commit ea76e10, pushed; server side already live from 555d835).
+  Web: new `components/browser/` (`browser-pane.tsx` + `index.ts` barrel, concept
+  layout 1:1 — header + agent-grouped pills + address bar + sandboxed iframe;
+  every control hits a live `/api/browser/*` endpoint: open w/ optional
+  URL+agent, Go = real navigate, Back/Forward step the REAL history pointer
+  (disabled at the edge via `canGoBack/canGoForward`), Reload touches the tab
+  + re-keys the frame, two-click close, `historyPosition` + `shortScope`
+  labels, external-link fallback for X-Frame-Options sites; concept hardcoded
+  `builder-1/reviewer-2` pills + toast-only nav NOT ported — no dead buttons)
+  wired as 8th Inspector tab (session-gated like Terminal); `ui/button` has
+  no `iconSm` size (same trap class as GitPane `ink`) → `size="sm"
+  className="h-5 w-5 p-0"`.
+  Honest scope notes: (1) no CDP/screenshot pipeline (no Playwright dep —
+  live AI screenshots land with the agent tool loop W4+); (2) pages render
+  client-side, REST owns tabs + history only.
+  Gates: root `tsc --noEmit` 0 errors · web build green (1659 modules,
+  476k JS/gzip 134k) · server `tsc -p` clean · browser probe 22/22 ·
+  mock grep clean (2 hits = labeled input `placeholder` attrs) · LIVE probe
+  on lokma.fermag.com.tr 9/9: open (bare host → https) → navigate → back →
+  forward → reload → close → re-get 404 → `javascript:` 400 `bad_url`
+  (probe tab deleted after).
+  W3 Files/Terminal/Git/Browser COMPLETE (W3-9 + W3-10 + W3-11 + W3-12).
 
 - (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 

@@ -21,6 +21,9 @@ export type WsStatus = 'idle' | 'connecting' | 'open' | 'closed' | 'error';
 /** Server frames the permission flow produces (narrowed for UI queues). */
 export type PermissionRequest = Extract<ServerMessage, { type: 'permission_request' }>;
 export type QuestionRequest = Extract<ServerMessage, { type: 'ask_user_question' }>;
+/** Live shell output + exit frames behind the TerminalPane (W3-10). */
+export type TerminalDataFrame = Extract<ServerMessage, { type: 'terminal/data' }>;
+export type TerminalExitFrame = Extract<ServerMessage, { type: 'terminal/exit' }>;
 export type ToolCallEntry = {
   tool: string;
   input: unknown;
@@ -138,6 +141,21 @@ export function questionAnswer(requestId: string, answer: string): string {
   return checked({ type: 'ask_response', requestId, answer });
 }
 
+/** Write stdin bytes to a live shell (server answers with `terminal/data`). */
+export function terminalInput(terminalId: string, data: string): string {
+  return checked({ type: 'terminal/input', terminalId, data });
+}
+
+/** Record the pane size for a live shell (stored server-side). */
+export function terminalResize(terminalId: string, cols: number, rows: number): string {
+  return checked({ type: 'terminal/resize', terminalId, cols, rows });
+}
+
+/** End a live shell (server confirms with `terminal/exit`). */
+export function terminalKill(terminalId: string): string {
+  return checked({ type: 'terminal/kill', terminalId });
+}
+
 // ─── Pure UI reducer (React state derives from this, unit-tested) ────────────
 
 export function initialWsUiState(): WsUiState {
@@ -193,6 +211,11 @@ export function applyServerFrame(state: WsUiState, msg: ServerMessage): WsUiStat
     case 'cost':
       return { ...state, cost: addCost(state.cost, msg) };
     case 'agent_state':
+      return state;
+    case 'terminal/data':
+    case 'terminal/exit':
+      // Terminal traffic belongs to the TerminalPane (it reads the same
+      // frame log) — chat state never changes on shell output.
       return state;
     case 'done':
       return { ...state, done: true, doneReason: msg.reason };

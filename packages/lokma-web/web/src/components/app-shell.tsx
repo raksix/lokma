@@ -152,7 +152,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         {rightVisible ? (
           <PaneErrorBoundary paneName="Inspector">
             <Sidebar side="right" title="Inspector">
-              <InspectorPanel onOpenSession={switchSession} />
+              <InspectorPanel onOpenSession={switchSession} sessionId={activeId} ws={ws} />
             </Sidebar>
           </PaneErrorBoundary>
         ) : null}

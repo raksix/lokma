@@ -266,6 +266,30 @@ export type FileWriteRes = { ok: boolean; path: string; sha: string; size: numbe
 export type FileSearchHit = { path: string; type: 'file' | 'dir'; score: number };
 export type FileSearchRes = { ok: boolean; q: string; hits: FileSearchHit[] };
 
+// ─── Terminals (live shell processes behind the TerminalPane, W3-10) ──────
+
+export type TerminalStatus = 'running' | 'exited' | 'error';
+export type TerminalInfo = {
+  id: string;
+  shell: string;
+  cwd: string;
+  pid: number | null;
+  agentId: string | null;
+  sessionId: string;
+  status: TerminalStatus;
+  startedAt: string;
+  exitCode: number | null;
+  signal: string | null;
+  cols: number;
+  rows: number;
+};
+export type TerminalsRes = { ok: boolean; terminals: TerminalInfo[]; count: number };
+export type TerminalDetailRes = { ok: boolean; terminal: TerminalInfo; tail: string };
+export type CreateTerminalBody = { cwd?: string; agentId?: string; sessionId?: string; cols?: number; rows?: number };
+export type CreateTerminalRes = { ok: boolean; terminal: TerminalInfo };
+export type TerminalInputRes = { ok: boolean; id: string; bytes: number };
+export type DeleteTerminalRes = { ok: boolean; id: string; killed: boolean; exitCode: number | null; signal: string | null };
+
 // ─── One function per endpoint group ────────────────────────────────────────
 
 export const api = {
@@ -371,4 +395,14 @@ export const api = {
       content,
       ...(expectedSha ? { expectedSha } : {}),
     }),
+
+  // Terminals — live shells (W3-10). Bytes flow over WS `terminal/*` frames;
+  // REST only spawns/lists/inspects/kills.
+  listTerminals: () => get<TerminalsRes>('/api/terminal'),
+  createTerminal: (body: CreateTerminalBody) => post<CreateTerminalRes>('/api/terminal', body),
+  getTerminal: (id: string) => get<TerminalDetailRes>(`/api/terminal/${encodeURIComponent(id)}`),
+  /** Non-WS stdin path (CLI parity + probes) — the pane sends over WS. */
+  sendTerminalInput: (id: string, data: string) =>
+    post<TerminalInputRes>(`/api/terminal/${encodeURIComponent(id)}/input`, { data }),
+  deleteTerminal: (id: string) => del<DeleteTerminalRes>(`/api/terminal/${encodeURIComponent(id)}`),
 };

@@ -11,6 +11,9 @@ import {
   promptMessage,
   questionAnswer,
   reconnectDelay,
+  terminalInput,
+  terminalKill,
+  terminalResize,
   withAuthToken,
   wsUrl,
   type CostTotal,
@@ -47,6 +50,12 @@ export type UseWs = {
   answerPermission: (requestId: string, decision: 'allow' | 'deny' | 'always') => void;
   answerQuestion: (requestId: string, answer: string) => void;
   interrupt: () => void;
+  /** Write stdin bytes to a live shell (answer arrives as `terminal/data`). */
+  sendTerminal: (terminalId: string, data: string) => void;
+  /** Record the pane size for a live shell. */
+  resizeTerminal: (terminalId: string, cols: number, rows: number) => void;
+  /** End a live shell (server confirms with `terminal/exit`). */
+  killTerminal: (terminalId: string) => void;
   reconnect: () => void;
   disconnect: () => void;
   connect: () => void;
@@ -198,6 +207,21 @@ export function useWs(sessionId: string): UseWs {
     socketSend(wsRef.current, abortMessage(sessionRef.current));
   }, []);
 
+  const sendTerminal = useCallback((terminalId: string, data: string) => {
+    if (!terminalId || !data) return;
+    socketSend(wsRef.current, terminalInput(terminalId, data));
+  }, []);
+
+  const resizeTerminal = useCallback((terminalId: string, cols: number, rows: number) => {
+    if (!terminalId) return;
+    socketSend(wsRef.current, terminalResize(terminalId, cols, rows));
+  }, []);
+
+  const killTerminal = useCallback((terminalId: string) => {
+    if (!terminalId) return;
+    socketSend(wsRef.current, terminalKill(terminalId));
+  }, []);
+
   return {
     status,
     messages,
@@ -213,6 +237,9 @@ export function useWs(sessionId: string): UseWs {
     answerPermission,
     answerQuestion,
     interrupt,
+    sendTerminal,
+    resizeTerminal,
+    killTerminal,
     reconnect: connect,
     disconnect,
     connect,

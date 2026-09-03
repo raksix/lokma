@@ -1,10 +1,12 @@
 import * as React from 'react';
-import { BarChart3, Info, Layers, Plug2, Settings } from 'lucide-react';
+import { BarChart3, Info, Layers, Plug2, Settings, Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InfoPanel } from '@/components/sidebar';
+import type { UseWs } from '@/hooks/use-ws';
 import { ModelsPane } from './models-pane';
 import { ProvidersPane } from './providers-pane';
 import { SettingsPane } from '@/components/settings';
+import { TerminalPane } from '@/components/terminal';
 import { UsagePane } from '@/components/usage/usage-pane';
 
 /**
@@ -13,12 +15,23 @@ import { UsagePane } from '@/components/usage/usage-pane';
  * pane (enable/disable over `PATCH /api/models`), Usage the real W2-7
  * pane (token/cost accounting over `GET /api/usage/*` + CSV/JSONL export),
  * Settings the real W2-8 pane (Config/Appearance/Permissions/MCP over
- * `GET/PATCH /api/config`).
+ * `GET/PATCH /api/config`), Terminal the real W3-10 pane (live shells over
+ * `POST /api/terminal` + WS `terminal/*` frames).
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
  */
-export function InspectorPanel({ onOpenSession }: { onOpenSession?: (id: string) => void }) {
-  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings'>('info');
+export function InspectorPanel({
+  onOpenSession,
+  sessionId,
+  ws,
+}: {
+  onOpenSession?: (id: string) => void;
+  sessionId?: string;
+  ws?: UseWs;
+}) {
+  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal'>(
+    'info',
+  );
 
   return (
     <div className="space-y-3">
@@ -68,6 +81,15 @@ export function InspectorPanel({ onOpenSession }: { onOpenSession?: (id: string)
           <Settings className="h-3 w-3" />
           Settings
         </Button>
+        <Button
+          variant={tab === 'terminal' ? 'default' : 'ghost'}
+          size="sm"
+          className="h-6 flex-1 gap-1.5 text-[11px]"
+          onClick={() => setTab('terminal')}
+        >
+          <Terminal className="h-3 w-3" />
+          Terminal
+        </Button>
       </div>
       {tab === 'info' ? (
         <InfoPanel />
@@ -77,8 +99,14 @@ export function InspectorPanel({ onOpenSession }: { onOpenSession?: (id: string)
         <ModelsPane />
       ) : tab === 'usage' ? (
         <UsagePane onOpenSession={onOpenSession} />
-      ) : (
+      ) : tab === 'settings' ? (
         <SettingsPane />
+      ) : sessionId && ws ? (
+        <TerminalPane key={sessionId} sessionId={sessionId} ws={ws} />
+      ) : (
+        <div className="rounded border border-dashed p-3 text-xs text-muted-foreground">
+          Open a session to use the terminal.
+        </div>
       )}
     </div>
   );

@@ -76,6 +76,14 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 
   applyWsEvent: (msg: ServerMessage) => {
     if (msg.type !== 'agent_state') return;
+    // A deleted row is gone on the server — drop it instead of merging.
+    if (msg.state === 'deleted') {
+      set((prev) => ({
+        agents: prev.agents.filter((a) => a.id !== msg.agentId),
+        selectedAgentId: prev.selectedAgentId === msg.agentId ? null : prev.selectedAgentId,
+      }));
+      return;
+    }
     set((prev) => {
       const existing = prev.agents.find((a) => a.id === msg.agentId);
       const agents = existing

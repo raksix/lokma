@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAgentStore } from '@/stores/agent';
 import {
   MAX_RECONNECT_ATTEMPTS,
   abortMessage,
@@ -31,6 +32,8 @@ import {
  * auto-reconnects with capped backoff, and folds every validated server frame
  * into React state via the pure `applyServerFrame` reducer.
  * Single hook, reused by Chat and every future pane (no duplication).
+ * Every decoded frame is also forwarded to the agent store — `agent_state`
+ * frames keep the Hub + Orchestration panes live without polling (W4-14).
  */
 
 export type SendOpts = { model?: string; contextPaths?: string[] };
@@ -99,6 +102,10 @@ export function useWs(sessionId: string): UseWs {
         if (!msg) return;
         setMessages((prev) => [...prev, msg]);
         setUi((prev) => applyServerFrame(prev, msg));
+        // Live agent presence for the Hub + Orchestration panes (W4-14).
+        // The store ignores every non-`agent_state` frame, so this is safe
+        // for chat/terminal traffic.
+        useAgentStore.getState().applyWsEvent(msg);
       };
       ws.onerror = () => {
         // Error details arrive via onclose; just make sure a dead socket closes.

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { BarChart3, GitBranch, Globe, Info, Layers, Plug2, Settings, Terminal, Users } from 'lucide-react';
+import { BarChart3, Cpu, GitBranch, Globe, Info, Layers, Plug2, Settings, Terminal, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
@@ -10,6 +10,7 @@ import { TerminalPane } from '@/components/terminal';
 import { GitPane } from '@/components/git';
 import { BrowserPane } from '@/components/browser';
 import { AgentsPane } from '@/components/agents';
+import { OrchestrationPane } from '@/components/orchestration';
 import { UsagePane } from '@/components/usage/usage-pane';
 
 /**
@@ -24,7 +25,10 @@ import { UsagePane } from '@/components/usage/usage-pane';
  * Browser the real W3-12 pane (per-agent live tabs + server-owned history
  * over `GET/POST /api/browser/*`, pages in a sandboxed iframe), Agents the
  * real W4-13 pane (registry CRUD + pause/resume/kill/fork/clone +
- * SOUL.md/MEMORY.md editors over `GET/POST/PATCH/DELETE /api/agents/*`).
+ * SOUL.md/MEMORY.md editors over `GET/POST/PATCH/DELETE /api/agents/*`),
+ * Orchestration the real W4-14 pane (live state-grouped tree + fan-out
+ * creation + cancel-all over the same registry, kept live by WS
+ * `agent_state` frames).
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
  */
@@ -37,7 +41,7 @@ export function InspectorPanel({
   sessionId?: string;
   ws?: UseWs;
 }) {
-  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents'>(
+  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration'>(
     'info',
   );
 
@@ -125,9 +129,20 @@ export function InspectorPanel({
           <Users className="h-3 w-3" />
           Agents
         </Button>
+        <Button
+          variant={tab === 'orchestration' ? 'default' : 'ghost'}
+          size="sm"
+          className="h-6 flex-1 gap-1.5 text-[11px]"
+          onClick={() => setTab('orchestration')}
+        >
+          <Cpu className="h-3 w-3" />
+          Orchestration
+        </Button>
       </div>
       {tab === 'info' ? (
         <InfoPanel />
+      ) : tab === 'orchestration' ? (
+        <OrchestrationPane />
       ) : tab === 'agents' ? (
         <AgentsPane />
       ) : tab === 'providers' ? (

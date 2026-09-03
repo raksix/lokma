@@ -215,6 +215,8 @@ export type CreateAgentBody = {
   budgets?: { tokens?: number; usd?: number };
   soul?: string;
   memory?: string;
+  /** Lineage tag (`fork:<id>` / `fanout:<stem>` / `ai:<id>`) — server records it. */
+  createdBy?: string;
 };
 export type PatchAgentBody = { name?: string; model?: string; budgets?: { tokens?: number; usd?: number } };
 export type AgentDocRes = { ok: boolean; id: string; doc: string; content: string };

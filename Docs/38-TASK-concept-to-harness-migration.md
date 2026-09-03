@@ -1651,6 +1651,48 @@ survives; never delete both at once). If even that serves stale code, escalate i
 |    online (server pid 1422833, web pid 1423300).
 |    Next piece: W6-26 ExtrasPane (23 ranked ideas as a REAL feature-flag
 |    board over `GET/PATCH /api/config` flags).
+  - 2026-09-03 — W6-26 ExtrasPane DONE (web commit 37236f5, pushed; NO
+    server commit — `PATCH /api/config {features}` already persists the
+    full map, verified live).
+    NOTE: a sibling run concurrently scaffolded the same pane (inspector
+    wiring + pane/test/index against a `slug/flag/extras.*` API). This run
+    adopted it as its ONE piece: kept the sibling's 3 files, rewrote only
+    `extras.ts` to the sibling API (SINGLE source — no duplicate catalog),
+    fixed 1 glyph (`…` → `Saving`, symbol-glyph rule), ran all gates +
+    the full live probe before the atomic commit.
+    Web (`components/extras/` new: `extras.ts` catalog + helpers +
+    `extras-pane.tsx` + `extras.test.ts` 49 checks PASS + barrel; 22nd
+    Inspector tab `Extras`, Star icon): concept layout 1:1 — All/Done/
+    Todo filters, 14/23 · 61% progress bar, rows with Check-badged
+    shipped cards + dashed roadmap cards; shipped rows Open their real
+    tab (bots/agents/cron/observability/skills/setup/vault/browser/git)
+    or name their real surface (Sessions sidebar → Fork, Composer mic);
+    roadmap rows toggle a REAL `features.extras.*` flag (full-map PATCH
+    so SetupPane stack flags survive — the shallow-merge trap) or show
+    the real milestone (#20 session-drag-handoff is milestone-only,
+    waits on W7). Honest deviations from the concept `done` column: #11
+    browser-per-agent shipped (W3-12 per-agent tabs), #16 worktree GC
+    shipped as the W3-11 Git-tab GC button (manual prune; TTL sweeper is
+    Phase 3) — both noted in the test. Concept toast-only Open/Plan
+    button NOT ported — no dead buttons, no fake data.
+    Gates: root `tsc --noEmit` 0 errors · web build green (5.51s) ·
+    server `tsc -p` untouched-clean (no server files changed) · extras
+    probe 49/49 · mock grep clean (hits = `todo` filter labels only) ·
+    LIVE probe (in-process createApp + inject, startup-env temp HOME +
+    refuse-guard) 8/8: setup seed → PATCH extras flag → GET reflects +
+    siblings kept → toggle off → non-bool 400 → real `~/.lokma`
+    untouched.
+    Deploy 2026-09-03: web-only piece — `web/dist` rebuilt + `pm2
+    restart lokma-web` → `/` 200 WITH creds serving the FRESH Vite
+    build (`assets/index-D7SI_RkA.js`, zero `_next/` refs, bundle
+    contains `Extras — 23 ranked`), 401 without creds; `/health` 200
+    (server untouched, still this week's code). Both processes online
+    (server pid 1422833, web pid 1914651, `bun x vite preview` —
+    stale-stack check PASS).
+    W6 System panes COMPLETE (W6-21 auth + W6-22 setup + W6-23 plugins +
+    W6-24 observability + W6-25 cron + W6-26 extras).
+    Next piece: W7-27 Pane system port (`Pane.tsx` + `SplitTree.tsx` +
+    `WindowedCanvas.tsx` + `TilingBar.tsx` + `App.tsx` shell state).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

@@ -1079,6 +1079,56 @@ everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
   Next piece: W4-16 SkillsPane (`GET /api/skills` registry +
   `skill_view` trie + `PATCH /api/skills/:id` curator + telemetry).
 
+  |- 2026-09-03 — W4-16 SkillsPane DONE
+  |  (server commit 16ec050 + web commit b56b898, both pushed).
+  |  Server (shared `SkillUsage`/`SkillUsageMap` Zod + core
+  |  `curator.ts` REAL `recordUsage`/`readUsage` over
+  |  `~/.lokma/skills/.usage.json` (Hermes `use_count`/`view_count`/
+  |  `patch_count` shape, corrupt file reads as empty, atomic write) +
+  |  `registry.ts` `SkillError` + `readSkillView` (skill_view parity) +
+  |  `readSkillFile` (jailed to the skill dir, `..`/absolute 400) +
+  |  `patchSkill` (exact old→new, zero/ambiguous-match 400, rescan
+  |  after write); routes rewritten: `GET /api/skills` (+ best-effort
+  |  `usage` map, shape backward compatible), `GET /api/skills/:id`
+  |  (`{skill,content}`, records a view), `GET /api/skills/:id/file`
+  |  (`{path,content}`), `PATCH /api/skills/:id` (records a patch),
+  |  `POST /api/skills/:id/use` (records a use — web parity of the
+  |  agent loop's use event); all failures `{code,message}`.
+  |  Web (`components/skills/` new: `skills.ts` helpers + `skills-pane.tsx`
+  |  + `skills.test.ts` 35/35 PASS + barrel; `api.ts` skill fns extended;
+  |  12th Inspector tab `Skills`): concept layout 1:1 — live search
+  |  (name/id/description/category), `bundled`/`user` source badges
+  |  derived from the real SKILL.md path, per-row real telemetry
+  |  (`used N · viewed M · patched K`, zeros when untouched — no
+  |  invented ranks), skill_view preview of the REAL SKILL.md body,
+  |  clickable linked_files (real single-file loads), curator Patch
+  |  editor with client+server validation, Record-use button, live
+  |  `<available_skills>` block built from the loaded rows.
+  |  Concept mock SKILLS rows + ranks + toast-only /skills palette +
+  |  Marketplace + enabled dot NOT ported (no dead buttons, no fake
+  |  data; the registry has no enabled flag — patches are the curator
+  |  contract). `/skills` header button focuses search (real).
+  |  Gates: root `tsc --noEmit` 0 errors · web build green (546k
+  |  JS/gzip 150k) · shared+core+server `tsc -p` clean · all 20 probe
+  |  files PASS (skills 35/35) · mock grep clean (1 hit = labeled
+  |  input `placeholder` attr) · LIVE probe on :3471 with temp HOME
+  |  24/24 (list 2 + linked_files → detail + view +1 → file 200 +
+  |  escape/empty/missing 400/404s → patch 200 + persisted + patch
+  |  +1 → no_match/ambiguous/empty/missing 400/404s → use 200 +
+  |  last_used → disk `.usage.json` verified, real `~/.lokma`
+  |  untouched).
+  |  Probe lesson: skill ids contain a slash (`dev/test-skill`) so
+  |  Fastify `:id` needs `%2F` — the web client already sends
+  |  `encodeURIComponent`, probes must too (raw slash = route 404).
+  |  Honest scope: no `POST /api/skills` create (card required PATCH
+  |  only — create is a follow-up), no hub/marketplace (Docs/27 §7.4
+  |  future), no auto-propose (no agent loop yet), ranking stays raw
+  |  counts (no curator re-rank algorithm yet).
+  |  W4 Agents/Orchestration/Vault/Skills COMPLETE (W4-13 + W4-14 +
+  |  W4-15 + W4-16).
+  |  Next piece: W5-17 ArchifyPane (5 diagram types via REAL `archify`
+  |  tool + IR JSON preview + Before/Delta/After + share export).
+  |
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

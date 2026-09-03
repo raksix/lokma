@@ -290,6 +290,47 @@ export type CreateTerminalRes = { ok: boolean; terminal: TerminalInfo };
 export type TerminalInputRes = { ok: boolean; id: string; bytes: number };
 export type DeleteTerminalRes = { ok: boolean; id: string; killed: boolean; exitCode: number | null; signal: string | null };
 
+// ─── Repo git (real status/log/commit/push behind the GitPane, W3-11) ─────
+
+export type GitFileChange = { path: string; staged: string | null; worktree: string | null };
+export type GitStatusRes =
+  | {
+      ok: boolean;
+      repo: true;
+      cwd: string;
+      branch: string;
+      upstream: string | null;
+      ahead: number;
+      behind: number;
+      files: GitFileChange[];
+      counts: { changed: number; staged: number; unstaged: number };
+      worktrees: string[];
+    }
+  | { ok: boolean; repo: false; cwd: string };
+export type GitLogEntry = { hash: string; short: string; message: string; author: string; date: string };
+export type GitLogRes = { ok: boolean; branch: string; commits: GitLogEntry[] };
+export type GitCommitRes = { ok: boolean; hash: string; short: string; message: string };
+export type GitPushRes = { ok: boolean; pushed: boolean; output: string };
+export type GitGcRes = { ok: boolean; pruned: boolean };
+export type GitLockRow = { path: string; owner: string; leaseUntil: number };
+export type GitLocksRes = { ok: boolean; cwd: string; locks: GitLockRow[]; count: number; expired: number };
+export type AgentLockInfo = {
+  path: string;
+  owner: string;
+  acquiredAt: number;
+  leaseUntil: number;
+  mode: string;
+  reason?: string;
+};
+export type AgentLocksRes = {
+  ok: boolean;
+  agentId: string;
+  agent: unknown;
+  locks: AgentLockInfo[];
+  expired: number;
+  worktrees: string[];
+};
+
 // ─── One function per endpoint group ────────────────────────────────────────
 
 export const api = {
@@ -405,4 +446,31 @@ export const api = {
   sendTerminalInput: (id: string, data: string) =>
     post<TerminalInputRes>(`/api/terminal/${encodeURIComponent(id)}/input`, { data }),
   deleteTerminal: (id: string) => del<DeleteTerminalRes>(`/api/terminal/${encodeURIComponent(id)}`),
+
+  // Repo git — real status/log/commit/push (W3-11). All calls scope to the
+  // session cwd, like the file endpoints.
+  getGitStatus: (cwd?: string) =>
+    get<GitStatusRes>(cwd ? `/api/git/status?cwd=${encodeURIComponent(cwd)}` : '/api/git/status'),
+  getGitLog: (cwd?: string, max = 20) =>
+    get<GitLogRes>(
+      cwd
+        ? `/api/git/log?cwd=${encodeURIComponent(cwd)}&max=${max}`
+        : `/api/git/log?max=${max}`,
+    ),
+  /** Stage-all + commit (server returns the new hash). */
+  commitGit: (message: string, cwd?: string) =>
+    post<GitCommitRes>('/api/git/commit', { message, ...(cwd ? { cwd } : {}) }),
+  pushGit: (cwd?: string) => post<GitPushRes>('/api/git/push', cwd ? { cwd } : {}),
+  /** Worktree prune (the pane GC button). */
+  gcGit: (cwd?: string) => post<GitGcRes>('/api/git/gc', cwd ? { cwd } : {}),
+  /** Live locks under the repo (rows + banner). */
+  getGitLocks: (cwd?: string) =>
+    get<GitLocksRes>(cwd ? `/api/git/locks?cwd=${encodeURIComponent(cwd)}` : '/api/git/locks'),
+  /** Per-agent 3-layer safety state (plan §W3-11, reused by W4 AgentHub). */
+  getAgentLocks: (id: string, cwd?: string) =>
+    get<AgentLocksRes>(
+      cwd
+        ? `/api/agents/${encodeURIComponent(id)}/locks?cwd=${encodeURIComponent(cwd)}`
+        : `/api/agents/${encodeURIComponent(id)}/locks`,
+    ),
 };

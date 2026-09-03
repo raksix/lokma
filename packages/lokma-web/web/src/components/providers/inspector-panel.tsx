@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { BarChart3, Info, Layers, Plug2, Settings, Terminal } from 'lucide-react';
+import { BarChart3, GitBranch, Info, Layers, Plug2, Settings, Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
@@ -7,6 +7,7 @@ import { ModelsPane } from './models-pane';
 import { ProvidersPane } from './providers-pane';
 import { SettingsPane } from '@/components/settings';
 import { TerminalPane } from '@/components/terminal';
+import { GitPane } from '@/components/git';
 import { UsagePane } from '@/components/usage/usage-pane';
 
 /**
@@ -16,7 +17,8 @@ import { UsagePane } from '@/components/usage/usage-pane';
  * pane (token/cost accounting over `GET /api/usage/*` + CSV/JSONL export),
  * Settings the real W2-8 pane (Config/Appearance/Permissions/MCP over
  * `GET/PATCH /api/config`), Terminal the real W3-10 pane (live shells over
- * `POST /api/terminal` + WS `terminal/*` frames).
+ * `POST /api/terminal` + WS `terminal/*` frames), Git the real W3-11 pane
+ * (branch/status/log/commit/push over `GET/POST /api/git/*` + live locks).
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
  */
@@ -29,7 +31,7 @@ export function InspectorPanel({
   sessionId?: string;
   ws?: UseWs;
 }) {
-  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal'>(
+  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git'>(
     'info',
   );
 
@@ -90,6 +92,15 @@ export function InspectorPanel({
           <Terminal className="h-3 w-3" />
           Terminal
         </Button>
+        <Button
+          variant={tab === 'git' ? 'default' : 'ghost'}
+          size="sm"
+          className="h-6 flex-1 gap-1.5 text-[11px]"
+          onClick={() => setTab('git')}
+        >
+          <GitBranch className="h-3 w-3" />
+          Git
+        </Button>
       </div>
       {tab === 'info' ? (
         <InfoPanel />
@@ -101,6 +112,8 @@ export function InspectorPanel({
         <UsagePane onOpenSession={onOpenSession} />
       ) : tab === 'settings' ? (
         <SettingsPane />
+      ) : tab === 'git' ? (
+        <GitPane key={sessionId ?? 'no-session'} sessionId={sessionId} />
       ) : sessionId && ws ? (
         <TerminalPane key={sessionId} sessionId={sessionId} ws={ws} />
       ) : (

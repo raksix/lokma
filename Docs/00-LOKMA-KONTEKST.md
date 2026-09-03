@@ -416,11 +416,20 @@
   - **Tur içinde yakalanan sözleşme bug'ı:** `POST /validate` ilk taslakta hep `ok:true` dönüyordu, pane bozuk IR'leri kaydedecekti → `ok` geçerliliği taşır (asla 4xx yok).
   - **Gates:** root tsc 0 · web build green (1675 modül, 570k JS/gzip 155k) · core+server clean · 21 probun hepsi PASS (archify 33 dahil) · mock grep temiz · CANLI prob (:3472, temp HOME) 38/38.
   - **Dürüst kapsam:** Lokma-native deterministik renderer (vendored `tt-a1i/archify` CLI bağımlılığı yok — IR sözleşmesi + gate'ler + viewer tuşları + disk yolları Docs/31'e uygun); `DELETE /api/archify/:id` yok (concept'te delete butonu yok — follow-up); PNG/WebM follow-up (headless Chromium ister).
-- **Sıradaki parça:** W5-18 DesignStudioPane (GERÇEK design pipeline ile 6 artifact tipi + DESIGN.md guard + sandbox önizleme + export).
+|- **Sıradaki parça:** W5-19 TestingPane (Test Lab Plan→Run→Report + `POST /api/tests/run` + Shannon + junit).
+
+### 2026-09-03 — TASK-38 W5-18 DesignStudioPane DONE (server 0823f52 + web a9ff8c5)
+- **Executor run:** W5-18 tamamlandı — Inspector'da 14. sekme olarak gerçek design studio canlı.
+  - **Server:** yeni `lokma-core/src/design/` (`types.ts` 6 tip + token'lı 4 bundled system + guard/critique sözleşmeleri; `render.ts` tip başına deterministik self-contained HTML — CDN/LLM/image modeli yok; `store.ts` `~/.lokma/design/artifacts/<id>/` altında artifact.json/artifact.html/design.md/critique.json + 5 boyutlu heuristic critique + GERÇEK `.lokma/DESIGN.md` guard parse'ı (7+ H2 kuralı) + bağımlılıksız stored-ZIP yazıcı) + 9 yeni endpoint (`POST /generate`, `GET /list|systems|guard`, `GET|PUT /:id`, `POST /:id/critique`, `GET /:id/export?format=html|zip|json`, `GET /:id/view`); tüm hatalar `{code,message}`.
+  - **Web:** yeni `components/design/` (saf helper'lar + `design.test.ts` 28/28 PASS) + `design-pane.tsx` (concept düzeni 1:1 — New formu, guard şeridi, aranabilir/filtreli artifact listesi, gerçek `/view` URL'li sandbox viewer, Code/Critique/Export sekmeleri, canlı guard sayılı footer kartları; concept toast-only butonlar taşınmadı — ölü buton yok) + barrel; `api.ts`'e design tipleri + 9 fonksiyon; 14. Inspector sekmesi.
+  - **Tur içinde yakalanan sözleşme bug'ı:** `DesignGuard` kendi `ok` alanını taşıyor (lint sonucu) → guard route'u spread yerine `guard` altına nest ediyor (envelope `ok` çakışması, server build yakaladı).
+  - **Gates:** root tsc 0 · web build green (1678 modül, 588k JS) · core+server clean · 22 probun hepsi PASS · mock grep temiz · CANLI prob (:3473, temp HOME) 33/33 + python-zipfile bundle doğrulaması.
+  - **Dürüst kapsam:** deterministik starter HTML (agent `write_file` döngüsü follow-up, Docs/34 §9); `image` provider modeli gelene dek SVG kompozisyon; PDF/PPTX/MP4 400 `needs_toolchain` (pane sadece html/zip/json sunuyor + footer notu); critique yapısal heuristic (footer'da yazıyor); DELETE yok (concept'te delete butonu yok — follow-up).
+- **Sıradaki parça:** W5-19 TestingPane (Test Lab Plan→Run→Report + `POST /api/tests/run` + Shannon + junit).
 
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W5-17 ArchifyPane DONE — server 6941f04 + web a13a2e6)
-- **Son işlem:** TASK-38 W5-17 DONE — gerçek archify paneli canlı (13. Inspector sekmesi: New Diagram + sandbox viewer + 5-gate receipt + Before/Delta/After + 4 gerçek export, `GET/POST /api/archify/*` 9 endpoint ile; concept mock satırlar taşınmadı); sırada W5-18 DesignStudioPane
+- **Son güncelleme:** 2026-09-03 (TASK-38 W5-18 DesignStudioPane DONE — server 0823f52 + web a9ff8c5)
+- **Son işlem:** TASK-38 W5-18 DONE — gerçek design studio canlı (14. Inspector sekmesi: 6 artifact tipi + 4 bundled system + gerçek `.lokma/DESIGN.md` guard + sandbox viewer + Code/Critique-5D/Export sekmeleri + HTML/ZIP/JSON gerçek indirme, `GET/POST/PUT /api/design/*` 9 endpoint ile; concept toast-only butonlar taşınmadı); sırada W5-19 TestingPane
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

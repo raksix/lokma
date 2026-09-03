@@ -1185,6 +1185,53 @@ everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
   |  Next piece: W5-18 DesignStudioPane (6 artifact types via REAL
   |  design pipeline + DESIGN.md guard + sandbox preview + exports).
   |
+  |- 2026-09-03 — W5-18 DesignStudioPane DONE
+  |  (server commit 0823f52 + web commit a9ff8c5, both pushed).
+  |  Server (`lokma-core/src/design/` new: `types.ts` 6 types + 4 bundled
+  |  systems with full tokens + guard/critique contracts; `render.ts`
+  |  deterministic self-contained HTML per type (no CDN/LLM/image model);
+  |  `store.ts` `~/.lokma/design/artifacts/<id>/`
+  |  artifact.json/artifact.html/design.md/critique.json + 5D heuristic
+  |  critique + REAL `.lokma/DESIGN.md` guard parse (7+ H2 rule) +
+  |  dependency-free stored-ZIP writer); routes `POST /api/design/generate`,
+  |  `GET /api/design/list|systems|guard`, `GET|PUT /api/design/:id`,
+  |  `POST /api/design/:id/critique`,
+  |  `GET /api/design/:id/export?format=html|zip|json`,
+  |  `GET /api/design/:id/view`; all failures `{code,message}`.
+  |  Contract fix caught mid-run: `DesignGuard` carries its own `ok`
+  |  (lint result) so the guard route nests it under `guard` instead of
+  |  spreading (envelope `ok` collision, server build caught it).
+  |  Web (`components/design/` new: `design.ts` helpers +
+  |  `design.test.ts` 28/28 PASS + `design-pane.tsx` + barrel;
+  |  `api.ts` design types + 9 fns; 14th Inspector tab `Design`):
+  |  concept layout 1:1 — New form (type + brief + system), guard
+  |  strip, searchable/filterable recent artifacts (Docs/34 §7 left
+  |  panel), sandboxed viewer over the real `/view` URL, Code tab
+  |  (PUT + re-critique) / Critique tab (5D scores + fixes + re-run) /
+  |  Export tab (HTML/ZIP/JSON real downloads), footer cards with live
+  |  guard numbers. Concept toast-only Generate/Preview/Export NOT
+  |  ported — no dead buttons. `ui/button` has no `ink` variant
+  |  (GitPane lesson) → active type uses `default`.
+  |  Gates: root `tsc --noEmit` 0 errors · web build green (1678
+  |  modules, 588k JS/gzip 158k) · core+server `tsc -p` clean · all 22
+  |  probe files PASS (design 28/28) · mock grep clean (3 hits =
+  |  labeled input `placeholder` attrs) · LIVE probe on :3473 with temp
+  |  HOME 33/33 (generate → bad-type/empty/long 400s → list/get →
+  |  unknown 404 → evil-id 400 → systems x4 → guard missing/3/9 →
+  |  critique + 404 → PUT edit + empty/no-markup 400s → html/json/zip
+  |  exports → pdf `needs_toolchain` → bad-format 400 → view → all 4
+  |  artifacts on disk, real `~/.lokma` untouched) + python-zipfile
+  |  bundle verified (artifact.html/manifest.json/DESIGN.md).
+  |  Honest scope: deterministic starter HTML (the agent `write_file`
+  |  loop is the follow-up engine, Docs/34 §9); `image` renders an SVG
+  |  composition until a provider image model lands (pane-adjacent copy
+  |  says so); PDF/PPTX/MP4 answer 400 `needs_toolchain` and the pane
+  |  offers only html/zip/json + footer note; critique scores are
+  |  structural heuristics (footer says so); no `DELETE /api/design/:id`
+  |  (concept has no delete button — follow-up).
+  |  Next piece: W5-19 TestingPane (Test Lab Plan→Run→Report +
+  |  `POST /api/tests/run` + Shannon suite + junit.xml).
+  |
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

@@ -290,6 +290,28 @@ export type CreateTerminalRes = { ok: boolean; terminal: TerminalInfo };
 export type TerminalInputRes = { ok: boolean; id: string; bytes: number };
 export type DeleteTerminalRes = { ok: boolean; id: string; killed: boolean; exitCode: number | null; signal: string | null };
 
+// ─── Browser tabs (per-agent live tabs behind the BrowserPane, W3-12) ───
+
+export type BrowserTab = {
+  id: string;
+  url: string;
+  /** Full navigation history, oldest first (server-owned, real pointer). */
+  history: string[];
+  /** Index into `history` pointing at `url`. */
+  index: number;
+  agentId: string | null;
+  sessionId: string;
+  /** Workspace scope label shown under each tab. */
+  cwd: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+export type BrowserTabsRes = { ok: boolean; tabs: BrowserTab[]; count: number };
+export type BrowserTabRes = { ok: boolean; tab: BrowserTab };
+export type OpenBrowserTabBody = { url?: string; agentId?: string; sessionId?: string; cwd?: string };
+export type OpenBrowserTabRes = { ok: boolean; tabId: string; tab: BrowserTab };
+export type CloseBrowserTabRes = { ok: boolean; id: string; closed: boolean };
+
 // ─── Repo git (real status/log/commit/push behind the GitPane, W3-11) ─────
 
 export type GitFileChange = { path: string; staged: string | null; worktree: string | null };
@@ -473,4 +495,24 @@ export const api = {
         ? `/api/agents/${encodeURIComponent(id)}/locks?cwd=${encodeURIComponent(cwd)}`
         : `/api/agents/${encodeURIComponent(id)}/locks`,
     ),
+
+  // Browser tabs — per-agent live tabs (W3-12). The server owns tabs +
+  // history; pages render live in the client iframe (no page bytes on REST).
+  listBrowserTabs: (sessionId?: string) =>
+    get<BrowserTabsRes>(
+      sessionId ? `/api/browser?sessionId=${encodeURIComponent(sessionId)}` : '/api/browser',
+    ),
+  openBrowserTab: (body: OpenBrowserTabBody) => post<OpenBrowserTabRes>('/api/browser/open', body),
+  getBrowserTab: (id: string) => get<BrowserTabRes>(`/api/browser/${encodeURIComponent(id)}`),
+  /** Address-bar go — pushes real history (drops forward entries). */
+  navigateBrowserTab: (id: string, url: string) =>
+    post<BrowserTabRes>(`/api/browser/${encodeURIComponent(id)}/navigate`, { url }),
+  backBrowserTab: (id: string) => post<BrowserTabRes>(`/api/browser/${encodeURIComponent(id)}/back`, {}),
+  forwardBrowserTab: (id: string) =>
+    post<BrowserTabRes>(`/api/browser/${encodeURIComponent(id)}/forward`, {}),
+  /** Server touch — the client re-sets the frame (see BrowserPane reload key). */
+  reloadBrowserTab: (id: string) =>
+    post<BrowserTabRes>(`/api/browser/${encodeURIComponent(id)}/reload`, {}),
+  closeBrowserTab: (id: string) =>
+    del<CloseBrowserTabRes>(`/api/browser/${encodeURIComponent(id)}`),
 };

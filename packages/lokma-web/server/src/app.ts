@@ -13,6 +13,7 @@ import { vaultRoutes } from './routes/vault.js';
 import { fileRoutes } from './routes/files.js';
 import { gitRoutes } from './routes/git.js';
 import { terminalRoutes } from './routes/terminal.js';
+import { browserRoutes } from './routes/browser.js';
 import { wsRoutes } from './routes/ws.js';
 
 /**
@@ -38,6 +39,7 @@ export async function createApp(): Promise<ReturnType<typeof Fastify>> {
   await fileRoutes(app);
   await gitRoutes(app);
   await terminalRoutes(app);
+  await browserRoutes(app);
   await wsRoutes(app);
 
   return app;

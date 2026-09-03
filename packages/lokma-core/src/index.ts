@@ -36,5 +36,8 @@ export * from './git/index.js';
 // Terminals (live shell processes + scrollback, piped stdio over WS)
 export * from './terminal/index.js';
 
+// Browser tabs (per-agent tab registry + real history for the BrowserPane)
+export * from './browser/index.js';
+
 // Utils (DRY — reuse from here, don't duplicate)
 export * from './utils/index.js';

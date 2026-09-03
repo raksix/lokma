@@ -56,4 +56,21 @@ assert(STARTER_PROMPTS.length === 3, 'three starter cards');
 assert(STARTER_PROMPTS.every((s) => s.prompt.length > 10), 'starter prompts are sendable');
 assert(typeof timeGreeting(new Date('2026-01-01T09:00:00')) === 'string', 'greeting renders');
 
+// 6. W1-4 hero acceptance: greeting follows the clock (no hardcoded persona),
+// cards are unique, and every prompt is non-trivial (real session starter).
+assert(timeGreeting(new Date('2026-01-01T02:30:00')) === 'Up late', 'night greeting');
+assert(timeGreeting(new Date('2026-01-01T09:00:00')) === 'Good morning', 'morning greeting');
+assert(timeGreeting(new Date('2026-01-01T14:00:00')) === 'Good afternoon', 'afternoon greeting');
+assert(timeGreeting(new Date('2026-01-01T21:00:00')) === 'Good evening', 'evening greeting');
+const heroTitles = STARTER_PROMPTS.map((s) => s.title);
+assert(new Set(heroTitles).size === heroTitles.length, 'starter card titles unique');
+assert(
+  STARTER_PROMPTS.every((s) => s.title.trim().length > 0 && s.desc.trim().length > 0),
+  'starter cards have title + description',
+);
+assert(
+  STARTER_PROMPTS.every((s) => !/aylin/i.test(`${s.title} ${s.desc} ${s.prompt}`)),
+  'hero carries no hardcoded persona name',
+);
+
 console.log('chat.test.ts: all W1-1 chat checks passed');

@@ -1470,9 +1470,58 @@ everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
         live in Settings); init creates the 6 dirs the harness stores bind
         to (sessions/auth/vault are caller-scoped, not created); the soul
         probe caps at 20 agents.
-        W6 System panes continue (W6-21 auth + W6-22 setup done).
-        Next piece: W6-23 PluginMarketplacePane (Cordis list + enable/disable
-        without restart + install-from-URL).
+|        W6 System panes continue (W6-21 auth + W6-22 setup done).
+|        Next piece: W6-23 PluginMarketplacePane (Cordis list + enable/disable
+|        without restart + install-from-URL).
+|  - 2026-09-03 — W6-23 PluginMarketplacePane DONE
+|    (server commit 8eaf50d + web commit a4c7912, both pushed).
+|    Server (shared `schemas/plugin.ts` PluginSource/Category/Record Zod +
+|    new `lokma-core/src/plugins/` + new `server/src/routes/plugins.ts`,
+|    `app.ts` registration): 6 bundled manifests with REAL endpoint lists
+|    (archify 9 + design 9 + testing 4 + bots 7 + vault 4 + browser 8 = 41
+|    routes, verified against the route files) + `~/.lokma/plugins/`
+|    state.json (hot flags) + registry.json (URL records); scoped ids
+|    (`@lokma/...`) travel as one `%2F`-encoded segment (same trick as
+|    skill ids); an onRequest guard answers 503 `plugin_disabled` on
+|    suspended prefixes (hot, no restart; skips `/api/plugins` itself).
+|    Routes `GET /api/plugins|/:id`, `PATCH /:id {enabled}`
+|    (400 `empty_patch`/`bad_enabled`, 404 `plugin_not_found`),
+|    `POST /api/plugins/install {url}` (https-only, no creds, no
+|    local/private hosts, 409 `plugin_exists`, stored suspended as
+|    version `0.0.0` — no fetch, no SSRF surface),
+|    `DELETE /api/plugins/:id` (URL-only, bundled 400
+|    `bundled_readonly`); all failures `{code,message}`.
+|    Real bug caught by the live probe mid-run: `PLUGIN_ID_PATTERN`
+|    rejected `@`/`/` so every bundled detail 400d — widened (ids never
+|    touch the fs: string compare + JSON map, `..` is unknown/400).
+|    Web (`components/plugins/` new: `plugins.ts` helpers +
+|    `plugins-pane.tsx` + `plugins.test.ts` 32/32 PASS + barrel; `api.ts`
+|    plugin types + 5 fns; 19th Inspector tab `Plugins`, Package icon):
+|    concept layout 1:1 — Installed/Suspended tabs (live counts), search +
+|    category filter, labeled add-from-URL form (client mirrors server
+|    rules), Enable/Enabled toggle, Kernel expander (real manifest:
+|    prefixes + endpoint list), two-click Delete on URL rows. Concept
+|    invented downloads/stars + fake marketplace rows + toast-only
+|    buttons NOT ported (no dead buttons; footer states no remote
+|    marketplace yet).
+|    Gates: root `tsc --noEmit` 0 errors · web build green (1694
+|    modules, 673k JS/gzip 177k) · shared+core+ai+server dist emit clean ·
+|    all 27 probe files PASS (plugins 32/32) · mock grep clean · LIVE
+|    probe (in-process createApp + inject, startup-env temp HOME +
+|    refuse-guard) 40/40: list 6 + archify 9 + total 41 → detail →
+|    unknown/garbage/evil 404/400/400 → disable → archify list+validate
+|    503 → guard skips self + sibling 200 → re-enable → 200 → PATCH
+|    400/400/404 → 9 bad URLs + missing 400 → install (suspended) →
+|    count 7 → dup 409 → detail → enable → bundled delete 400 →
+|    delete → re-delete 404 → count 6 → state+registry under temp HOME
+|    → real `~/.lokma/plugins` absent (untouched).
+|    Honest scope: no remote marketplace (Docs/23 §profiles future);
+|    URL records own no routes until the fetch wave (pane says so);
+|    guard cache is in-process (sole writer is this server — no CLI
+|    plugin commands yet); suspending vault also 503s its search
+|    (real consequence, pane warns).
+|    Next piece: W6-24 ObservabilityPane (TokenLedger + bus-log trace
+|    timeline + Replay + Share).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

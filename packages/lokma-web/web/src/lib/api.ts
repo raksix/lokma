@@ -370,6 +370,42 @@ export type OpenBrowserTabBody = { url?: string; agentId?: string; sessionId?: s
 export type OpenBrowserTabRes = { ok: boolean; tabId: string; tab: BrowserTab };
 export type CloseBrowserTabRes = { ok: boolean; id: string; closed: boolean };
 
+// ─── Archify diagrams (typed IR → validated HTML/SVG behind the ArchifyPane, W5-17) ───
+
+export type ArchifyNode = { id: string; label: string; kind?: string };
+export type ArchifyEdge = { from: string; to: string; label?: string };
+export type ArchifyIR = {
+  type: string;
+  preset: string;
+  theme: string;
+  title: string;
+  nodes: ArchifyNode[];
+  edges: ArchifyEdge[];
+  trace?: string[];
+};
+export type ArchifyReceiptRow = { gate: string; status: 'pass' | 'fail'; msg: string };
+export type ArchifyGateError = { gate: string; message: string };
+export type DiagramSummary = {
+  id: string;
+  type: string;
+  preset: string;
+  theme: string;
+  title: string;
+  nodeCount: number;
+  edgeCount: number;
+  updatedAt: string;
+};
+export type DiagramsRes = { items: DiagramSummary[]; count: number };
+export type DiagramDetailRes = { ok: boolean; id: string; ir: ArchifyIR; receipt: ArchifyReceiptRow[]; html: string };
+export type GenerateDiagramBody = { type: string; prompt: string; preset?: string; theme?: string };
+export type GenerateDiagramRes = { ok: boolean; id: string; ir: ArchifyIR };
+export type ValidateDiagramRes = { ok: boolean; errors: ArchifyGateError[]; receipt: ArchifyReceiptRow[] };
+export type SaveDiagramRes = { ok: boolean; id: string; receipt: ArchifyReceiptRow[] };
+export type DiagramDiff = { added: string[]; removed: string[]; changed: string[]; rerouted: string[] };
+export type DiagramDeltaRes = { ok: boolean; diff: DiagramDiff; deltaHtml: string };
+export type ArchifyGuideRes = { ok: boolean; id: string; starter: string };
+export type ArchifyExportFormat = 'svg' | 'html' | 'json' | 'card';
+
 // ─── Repo git (real status/log/commit/push behind the GitPane, W3-11) ─────
 
 export type GitFileChange = { path: string; staged: string | null; worktree: string | null };
@@ -612,4 +648,42 @@ export const api = {
     post<BrowserTabRes>(`/api/browser/${encodeURIComponent(id)}/reload`, {}),
   closeBrowserTab: (id: string) =>
     del<CloseBrowserTabRes>(`/api/browser/${encodeURIComponent(id)}`),
+
+  // Archify diagrams — typed IR → validated HTML/SVG (W5-17). The server
+  // owns validation + rendering; the pane edits IR and downloads artifacts.
+  listDiagrams: () => get<DiagramsRes>('/api/archify/list'),
+  generateDiagram: (body: GenerateDiagramBody) => post<GenerateDiagramRes>('/api/archify/generate', body),
+  /** 5-gate check without saving (the pane receipt preview). */
+  validateDiagram: (ir: ArchifyIR) => post<ValidateDiagramRes>('/api/archify/validate', { ir }),
+  getDiagram: (id: string) => get<DiagramDetailRes>(`/api/archify/${encodeURIComponent(id)}`),
+  /** Persist an edited IR — server validates + rebuilds viewer/exports. */
+  saveDiagram: (id: string, ir: ArchifyIR) =>
+    request<SaveDiagramRes>(`/api/archify/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ ir }),
+    }),
+  /** Before/Delta/After against another diagram (writes delta.html). */
+  compareDiagrams: (id: string, baseId: string) =>
+    post<DiagramDeltaRes>(`/api/archify/${encodeURIComponent(id)}/delta`, { baseId }),
+  /** Starter chain for a topic (fills the generate prompt, editable). */
+  getArchifyGuide: (id: string, topic?: string) =>
+    get<ArchifyGuideRes>(
+      topic
+        ? `/api/archify/${encodeURIComponent(id)}/guide?topic=${encodeURIComponent(topic)}`
+        : `/api/archify/${encodeURIComponent(id)}/guide`,
+    ),
+  /** Stable viewer URL (deep-link hashes work on a real URL, not srcDoc). */
+  archifyViewUrl: (id: string) => `/api/archify/${encodeURIComponent(id)}/view`,
+  /** Real file download — blob + server filename, auth via `authedFetch`. */
+  downloadArchifyExport: async (
+    id: string,
+    format: ArchifyExportFormat,
+  ): Promise<{ filename: string; blob: Blob }> => {
+    const fallback = `${id}.${format === 'card' ? 'card.svg' : format}`;
+    const res = await authedFetch(`/api/archify/${encodeURIComponent(id)}/export?format=${format}`);
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') ?? '';
+    const match = disposition.match(/filename="([^"]+)"/);
+    return { filename: match?.[1] ?? fallback, blob };
+  },
 };

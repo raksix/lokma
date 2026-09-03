@@ -948,7 +948,61 @@ everyone down). If `pm2 restart` serves stale code (ESM cache trap), escalate in
   (or an ecosystem file), then `curl https://lokma.fermag.com.tr/` must return
   the Vite `Lokma — harness` HTML instead of `/_next/`.
 
-- (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
+|- (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
+|- 2026-09-03 — W4-13 AgentHubPane DONE
+  (server commit 228434c + web commit 68bb528, both pushed).
+  Server: `lokma-core/src/agents/registry.ts` extended — `AgentError`
+  (`{code,status}`, routes map straight to `{code,message}`),
+  `AGENT_MAX_AGENTS=20/MAX_CONCURRENT=5/MAX_QUEUE=20` caps,
+  `createAgent` (optional explicit id or slug+random, persona/model/cwd/
+  budgets/soul/memory/createdBy validation, 409 `agent_exists`, 429
+  `agent_limit`, cwd must exist like terminal spawn), `updateAgent`
+  (name/model/budgets, 400 `empty_patch`), `pauseAgent` (idle/queued/
+  running→paused) / `resumeAgent` (paused→idle) / `killAgent`
+  (non-terminal→killed, 409 `bad_transition`/`terminal_state`),
+  `forkAgent`/`cloneAgent` (dir copy incl. SOUL+MEMORY, fresh id, state
+  idle, createdBy `fork|clone:<id>`, IDENTITY.json rewritten),
+  `readAgentDoc`/`writeAgentDoc` (SOUL.md/MEMORY.md, 256KB cap, 404
+  `agent_not_found`); `deleteAgent` now 404s on unknown (was silent)
+  and validates the id shape (no path traversal into rm).
+  Routes: `POST /api/agents`, `PATCH /api/agents/:id`,
+  `POST /:id/pause|resume|kill`, `POST /:id/fork|clone`,
+  `DELETE /api/agents/:id`, `GET|PUT /:id/soul|memory`;
+  `GET /api/agents` caps gain `maxQueue`.
+  Web: new `components/agents/` (`agents.ts` pure helpers:
+  normalizeAgent/stateTone/queuePosition/validateAgentForm/formatBudget/
+  initials, `agents.test.ts` 36/36 PASS) + `agents-pane.tsx` (concept
+  layout 1:1 — header + live caps banner + registry list + detail with
+  Pause/Resume/Kill/Fork/Clone/two-click Delete + name/model/budget edit
+  form + SOUL/MEMORY editors + locks/worktrees line via getAgentLocks;
+  concept mock AGENTS rows + invented token/cost figures + toast-only
+  buttons NOT ported — no dead buttons, no invented usage) +
+  `agent-dialog.tsx` (labeled create form) + barrel, wired as 9th
+  Inspector tab; `api.ts` gains put helper + agent CRUD/doc fns +
+  `AgentsRes.caps`; agentStore gains caps + create/update/move/copy/
+  remove (server-truth refresh, lastError).
+  Bug caught by the live probe mid-run: `assertBudgets` returned
+  full defaults so `PATCH {budgets:{usd}}` clobbered tokens to 500k —
+  fixed to partial-return with defaults applied only at create.
+  Honest scope notes: (1) no live token-spend figures (usage ledger has
+  no agentId — spend accrues with the orchestration wave; the budget bar
+  shows the configured cap at 0% with a title saying so);
+  (2) queue position is computed from registry order (no runner queue
+  yet); (3) W4 acceptance leg "CLI create appears via WS <2s" not met —
+  no agent pub/sub on WS yet (lands with W4-14 Orchestration); the Hub
+  refreshes on mount + manual Refresh.
+  Gates: root `tsc --noEmit` 0 errors · web build green (1663
+  modules, 500k JS/gzip 140k) · core+server `tsc -p` clean · all 17
+  probes PASS · mock grep: agents clean (hits = own anti-mock comments
+  + labeled input `placeholder` attrs) · LIVE probe on :3468 with temp
+  HOME 33/33: create (budgets kept) → dup 409 → bad persona/name/cwd/
+  budgets/id 400 → patch keeps tokens → empty-patch 400 → pause →
+  pause 409 → resume → resume 409 → kill → kill `terminal_state` →
+  soul/memory read+write+reflect → fork (soul+budgets kept) → clone →
+  delete → re-delete 404 → unknown 404 → locks null-agent → disk
+  SOUL.md + clone config.json verified (real `~/.lokma` untouched).
+  Next piece: W4-14 OrchestrationPane (live tree from
+  `agent/start|delta|end` frames + fan-out controls).
 
 ---
 

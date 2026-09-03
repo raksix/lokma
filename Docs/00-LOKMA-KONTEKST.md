@@ -375,9 +375,18 @@
 - **W3 TAMAMEN BİTTİ** (W3-9 files + W3-10 terminal + W3-11 git + W3-12 browser).
 - **Sıradaki parça:** W4-13 AgentHubPane (`GET/POST /api/agents` create/pause/kill + SOUL/MEMORY editörleri + bütçeler).
 
+### 2026-09-03 — TASK-38 W4-13 AgentHubPane DONE (server 228434c + web 68bb528)
+- **Executor run:** W4-13 tamamlandı — Inspector'da 9. sekme olarak gerçek agent registry canlı.
+  - **Server:** `lokma-core/src/agents/registry.ts` genişletildi (`AgentError` kodlu hatalar, 20/5/20 caps, validasyonlu `createAgent`, `updateAgent`, guarded `pause/resume/kill`, `fork/clone` dir-kopyası, SOUL.md/MEMORY.md okuma/yazma, `deleteAgent` 404 + traversal koruması) + 10 yeni endpoint (`POST /api/agents`, `PATCH /:id`, `POST /:id/pause|resume|kill|fork|clone`, `DELETE /:id`, `GET|PUT /:id/soul|memory`); `GET /api/agents` caps'e `maxQueue` eklendi.
+  - **Web:** yeni `components/agents/` (saf helper'lar + `agents.test.ts` 36/36 PASS) + `agents-pane.tsx` (concept düzeni 1:1 — caps banner, registry liste, Pause/Resume/Kill/Fork/Clone/iki-tıklı Delete, name/model/bütçe formu, SOUL/MEMORY editörleri, locks/worktrees satırı; concept mock satırları + uydurma token/maliyet + toast-only butonlar taşınmadı) + `agent-dialog.tsx` (etiketli create formu); 9. Inspector sekmesi. `api.ts`'e put helper + agent CRUD/doc fonksiyonları, agentStore'a caps + mutation aksiyonları.
+  - **Canlı probda yakalanan bug:** `assertBudgets` full-default döndürüp PATCH'te tokens'ı 500k'ya eziyordu → partial-return'e çevrildi (default sadece create'te).
+  - **Gates:** root tsc 0 · web build green (1663 modül) · core+server clean · 17 probun hepsi PASS · mock grep temiz · CANLI prob (:3468, temp HOME) 33/33.
+  - **Dürüst kapsam:** canlı token-harcama yok (ledger'da agentId yok — orchestration dalgasında), queue pozisyonu registry sırasından, WS ile <2s canlı yansıma yok (W4-14 Orchestration'da).
+- **Sıradaki parça:** W4-14 OrchestrationPane (canlı ağaç + fan-out kontrolleri).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W3-12 BrowserPane DONE — web ea76e10)
-- **Son işlem:** TASK-38 W3-12 DONE — gerçek browser paneli canlı (per-agent tab'lar + server-owned history + sandbox iframe, 8. Inspector sekmesi); W3 dalgası TAMAMLANDI, sırada W4-13 AgentHubPane
+- **Son güncelleme:** 2026-09-03 (TASK-38 W4-13 AgentHubPane DONE — server 228434c + web 68bb528)
+- **Son işlem:** TASK-38 W4-13 DONE — gerçek agent registry canlı (CRUD + pause/resume/kill/fork/clone/delete + SOUL/MEMORY editörleri + bütçeler, 9. Inspector sekmesi); sırada W4-14 OrchestrationPane
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

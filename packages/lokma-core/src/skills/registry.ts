@@ -1,5 +1,5 @@
-import { readdir, readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { dirname, join, normalize, relative, resolve } from 'node:path';
 import { expandHome } from '../utils/fs.js';
 import type { Skill } from 'lokma-shared';
 
@@ -108,6 +108,135 @@ export async function scan(opts: ScanOpts): Promise<Skill[]> {
 
 export function getCached(): Skill[] | null {
   return cache?.skills ?? null;
+}
+
+/** Typed registry failure — routes map it straight to `{ code, message }`. */
+export class SkillError extends Error {
+  readonly code: string;
+  readonly status: number;
+
+  constructor(code: string, message: string, status: number) {
+    super(message);
+    this.name = 'SkillError';
+    this.code = code;
+    this.status = status;
+  }
+}
+
+/** Refuse to serve or patch absurdly large skill files. */
+export const SKILL_FILE_CAP = 256 * 1024;
+
+/** Scan dirs every lookup — the registry is small and always fresh. */
+const SKILL_SCAN_DIRS = ['skills', '~/.lokma/skills'];
+
+/** Resolve a skill by id or name without ever joining user input into a path. */
+async function findSkillOrThrow(skillId: string): Promise<Skill> {
+  const id = (skillId ?? '').trim();
+  if (!id) throw new SkillError('bad_skill_id', 'Skill id must not be empty', 400);
+  const skills = await scan({ dirs: SKILL_SCAN_DIRS });
+  const skill = skills.find((s) => s.id === id || s.name === id);
+  if (!skill) throw new SkillError('skill_not_found', `No skill '${id}' in the registry`, 404);
+  return skill;
+}
+
+/**
+ * skill_view parity (Docs/27 §7.3): full SKILL.md body for the detail pane.
+ * Progressive disclosure — the list stays light, this loads one skill.
+ */
+export async function readSkillView(skillId: string): Promise<{ skill: Skill; content: string }> {
+  const skill = await findSkillOrThrow(skillId);
+  let raw: string;
+  try {
+    raw = await readFile(skill.path, 'utf-8');
+  } catch {
+    throw new SkillError('skill_unreadable', `SKILL.md for '${skill.id}' cannot be read`, 500);
+  }
+  if (raw.length > SKILL_FILE_CAP) {
+    throw new SkillError('too_large', `SKILL.md for '${skill.id}' exceeds 256KB`, 400);
+  }
+  return { skill, content: raw };
+}
+
+/**
+ * Single reference load (Docs/27 §7.3 `GET /api/skills/:id/file`).
+ * Jailed to the skill directory — `..` escapes and absolute paths 400.
+ */
+export async function readSkillFile(
+  skillId: string,
+  filePath: unknown,
+): Promise<{ path: string; content: string }> {
+  const skill = await findSkillOrThrow(skillId);
+  if (typeof filePath !== 'string' || !filePath.trim()) {
+    throw new SkillError('bad_path', 'Query param `path` must be a non-empty relative path', 400);
+  }
+  const rel = normalize(filePath.trim()).replace(/\\/g, '/');
+  if (rel.startsWith('/') || rel === '..' || rel.startsWith('../')) {
+    throw new SkillError('outside_root', 'Reference path must stay inside the skill directory', 400);
+  }
+  const base = resolve(dirname(skill.path));
+  const full = resolve(base, rel);
+  if (relative(base, full).startsWith('..') || relative(base, full) === '') {
+    throw new SkillError('outside_root', 'Reference path must stay inside the skill directory', 400);
+  }
+  let raw: string;
+  try {
+    const st = await stat(full);
+    if (!st.isFile()) throw new Error('not a file');
+    raw = await readFile(full, 'utf-8');
+  } catch (e) {
+    if (e instanceof SkillError) throw e;
+    throw new SkillError('not_a_file', `No readable file '${rel}' in skill '${skill.id}'`, 404);
+  }
+  if (raw.length > SKILL_FILE_CAP) {
+    throw new SkillError('too_large', `File '${rel}' exceeds 256KB`, 400);
+  }
+  return { path: rel, content: raw };
+}
+
+export type SkillPatchResult = { skill: Skill; bytes: number };
+
+/**
+ * Curator patch (Docs/27 §7.3 `PATCH /api/skills/:id`, Hermes
+ * `skill_manage(patch)` parity): exact `old_string` → `new_string`
+ * replacement inside SKILL.md. Single-occurrence guard — zero or
+ * ambiguous matches 400 instead of silently editing the wrong block.
+ */
+export async function patchSkill(
+  skillId: string,
+  oldString: unknown,
+  newString: unknown,
+): Promise<SkillPatchResult> {
+  const skill = await findSkillOrThrow(skillId);
+  if (typeof oldString !== 'string' || !oldString) {
+    throw new SkillError('bad_patch', 'Body field `old_string` must be a non-empty string', 400);
+  }
+  if (typeof newString !== 'string') {
+    throw new SkillError('bad_patch', 'Body field `new_string` must be a string', 400);
+  }
+  if (newString.length > SKILL_FILE_CAP) {
+    throw new SkillError('too_large', 'Patched SKILL.md would exceed 256KB', 400);
+  }
+  let raw: string;
+  try {
+    raw = await readFile(skill.path, 'utf-8');
+  } catch {
+    throw new SkillError('skill_unreadable', `SKILL.md for '${skill.id}' cannot be read`, 500);
+  }
+  const hits = raw.split(oldString).length - 1;
+  if (hits === 0) throw new SkillError('no_match', '`old_string` matches nothing in SKILL.md', 400);
+  if (hits > 1) {
+    throw new SkillError(
+      'ambiguous_match',
+      `\`old_string\` matches ${hits} blocks — narrow it to exactly one`,
+      400,
+    );
+  }
+  const next = raw.replace(oldString, newString);
+  await writeFile(skill.path, next, 'utf-8');
+  // Re-scan so the registry (description/linked_files) reflects the patch.
+  const fresh = await scan({ dirs: SKILL_SCAN_DIRS });
+  const updated = fresh.find((s) => s.id === skill.id) ?? skill;
+  return { skill: updated, bytes: next.length };
 }
 
 export async function view(skillId: string, filePath?: string): Promise<{ content: string; linked_files?: Record<string, string> } | null> {

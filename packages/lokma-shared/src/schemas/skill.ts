@@ -24,3 +24,22 @@ export const SkillViewSchema = z.object({
 });
 
 export type SkillView = z.infer<typeof SkillViewSchema>;
+
+/**
+ * Curator telemetry — per-skill counters in `~/.lokma/skills/.usage.json`.
+ * Same shape as Hermes (`use_count`/`view_count`/`patch_count`).
+ * See Docs/27 §7.5.
+ */
+export const SkillUsageSchema = z.object({
+  use_count: z.number().int().nonnegative().default(0),
+  view_count: z.number().int().nonnegative().default(0),
+  patch_count: z.number().int().nonnegative().default(0),
+  last_used: z.string().optional(),
+});
+
+export type SkillUsage = z.infer<typeof SkillUsageSchema>;
+
+/** skill id → counters (missing entries mean zero activity). */
+export const SkillUsageMapSchema = z.record(z.string(), SkillUsageSchema);
+
+export type SkillUsageMap = z.infer<typeof SkillUsageMapSchema>;

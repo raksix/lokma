@@ -60,5 +60,8 @@ export * from './auth/index.js';
 // Setup (optional-stack features + init for the SetupPane, Docs/32)
 export * from './setup/index.js';
 
+// Plugins (kernel registry + hot toggle + add-from-URL for the Plugins pane)
+export * from './plugins/index.js';
+
 // Utils (DRY — reuse from here, don't duplicate)
 export * from './utils/index.js';

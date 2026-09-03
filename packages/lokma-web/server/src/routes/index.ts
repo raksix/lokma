@@ -3,6 +3,7 @@ export * from './config.js';
 export * from './providers.js';
 export * from './models.js';
 export * from './sessions.js';
+export * from './usage.js';
 export * from './agents.js';
 export * from './skills.js';
 export * from './vault.js';

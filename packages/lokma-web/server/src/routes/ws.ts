@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { normalize, relative, resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { SessionStore } from 'lokma-core';
+import { SessionStore, UsageLedger, estimateCost, estimateTokens } from 'lokma-core';
 import { stream as aiStream } from 'lokma-ai';
 import { decodeClientMessage, encodeServerMessage } from 'lokma-shared';
 
@@ -91,15 +91,34 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
           }
           await store.append(sessionId, { role: 'assistant', content: full, timestamp: new Date().toISOString() });
           socket.send(encodeServerMessage({ type: 'done', sessionId, reason: 'complete' }));
-          // Real character counts; pricing lands with the Usage wave (W2),
-          // so costUsd stays 0 until a real price table exists.
+          // Real accounting: token estimates from the core price table land
+          // in the per-project usage ledger (powers GET /api/usage/*) and in
+          // the `cost` frame (powers the header badge + message cost footer).
+          // Unpriced models report costUsd 0 + priced:false — never a guess.
+          const inputTokens = estimateTokens(effectivePrompt.length);
+          const outputTokens = estimateTokens(full.length);
+          const { costUsd, priced } = estimateCost(model, inputTokens, outputTokens);
+          try {
+            await new UsageLedger(cwd).record({
+              sessionId,
+              provider,
+              model,
+              inputTokens,
+              outputTokens,
+              costUsd,
+              priced,
+            });
+          } catch (e) {
+            // Accounting must never break chat — log and keep streaming.
+            app.log.warn(`[ws] usage record failed session=${sessionId}: ${String(e)}`);
+          }
           socket.send(
             encodeServerMessage({
               type: 'cost',
               sessionId,
-              inputTokens: effectivePrompt.length,
-              outputTokens: full.length,
-              costUsd: 0,
+              inputTokens,
+              outputTokens,
+              costUsd,
               model,
             }),
           );

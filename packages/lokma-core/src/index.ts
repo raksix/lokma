@@ -24,5 +24,8 @@ export * from './memory/index.js';
 // Agents (per-agent SOUL/MEMORY/model + caps + locks + worktree)
 export * from './agents/index.js';
 
+// Usage (per-run token/cost ledger + model pricing)
+export * from './usage/index.js';
+
 // Utils (DRY — reuse from here, don't duplicate)
 export * from './utils/index.js';

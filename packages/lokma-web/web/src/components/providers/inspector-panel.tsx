@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { BarChart3, Beaker, Cpu, Folder, GitBranch, Globe, Info, Layers, Paintbrush, Plug2, Puzzle, Settings, Terminal, Users, Workflow } from 'lucide-react';
+import { BarChart3, Beaker, Bot, Cpu, Folder, GitBranch, Globe, Info, Layers, Paintbrush, Plug2, Puzzle, Settings, Terminal, Users, Workflow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
@@ -16,6 +16,7 @@ import { SkillsPane } from '@/components/skills';
 import { ArchifyPane } from '@/components/archify';
 import { DesignPane } from '@/components/design';
 import { TestingPane } from '@/components/testing';
+import { BotsPane } from '@/components/bots';
 import { UsagePane } from '@/components/usage/usage-pane';
 
 /**
@@ -47,7 +48,9 @@ import { UsagePane } from '@/components/usage/usage-pane';
  * viewer + Code/Critique/Export tabs + real file downloads), Testing the
  * real W5-19 pane (Plan→Run→Classify→Report over live handlers +
  * Shannon scan over `GET/POST /api/tests/*`, per-test rows + real
- * `junit.xml` download).
+ * `junit.xml` download), Bots the real W5-20 pane (Bot Gallery over
+ * `GET /api/bots` + create/fork/publish/run over `POST/PATCH`
+ * `/api/bots/*`, playground runs spawn a real agent + session).
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
  */
@@ -60,7 +63,7 @@ export function InspectorPanel({
   sessionId?: string;
   ws?: UseWs;
 }) {
-  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault' | 'skills' | 'archify' | 'design' | 'testing'>(
+  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault' | 'skills' | 'archify' | 'design' | 'testing' | 'bots'>(
     'info',
   );
 
@@ -202,9 +205,20 @@ export function InspectorPanel({
           <Beaker className="h-3 w-3" />
           Testing
         </Button>
+        <Button
+          variant={tab === 'bots' ? 'default' : 'ghost'}
+          size="sm"
+          className="h-6 flex-1 gap-1.5 text-[11px]"
+          onClick={() => setTab('bots')}
+        >
+          <Bot className="h-3 w-3" />
+          Bots
+        </Button>
       </div>
       {tab === 'info' ? (
         <InfoPanel />
+      ) : tab === 'bots' ? (
+        <BotsPane onOpenSession={onOpenSession} />
       ) : tab === 'testing' ? (
         <TestingPane />
       ) : tab === 'design' ? (

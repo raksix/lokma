@@ -540,6 +540,87 @@ export type AgentLocksRes = {
   worktrees: string[];
 };
 
+// ─── Bots (shareable bot.json packages + run-as-agent, W5-20) ───
+
+export type BotSource = 'bundled' | 'global' | 'project';
+export type BotVisibility = 'private' | 'shared' | 'public';
+export type BotMemoryScope = 'bot' | 'project' | 'user' | 'isolated';
+export type BotBudgets = { maxTokens: number; maxUsd: number; maxTurns: number };
+export type Bot = {
+  id: string;
+  name: string;
+  avatar?: string;
+  description: string;
+  systemPrompt: string;
+  model: string;
+  fallback: string[];
+  tools: string[];
+  skills: string[];
+  mcpServers: string[];
+  knowledgeFiles: string[];
+  memoryScope: BotMemoryScope;
+  budgets: BotBudgets;
+  visibility: BotVisibility;
+  version: string;
+  createdFrom?: string;
+  tags: string[];
+  author?: string;
+  createdAt?: string;
+  featured: boolean;
+  source: BotSource;
+};
+export type BotsRes = { bots: Bot[]; count: number };
+export type BotDetailRes = { ok: boolean; bot: Bot };
+export type CreateBotBody = {
+  id?: string;
+  name: string;
+  description?: string;
+  systemPrompt?: string;
+  model?: string;
+  fallback?: string[];
+  tools?: string[];
+  skills?: string[];
+  mcpServers?: string[];
+  knowledgeFiles?: string[];
+  memoryScope?: BotMemoryScope;
+  budgets?: Partial<BotBudgets>;
+  visibility?: BotVisibility;
+  version?: string;
+  createdFrom?: string;
+  tags?: string[];
+  author?: string;
+};
+export type PatchBotBody = Partial<
+  Pick<
+    Bot,
+    | 'name'
+    | 'avatar'
+    | 'description'
+    | 'systemPrompt'
+    | 'model'
+    | 'fallback'
+    | 'tools'
+    | 'skills'
+    | 'mcpServers'
+    | 'knowledgeFiles'
+    | 'memoryScope'
+    | 'visibility'
+    | 'version'
+    | 'tags'
+    | 'author'
+  >
+> & { budgets?: Partial<BotBudgets> };
+export type BotMutationRes = { ok: boolean; bot: Bot; from?: string; visibility?: BotVisibility };
+export type ForkBotBody = { as?: string };
+export type PublishBotBody = { visibility: BotVisibility };
+export type RunBotBody = { task: string; cwd?: string };
+export type RunBotRes = {
+  ok: boolean;
+  agentId: string;
+  agent: { id: string; [k: string]: unknown };
+  sessionId: string;
+};
+
 // ─── One function per endpoint group ────────────────────────────────────────
 
 export const api = {
@@ -828,4 +909,23 @@ export const api = {
     const match = disposition.match(/filename="([^"]+)"/);
     return { filename: match?.[1] ?? fallback, blob };
   },
+
+  // Bots — shareable bot.json packages (W5-20). The server owns the
+  // registry (`~/.lokma/bots/` + bundled lokma-ceo); run spawns a real
+  // agent + a real session for playground chat.
+  listBots: () => get<BotsRes>('/api/bots'),
+  getBot: (id: string) => get<BotDetailRes>(`/api/bots/${encodeURIComponent(id)}`),
+  createBot: (body: CreateBotBody) => post<BotMutationRes>('/api/bots', body),
+  /** Edit a user bot (bundled templates answer 400 `bundled_readonly`). */
+  patchBot: (id: string, body: PatchBotBody) =>
+    patch<BotMutationRes>(`/api/bots/${encodeURIComponent(id)}`, body),
+  /** Clone into a new private bot (`as` optional — server derives one). */
+  forkBot: (id: string, body: ForkBotBody = {}) =>
+    post<BotMutationRes>(`/api/bots/${encodeURIComponent(id)}/fork`, body),
+  /** Flip gallery visibility (shared/public legs). */
+  publishBot: (id: string, body: PublishBotBody) =>
+    post<BotMutationRes>(`/api/bots/${encodeURIComponent(id)}/publish`, body),
+  /** Spawn a real agent + session from the bot (playground run). */
+  runBot: (id: string, body: RunBotBody) =>
+    post<RunBotRes>(`/api/bots/${encodeURIComponent(id)}/run`, body),
 };

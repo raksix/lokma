@@ -1585,8 +1585,61 @@ survives; never delete both at once). If even that serves stale code, escalate i
 |    `pm2 restart lokma-web` → `/` 200 BUT still stale `/_next/` HTML —
 |    DEPLOY BLOCKER persists (PM2 runs `next start` 15.5.24, needs
 |    foreground delete+start, not done per rule). Both processes online.
-|    Next piece: W6-25 CronApprovalsPane (per-agent cron CRUD + approvals
-|    queue on the SAME rule store as the chat permission card).
+|  Next piece: W6-25 CronApprovalsPane (per-agent cron CRUD + approvals
+|  queue on the SAME rule store as the chat permission card).
+|  - 2026-09-03 — W6-25 CronApprovalsPane DONE
+|    (server commit 5c9c64a + web commit 6fd6453, both pushed).
+|    NOTE: the core/shared/server/web implementation was found as
+|    uncommitted WIP in the dirty tree (orphaned run, same pattern as
+|    W2-6/W4-15/W5-19/W5-20/W6-21) — adopted as this run's ONE piece,
+|    reviewed fresh file-by-file, one real bug fixed (`agent_not_found`
+|    answered 400, now 404 like every other unknown-agent route), all
+|    gates + the full live probe re-run before the atomic commits
+|    (server + web separate).
+|    Server (`lokma-core/src/cron/` new: `cron.ts` 322 lines + `approvals.ts`
+|    + `index.ts`; shared `schemas/cron.ts`; `server/src/routes/cron.ts`;
+|    `app.ts` registration; `ws.ts` hook): 5-field standard cron
+|    validation (per-field ranges, `*`/`*/n`/`n`/`a-b`/comma, dow 7→0,
+|    dom+dow OR semantics) + `nextRunAfter` pure next-fire computation
+|    (366-day cap); jobs persist in `~/.lokma/cron/jobs.json` keyed by
+|    server-minted `c_+hex` ids; approvals decision log appends every real
+|    WS `permission_response`/`ask_response` to
+|    `~/.lokma/approvals/decisions.jsonl` (best-effort, never breaks chat).
+|    Routes `GET /api/cron`, `GET/POST /api/agents/:id/cron`,
+|    `PATCH/DELETE /api/agents/:id/cron/:jobId`, `GET /api/approvals`
+|    (`?limit=` capped 200, default 100); all failures `{code,message}`
+|    (`bad_schedule/bad_task/bad_enabled/empty_patch/cron_not_found/
+|    bad_agent_id/agent_not_found`).
+|    Web (`components/cron/` new: `cron.ts` helpers + `cron-pane.tsx` +
+|    `cron.test.ts` 44 checks PASS + barrel; `api.ts` cron/approval types
+|    + 6 fns; 21st Inspector tab `Cron`, Clock3 icon): concept layout 1:1 —
+|    per-agent cron list (agent filter + text search, enable toggle,
+|    two-click delete, labeled create form with client-mirrored rules),
+|    honest pending box (empty until the agent tool loop emits frames),
+|    Rules editor over the SAME `GET/PATCH /api/config` permissions store
+|    the chat card writes (one store, two views), real WS decision
+|    history with search. Concept mock CRONS/APPROVALS rows + invented
+|    risk badges + auto-classifier copy + toast-only `+ Cron` / `Approve
+|    all` / quick-approve NOT ported (no dead buttons, no fake data).
+|    Gates: root `tsc --noEmit` 0 errors · web build green (1700
+|    modules, 704k JS/gzip 184k) · shared+core+server dist emit clean ·
+|    all 29 probe files PASS (cron 44) · mock grep zero hits on all new
+|    files · LIVE probe (in-process createApp + inject, startup-env temp
+|    HOME + refuse-guard) 29/29: empty list/approvals → create agent →
+|    agent-cron empty → unknown-agent 404 → evil-id 400 → create (id +
+|    nextRunAt + null lastRunAt) → bad/blank/range schedule + bad task
+|    400s → unknown-agent create 404 → list 1 → disable (nextRunAt null)
+|    → re-schedule → empty/bad-schedule/unknown-job 400s/404 → delete →
+|    re-delete 404 → empty again → session + 2 decisions → newest-first
+|    + limit=1 → jobs.json on disk under temp HOME → real
+|    `~/.lokma/{cron,approvals}` absent (untouched).
+|    Honest scope: no firing daemon (runner wave — `lastRunAt` stays
+|    null, rows show the computed next fire, pane says so); no pending
+|    queue (no tool loop yet — decisions log the moment answers arrive);
+|    no `DELETE /api/cron` global clear (concept has no such button —
+|    follow-up).
+|    Next piece: W6-26 ExtrasPane (23 ranked ideas as a REAL feature-flag
+|    board over `GET/PATCH /api/config` flags).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

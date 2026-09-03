@@ -42,5 +42,8 @@ export * from './terminal/index.js';
 // Browser tabs (per-agent tab registry + real history for the BrowserPane)
 export * from './browser/index.js';
 
+// Archify (typed IR → validated deterministic HTML/SVG + share cards)
+export * from './archify/index.js';
+
 // Utils (DRY — reuse from here, don't duplicate)
 export * from './utils/index.js';

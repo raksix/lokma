@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Activity, BarChart3, Beaker, Bot, Clock3, Cpu, Folder, GitBranch, Globe, HardDrive, Info, Layers, Package, Paintbrush, Plug2, Puzzle, Settings, Shield, Terminal, Users, Workflow } from 'lucide-react';
+import { Activity, BarChart3, Beaker, Bot, Clock3, Cpu, Folder, GitBranch, Globe, HardDrive, Info, Layers, Package, Paintbrush, Plug2, Puzzle, Settings, Shield, Star, Terminal, Users, Workflow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
@@ -22,6 +22,7 @@ import { SetupPane } from '@/components/setup';
 import { PluginsPane } from '@/components/plugins';
 import { ObservabilityPane } from '@/components/observability';
 import { CronApprovalsPane } from '@/components/cron';
+import { ExtrasPane } from '@/components/extras';
 import { UsagePane } from '@/components/usage/usage-pane';
 
 /**
@@ -70,7 +71,9 @@ import { UsagePane } from '@/components/usage/usage-pane';
  * `/api/share/*`). Cron the real W6-25 pane (per-agent cron CRUD over
  * `GET/POST/PATCH/DELETE /api/agents/:id/cron` + `GET /api/cron`, approvals
  * rules over the shared `PATCH /api/config` permissions store, WS decision
- * history over `GET /api/approvals`).
+ * history over `GET /api/approvals`). Extras the real W6-26 pane (23 ranked
+ * agent-system extras as a live feature-flag board over `GET/PATCH
+ * /api/config` `features`, shipped rows opening their real Inspector tab).
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
  */
@@ -83,7 +86,7 @@ export function InspectorPanel({
   sessionId?: string;
   ws?: UseWs;
 }) {
-  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault' | 'skills' | 'archify' | 'design' | 'testing' | 'bots' | 'auth' | 'setup' | 'plugins' | 'observability' | 'cron'>(
+  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault' | 'skills' | 'archify' | 'design' | 'testing' | 'bots' | 'auth' | 'setup' | 'plugins' | 'observability' | 'cron' | 'extras'>(
     'info',
   );
 
@@ -279,9 +282,20 @@ export function InspectorPanel({
           <Clock3 className="h-3 w-3" />
           Cron
         </Button>
+        <Button
+          variant={tab === 'extras' ? 'default' : 'ghost'}
+          size="sm"
+          className="h-6 flex-1 gap-1.5 text-[11px]"
+          onClick={() => setTab('extras')}
+        >
+          <Star className="h-3 w-3" />
+          Extras
+        </Button>
       </div>
       {tab === 'info' ? (
         <InfoPanel />
+      ) : tab === 'extras' ? (
+        <ExtrasPane onOpenTab={(t) => setTab(t)} />
       ) : tab === 'cron' ? (
         <CronApprovalsPane />
       ) : tab === 'observability' ? (

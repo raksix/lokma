@@ -8,7 +8,7 @@ import { useSessionStore } from '@/stores';
  * live sessions (`GET /api/sessions`, via sessionStore) + vault notes
  * (`GET /api/vault/graph?q=`). The concept's hardcoded DOCS array is gone —
  * every row below comes from the server. Selecting a session switches to it;
- * selecting a note toasts its id (the note pane lands in W4).
+ * selecting a note toasts its id (open it fully from the Vault tab).
  */
 
 export type NoteHit = { id: string; title: string };
@@ -152,7 +152,7 @@ export function SearchModal({
               <div className="px-2 py-3 text-center text-xs text-red-600">{notesError}</div>
             ) : noteHits.length === 0 ? (
               <div className="px-2 py-3 text-center text-xs text-zinc-500">
-                No notes yet — the vault graph lands fully in W4.
+                No notes yet — ingest one from the Vault tab.
               </div>
             ) : (
               noteHits.map((n) => (

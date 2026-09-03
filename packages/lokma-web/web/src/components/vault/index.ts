@@ -1,0 +1,23 @@
+export { VaultPane } from './vault-pane';
+export {
+  clampDepth,
+  emptyIngestForm,
+  layoutGraph,
+  NODE_PALETTE,
+  nodeRadius,
+  normalizeNode,
+  normalizeNodes,
+  paletteIndex,
+  resolveWikilinkClick,
+  splitWikilinks,
+  validateIngestForm,
+  VAULT_MAX_DEPTH,
+  VAULT_MIN_DEPTH,
+  type BodyChunk,
+  type IngestForm,
+  type PlacedNode,
+  type VaultHit,
+  type VaultLink,
+  type VaultNode,
+  type VaultNoteDetail,
+} from './vault';

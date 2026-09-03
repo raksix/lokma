@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { BarChart3, Cpu, GitBranch, Globe, Info, Layers, Plug2, Settings, Terminal, Users } from 'lucide-react';
+import { BarChart3, Cpu, Folder, GitBranch, Globe, Info, Layers, Plug2, Settings, Terminal, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
@@ -11,6 +11,7 @@ import { GitPane } from '@/components/git';
 import { BrowserPane } from '@/components/browser';
 import { AgentsPane } from '@/components/agents';
 import { OrchestrationPane } from '@/components/orchestration';
+import { VaultPane } from '@/components/vault';
 import { UsagePane } from '@/components/usage/usage-pane';
 
 /**
@@ -28,7 +29,10 @@ import { UsagePane } from '@/components/usage/usage-pane';
  * SOUL.md/MEMORY.md editors over `GET/POST/PATCH/DELETE /api/agents/*`),
  * Orchestration the real W4-14 pane (live state-grouped tree + fan-out
  * creation + cancel-all over the same registry, kept live by WS
- * `agent_state` frames).
+ * `agent_state` frames), Vault the real W4-15 pane (live file graph +
+ * note reader with `[[wikilink]]` navigation + ingest over
+ * `GET /api/vault/graph|tree`, `GET /api/vault/note`,
+ * `POST /api/vault/ingest`).
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
  */
@@ -41,7 +45,7 @@ export function InspectorPanel({
   sessionId?: string;
   ws?: UseWs;
 }) {
-  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration'>(
+  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault'>(
     'info',
   );
 
@@ -138,9 +142,20 @@ export function InspectorPanel({
           <Cpu className="h-3 w-3" />
           Orchestration
         </Button>
+        <Button
+          variant={tab === 'vault' ? 'default' : 'ghost'}
+          size="sm"
+          className="h-6 flex-1 gap-1.5 text-[11px]"
+          onClick={() => setTab('vault')}
+        >
+          <Folder className="h-3 w-3" />
+          Vault
+        </Button>
       </div>
       {tab === 'info' ? (
         <InfoPanel />
+      ) : tab === 'vault' ? (
+        <VaultPane />
       ) : tab === 'orchestration' ? (
         <OrchestrationPane />
       ) : tab === 'agents' ? (

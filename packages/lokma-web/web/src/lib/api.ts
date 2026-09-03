@@ -223,7 +223,23 @@ export type AgentDocRes = { ok: boolean; id: string; doc: string; content: strin
 export type AgentDocWriteRes = { ok: boolean; id: string; doc: string; bytes: number };
 export type SkillInfo = { id: string; [k: string]: unknown };
 export type SkillsRes = { skills: SkillInfo[] };
-export type VaultGraphRes = { nodes: unknown[]; links: unknown[]; note?: string };
+export type VaultGraphRes = { nodes: unknown[]; links: unknown[]; count?: number; note?: string };
+export type VaultTreeEntry = { name: string; path: string; type: 'dir' | 'note'; children?: VaultTreeEntry[] };
+export type VaultTreeRes = { ok: boolean; tree: VaultTreeEntry[] };
+export type VaultNoteRes = {
+  ok: boolean;
+  path: string;
+  title: string;
+  tags: string[];
+  links: string[];
+  provenance: string | null;
+  size: number;
+  mtimeMs: number;
+  content: string;
+  truncated: boolean;
+};
+export type VaultIngestBody = { path: string; content: string; provenance?: string };
+export type VaultIngestRes = { ok: boolean; path: string; bytes: number; created: boolean };
 export type UsageModelRow = {
   model: string;
   family: string;
@@ -447,9 +463,22 @@ export const api = {
   listSkills: () => get<SkillsRes>('/api/skills'),
   getSkill: (id: string) => get<SkillInfo>(`/api/skills/${encodeURIComponent(id)}`),
 
-  // Vault (real graph lands in W4; the client already hits the real URL)
-  getVaultGraph: (query?: string) =>
-    get<VaultGraphRes>(query ? `/api/vault/graph?q=${encodeURIComponent(query)}` : '/api/vault/graph'),
+  // Vault — live file graph + note reads + ingest (W4-15).
+  getVaultGraph: (query?: string, opts?: { folder?: string; depth?: number }) => {
+    const params = new URLSearchParams();
+    if (query) params.set('q', query);
+    if (opts?.folder) params.set('folder', opts.folder);
+    if (opts?.depth !== undefined) params.set('depth', String(opts.depth));
+    const suffix = params.size > 0 ? `?${params.toString()}` : '';
+    return get<VaultGraphRes>(`/api/vault/graph${suffix}`);
+  },
+  /** Nested dir/note tree for the vault folder browser. */
+  getVaultTree: (folder?: string) =>
+    get<VaultTreeRes>(folder ? `/api/vault/tree?folder=${encodeURIComponent(folder)}` : '/api/vault/tree'),
+  /** Full note read (wikilink click → pane). */
+  getVaultNote: (path: string) => get<VaultNoteRes>(`/api/vault/note?path=${encodeURIComponent(path)}`),
+  /** Ingest a `.md` note (`provenance` = the ingesting agent id). */
+  ingestVaultNote: (body: VaultIngestBody) => post<VaultIngestRes>('/api/vault/ingest', body),
 
   // Usage — real token/cost accounting (W2-7). The ledger fills from WS runs.
   getUsageSummary: (range: UsageRange = '7d', cwd?: string) =>

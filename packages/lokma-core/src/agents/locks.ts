@@ -1,4 +1,4 @@
-import { readFile, writeFile, rm, mkdir } from 'node:fs/promises';
+import { readdir, readFile, writeFile, rm, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { sha1HexSync } from 'lokma-shared';
 import type { Lock } from 'lokma-shared';
@@ -56,4 +56,27 @@ export async function heartbeat(path: string, owner: string, leaseMs = 60_000): 
   } catch {
     return false;
   }
+}
+
+/** Every lock file on disk (live + expired) — callers split by `leaseUntil`. */
+export async function listLocks(): Promise<Lock[]> {
+  const dir = expandHome(LOCKS_DIR);
+  let names: string[];
+  try {
+    names = await readdir(dir);
+  } catch {
+    return [];
+  }
+  const out: Lock[] = [];
+  for (const name of names) {
+    if (!name.endsWith('.json')) continue;
+    try {
+      const raw = await readFile(join(dir, name), 'utf-8');
+      const lock = JSON.parse(raw) as Lock;
+      if (typeof lock.path === 'string' && typeof lock.owner === 'string') out.push(lock);
+    } catch {
+      // Corrupt lock files are skipped, never fatal.
+    }
+  }
+  return out;
 }

@@ -30,6 +30,9 @@ export * from './usage/index.js';
 // Workspace files (jailed tree/read/write/search + git overlay)
 export * from './files/index.js';
 
+// Repo git (branch/status/log/commit/push/worktree-prune for the GitPane)
+export * from './git/index.js';
+
 // Terminals (live shell processes + scrollback, piped stdio over WS)
 export * from './terminal/index.js';
 

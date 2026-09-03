@@ -265,9 +265,15 @@
   - **Baseline:** root `tsc --noEmit` 0 hata · concept 1863 modules green · web 46 modules green · server `tsc -p` clean · tree clean.
 - **Sıradaki parça:** W0-F1 api client (`web/src/lib/api.ts` — typed wrapper, 401→login, `{code,message}`, endpoint-grup fonksiyonları).
 
+### 2026-09-03 — TASK-38 W0-F1 api client DONE (commit 23dcca4)
+- **Executor run:** W0-F1 tamamlandı — `packages/lokma-web/web/src/lib/api.ts` typed wrapper'a çevrildi + `api.test.ts` 401-path probu (10/10 PASS).
+  - `request<T>` (GET/POST/PATCH/DELETE, cookie include + Bearer `lokma-token`), `ApiError {code,message,status}` (yeni + legacy `{ok:false,error}` şekillerini normalize eder), 401→`/login` redirect (loop korumalı). Grup fonksiyonları: health/config/patchConfig, listProviders/testProvider, listModels, listSessions/getSession/createSession/forkSession (fork URL gerçek, server W1'de), listAgents/getAgent, listSkills/getSkill, getVaultGraph. `fetchJson` + eski `api.*` adları korundu (HealthBadge dokunulmadı).
+  - **Gates:** root `tsc --noEmit` 0 · web build 46 modules green · server `tsc -p` clean · mock grep'te F1 dışı 1 pre-existing hit (`chat/input.tsx` "mock WS" placeholder yazısı — F2/W1'de temizlenecek).
+- **Sıradaki parça:** W0-F2 ws client (`web/src/lib/ws.ts` + `hooks/use-ws.ts` — proxy-relative URL, reconnect backoff, typed frame'ler).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38)
-- **Son işlem:** TASK-38 W0 pre-flight DONE — server REAL-vs-STUB tablosu + vite proxy kararı (KEEP :3456) §9'da, baseline green (tsc 0, concept 1863, web 46, server clean), sırada W0-F1 api client
+- **Son güncelleme:** 2026-09-03 (TASK-38 W0-F1)
+- **Son işlem:** TASK-38 W0-F1 api client DONE (23dcca4) — typed wrapper + 401 redirect + per-group fns + 10/10 probe green, §9'da, sırada W0-F2 ws client
 - **Sıradaki adım:**
   1. Auth implementation — `lokma-shared/src/schemas/user.ts` + `project.ts` + `projectMember.ts` + `authSettings.ts` (Zod) → `lokma-core/src/auth/*` (verifyJwt, can, invite) → Fastify `preHandler` + pane updates
   2. Phase 1: core loop + chat + providers/models/sessions/usage + skills/memory + **agents MVP + self-spawn (1.5) + archify/design/testing/bots stubs**

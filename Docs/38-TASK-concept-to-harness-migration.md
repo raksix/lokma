@@ -384,6 +384,20 @@ drag, tiling toggle, save/reset layout — all against live data, zero mock cont
   Vite proxy decision: KEEP as-is, no change. Server default `:3456` (`server/src/index.ts`), web dev `:3457` with `/api` + `/ws` → `127.0.0.1:3456` already wired in `web/vite.config.ts`.
   Baseline verification (2026-09-03, sterile env): root `bun x tsc --noEmit` 0 errors; `concept/` build 1863 modules 497.03k JS green; `packages/lokma-web/web` build 46 modules green; `packages/lokma-web/server` build (`tsc -p`) clean; `git status` clean.
   Next piece: W0-F1 api client (`web/src/lib/api.ts`).
+- 2026-09-03 — W0-F1 api client DONE (`web/src/lib/api.ts` + `web/src/lib/api.test.ts`, commit 23dcca4).
+  Typed `request<T>` wrapper (GET/POST/PATCH/DELETE, cookie `include` + Bearer from
+  `localStorage["lokma-token"]`), `ApiError { code, message, status }` normalizing both
+  the future `{ code, message }` shape and the legacy Phase 0 `{ ok: false, error }`
+  shape, 401 → redirect `/login` (no loop on `/login` itself). Per-group fns:
+  health/getConfig/patchConfig, listProviders/testProvider, listModels,
+  listSessions/getSession/createSession/forkSession (fork URL real, server lands W1),
+  listAgents/getAgent, listSkills/getSkill, getVaultGraph. Back-compat: `fetchJson` +
+  `api.health/config/providers/models/sessions` kept (HealthBadge untouched).
+  401-path probe `api.test.ts` (`bun src/lib/api.test.ts`): 10/10 PASS.
+  Gates: root `tsc --noEmit` 0 errors · web build 46 modules green ·
+  server `tsc -p` clean · mock grep: 1 pre-existing hit left for F2/W1
+  (`components/chat/input.tsx` placeholder text mentions "mock WS" — chat scope, not F1).
+  Next piece: W0-F2 ws client (`web/src/lib/ws.ts` + `hooks/use-ws.ts`).
 - (append: `2026-.. — W<n> <pane> — <commit hash> — <acceptance result>`)
 
 ---

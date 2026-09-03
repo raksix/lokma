@@ -1,26 +1,175 @@
 /**
- * API helpers — DRY fetch wrappers for REST endpoints.
- * Web and CLI share the same server routes (lokma-shared schemas).
+ * Typed API client for the Lokma harness server (Fastify).
+ * Single HTTP entry point for the web app — all panes go through here (DRY).
+ * Real endpoints only: every function calls a live `/api/*` URL, never mock data.
+ * Auth: httpOnly cookie (sent via `credentials: include`) + optional Bearer token
+ * from `localStorage["lokma-token"]` (`lokma auth <token>` stores it there).
  */
 
-export async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, init);
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-  return res.json() as Promise<T>;
+export type ApiErrorShape = { code: string; message: string };
+
+/** Typed fetch error — carries the server `{ code, message }` shape. */
+export class ApiError extends Error {
+  readonly code: string;
+  readonly status: number;
+
+  constructor(code: string, message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.code = code;
+    this.status = status;
+  }
 }
 
-// ─── Typed fetchers for Phase 0 routes ───────────────────────────────────
+const TOKEN_KEY = 'lokma-token';
+const LOGIN_PATH = '/login';
+
+/** Read the stored Bearer token without crashing outside the browser. */
+function readToken(): string | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Bounce to login on 401 (browser only, never loops on the login page itself). */
+function redirectToLogin(): void {
+  try {
+    if (typeof window === 'undefined' || !window.location) return;
+    if (window.location.pathname === LOGIN_PATH) return;
+    window.location.href = LOGIN_PATH;
+  } catch {
+    // Non-browser runtimes (tests, SSR probes) skip the redirect.
+  }
+}
+
+/** Normalize every server failure shape into `{ code, message }`. */
+async function toApiError(res: Response): Promise<ApiError> {
+  const status = res.status;
+  if (status === 401) {
+    redirectToLogin();
+    return new ApiError('unauthorized', 'Not signed in — redirected to login', 401);
+  }
+  let code = 'http_error';
+  let message = `HTTP ${status}`;
+  try {
+    const text = await res.text();
+    if (text) {
+      try {
+        const body = JSON.parse(text) as Record<string, unknown>;
+        if (typeof body.code === 'string' && typeof body.message === 'string') {
+          code = body.code;
+          message = body.message;
+        } else if (typeof body.error === 'string') {
+          // Legacy server shape `{ ok: false, error: "..." }` (Phase 0 routes).
+          message = body.error;
+          code = typeof body.code === 'string' ? body.code : 'request_failed';
+        } else if (typeof body.message === 'string') {
+          message = body.message;
+        } else {
+          message = text.slice(0, 300);
+        }
+      } catch {
+        message = text.slice(0, 300);
+      }
+    }
+  } catch {
+    // Keep the default HTTP message when the body is unreadable.
+  }
+  return new ApiError(code, message, status);
+}
+
+/**
+ * Core request helper — GET/POST/PATCH/DELETE with auth + 401 handling.
+ * Throws ApiError on any non-2xx response.
+ */
+export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  const token = readToken();
+  if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
+  if (init.body !== undefined && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+  const res = await fetch(path, { ...init, headers, credentials: 'include' });
+  if (!res.ok) throw await toApiError(res);
+  if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
+}
+
+async function get<T>(path: string): Promise<T> {
+  return request<T>(path, { method: 'GET' });
+}
+
+async function post<T>(path: string, body?: unknown): Promise<T> {
+  return request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });
+}
+
+async function patch<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
+}
+
+/** Back-compat thin wrapper — kept for existing callers, now with auth + 401 handling. */
+export async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
+  return request<T>(path, init);
+}
+
+// ─── Response types (mirror live server route shapes) ───────────────────────
 
 export type HealthRes = { ok: boolean; service: string; version: string };
-export type ConfigRes = { config: unknown; credentials: Record<string, { keySet: boolean; last4: string | null }> };
-export type ProvidersRes = { providers: { id: string; keySet: boolean; last4: string | null }[] };
-export type ModelsRes = { models: { id: string; label: string; provider: string }[] };
-export type SessionsRes = { sessions: { id: string }[] };
+export type ConfigRes = {
+  config: unknown;
+  credentials: Record<string, { keySet: boolean; last4: string | null }>;
+};
+export type ProviderInfo = { id: string; enabled: boolean; keySet: boolean; last4: string | null };
+export type ProvidersRes = { providers: ProviderInfo[] };
+export type ProviderTestRes = { ok: boolean; provider: string; error?: string; note?: string };
+export type ModelInfo = { id: string; label: string; provider: string };
+export type ModelsRes = { models: ModelInfo[]; count: number; cached: boolean };
+export type SessionSummary = { id: string; cwd?: string };
+export type SessionsRes = { sessions: SessionSummary[]; count: number };
+export type SessionDetail = { id: string; cwd: string; messages: unknown[]; count: number };
+export type CreateSessionRes = { ok: boolean; id: string; cwd: string };
+export type ForkSessionRes = { ok: boolean; id: string; from: string };
+export type AgentInfo = { id: string; [k: string]: unknown };
+export type AgentsRes = { agents: AgentInfo[] };
+export type SkillInfo = { id: string; [k: string]: unknown };
+export type SkillsRes = { skills: SkillInfo[] };
+export type VaultGraphRes = { nodes: unknown[]; links: unknown[]; note?: string };
+
+// ─── One function per endpoint group ────────────────────────────────────────
 
 export const api = {
-  health: () => fetchJson<HealthRes>('/api/health'),
-  config: () => fetchJson<ConfigRes>('/api/config'),
-  providers: () => fetchJson<ProvidersRes>('/api/providers'),
-  models: () => fetchJson<ModelsRes>('/api/models'),
-  sessions: () => fetchJson<SessionsRes>('/api/sessions'),
+  // Health + config
+  health: () => get<HealthRes>('/api/health'),
+  getConfig: () => get<ConfigRes>('/api/config'),
+  config: () => get<ConfigRes>('/api/config'),
+  patchConfig: (patchBody: Record<string, unknown>) =>
+    patch<{ ok: boolean; patched: string[] }>('/api/config', patchBody),
+
+  // Providers + models
+  listProviders: () => get<ProvidersRes>('/api/providers'),
+  providers: () => get<ProvidersRes>('/api/providers'),
+  testProvider: (id: string) => post<ProviderTestRes>(`/api/providers/${encodeURIComponent(id)}/test`),
+  listModels: () => get<ModelsRes>('/api/models'),
+  models: () => get<ModelsRes>('/api/models'),
+
+  // Sessions — fork lands server-side in W1; the client already hits the real URL.
+  listSessions: (cwd?: string) =>
+    get<SessionsRes>(cwd ? `/api/sessions?cwd=${encodeURIComponent(cwd)}` : '/api/sessions'),
+  sessions: () => get<SessionsRes>('/api/sessions'),
+  getSession: (id: string) => get<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
+  createSession: (body?: { cwd?: string; model?: string }) => post<CreateSessionRes>('/api/sessions', body ?? {}),
+  forkSession: (id: string) => post<ForkSessionRes>(`/api/sessions/${encodeURIComponent(id)}/fork`),
+
+  // Agents + skills (read-only on the server today; mutations land in W4)
+  listAgents: () => get<AgentsRes>('/api/agents'),
+  getAgent: (id: string) => get<AgentInfo>(`/api/agents/${encodeURIComponent(id)}`),
+  listSkills: () => get<SkillsRes>('/api/skills'),
+  getSkill: (id: string) => get<SkillInfo>(`/api/skills/${encodeURIComponent(id)}`),
+
+  // Vault (real graph lands in W4; the client already hits the real URL)
+  getVaultGraph: (query?: string) =>
+    get<VaultGraphRes>(query ? `/api/vault/graph?q=${encodeURIComponent(query)}` : '/api/vault/graph'),
 };

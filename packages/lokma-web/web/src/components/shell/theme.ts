@@ -2,7 +2,10 @@
  * Shell theme helper — single place that owns the `lokma-theme` contract.
  * Light is the default; dark toggles the `dark` class on <html> (same key
  * the concept shell uses, so concept-saved preferences keep working).
- * F5 ports the full 4-theme token set; this file only owns light/dark.
+ * F5 ported the concept token set 1:1 into `web/src/index.css`, so this
+ * file only owns the light/dark switch — the `themes/*.json`
+ * (claude/omp/midnight/paper) palettes stay CLI-side until a web theme
+ * picker wave wires them to CSS vars.
  */
 
 const THEME_KEY = 'lokma-theme';

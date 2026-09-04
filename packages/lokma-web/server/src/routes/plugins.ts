@@ -1,10 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import {
+  MarketplaceError,
   PluginError,
   deletePlugin,
   getPlugin,
   installPluginFromUrl,
   listPlugins,
+  searchMarketplace,
   setPluginEnabled,
   suspendedPrefixes,
 } from 'lokma-core';
@@ -12,7 +14,10 @@ import {
 /**
  * Plugins — kernel registry for the Plugins pane (W6-23, Docs/23).
  * `GET /api/plugins` (bundled manifests with REAL endpoint lists +
- * URL-installed records); `GET /api/plugins/:id` (manifest detail);
+ * URL-installed records); `GET /api/plugins/marketplace?q=` (live GitHub
+ * `lokma-plugin` topic search — every hit is a real repo, stars/descriptions
+ * come from the API, `url` feeds `POST /install` directly);
+ * `GET /api/plugins/:id` (manifest detail);
  * `PATCH /api/plugins/:id { enabled }` (hot toggle — the suspension
  * guard below reads live state, no restart); `POST /api/plugins/install
  * { url }` (strict https validation, stored suspended, no fetch);
@@ -55,6 +60,19 @@ export async function pluginsRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/plugins', async () => {
     const { plugins, count } = await listPlugins();
     return { plugins, count };
+  });
+
+  // Static before `:id` — the live remote marketplace (no local writes).
+  app.get('/api/plugins/marketplace', async (req, reply) => {
+    const { q } = (req.query ?? {}) as { q?: unknown };
+    try {
+      return await searchMarketplace(q ?? '');
+    } catch (e) {
+      if (e instanceof MarketplaceError) {
+        return reply.status(e.status).send({ code: e.code, message: e.message });
+      }
+      throw e;
+    }
   });
 
   app.get('/api/plugins/:id', async (req, reply) => {

@@ -1761,6 +1761,39 @@ survives; never delete both at once). If even that serves stale code, escalate i
     skills record-use, files write): archify (3 POST), design (2 POST),
     tests (1 POST), vault ingest (1 POST). Next piece:
     `DELETE /api/archify/:id`.
+- 2026-09-04 — Phase 1 DELETE endpoints, piece 2/8: `DELETE /api/archify/:id` DONE
+  (server 93d2e58 + web 1fe2b6d, both pushed).
+  - **Executor run:** second DELETE in the Phase 1 "DELETE for every POST
+    resource" series. Core `deleteDiagram()` (`archify/store.ts`:
+    `assertDiagramId` 400 on bad shape, `readStoredIr` 404 on unknown
+    before touching disk, then `rm` of the whole `<id>/` dir — the id is a
+    single validated segment so `rm` can never escape the archify root) +
+    `DELETE /api/archify/:id` (`routes/archify.ts`, `{ ok, id }`, same
+    `ArchifyError` mapping as the sibling routes). Plugin registry
+    `@lokma/plugin-archify` endpoints 9→10 (footer now reads 42 total;
+    the suspend guard is path-prefix based so DELETE is covered with no
+    extra code). Web: `api.deleteDiagram()` + header Delete button
+    (two-click arm, Trash2 lucide, destructive on confirm, resets the arm
+    on row select; success clears selection/detail and reloads the list) +
+    `plugins.ts` footer example comment 41→42.
+  - **Gates:** root `tsc --noEmit` 0 · core dist emit + server `tsc -p`
+    clean (server reads core from dist — rebuild was required) · web build
+    green (747k JS/gzip 197k) · archify helpers probe 33/33 · live probe
+    (in-process createApp + inject, startup-env temp HOME + refuse-guard)
+    18/18: empty list → generate A+B → dir on disk → DELETE A `{ok,id}` →
+    dir gone → GET-after-delete 404 `diagram_not_found` → re-delete 404 →
+    list count 1 (only B) → sibling export+view 200 → evil-id 400 `bad_id`
+    → unknown 404 → dotdot normalizes to `/api/` 404 (never 200) →
+    registry archify 10 incl. DELETE · mock grep clean (1 hit = pre-existing
+    anti-mock NOT-ported comment, legit) · real `~/.lokma` untouched
+    (no dir before or after).
+  - **Honest scope:** no per-diagram ownership (all diagrams deletable —
+    no `deleteBlockReason` helper needed, so `archify.test.ts` gains no new
+    checks; the existing 33 pin the helper contracts and the live probe
+    pins the new endpoint); delta snapshots die with the head dir (no
+    cross-diagram refs to repair).
+  - Remaining DELETE pieces: design (2 POST), tests (1 POST), vault ingest
+    (1 POST). Next piece: `DELETE /api/design/:id`.
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

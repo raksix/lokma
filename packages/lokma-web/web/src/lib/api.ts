@@ -504,7 +504,7 @@ export type SaveDiagramRes = { ok: boolean; id: string; receipt: ArchifyReceiptR
 export type DiagramDiff = { added: string[]; removed: string[]; changed: string[]; rerouted: string[] };
 export type DiagramDeltaRes = { ok: boolean; diff: DiagramDiff; deltaHtml: string };
 export type ArchifyGuideRes = { ok: boolean; id: string; starter: string };
-export type ArchifyExportFormat = 'svg' | 'html' | 'json' | 'card';
+export type ArchifyExportFormat = 'svg' | 'html' | 'json' | 'card' | 'png';
 
 // ─── Design Studio (6 artifact types over bundled systems + DESIGN.md guard, W5-18) ───
 
@@ -1198,9 +1198,11 @@ export const api = {
   downloadArchifyExport: async (
     id: string,
     format: ArchifyExportFormat,
+    scale?: 1 | 2,
   ): Promise<{ filename: string; blob: Blob }> => {
     const fallback = `${id}.${format === 'card' ? 'card.svg' : format}`;
-    const res = await authedFetch(`/api/archify/${encodeURIComponent(id)}/export?format=${format}`);
+    const suffix = format === 'png' && scale !== undefined ? `&scale=${scale}` : '';
+    const res = await authedFetch(`/api/archify/${encodeURIComponent(id)}/export?format=${format}${suffix}`);
     const blob = await res.blob();
     const disposition = res.headers.get('Content-Disposition') ?? '';
     const match = disposition.match(/filename="([^"]+)"/);

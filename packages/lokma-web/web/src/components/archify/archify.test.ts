@@ -100,10 +100,12 @@ const rows: NormalizedDiagram[] = [
 
 // Export formats offered by the pane match the server endpoint exactly.
 {
-  check('4 export formats', ARCHIFY_EXPORTS.length === 4);
+  check('5 export formats', ARCHIFY_EXPORTS.length === 5);
   check(
-    'formats are svg|html|json|card',
-    (['svg', 'html', 'json', 'card'] as const).every((f) => (ARCHIFY_EXPORTS as readonly string[]).includes(f)),
+    'formats are svg|html|json|card|png',
+    (['svg', 'html', 'json', 'card', 'png'] as const).every((f) =>
+      (ARCHIFY_EXPORTS as readonly string[]).includes(f),
+    ),
   );
 }
 

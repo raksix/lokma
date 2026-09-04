@@ -42,8 +42,8 @@ import {
  * delta compares two real diagrams, exports download real files.
  * NOT ported: the concept's hardcoded ITEMS rows + mock IR preview, the
  * toast-only Validate/Build/Guide/Delta/Card/Export buttons, the mock
- * receipt table (the real 5-gate receipt renders instead), and PNG/WebM
- * exports (they need headless Chromium — a follow-up; the pane only offers
+ * receipt table (the real 5-gate receipt renders instead), and WebM
+ * export (it needs a video toolchain — a follow-up; the pane only offers
  * the formats the server actually serves, so there are no dead buttons).
  * Delete removes the real dir (`DELETE /api/archify/:id`, two-click arm).
  */
@@ -91,6 +91,8 @@ export function ArchifyPane() {
   const [comparing, setComparing] = React.useState(false);
   const [viewerHash, setViewerHash] = React.useState('');
   const [exporting, setExporting] = React.useState<string | null>(null);
+  // PNG raster scale (1x/2x) — passed as `?scale=` to the export endpoint.
+  const [pngScale, setPngScale] = React.useState<1 | 2>(2);
   // Two-click delete arm (bots-pane pattern) + in-flight flag.
   const [confirmDelete, setConfirmDelete] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
@@ -252,7 +254,11 @@ export function ArchifyPane() {
       if (!selected || exporting) return;
       setExporting(format);
       try {
-        const { filename, blob } = await api.downloadArchifyExport(selected, format);
+        const { filename, blob } = await api.downloadArchifyExport(
+          selected,
+          format,
+          format === 'png' ? pngScale : undefined,
+        );
         saveBlob(filename, blob);
         toast(`Exported ${filename}`);
       } catch (e) {
@@ -261,7 +267,7 @@ export function ArchifyPane() {
         setExporting(null);
       }
     },
-    [selected, exporting],
+    [selected, exporting, pngScale],
   );
 
   const runDelete = React.useCallback(async () => {
@@ -728,6 +734,7 @@ export function ArchifyPane() {
                         { fmt: 'html' as const, desc: 'self-contained' },
                         { fmt: 'json' as const, desc: 'typed IR' },
                         { fmt: 'card' as const, desc: '1200×630 OG' },
+                        { fmt: 'png' as const, desc: 'raster via Chromium' },
                       ].map((x) => (
                         <Button
                           key={x.fmt}
@@ -753,8 +760,24 @@ export function ArchifyPane() {
                       </code>{' '}
                       · reach &amp; route deep links
                     </div>
+                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+                      <label htmlFor="archify-png-scale" className="font-medium">
+                        PNG scale
+                      </label>
+                      <select
+                        id="archify-png-scale"
+                        value={pngScale}
+                        onChange={(e) => setPngScale(e.target.value === '1' ? 1 : 2)}
+                        disabled={exporting !== null}
+                        className={inputClass}
+                      >
+                        <option value={1}>1x</option>
+                        <option value={2}>2x</option>
+                      </select>
+                      <span>rasterizes the SVG with headless Chromium</span>
+                    </div>
                     <div className="text-[11px] text-zinc-500">
-                      PNG/WebM need headless Chromium — follow-up, not offered as dead buttons.
+                      WebM needs a video toolchain — follow-up, not offered as a dead button.
                     </div>
                   </div>
                 )}

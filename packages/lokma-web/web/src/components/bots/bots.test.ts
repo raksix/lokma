@@ -1,5 +1,6 @@
 import {
   agentCountFor,
+  deleteBlockReason,
   emptyCreateForm,
   filterBots,
   formatBudgets,
@@ -141,6 +142,13 @@ const gallery: Bot[] = [
   check('valid id passes', validateForkForm('my-fork_2') === null);
   check('spaces rejected', validateForkForm('my fork') !== null);
   check('empty string is server-derived', validateForkForm('') === null);
+}
+
+// deleteBlockReason — bundled templates are server-side read-only.
+{
+  check('bundled blocked', deleteBlockReason(bot({ source: 'bundled' })) !== null);
+  check('global allowed', deleteBlockReason(bot({ source: 'global' })) === null);
+  check('project allowed', deleteBlockReason(bot({ source: 'project' })) === null);
 }
 
 // validateTaskForm — mirrors the server run rule (task 1-2000 chars).

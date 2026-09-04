@@ -1120,6 +1120,8 @@ export const api = {
   /** Spawn a real agent + session from the bot (playground run). */
   runBot: (id: string, body: RunBotBody) =>
     post<RunBotRes>(`/api/bots/${encodeURIComponent(id)}/run`, body),
+  /** Remove a user bot (bundled rows answer 400 `bundled_readonly`). */
+  deleteBot: (id: string) => del<{ ok: boolean; id: string }>(`/api/bots/${encodeURIComponent(id)}`),
 
   // Auth + users + projects — RBAC matrix + visibility (W6-21, Docs/36).
   // Login/register return the token twice: httpOnly cookie (set by the

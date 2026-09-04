@@ -1,11 +1,12 @@
 import * as React from 'react';
-import { Bot as BotIcon, CheckCircle2, Copy, GitFork, Play, RefreshCw, Search, Share2, Sparkles } from 'lucide-react';
+import { Bot as BotIcon, CheckCircle2, Copy, GitFork, Play, RefreshCw, Search, Share2, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ApiError, api, type AgentInfo, type Bot, type BotVisibility } from '@/lib/api';
 import {
   BOT_TABS,
   agentCountFor,
+  deleteBlockReason,
   emptyCreateForm,
   filterBots,
   formatBudgets,
@@ -40,7 +41,9 @@ const LIFECYCLE = ['Create', 'Playground', 'Publish', 'Fork', 'Run → Agent'] a
  * `GET /api/bots` (bundled lokma-ceo + `~/.lokma/bots/`), Run spawns a
  * REAL agent + session (`POST /api/bots/:id/run`), Fork clones the real
  * `bot.json` (`POST /:id/fork`), Publish flips real visibility
- * (`POST /:id/publish`), and bot.json copies the loaded record.
+ * (`POST /:id/publish`), Delete removes the real dir
+ * (`DELETE /api/bots/:id`, two-click arm, bundled stays read-only),
+ * and bot.json copies the loaded record.
  * NOT ported: the concept's mock BOTS rows with invented run counts
  * (the pane counts live agents instead, labeled as such), its
  * toast-only Create/Hub buttons (Create opens a real dialog, Hub is a
@@ -71,6 +74,9 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
   const [forking, setForking] = React.useState(false);
   const [publishVisibility, setPublishVisibility] = React.useState<BotVisibility>('shared');
   const [publishing, setPublishing] = React.useState(false);
+  // Two-click delete arm (cron-pane pattern) + in-flight flag.
+  const [confirmDelete, setConfirmDelete] = React.useState<string | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
 
   const load = React.useCallback(async (keepSelection?: string) => {
     setLoading(true);
@@ -110,6 +116,7 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
     setTaskError(null);
     setForkError(null);
     setForkAs('');
+    setConfirmDelete(null);
   }, [selectedId]);
 
   async function createBot(form: CreateBotForm): Promise<void> {
@@ -189,6 +196,26 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
       toast(`Publish failed: ${errMessage(e)}`);
     } finally {
       setPublishing(false);
+    }
+  }
+
+  async function deleteSelected(): Promise<void> {
+    if (!selected || deleting) return;
+    if (confirmDelete !== selected.id) {
+      setConfirmDelete(selected.id);
+      return;
+    }
+    setConfirmDelete(null);
+    setDeleting(true);
+    try {
+      await api.deleteBot(selected.id);
+      toast(`Bot deleted: ${selected.id}`);
+      // The id is gone, so load() falls back to lokma-ceo/first.
+      await load();
+    } catch (e) {
+      toast(`Delete failed: ${errMessage(e)}`);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -360,6 +387,21 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
                       <div className="mt-1 text-[11px] text-zinc-400">forked from {selected.createdFrom}</div>
                     )}
                   </div>
+                  <Button
+                    variant={confirmDelete === selected.id ? 'destructive' : 'ghost'}
+                    size="sm"
+                    className="h-6 text-[11px] gap-1 shrink-0"
+                    aria-label={confirmDelete === selected.id ? 'Confirm bot delete' : 'Delete bot'}
+                    title={
+                      deleteBlockReason(selected) ??
+                      (confirmDelete === selected.id ? 'Click again to confirm delete' : 'Delete this bot')
+                    }
+                    disabled={deleting || deleteBlockReason(selected) !== null}
+                    onClick={() => void deleteSelected()}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    {confirmDelete === selected.id ? 'Confirm?' : deleting ? 'Deleting…' : 'Delete'}
+                  </Button>
                 </div>
                 <div className="mt-3 grid grid-cols-4 gap-1">
                   <Button size="sm" className="h-7 text-xs gap-1" disabled={running} onClick={() => void runSelected()}>

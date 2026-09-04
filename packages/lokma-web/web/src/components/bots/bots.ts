@@ -108,6 +108,16 @@ export function validateForkForm(asId: string): string | null {
   return null;
 }
 
+/**
+ * Delete gate for one bot — bundled templates are server-side read-only,
+ * so the pane disables Delete there (same rule as Publish). Returns the
+ * disabled reason (null when deletion is allowed).
+ */
+export function deleteBlockReason(bot: Pick<Bot, 'source'>): string | null {
+  if (bot.source === 'bundled') return 'Bundled templates are read-only — fork to customize.';
+  return null;
+}
+
 /** Mirrors the server run rule (task 1-2000 chars). */
 export function validateTaskForm(task: string): string | null {
   if (!task.trim() || task.trim().length > 2000) return 'Task must be 1-2000 chars.';

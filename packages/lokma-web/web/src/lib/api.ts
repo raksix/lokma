@@ -1098,6 +1098,9 @@ export const api = {
   listTestRuns: () => get<TestsRes>('/api/tests/list'),
   runTestPlan: (body: RunTestBody) => post<RunTestRes>('/api/tests/run', body),
   getTestRun: (id: string) => get<TestDetailRes>(`/api/tests/${encodeURIComponent(id)}`),
+  /** Remove the whole on-disk run dir (plan.json + report.json + junit.xml). */
+  deleteTestRun: (id: string) =>
+    del<{ ok: boolean; id: string }>(`/api/tests/${encodeURIComponent(id)}`),
   /** Report-stage `junit.xml` — blob + server filename, auth via `authedFetch`. */
   downloadTestJunit: async (id: string): Promise<{ filename: string; blob: Blob }> => {
     const fallback = `${id}.junit.xml`;

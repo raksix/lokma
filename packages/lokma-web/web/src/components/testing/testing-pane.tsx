@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Search,
   ShieldAlert,
+  Trash2,
   Video,
   Workflow,
   XCircle,
@@ -70,7 +71,8 @@ function errMessage(e: unknown): string {
  * (`POST /api/tests/run` — one real `GET` check per target through the
  * live handlers + a Shannon secret scan), expanding a card loads the
  * stored plan + classified report (`GET /api/tests/:id`), and the
- * Report-stage button downloads the real `junit.xml`.
+ * Report-stage button downloads the real `junit.xml`, and each expanded
+ * report carries a real Delete (`DELETE /api/tests/:id`, two-click arm).
  * NOT ported: the concept's mock RUNS rows, its toast-only New-run button,
  * and the fake `.webm`/`trace.zip` thumbnails — there is no Playwright
  * dep here, so the card shows the real per-test rows instead and the
@@ -91,6 +93,8 @@ export function TestingPane() {
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const [detail, setDetail] = React.useState<TestDetailRes | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
+  const [confirmDelete, setConfirmDelete] = React.useState<string | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -149,10 +153,12 @@ export function TestingPane() {
     if (expandedId === id) {
       setExpandedId(null);
       setDetail(null);
+      setConfirmDelete(null);
       return;
     }
     setExpandedId(id);
     setDetail(null);
+    setConfirmDelete(null);
     setDetailLoading(true);
     try {
       setDetail(await api.getTestRun(id));
@@ -169,6 +175,29 @@ export function TestingPane() {
       saveBlob(filename, blob);
     } catch (e) {
       toast(`junit download failed: ${errMessage(e)}`);
+    }
+  }
+
+  async function runDelete(id: string): Promise<void> {
+    if (deleting) return;
+    if (confirmDelete !== id) {
+      setConfirmDelete(id);
+      return;
+    }
+    setConfirmDelete(null);
+    setDeleting(true);
+    try {
+      await api.deleteTestRun(id);
+      toast(`Deleted ${id}`);
+      if (expandedId === id) {
+        setExpandedId(null);
+        setDetail(null);
+      }
+      await load();
+    } catch (e) {
+      toast(`Delete failed: ${errMessage(e)}`);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -399,14 +428,28 @@ export function TestingPane() {
                           classify: contract {classifyCounts(detail.report).contract} · env{' '}
                           {classifyCounts(detail.report).env} · fragility {classifyCounts(detail.report).fragility}
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-6 text-[11px] shrink-0 bg-white/5 border-white/10 text-white hover:bg-white/10 gap-1"
-                          onClick={() => void downloadJunit(r.id)}
-                        >
-                          <Download className="w-3 h-3" /> junit.xml
-                        </Button>
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 text-[11px] shrink-0 bg-white/5 border-white/10 text-white hover:bg-white/10 gap-1"
+                            onClick={() => void downloadJunit(r.id)}
+                          >
+                            <Download className="w-3 h-3" /> junit.xml
+                          </Button>
+                          <Button
+                            variant={confirmDelete === r.id ? 'destructive' : 'outline'}
+                            size="sm"
+                            className="h-6 text-[11px] shrink-0 gap-1 bg-white/5 border-white/10 text-white hover:bg-white/10"
+                            aria-label={confirmDelete === r.id ? 'Confirm run delete' : 'Delete run'}
+                            title={confirmDelete === r.id ? 'Click again to confirm delete' : 'Delete this run'}
+                            disabled={deleting}
+                            onClick={() => void runDelete(r.id)}
+                          >
+                            <Trash2 className="w-3 h-3" />{' '}
+                            {confirmDelete === r.id ? 'Confirm?' : deleting ? 'Deleting…' : 'Delete'}
+                          </Button>
+                        </div>
                       </>
                     ) : (
                       <div className="text-[11px] text-white/60">Report unavailable.</div>

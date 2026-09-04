@@ -501,13 +501,20 @@
   - **Dürüst kapsam:** araç pane'leri (terminal/git/browser) workspace session'ına bağlı, session yoksa gerçek New-session geçidi; sekme anlık görüntüleri `lokma:tiling-tabs:v1`'de (doğrulamalı yükleme); layout `lokma:layout:v1`'de; merge hedefi pane'in kendi session sekmesi (yoksa chooser'da yazıyor).
 - **TASK-38 TÜM DALGALAR TAMAMLANDI** (W0 temel + W1 chat + W2 settings/usage + W3 workspace'ler + W4 agents/orchestration/vault/skills + W5 builder araçları + W6 sistem pane'leri + W7 pane sistemi).
 
+### 2026-09-04 — Phase 1 DELETE 1/5: `DELETE /api/bots/:id` DONE (server 4a51723 + web cdd00b0)
+- **Executor run:** Phase 1 "her POST kaynağına DELETE" serisinin ilk parçası. Ağaçta yetim WIP olarak bulundu, bu run'ın tek parçası olarak devralındı: taze incelendi, 1 DRY düzeltmesi yapıldı (`deleteBot` ortak `sourceDirOf()` resolver'ı kullanıyor, inline path türetme yok), tüm kapılar + canlı prob yeniden koşuldu, server+web ayrı atomic commit.
+  - **Server:** core `deleteBot()` + `DELETE /api/bots/:id` (`{ok,id}`, bundled 400 `bundled_readonly`, unknown 404, bad-id 400).
+  - **Web:** `api.deleteBot()` + Gallery Delete butonu (two-click confirm, bundled'da gerekçeli disabled) + `bots.test.ts` 49/49.
+  - **Gates:** root tsc 0 · web build green · core+server clean · live prob 16/16 · mock grep temiz (anti-mock yorumlar hariç) · gerçek `~/.lokma`'ya dokunulmadı.
+- **Sıradaki parça:** `DELETE /api/archify/:id` (kalan: archify, design, tests, vault).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-03 (TASK-38 W7-27 Pane system port DONE — web 239708d, TASK-38 COMPLETE)
-- **Son işlem:** TASK-38 W7-27 DONE — harness merkezinde gerçek tiling workspace canlı (split/windowed pane'ler, 5-zone drop, session chooser, tab picker, dosya önizleme); 31/31 prob PASS; dist'te `Tiling workspace`, canlıda TAZE Vite build.
+- **Son güncelleme:** 2026-09-04 (Phase 1 DELETE 1/5: `DELETE /api/bots/:id` DONE — server 4a51723 + web cdd00b0)
+- **Son işlem:** Phase 1 DELETE serisinin ilk parçası canlı — Bot Gallery'de gerçek Delete butonu (two-click confirm, bundled satırlarda read-only), server'da `deleteBot()` + `DELETE /api/bots/:id`; live prob 16/16; route audit'e göre kalan DELETE'ler: archify, design, tests, vault.
 
 ## Sıradaki adım (Phase 1/2/3 follow-up'ları)
 - **Sıradaki adım:**
-  1. Phase 1: core loop + agent runner daemon (cron firing, `lastRunAt` canlanması) + `DELETE` endpoint'leri
+  1. Phase 1: core loop + agent runner daemon (cron firing, `lastRunAt` canlanması) + `DELETE` endpoint'leri (~~bots ✅ 4a51723/cdd00b0~~ → sıradaki: archify, sonra design, tests, vault — run başına TEK parça)
   2. Phase 2: FTS5 vault araması + 3D vault grafiği + remote plugin marketplace + memory deep
   3. Phase 3: PNG/WebM export'ları (archify/design) + themes + sharing + cloud + mobile + perf + a11y
 

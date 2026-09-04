@@ -1734,6 +1734,33 @@ survives; never delete both at once). If even that serves stale code, escalate i
     Next: Phase 1/2/3 follow-ups (agent runner daemon, FTS5 vault,
     remote marketplace, firing cron daemon, 3D vault, PNG/WebM
     exports, `DELETE` endpoints).
+- 2026-09-04 — Phase 1 DELETE endpoints, piece 1/8: `DELETE /api/bots/:id` DONE
+  (server 4a51723 + web cdd00b0, both pushed).
+  - **Executor run:** first DELETE in the Phase 1 "DELETE for every POST
+    resource" series. Core `deleteBot()` (`store.ts`, reuses the shared
+    `sourceDirOf()` resolver — project overlay when the bot resolves from
+    `cwd`, else the global root; review fix, no inline path re-derivation)
+    + `DELETE /api/bots/:id` (`routes/bots.ts`, `{ ok, id }`, bundled
+    templates 400 `bundled_readonly`, unknown 404 `bot_not_found`, bad ids
+    400 `bad_bot_id`, dot-segments 404 at the router before the handler).
+    Web: `api.deleteBot()` + Gallery Delete button (two-click arm,
+    Trash2 lucide, disabled with reason on bundled rows via
+    `deleteBlockReason()`) + `bots.test.ts` 49/49 PASS (3 new delete checks).
+  - **Gates:** root `tsc --noEmit` 0 · web build green · core+server `tsc -p`
+    clean · live probe (in-process createApp + inject, startup-env temp
+    HOME + refuse-guard) 16/16: create→delete→get-404→count→re-delete-404→
+    bundled-400→still-present→dotdot-404→evil-400→unknown-404→fork→delete
+    child→delete parent · mock grep clean (anti-mock comments only) · real
+    `~/.lokma` untouched.
+  - **Honest scope:** agents spawned from a deleted bot keep running
+    (Gallery counter drops to zero — same semantics as deleting an agent
+    with live locks); project-overlay delete resolves via the same `cwd`
+    the pane lists with.
+  - Remaining DELETE pieces (route audit 2026-09-04, POST>0 + DELETE=0 —
+    action-only routes excluded: git commit/push/gc, setup init/save,
+    skills record-use, files write): archify (3 POST), design (2 POST),
+    tests (1 POST), vault ingest (1 POST). Next piece:
+    `DELETE /api/archify/:id`.
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

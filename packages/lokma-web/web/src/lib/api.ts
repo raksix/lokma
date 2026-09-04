@@ -910,6 +910,9 @@ export const api = {
   getVaultNote: (path: string) => get<VaultNoteRes>(`/api/vault/note?path=${encodeURIComponent(path)}`),
   /** Ingest a `.md` note (`provenance` = the ingesting agent id). */
   ingestVaultNote: (body: VaultIngestBody) => post<VaultIngestRes>('/api/vault/ingest', body),
+  /** Delete a `.md` note — the undo for ingest. */
+  deleteVaultNote: (path: string) =>
+    del<{ ok: boolean; path: string }>(`/api/vault/note?path=${encodeURIComponent(path)}`),
 
   // Usage — real token/cost accounting (W2-7). The ledger fills from WS runs.
   getUsageSummary: (range: UsageRange = '7d', cwd?: string) =>

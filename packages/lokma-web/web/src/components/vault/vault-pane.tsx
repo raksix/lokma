@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { FilePlus2, Folder, GitBranch, Link2, RefreshCw, Search, X } from 'lucide-react';
+import { FilePlus2, Folder, GitBranch, Link2, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { formatSize } from '@/components/files';
@@ -29,6 +29,9 @@ import {
  * via `GET /api/vault/note?path=`, `[[wikilink]]` clicks resolve against
  * the loaded graph and open the target note, and the New-note form writes
  * through `POST /api/vault/ingest` (with `provenance:` = ingesting agent).
+ * The open note reader carries a two-click Delete (the undo for ingest —
+ * `DELETE /api/vault/note?path=`), which closes the reader and reloads
+ * the graph on success.
  * NOT ported: the concept's hardcoded NOTES/EDGES rows, the mock
  * barnesHut constants strip (ours is a deterministic circle layout — the
  * footer says so), the toast-only Full button, and the 3D star-map (no
@@ -49,11 +52,17 @@ function NoteReader({
   nodes,
   onOpenPath,
   onClose,
+  onDelete,
+  deleteArmed,
+  deleting,
 }: {
   note: VaultNoteDetail;
   nodes: VaultNode[];
   onOpenPath: (path: string) => void;
   onClose: () => void;
+  onDelete: () => void;
+  deleteArmed: boolean;
+  deleting: boolean;
 }) {
   return (
     <div className="border-t border-line/50 bg-white/80 dark:bg-[#1E1E21]/80 flex flex-col min-h-0 max-h-[46%]">
@@ -70,6 +79,17 @@ function NoteReader({
           </span>
         ) : null}
         <span className="ml-auto text-zinc-400 shrink-0">{formatSize(note.size)}</span>
+        <Button
+          variant={deleteArmed ? 'destructive' : 'ghost'}
+          size="sm"
+          className="h-5 w-5 p-0"
+          onClick={onDelete}
+          disabled={deleting}
+          aria-label={deleteArmed ? 'Confirm note delete' : 'Delete note'}
+          title={deleteArmed ? 'Click again to confirm delete' : 'Delete this note'}
+        >
+          <Trash2 className="w-3 h-3" />
+        </Button>
         <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={onClose} aria-label="Close note">
           <X className="w-3 h-3" />
         </Button>
@@ -117,6 +137,8 @@ export function VaultPane() {
   const [form, setForm] = React.useState<IngestForm>(emptyIngestForm);
   const [ingestError, setIngestError] = React.useState<string | null>(null);
   const [ingesting, setIngesting] = React.useState(false);
+  const [confirmDelete, setConfirmDelete] = React.useState<string | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
   const reloadRef = React.useRef(0);
 
   const loadGraph = React.useCallback(async (query: string, dir: string, d: number) => {
@@ -151,6 +173,7 @@ export function VaultPane() {
   const openNote = React.useCallback(
     async (path: string) => {
       setSelected(path);
+      setConfirmDelete(null);
       setNoteLoading(true);
       try {
         const res = await api.getVaultNote(path);
@@ -201,6 +224,27 @@ export function VaultPane() {
       setIngesting(false);
     }
   }
+
+  const runDelete = React.useCallback(async () => {
+    if (!note || deleting) return;
+    if (confirmDelete !== note.path) {
+      setConfirmDelete(note.path);
+      return;
+    }
+    setConfirmDelete(null);
+    setDeleting(true);
+    try {
+      await api.deleteVaultNote(note.path);
+      toast(`Deleted ${note.path}`);
+      setNote(null);
+      setSelected(null);
+      await loadGraph(q, folder, depth);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'delete failed');
+    } finally {
+      setDeleting(false);
+    }
+  }, [note, deleting, confirmDelete, loadGraph, q, folder, depth]);
 
   const placed = React.useMemo(() => layoutGraph(nodes), [nodes]);
   const edgeSet = React.useMemo(() => {
@@ -482,7 +526,11 @@ export function VaultPane() {
               onClose={() => {
                 setNote(null);
                 setSelected(null);
+                setConfirmDelete(null);
               }}
+              onDelete={() => void runDelete()}
+              deleteArmed={confirmDelete === note.path}
+              deleting={deleting}
             />
           ) : null}
           <div className="p-1.5 border-t border-line/50 bg-white/60 dark:bg-[#1E1E21]/60 text-[11px] text-zinc-500 flex gap-1 flex-wrap shrink-0">

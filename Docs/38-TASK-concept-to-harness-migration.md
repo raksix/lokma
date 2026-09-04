@@ -1893,6 +1893,49 @@ survives; never delete both at once). If even that serves stale code, escalate i
     vault — every POST resource now has its DELETE).
     Next piece: Phase 1 core loop + agent runner daemon (cron firing,
     `lastRunAt` coming alive).
+- 2026-09-04 — Phase 1 agent-runner daemon, wave 1: cron firing DONE
+  (server 9c879d3 + web 6e4a584, both pushed).
+  - **Executor run:** the firing daemon is live — `lastRunAt` comes alive.
+    Core `cron/runner.ts` (new: `CronRunRecord` + `runs.jsonl` append/list
+    with prune cap, pure `matchesMinute`/`selectDueJobs` reusing the
+    store's field expansion + day semantics, `mintRunId`) + `recordJobRun()`
+    in `cron/cron.ts` (stamps `lastRunAt`+`updatedAt`, unknown 404) +
+    exported `splitSchedule`/`expandField`/`dayMatches` for the runner.
+    Server `cron-runner.ts` (new: `fireCronJob()` resolves agent → opens a
+    real `cron-<job>-<ts>` session seeded with the task → streams the
+    agent's model via shared `lokma-ai stream()` (same path as WS chat) →
+    persists both transcript sides → best-effort usage record → stamps
+    `lastRunAt` (best-effort, never eats the record) → appends the run
+    record; failures are RECORDED `failed`, never thrown) +
+    `startCronTicker()` (30s tick, at-most-once-per-minute per job +
+    in-flight guard; started in `index.ts` only — `createApp()` stays
+    side-effect free so in-process probes never fire) + routes
+    `POST /api/agents/:id/cron/:jobId/run` (`{ok,job,run}`, `ok:false`
+    when the model call failed) + `GET /api/cron/runs` (`?limit`, 500 cap).
+    Web: `api.runCronJob()`/`listCronRuns()` + `CronRunRecordView`/
+    `CronFireRes` types, `formatLastRun`/`runTone`/`runLabel` helpers
+    (`formatNextRun` null-next without runs is now plain `never`), per-row
+    Play Run-now button (honest failed-run toast), row last-run cells, and
+    a Recent-runs section (last 5, empty state included) — no dead buttons.
+  - **Gates:** root `tsc --noEmit` 0 · shared+core+ai+server dist emit clean ·
+    web build green · cron helpers probe 53/53 (was 44) + full web suite
+    31/31 exit 0 · live probe (in-process createApp + inject, startup-env
+    temp HOME + refuse-guard) 27/27: pure selection (match/miss/disabled/
+    fired-this-minute/refire-next-minute) → empty runs → agent+job →
+    unknown-agent/unknown-job 404s + bad-id 400 → manual fire 200
+    (`ok:false`, `failed`, `Unknown provider`, session `cron-*`, stamp) →
+    session readable with the task prompt → list reflects stamp → runs
+    history 1:1 (core log agrees) → not due again this minute → cleanup →
+    real `~/.lokma` untouched (no `cron/` dir) · mock grep clean (labelled
+    input `placeholder` attrs only, legit).
+  - **Honest scope:** no agent state transitions on fire (registry has
+    running/completed/failed states but no public setState yet — the run
+    record + session + usage ledger are the evidence; state transitions
+    land with core-loop hardening); no concurrency-cap check against
+    `AGENT_MAX_CONCURRENT` (same follow-up); failures need a real provider
+    key to go green (the pane toasts `recorded as failed` honestly).
+  - Next piece: Phase 1 core-loop hardening (tool/permission/ask frames
+    over WS — server actually emitting them, not just acknowledging).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

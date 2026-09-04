@@ -537,13 +537,19 @@
 - **Phase 1 DELETE SERİSİ TAMAMLANDI** (bots, archify, design, tests, vault — her POST kaynağının DELETE'i var).
 - **Sıradaki parça:** Phase 1 core loop + agent runner daemon (cron firing, `lastRunAt` canlanması).
 
+### 2026-09-04 — Phase 1 agent-runner daemon wave 1: cron firing DONE (server 9c879d3 + web 6e4a584)
+- **Executor run:** firing daemon canlı — `lastRunAt` canlandı. Core `cron/runner.ts` (yeni: `CronRunRecord` + prune-cap'li `runs.jsonl`, saf `matchesMinute`/`selectDueJobs`, `mintRunId`) + `cron.ts`'e `recordJobRun()` (stamp, unknown 404) + `splitSchedule`/`expandField`/`dayMatches` export. Server `cron-runner.ts` (yeni: `fireCronJob()` agent çöz → `cron-<job>-<ts>` session aç → agent modelini paylaşılan `lokma-ai stream()` ile koş → transcript + usage yaz → `lastRunAt` stamp (best-effort) → run record; hatalar RECORDED `failed`) + `startCronTicker()` (30sn tick, dakikada en fazla 1 fire + in-flight guard; sadece `index.ts`'te — `createApp()` side-effect'siz) + `POST .../run` (`{ok,job,run}`) + `GET /api/cron/runs`. Web: `api.runCronJob()`/`listCronRuns()`, `formatLastRun`/`runTone`/`runLabel`, satırda Play Run-now butonu + last-run hücresi + Recent-runs bölümü (son 5).
+- **Gates:** root tsc 0 · shared+core+ai+server dist clean · web build green · cron probu 53/53 (44'tü) + full web suite 31/31 · canlı prob 27/27 (selection + 404/400'ler + manual fire + session + stamp + history + same-minute guard) · gerçek `~/.lokma`'ya dokunulmadı · mock grep temiz (etiketli `placeholder`'lar, legit).
+- **Dürüst kapsam:** fire'da agent state geçişi yok (public setState yok — core-loop hardening'de), `AGENT_MAX_CONCURRENT` kontrolü yok, `failed` run'lar gerçek provider key ister (pane dürüstçe toast'lar).
+- **Sıradaki parça:** Phase 1 core-loop hardening (WS üstünde tool/permission/ask frame'leri — server gerçekten üretecek, sadece acknowledge değil).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-04 (Phase 1 DELETE 5/5: `DELETE /api/vault/note` DONE — server 7cfdbe6 + web b0b5d9d — DELETE SERİSİ TAMAMLANDI)
-- **Son işlem:** Phase 1 DELETE serisinin son parçası canlı — Vault'ta açık not okuyucuda gerçek Delete butonu (two-click confirm), server'da `deleteNote()` + `DELETE /api/vault/note?path=`; registry 5 endpoint; live prob 16/16. Her POST kaynağının DELETE'i var (bots, archify, design, tests, vault).
+- **Son güncelleme:** 2026-09-04 (Phase 1 agent-runner daemon wave 1: cron firing DONE — server 9c879d3 + web 6e4a584)
+- **Son işlem:** Cron firing daemon canlı — due job'lar 30sn ticker ile schedule'da fire oluyor, Play butonu on-demand fire ediyor, her fire `lastRunAt` stamp + `cron-<job>-<ts>` session + run record üretiyor; pane'de last-run hücreleri + Recent-runs bölümü canlı. Live prob 27/27.
 
 ## Sıradaki adım (Phase 1/2/3 follow-up'ları)
 - **Sıradaki adım:**
-  1. Phase 1: core loop + agent runner daemon (cron firing, `lastRunAt` canlanması) + ~~`DELETE` endpoint'leri (bots ✅ 4a51723/cdd00b0 · archify ✅ 93d2e58/1fe2b6d · design ✅ 9a61b52/f6f9b1f · tests ✅ 1fbd616/1ba81d9 · vault ✅ 7cfdbe6/b0b5d9d — SERİ TAMAMLANDI)~~ — run başına TEK parça)
+  1. Phase 1: ~~`DELETE` endpoint'leri (bots ✅ 4a51723/cdd00b0 · archify ✅ 93d2e58/1fe2b6d · design ✅ 9a61b52/f6f9b1f · tests ✅ 1fbd616/1ba81d9 · vault ✅ 7cfdbe6/b0b5d9d — SERİ TAMAMLANDI)~~ + ~~cron firing daemon ✅ 9c879d3/6e4a584 (30s ticker + Run-now + `lastRunAt` + run history — WAVE 1 TAMAMLANDI)~~ + core-loop hardening (tool/permission/ask frame'leri — sıradaki parça, run başına TEK parça)
   2. Phase 2: FTS5 vault araması + 3D vault grafiği + remote plugin marketplace + memory deep
   3. Phase 3: PNG/WebM export'ları (archify/design) + themes + sharing + cloud + mobile + perf + a11y
 

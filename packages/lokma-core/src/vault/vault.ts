@@ -1,4 +1,4 @@
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, stat, unlink } from 'node:fs/promises';
 import { basename, dirname, join, normalize, relative, resolve, sep } from 'node:path';
 import { expandHome, writeAtomic } from '../utils/fs.js';
 
@@ -520,4 +520,31 @@ export async function ingestNote(
   }
   await writeAtomic(abs, body);
   return { path: rel, bytes: Buffer.byteLength(body, 'utf-8'), created: !existed };
+}
+
+/**
+ * Delete a note (`DELETE /api/vault/note?path=` — the undo for ingest).
+ * Unknown notes 404 via `stat` before anything is touched; non-`.md`
+ * paths 400 (same rules as reads so delete can never remove a non-note);
+ * `resolveInVault` jails the target so `rm` can never escape the vault.
+ */
+export async function deleteNote(pathRaw: unknown): Promise<{ path: string }> {
+  if (typeof pathRaw !== 'string' || !pathRaw.trim()) {
+    throw new VaultError('bad_path', 'delete needs ?path=<vault note>', 400);
+  }
+  if (!pathRaw.trim().toLowerCase().endsWith('.md')) {
+    throw new VaultError('not_a_note', 'only .md notes can be deleted', 400);
+  }
+  const abs = resolveInVault(pathRaw);
+  const root = resolve(vaultRoot());
+  const rel = toRel(root, abs);
+  let s;
+  try {
+    s = await stat(abs);
+  } catch {
+    throw new VaultError('note_not_found', `no note at ${rel}`, 404);
+  }
+  if (!s.isFile()) throw new VaultError('note_not_found', `no note at ${rel}`, 404);
+  await unlink(abs);
+  return { path: rel };
 }

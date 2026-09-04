@@ -143,6 +143,7 @@ const BUNDLED_PLUGINS: BundledDef[] = [
       'GET /api/vault/tree',
       'GET /api/vault/note',
       'POST /api/vault/ingest',
+      'DELETE /api/vault/note',
     ],
   },
   {

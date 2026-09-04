@@ -1,10 +1,13 @@
 import type { FastifyInstance } from 'fastify';
-import { VaultError, buildGraph, deleteNote, ingestNote, readNote, readTree } from 'lokma-core';
+import { VaultError, buildGraph, deleteNote, ingestNote, readNote, readTree, searchNotesDetailed } from 'lokma-core';
 
 /**
  * File vault — real markdown notes under `~/.lokma/vault/` for the VaultPane (W4-15).
  * `GET /api/vault/graph?folder=&depth=&q=` (seeded graph + BFS over resolved
  * `[[wikilink]]` edges, depth 1-3, `count` of returned nodes);
+ * `GET /api/vault/search?q=&folder=` (FTS5 full-text hits with BM25 score +
+ * snippet, `engine` names the answering engine — cheaper than `graph` for
+ * typeaheads, which is why the global SearchModal uses it);
  * `GET /api/vault/tree?folder=` (nested dirs + notes, path-sorted);
  * `GET /api/vault/note?path=` (full note read for wikilink clicks);
  * `POST /api/vault/ingest { path, content, provenance? }` (writes a `.md`
@@ -26,6 +29,18 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
         q: query.q ?? '',
       });
       return { ok: true, ...graph };
+    } catch (e) {
+      if (e instanceof VaultError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      throw e;
+    }
+  });
+
+  app.get('/api/vault/search', async (req, reply) => {
+    const query = req.query as { q?: unknown; folder?: unknown };
+    try {
+      const folder = typeof query.folder === 'string' ? query.folder : '';
+      const { hits, engine } = await searchNotesDetailed(query.q ?? '', folder);
+      return { ok: true, q: typeof query.q === 'string' ? query.q : '', folder, hits, count: hits.length, engine };
     } catch (e) {
       if (e instanceof VaultError) return reply.status(e.status).send({ code: e.code, message: e.message });
       throw e;

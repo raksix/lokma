@@ -549,15 +549,21 @@
   - **Server:** `resolveProviderUpstream()` (`routes/providers.ts` — tek eşleme: anthropic→Anthropic, openai/deepseek/openrouter/ollama/custom→OpenAI adapter + config baseUrl; google/unknown dürüst hata), `routes/ws.ts` (prompt başına upstream çözümleme, eksik key `error` frame'i, run başına AbortController + 120s cap, `abort` HTTP çağrısını gerçekten iptal ediyor — tek `done/aborted`, kısmi çıktı korunur, hayalet usage yok), `cron-runner.ts` (aynı upstream).
   - **Gates:** root tsc 0 · ai/server dist clean · web build green · ai probu 22/22 + full web suite 31/31 · canlı WS probu (temp HOME + temp port) 10/10 · mock grep temiz (anti-mock yorumları hariç) · gerçek `~/.lokma`'ya dokunulmadı.
   - **Dürüst kapsam:** model-güdümlü tool/permission/ask frame'leri için gerçek tool loop şart (sonraki wave); google'da wire adapter yok (`provider_not_wired`); `listModels()` statik katalog olarak kalır; key'siz chat artık echo yerine dürüst hata verir (Settings → Providers).
-- **Sıradaki parça:** Phase 1 core-loop hardening wave 2 (agent tool loop — tool/permission/ask frame'lerini server gerçekten üretecek).
+- **Sıradaki parça:** Phase 1 core-loop hardening wave 2b (WS üstünde tool/permission/ask frame'leri — executor üstünden pending-gate resume).
+
+### 2026-09-04 — Phase 1 core-loop hardening wave 2a: core tool foundation DONE (core 1f95d06)
+- **Executor run:** orphan sibling WIP (`gate.ts` + `builtins.ts` + `executor.ts` + index export) adopted as this run's single piece — reviewed fresh, no fixes needed, probe written around it. `decideToolCall` (deny>allow>defaultMode, prefix matching, 5 modes), 5 workspace-jailed builtins reusing `WorkspaceFiles` DRY (`run_command` = single binary via `execFile`, no shell, metachar refusal, timeout/output caps), `executeToolCall`/`runApprovedCall` (events mirror WS `tool_start`/`tool_result`/`permission_request`, 128KB result cap), `tools.test.ts` 46/46 on a real temp workspace + real child process, core `tsconfig.json` excludes `*.test.ts` (`lokma-ai` precedent).
+- **Gates:** probe 46/46 · root tsc 0 (stale-dist TS6305 first — fixed by building core first) · core+server tsc clean · web build green · mock grep zero · real `~/.lokma` untouched.
+- **Honest scope:** nothing calls the executor yet — WS streams text only, `permission_response` only logs; model-driven tool calls land in wave 2b.
+- **Sıradaki parça:** Phase 1 core-loop hardening wave 2b (WS tool/permission/ask frames via executor pending-gate resume).
 
 ## Son Durum
-- **Son güncelleme:** 2026-09-04 (Phase 1 core-loop hardening wave 1: real provider streaming DONE — ai 98534e9 + server be7adb7)
-- **Son işlem:** Döngüdeki mock echo öldü — chat ve cron çalışması artık gerçek HTTP upstream'lere gidiyor (Anthropic Messages + OpenAI-uyumlu SSE, key'ler credentials store'dan, baseUrl config override'dan); eksik key dürüst `error` frame'i veriyor, Stop butonu HTTP çağrısını gerçekten iptal ediyor. Unit prob 22/22, canlı WS probu 10/10.
+- **Son güncelleme:** 2026-09-04 (Phase 1 core-loop hardening wave 2a: core tool foundation DONE — core 1f95d06)
+- **Son işlem:** Her agent tool çağrısının geçeceği tek yol artık var, testli, export'lu — permission gate (deny>allow>defaultMode) + 5 workspace-jailed builtin (read/list/search/write/run_command) + gate→emit→run executor (WS frame'lerini aynalayan event'ler). Probe 46/46. WS henüz frame üretmiyor (wave 2b).
 
 ## Sıradaki adım (Phase 1/2/3 follow-up'ları)
 - **Sıradaki adım:**
-  1. Phase 1: ~~`DELETE` endpoint'leri (bots ✅ 4a51723/cdd00b0 · archify ✅ 93d2e58/1fe2b6d · design ✅ 9a61b52/f6f9b1f · tests ✅ 1fbd616/1ba81d9 · vault ✅ 7cfdbe6/b0b5d9d — SERİ TAMAMLANDI)~~ + ~~cron firing daemon ✅ 9c879d3/6e4a584 (30s ticker + Run-now + `lastRunAt` + run history — WAVE 1 TAMAMLANDI)~~ + ~~gerçek provider streaming ✅ 98534e9/be7adb7 (mock echo öldü, key/baseUrl çözümleme + gerçek abort — WAVE 1 TAMAMLANDI)~~ + agent tool loop (tool/permission/ask frame'lerini server gerçekten üretecek — sıradaki parça, run başına TEK parça)
+  1. Phase 1: ~~`DELETE` endpoint'leri (bots ✅ 4a51723/cdd00b0 · archify ✅ 93d2e58/1fe2b6d · design ✅ 9a61b52/f6f9b1f · tests ✅ 1fbd616/1ba81d9 · vault ✅ 7cfdbe6/b0b5d9d — SERİ TAMAMLANDI)~~ + ~~cron firing daemon ✅ 9c879d3/6e4a584 (30s ticker + Run-now + `lastRunAt` + run history — WAVE 1 TAMAMLANDI)~~ + ~~gerçek provider streaming ✅ 98534e9/be7adb7 (mock echo öldü, key/baseUrl çözümleme + gerçek abort — WAVE 1 TAMAMLANDI)~~ + ~~core tool foundation ✅ 1f95d06 (gate + 5 builtin + executor + 46/46 probe — WAVE 2a TAMAMLANDI)~~ + WS tool/permission/ask frame'leri via executor pending-gate resume (sıradaki parça, run başına TEK parça)
   2. Phase 2: FTS5 vault araması + 3D vault grafiği + remote plugin marketplace + memory deep
   3. Phase 3: PNG/WebM export'ları (archify/design) + themes + sharing + cloud + mobile + perf + a11y
 

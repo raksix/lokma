@@ -1977,6 +1977,39 @@ survives; never delete both at once). If even that serves stale code, escalate i
     add keys in Settings → Providers (or provider env vars).
   - Next piece: Phase 1 core-loop hardening wave 2 (agent tool loop —
     server actually emitting tool/permission/ask frames).
+- 2026-09-04 — Phase 1 core-loop hardening, wave 2a: core tool foundation DONE
+  (core 1f95d06, pushed).
+  - **Executor run:** the single path every agent tool call will take now
+    exists, tested, exported. `lokma-core/src/tools/`: `gate.ts` (new:
+    `decideToolCall` reads the live `permissions` object — deny >
+    allow > `defaultMode` with exact-or-prefix matching; `auto` reads run
+    free / mutations ask; `manual` asks even reads; `plan` refuses
+    mutations; `bypass` runs everything; `describeToolCall` writes the
+    `permission_request.description` sentence), `builtins.ts` (new: five
+    Zod-typed tools bound to one workspace root — `read_file`,
+    `list_files`, `search_files`, `write_file` reuse `WorkspaceFiles` DRY,
+    `run_command` runs one binary via `execFile` with no shell +
+    metachar refusal + timeout/output caps), `executor.ts` (new:
+    `executeToolCall` gate → `runApprovedCall`, unknown-tool error, deny
+    with no events, ask with `perm_` request id and zero side effects,
+    events mirror the WS frames `tool_start`/`tool_result`/
+    `permission_request` so the server forwards without reshaping,
+    128KB result cap), `tools.test.ts` (new: 46/46 plain-assert probe on
+    a real temp workspace + real child process), `tsconfig.json`
+    (`**/*.test.ts` excluded from `tsc -p` output — `lokma-ai`
+    precedent). Orphan sibling WIP adopted as this run's single piece:
+    reviewed fresh, no changes needed, probe written around it.
+  - **Gates:** tools probe 46/46 · root `tsc --noEmit` 0 (after core dist
+    emit — stale-dist TS6305 seen first, resolved by building core first)
+    · core `tsc -p` clean · server `tsc -p` clean · web build green ·
+    mock grep on touched files zero hits · real `~/.lokma` untouched
+    (mkdtemp only).
+  - **Honest scope:** nothing calls the executor yet — WS `prompt` still
+    streams text only and `permission_response` still only logs (the
+    `ws.ts` comment stays accurate); model-driven tool calls (adapter
+    `tool_use` parsing + loop) land in wave 2b.
+  - Next piece: Phase 1 core-loop hardening wave 2b (WS actually emitting
+    tool/permission/ask frames via the executor — pending-gate resume).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

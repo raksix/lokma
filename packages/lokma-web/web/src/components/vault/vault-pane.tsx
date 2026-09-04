@@ -3,6 +3,7 @@ import { FilePlus2, Folder, GitBranch, Link2, RefreshCw, Search, Trash2, X } fro
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { formatSize } from '@/components/files';
+import { VaultGraph3D } from './vault-graph-3d';
 import {
   clampDepth,
   emptyIngestForm,
@@ -32,13 +33,12 @@ import {
  * The open note reader carries a two-click Delete (the undo for ingest —
  * `DELETE /api/vault/note?path=`), which closes the reader and reloads
  * the graph on success.
- * NOT ported: the concept's hardcoded NOTES/EDGES rows, the mock
- * barnesHut constants strip (ours is a deterministic circle layout — the
- * footer says so), the toast-only Full button, and the 3D star-map (no
- * `react-force-graph-3d` dep — the 3D toggle shows an honest notice, not
- * a fake graph). Search is SQLite FTS5 (weighted BM25 over path + title +
- * tags + body) — graph seeds and typeaheads rank through it; the footer
- * says so.
+ * NOT ported: the concept's hardcoded NOTES/EDGES rows and the mock
+ * barnesHut constants strip (ours is a deterministic circle layout in 2D
+ * and a Fibonacci-sphere canvas star-map in 3D — the footer says so), plus
+ * the toast-only Full button. Search is SQLite FTS5 (weighted BM25 over
+ * path + title + tags + body) — graph seeds and typeaheads rank through
+ * it; the footer says so.
  */
 
 const inputClass =
@@ -456,9 +456,7 @@ export function VaultPane() {
           </div>
           <div className="flex-1 relative p-2 overflow-hidden min-h-0">
             {mode === '3d' ? (
-              <div className="w-full h-full rounded-lg bg-[#0F0F11] grid place-items-center text-xs text-white/80 border border-white/10 p-4 text-center">
-                3D star-map needs react-force-graph-3d (follow-up wave) — the 2D graph above shows the same live data.
-              </div>
+              <VaultGraph3D nodes={nodes} links={edgeSet} selected={selected} onOpenNote={(p) => void openNote(p)} />
             ) : (
               <svg
                 viewBox="0 0 300 200"
@@ -537,7 +535,7 @@ export function VaultPane() {
           <div className="p-1.5 border-t border-line/50 bg-white/60 dark:bg-[#1E1E21]/60 text-[11px] text-zinc-500 flex gap-1 flex-wrap shrink-0">
             <span className="px-1.5 py-0.5 rounded bg-white border border-line">[[wikilink]] click → note</span>
             <span className="px-1.5 py-0.5 rounded bg-white border border-line">provenance: agentId</span>
-            <span className="ml-auto hidden sm:inline">FTS5 full-text · circle layout</span>
+            <span className="ml-auto hidden sm:inline">FTS5 full-text · {mode === '3d' ? '3D sphere' : '2D circle'}</span>
           </div>
         </div>
       </div>

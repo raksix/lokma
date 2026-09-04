@@ -5,14 +5,20 @@
  */
 import {
   clampDepth,
+  clampPitch,
   emptyIngestForm,
+  GRAPH_3D_RADIUS,
+  hitTestProjected,
   layoutGraph,
+  layoutGraph3D,
   NODE_PALETTE,
   nodeRadius,
   normalizeNode,
   normalizeNodes,
   paletteIndex,
+  projectGraph3D,
   resolveWikilinkClick,
+  rotatePoint,
   splitWikilinks,
   validateIngestForm,
   VAULT_MAX_DEPTH,
@@ -125,6 +131,72 @@ check(
 check(
   'ingest accepts empty provenance',
   validateIngestForm({ path: 'n.md', provenance: '', content: 'x' }) === null,
+);
+
+// ─── 3D star-map ────────────────────────────────────────────────────
+check('3d empty places nothing', layoutGraph3D([]).length === 0);
+const solo3d = layoutGraph3D([node()]);
+check('3d single node at origin', solo3d.length === 1 && solo3d[0].x === 0 && solo3d[0].y === 0 && solo3d[0].z === 0);
+const trio3d = layoutGraph3D([
+  node(),
+  node({ path: 'b.md', id: 'b.md' }),
+  node({ path: 'c.md', id: 'c.md' }),
+]);
+check(
+  '3d nodes sit on the sphere',
+  trio3d.every((n) => Math.abs(Math.hypot(n.x, n.y, n.z) - GRAPH_3D_RADIUS) < 1.5),
+);
+check(
+  '3d layout deterministic',
+  JSON.stringify(layoutGraph3D([node(), node({ path: 'b.md', id: 'b.md' })])) ===
+    JSON.stringify(layoutGraph3D([node(), node({ path: 'b.md', id: 'b.md' })])),
+);
+const spun = rotatePoint({ x: 100, y: 0, z: 0 }, { yaw: Math.PI / 2, pitch: 0 });
+check('yaw +90deg swings +x to -z', Math.abs(spun.x) < 1e-9 && Math.abs(spun.z + 100) < 1e-9);
+const held = rotatePoint({ x: 10, y: 20, z: 30 }, { yaw: 0, pitch: 0 });
+check('zero rotation is identity', held.x === 10 && held.y === 20 && held.z === 30);
+const projected = projectGraph3D(layoutGraph3D([node(), node({ path: 'b.md', id: 'b.md' })]), { yaw: 0, pitch: 0 }, 400, 300);
+check('projection centers on canvas', projected.every((n) => n.sx >= 0 && n.sx <= 400 && n.sy >= 0 && n.sy <= 300));
+check('depth normalized 0..1', projected.every((n) => n.depth >= 0 && n.depth <= 1));
+check('near node scales up', (() => {
+  const solo = projectGraph3D([{ ...node(), x: 0, y: 0, z: 90 }], { yaw: 0, pitch: 0 }, 400, 300);
+  const far = projectGraph3D([{ ...node(), x: 0, y: 0, z: -90 }], { yaw: 0, pitch: 0 }, 400, 300);
+  return solo[0].scale > far[0].scale && solo[0].depth > far[0].depth;
+})());
+check('yaw moves the projection', (() => {
+  const home = layoutGraph3D([node({ path: 'edge.md', id: 'edge.md' }), node({ path: 'b.md', id: 'b.md' })]);
+  const a = projectGraph3D(home, { yaw: 0, pitch: 0 }, 400, 300)[0];
+  const b = projectGraph3D(home, { yaw: 1.2, pitch: 0 }, 400, 300)[0];
+  return Math.abs(a.sx - b.sx) > 1 || Math.abs(a.sy - b.sy) > 1;
+})());
+check('pitch clamps high', clampPitch(9) === 1.4);
+check('pitch clamps low', clampPitch(-9) === -1.4);
+check('pitch NaN zeroes', clampPitch(Number.NaN) === 0);
+check(
+  'hit test finds near node',
+  hitTestProjected(
+    [
+      { path: 'a.md', sx: 10, sy: 10, r: 5 },
+      { path: 'b.md', sx: 100, sy: 100, r: 5 },
+    ],
+    12,
+    11,
+  ) === 'a.md',
+);
+check(
+  'hit test misses empty space',
+  hitTestProjected([{ path: 'a.md', sx: 10, sy: 10, r: 5 }], 200, 200) === null,
+);
+check(
+  'hit test picks nearest',
+  hitTestProjected(
+    [
+      { path: 'a.md', sx: 10, sy: 10, r: 8 },
+      { path: 'b.md', sx: 14, sy: 10, r: 8 },
+    ],
+    13,
+    10,
+  ) === 'b.md',
 );
 
 console.log(`\nPASS: ${passed} checks`);

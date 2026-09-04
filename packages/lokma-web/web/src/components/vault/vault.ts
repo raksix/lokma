@@ -4,9 +4,10 @@
  * The pane shows the LIVE file vault (`~/.lokma/vault/`, same store the
  * CLI reads) over `GET /api/vault/graph|tree` + `GET /api/vault/note` +
  * `POST /api/vault/ingest`. Search ranks through SQLite FTS5
- * (`GET /api/vault/search`); anything the server cannot do yet (3D force
- * layout) stays out of this file — the pane labels
- * those honestly instead of faking them.
+ * (`GET /api/vault/search`); the 2D view is a deterministic SVG circle
+ * layout and the 3D view a dependency-free canvas star-map (Fibonacci
+ * sphere + perspective camera — no force-graph dep), both over the same
+ * live graph payload.
  * Node normalization, SVG layout and `[[wikilink]]` splitting live here
  * so the pane itself stays a thin view over `api.*` calls.
  */
@@ -169,6 +170,120 @@ export const VAULT_MAX_DEPTH = 3;
 export function clampDepth(raw: number): number {
   if (!Number.isFinite(raw)) return 2;
   return Math.min(VAULT_MAX_DEPTH, Math.max(VAULT_MIN_DEPTH, Math.round(raw)));
+}
+
+/** A 3D unit used by the dependency-free star-map projection. */
+export type Vec3 = { x: number; y: number; z: number };
+
+/** Graph node with a deterministic 3D home position (unit sphere scaled). */
+export type PlacedNode3D = VaultNode & Vec3;
+
+/** Yaw/pitch camera rotation in radians (drag-driven, auto-rotate bumps yaw). */
+export type GraphRotation = { yaw: number; pitch: number };
+
+/** A 3D node projected onto the 2D canvas (screen px + depth shade 0..1). */
+export type ProjectedNode3D = PlacedNode3D & {
+  sx: number;
+  sy: number;
+  /** Perspective scale factor (near nodes render larger). */
+  scale: number;
+  /** 0 = far side, 1 = near side (drives alpha + draw order). */
+  depth: number;
+};
+
+/** Radius of the 3D home sphere (world units — the canvas fits it). */
+export const GRAPH_3D_RADIUS = 100;
+
+/**
+ * Deterministic Fibonacci-sphere layout for the 3D star-map (same input →
+ * same positions, no force library). Single node sits at the origin; pairs
+ * oppose each other; larger graphs spread evenly over the sphere.
+ */
+export function layoutGraph3D(nodes: VaultNode[], radius = GRAPH_3D_RADIUS): PlacedNode3D[] {
+  if (nodes.length === 0) return [];
+  if (nodes.length === 1) return [{ ...nodes[0], x: 0, y: 0, z: 0 }];
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  return nodes.map((node, i) => {
+    const t = (i + 0.5) / nodes.length;
+    const y = (1 - 2 * t) * radius;
+    const band = Math.sqrt(Math.max(0, radius * radius - y * y));
+    const theta = golden * i;
+    return {
+      ...node,
+      x: Math.round(band * Math.cos(theta) * 10) / 10,
+      y: Math.round(y * 10) / 10,
+      z: Math.round(band * Math.sin(theta) * 10) / 10,
+    };
+  });
+}
+
+/**
+ * Rotate one world point by yaw (around Y) then pitch (around X).
+ * Pure so the canvas renderer and the probe share the exact math.
+ */
+export function rotatePoint(point: Vec3, rot: GraphRotation): Vec3 {
+  const cosY = Math.cos(rot.yaw);
+  const sinY = Math.sin(rot.yaw);
+  const yawed = { x: point.x * cosY + point.z * sinY, y: point.y, z: -point.x * sinY + point.z * cosY };
+  const cosP = Math.cos(rot.pitch);
+  const sinP = Math.sin(rot.pitch);
+  return { x: yawed.x, y: yawed.y * cosP - yawed.z * sinP, z: yawed.y * sinP + yawed.z * cosP };
+}
+
+/**
+ * Project placed 3D nodes onto a `width`×`height` canvas with a simple
+ * perspective camera (`distance` = camera range in world units, larger =
+ * flatter). Returns screen coords plus depth for shading/draw order.
+ */
+export function projectGraph3D(
+  placed: PlacedNode3D[],
+  rot: GraphRotation,
+  width: number,
+  height: number,
+  distance = 340,
+): ProjectedNode3D[] {
+  const safeDistance = Number.isFinite(distance) && distance > GRAPH_3D_RADIUS + 1 ? distance : 340;
+  const minSide = Math.max(1, Math.min(width, height));
+  const fit = minSide / 2 / ((GRAPH_3D_RADIUS / safeDistance + 1) * GRAPH_3D_RADIUS);
+  return placed.map((node) => {
+    const spun = rotatePoint(node, rot);
+    const scale = safeDistance / (safeDistance - spun.z);
+    return {
+      ...node,
+      sx: width / 2 + spun.x * scale * fit * (safeDistance / (safeDistance + GRAPH_3D_RADIUS)),
+      sy: height / 2 + spun.y * scale * fit * (safeDistance / (safeDistance + GRAPH_3D_RADIUS)),
+      scale,
+      depth: (spun.z + GRAPH_3D_RADIUS) / (2 * GRAPH_3D_RADIUS),
+    };
+  });
+}
+
+/** Clamp pitch so the star-map never flips upside down. */
+export function clampPitch(pitch: number): number {
+  if (!Number.isFinite(pitch)) return 0;
+  return Math.min(1.4, Math.max(-1.4, pitch));
+}
+
+/**
+ * Hit-test a canvas click against projected nodes (nearest within its
+ * drawn radius + 4px grace). Returns the node path or null.
+ */
+export function hitTestProjected(
+  projected: Array<Pick<ProjectedNode3D, 'path' | 'sx' | 'sy'> & { r?: number }>,
+  px: number,
+  py: number,
+): string | null {
+  let best: string | null = null;
+  let bestDist = Number.POSITIVE_INFINITY;
+  for (const node of projected) {
+    const grace = (typeof node.r === 'number' ? node.r : 5) + 4;
+    const dist = Math.hypot(node.sx - px, node.sy - py);
+    if (dist <= grace && dist < bestDist) {
+      bestDist = dist;
+      best = node.path;
+    }
+  }
+  return best;
 }
 
 /** Ingest form values (path + optional provenance + markdown body). */

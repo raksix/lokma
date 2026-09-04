@@ -2321,6 +2321,47 @@ survives; never delete both at once). If even that serves stale code, escalate i
     surfaces as a toast when no browser is installed.
   - Next piece: Phase 3 design PNG export (then WebM, themes, sharing,
     cloud, mobile, perf + a11y).
+- 2026-09-04 — Phase 3 design PNG export DONE
+  (core c3318d6 + server 454e0f4 + web dbd33e0, all pushed).
+  - **Executor run:** the Design Export tab offers a fourth live format —
+    PNG rasterizes the stored self-contained `artifact.html` at a fixed
+    1280x800 CSS viewport through headless Chromium (same `--screenshot`
+    no-CDP pattern as archify, works inside locked-down LXC).
+  - **Core:** `design/raster.ts` (new: `exportArtifactPng(id, { scale })`
+    with `bad_scale` 400 / `bad_id` 400 / `design_not_found` 404 /
+    `needs_toolchain` 400 / `raster_failed` 500 + PNG-magic verification;
+    reuses archify `findChromeBinary` + `PNG_TIMEOUT_MS` DRY — one
+    candidate list, one `LOKMA_CHROME_BIN` override; `index.ts` export) +
+    `raster.test.ts` 15/15 (viewport contract, validation 400s/404 without
+    Chrome, end-to-end 1x + default-2x raster with real Chrome).
+  - **Server:** `GET /api/design/:id/export?format=png[&scale=1|2]` in
+    `design.ts` (`image/png` attachment + `X-Image-Width/Height` headers,
+    `?scale=` garbage → `bad_scale` 400); in-process createApp+inject
+    probe 17/17 (real PNG bytes, 1x 1280x800 + default 2x 2560x1600,
+    400s, 404, evil-id, json/html siblings intact). No plugin-registry
+    change (the `GET /api/design/:id/export` entry already covers it;
+    the pane endpoint count is computed, not hardcoded).
+  - **Web:** `DesignExportFormat` + `DESIGN_EXPORTS` gain `png`;
+    `downloadDesignExport(id, format, scale?)` passes `&scale=`; Export
+    tab gains a PNG button + labeled 1x/2x scale select (archify mirror);
+    `design.test.ts` 4-exports check; footer still lists PDF/PPTX/MP4 as
+    the toolchain follow-up.
+  - **Gates:** root `tsc --noEmit` 0 (after core dist rebuild — stale-dist
+    TS6305 precedent) · server `tsc -p` + dist clean · web build green ·
+    web suite 33/33 files PASS (design 28/28) · mock grep on touched
+    files clean (2 anti-mock comments + labeled input `placeholder=`s,
+    legit) · real `~/.lokma` untouched.
+  - **Honest scope:** PNG only (PDF still needs a print-to-PDF toolchain,
+    PPTX/MP4 need PptxGenJS/ffmpeg); viewport is fixed 1280x800 (no
+    per-artifact sizing — artifacts are full-page documents, not
+    measured canvases like archify SVGs).
+  - **Deploy:** `pm2 restart lokma-server` → `/health` 200; `pm2 restart
+    lokma-web` → creds 200 / no-creds 401 / `/health` 200; `pm2 show
+    lokma-web` script path bun/vite (stale-stack PASS); live
+    `.../export?format=png` on unknown id answers `design_not_found`
+    404 (new branch live — old code answered `bad_format` 400).
+  - Next piece: Phase 3 WebM exports (archify/design), then themes,
+    sharing, cloud, mobile, perf + a11y.
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

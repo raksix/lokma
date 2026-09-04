@@ -615,15 +615,24 @@
 - **Dürüst kapsam:** arama proje-kapsamlı (`?cwd=`, sidebar ile aynı — cross-project global search yok); FTS title'ları canlı resolve (rename resync'siz yansır); compaction hâlâ explicit POST (append'de auto-trigger yok); özetler extractive (LLM yok).
 - **Sıradaki parça:** Phase 3 PNG/WebM export'ları (archify/design).
 
+### 2026-09-04 — Phase 3 archify PNG export DONE (core ab5c1e7 + server 5866a89 + web 42413ca)
+- **Executor run:** Export sekmesinde beşinci canlı format — PNG, deterministik SVG'yi headless Chromium (`--screenshot`, CDP'siz, LXC'de çalışır) ile rasterize ediyor. Yetim sibling WIP'i bu run'ın tek parçası olarak devralındı: taze incelendi, 2 GERÇEK bug düzeltildi (`idRaw` tanımsız değişken, `validId` tanımsız filename), tüm kapılar yeniden koşuldu.
+- **Core:** `archify/raster.ts` (yeni: `LOKMA_CHROME_BIN`-öncelikli `findChromeBinary()`, exact-size `buildRasterHtml()`, `exportDiagramPng` + `bad_scale`/`needs_toolchain`/`raster_failed` + PNG-magic doğrulaması) + `raster.test.ts` 20/20 (gerçek Chrome 146 ile 1x + default-2x e2e raster dahil).
+- **Server:** `GET /api/archify/:id/export?format=png[&scale=1|2]` (`image/png` attachment + `X-Image-Width/Height`, bozuk scale → 400); in-process prob 15/15.
+- **Web:** `ArchifyExportFormat`/`ARCHIFY_EXPORTS` + `png`; `downloadArchifyExport(id, format, scale?)`; Export tab'ında PNG butonu + etiketli 1x/2x select; footer artık sadece WebM'i follow-up sayıyor.
+- **Gates:** root tsc 0 · core dist + server clean · web build green · archify 33 check PASS · mock grep temiz (anti-mock yorumlar, legit) · gerçek `~/.lokma`'ya dokunulmadı.
+- **Dürüst kapsam:** sadece PNG (WebM video toolchain ister); design PNG ayrı parça; browsersız kutuda `needs_toolchain` 400 toast olur.
+- **Sıradaki parça:** Phase 3 design PNG export (sonra WebM, themes, sharing, cloud, mobile, perf + a11y).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-04 (Phase 2 memory-deep wave 3b: session_search FTS + compaction pane UI DONE — core c651b02 + server b8eaf4f + web 7363b61)
-- **Son işlem:** Transcript'ler Memory sekmesinden aranabilir + küçültülebilir (`GET /api/sessions/search` FTS5 + Search-transcripts kartı + Compact-a-session kartı). Core probu 32/32 + server 15/15 + web suite 33/33.
+- **Son güncelleme:** 2026-09-04 (Phase 3 archify PNG export DONE — core ab5c1e7 + server 5866a89 + web 42413ca)
+- **Son işlem:** Export sekmesinde beşinci canlı format — PNG raster (`GET /api/archify/:id/export?format=png[&scale=1|2]`, headless Chromium, 1x/2x select). Core probu 20/20 + server 15/15 + archify 33 check.
 
 ## Sıradaki adım (Phase 1/2/3 follow-up'ları)
 - **Sıradaki adım:**
   1. Phase 1: ~~`DELETE` endpoint'leri (bots ✅ 4a51723/cdd00b0 · archify ✅ 93d2e58/1fe2b6d · design ✅ 9a61b52/f6f9b1f · tests ✅ 1fbd616/1ba81d9 · vault ✅ 7cfdbe6/b0b5d9d — SERİ TAMAMLANDI)~~ + ~~cron firing daemon ✅ 9c879d3/6e4a584 (30s ticker + Run-now + `lastRunAt` + run history — WAVE 1 TAMAMLANDI)~~ + ~~gerçek provider streaming ✅ 98534e9/be7adb7 (mock echo öldü, key/baseUrl çözümleme + gerçek abort — WAVE 1 TAMAMLANDI)~~ + ~~core tool foundation ✅ 1f95d06 (gate + 5 builtin + executor + 46/46 probe — WAVE 2a TAMAMLANDI)~~ + ~~WS tool/permission/ask frame'leri ✅ aaf9b7b/75efc63 (agent döngüsü canlı: `<tool>`/`<ask>` blokları + pending-gate resume + loop probu 27/27 + WS e2e 12/12 — WAVE 2b TAMAMLANDI)~~ (Phase 1 core-loop TAMAMLANDI)
   2. Phase 2: ~~FTS5 vault araması ✅ 03b3e8f/95d6ed2/5543f20 (SQLite FTS5 + BM25 + snippet + `/api/vault/search` + SearchModal — TAMAMLANDI)~~ + ~~3D vault grafiği ✅ 2d4ad5f (bağımlılıksız canvas star-map, aynı canlı veri, sürükle-döndür + zoom + auto-rotate — TAMAMLANDI)~~ + ~~remote plugin marketplace ✅ 0850343/563ab98/78e59e6 (canlı GitHub topic araması + Marketplace sekmesi + Install wiring — TAMAMLANDI)~~ + memory deep wave 1 ✅ bfad761/ba8dc13/22ec296 (`GET/POST/PATCH/DELETE /api/memory` + MemoryError + usage — TAMAMLANDI) + memory deep wave 2 ✅ 7d0841a (Memory UI sekmesi: toggle + usage meter + CRUD — TAMAMLANDI) + wave 3a ✅ c30c8aa/6ba9d9f/2695474 (2-tier transcript compaction: hygiene + extractive summary + archive + `GET|POST /:id/compaction` — TAMAMLANDI) + wave 3b ✅ c651b02/b8eaf4f/7363b61 (session_search FTS + compaction pane UI: `GET /api/sessions/search` + Search-transcripts kartı + Compact-a-session kartı — TAMAMLANDI, Phase 2 memory-deep TAMAMLANDI)
-  3. Phase 3: PNG/WebM export'ları (archify/design) + themes + sharing + cloud + mobile + perf + a11y
+  3. Phase 3: archify PNG ✅ ab5c1e7/5866a89/42413ca (headless-Chromium raster + `?scale=1|2` + Export tab'ında PNG butonu — TAMAMLANDI) + design PNG + WebM + themes + sharing + cloud + mobile + perf + a11y
 
 ---
 *Bu dosya otomatik yönetilir. Elle silme.*

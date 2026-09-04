@@ -2287,6 +2287,40 @@ survives; never delete both at once). If even that serves stale code, escalate i
     live so renames surface without a resync; compaction still explicit
     POST (no auto-trigger on append); summaries stay extractive (no LLM).
   - Next piece: Phase 3 PNG/WebM exports (archify/design).
+- 2026-09-04 — Phase 3 archify PNG export DONE
+  (core ab5c1e7 + server 5866a89 + web 42413ca, all pushed).
+  - **Executor run:** the Export tab offers a fifth live format — PNG
+    rasterizes the deterministic SVG through headless Chromium
+    (`--screenshot`, no CDP socket, so it works inside locked-down LXC).
+    An orphan sibling WIP (`raster.ts` + `readStoredIr` export) was adopted
+    as this run's single piece: reviewed fresh, 2 REAL bugs fixed
+    (`assertDiagramId(idRaw)` referenced an undefined variable,
+    `filename` used an undefined `validId`), all gates re-run.
+  - **Core:** `archify/raster.ts` (new: `findChromeBinary()`
+    `LOKMA_CHROME_BIN`-first resolution, `buildRasterHtml()` exact-size
+    shell, `exportDiagramPng(id, { scale })` with `bad_scale` 400 /
+    `needs_toolchain` 400 / `raster_failed` 500 + PNG-magic verification
+    before return; `index.ts` export) + `raster.test.ts` 20/20 (shell
+    contract, constants, validation 400s/404 without Chrome, end-to-end
+    1x + default-2x raster with real Chrome 146).
+  - **Server:** `GET /api/archify/:id/export?format=png[&scale=1|2]`
+    (`image/png` attachment + `X-Image-Width/Height` headers, `?scale=`
+    garbage → `bad_scale` 400); in-process createApp+inject probe 15/15
+    (real PNG bytes, 2x default, 400s, 404, evil-id 400, svg sibling
+    intact, `bad_format` intact).
+  - **Web:** `ArchifyExportFormat` + `ARCHIFY_EXPORTS` gain `png`;
+    `downloadArchifyExport(id, format, scale?)` passes `&scale=`;
+    Export tab gains a PNG button + labeled 1x/2x scale select; footer
+    and pane doc-comment now say WebM only is the follow-up.
+  - **Gates:** root `tsc --noEmit` 0 · core dist + server `tsc -p` clean ·
+    web build green · web suite (archify 33 checks) PASS · mock grep on
+    touched files clean (anti-mock comments only, legit) · real
+    `~/.lokma` untouched.
+  - **Honest scope:** PNG only (WebM still needs a video toolchain);
+    design-artifact PNG is a separate piece; `needs_toolchain` 400
+    surfaces as a toast when no browser is installed.
+  - Next piece: Phase 3 design PNG export (then WebM, themes, sharing,
+    cloud, mobile, perf + a11y).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

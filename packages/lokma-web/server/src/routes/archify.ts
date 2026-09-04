@@ -5,6 +5,7 @@ import {
   deleteDiagram,
   exportDiagram,
   exportDiagramPng,
+  exportDiagramWebm,
   generateDiagram,
   getDiagram,
   guideStarter,
@@ -24,11 +25,11 @@ import {
  * `POST /api/archify/:id/delta { baseId }` (Before/Delta/After);
  * `DELETE /api/archify/:id` (removes the whole on-disk dir — unknown 404,
  * bad shape 400);
- * `GET /api/archify/:id/export?format=svg|html|json|card|png[&scale=1|2]`
+ * `GET /api/archify/:id/export?format=svg|html|json|card|png|webm[&scale=1|2]`
  * (real file downloads — PNG rasterizes the deterministic SVG with
- * headless Chromium, answering `needs_toolchain` 400 when no browser is
- * installed; WebM is still a follow-up, so the pane only offers what
- * exists here; no dead buttons).
+ * headless Chromium, WebM encodes a 2s slow-zoom with Chromium + ffmpeg,
+ * both answering `needs_toolchain` 400 when a binary is missing; the pane
+ * only offers what exists here; no dead buttons).
  * All failures answer `{ code, message }` (never raw keys or stacks).
  */
 
@@ -119,6 +120,17 @@ export async function archifyRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     const query = req.query as { format?: unknown; scale?: unknown };
     try {
+      if (query.format === 'webm') {
+        const webm = await exportDiagramWebm(id);
+        return reply
+          .header('Content-Type', webm.contentType)
+          .header('Content-Disposition', `attachment; filename="${webm.filename}"`)
+          .header('X-Video-Width', String(webm.width))
+          .header('X-Video-Height', String(webm.height))
+          .header('X-Video-Fps', String(webm.fps))
+          .header('X-Video-Frames', String(webm.frames))
+          .send(webm.body);
+      }
       if (query.format === 'png') {
         // `?scale=` arrives as a string — garbage becomes NaN → bad_scale 400.
         const scale = query.scale === undefined ? undefined : { scale: Number(query.scale) };

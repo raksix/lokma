@@ -73,6 +73,7 @@ const BUNDLED_PLUGINS: BundledDef[] = [
       'GET /api/archify/:id/guide',
       'GET /api/archify/:id',
       'PUT /api/archify/:id',
+      'DELETE /api/archify/:id',
       'POST /api/archify/:id/delta',
       'GET /api/archify/:id/export',
       'GET /api/archify/:id/view',

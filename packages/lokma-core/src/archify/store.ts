@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, stat } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ensureDir, expandHome, writeAtomic } from '../utils/fs.js';
 import type { ArchifyIR, ArchifyPreset, ArchifyTheme, ArchifyType, ReceiptRow } from './ir.js';
@@ -266,6 +266,20 @@ export async function getDiagram(idRaw: unknown): Promise<DiagramDetail> {
   const ir = await readStoredIr(id);
   const receipt = await readReceipt(id);
   return { id, ir, receipt, html: buildStandaloneHtml(ir) };
+}
+
+/**
+ * Delete a diagram — removes its whole on-disk dir (`ir.json` +
+ * viewer + exports + receipt + delta). Unknown ids 404 via
+ * `readStoredIr` before anything is touched; bad shapes 400 via
+ * `assertDiagramId`. The id is validated to a single path segment so
+ * `rm` can never escape the archify root.
+ */
+export async function deleteDiagram(idRaw: unknown): Promise<{ id: string }> {
+  const id = assertDiagramId(idRaw);
+  await readStoredIr(id); // 404 on unknown before touching disk.
+  await rm(dirOf(id), { recursive: true, force: true });
+  return { id };
 }
 
 export type ExportFormat = 'svg' | 'html' | 'json' | 'card';

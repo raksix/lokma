@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import {
   ArchifyError,
   compareDiagrams,
+  deleteDiagram,
   exportDiagram,
   generateDiagram,
   getDiagram,
@@ -20,6 +21,8 @@ import {
  * `GET /api/archify/:id` (IR + receipt + viewer HTML);
  * `PUT /api/archify/:id { ir }` (pane JSON editor — validates, rebuilds);
  * `POST /api/archify/:id/delta { baseId }` (Before/Delta/After);
+ * `DELETE /api/archify/:id` (removes the whole on-disk dir — unknown 404,
+ * bad shape 400);
  * `GET /api/archify/:id/export?format=svg|html|json|card` (real file
  * downloads — PNG/WebM need headless Chromium and are a follow-up, so the
  * pane only offers what exists here; no dead buttons).
@@ -78,6 +81,17 @@ export async function archifyRoutes(app: FastifyInstance): Promise<void> {
     const body = (req.body ?? {}) as { ir?: unknown };
     try {
       return { ok: true, ...(await updateDiagram(id, body.ir)) };
+    } catch (e) {
+      if (e instanceof ArchifyError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      throw e;
+    }
+  });
+
+  app.delete('/api/archify/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    try {
+      const { id: deleted } = await deleteDiagram(id);
+      return { ok: true, id: deleted };
     } catch (e) {
       if (e instanceof ArchifyError) return reply.status(e.status).send({ code: e.code, message: e.message });
       throw e;

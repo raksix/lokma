@@ -2010,6 +2010,46 @@ survives; never delete both at once). If even that serves stale code, escalate i
     `tool_use` parsing + loop) land in wave 2b.
   - Next piece: Phase 1 core-loop hardening wave 2b (WS actually emitting
     tool/permission/ask frames via the executor — pending-gate resume).
+- 2026-09-04 — Phase 1 core-loop hardening, wave 2b: WS tool/permission/ask frames DONE
+  (core aaf9b7b + server 75efc63, both pushed).
+  - **Executor run:** the loop is real end to end — models drive tools
+    through `<tool>`/`<ask>` text blocks (ReAct-style, every adapter).
+    Core `tools/parse.ts` (new: `parseToolBlocks`/`parseAskBlocks`/
+    `stripModelBlocks`/`buildToolSystemPrompt` + incremental
+    `createBlockFilter()` that holds block markup off the chat surface;
+    first-`<` holdback — holding from the last `<` flushed opening markup
+    when a split closing tag arrived, caught by the 1-char torture probe;
+    fail-open past 8KB) + `parse.test.ts` 37/37 + `tools/index.ts` export.
+    Server `agent-loop.ts` (new: `runAgentLoop()` multi-turn, max 5 —
+    system prompt advertises the 5 builtins, per-turn 120s timeout, gate →
+    `permission_request` suspend → `waitApproval` (deny/`always` like
+    allow) → `runApprovedCall`, questions → `ask_user_question` suspend →
+    `waitAnswer`, results feed back as `<tool_results>`/`<answer>` user
+    turns, malformed blocks become honest `bad_tool_block` errors, turn
+    limit ends with a `turn_limit` error frame, every result stored as a
+    `role: 'tool'` JSONL row, `buildLoopHistory()` rebuilds capped model
+    history incl. tool rows) + `routes/ws.ts` rewired (prompt runs the
+    loop with capped history + live permissions, per-socket pending-gate
+    map with 10-min auto-deny/auto-empty, `always` persists an allow rule
+    via `saveGlobal`, abort/close rejects pendings, per-turn usage spans
+    the whole loop in the `cost` frame, exactly one `done/*`).
+  - **Gates:** root `tsc --noEmit` 0 · core+server `tsc -p`/dist clean ·
+    web build green (untouched, no web commit) · parse 37/37 + tools
+    46/46 + ai adapters 22/22 · loop probe 27/27 (stub SSE upstream, real
+    temp workspace+SessionStore: auto-allow read + follow-up carries file
+    bytes, manual deny, ask resume, malformed survival, always≈allow,
+    history mapping) · WS e2e 12/12 (real socket: 2 gates allow+always →
+    2 ok results, ask with choices, no markup on wire, done/complete,
+    note.txt on disk, rule persisted, 3 approvals rows, tool transcript
+    rows) · mock grep on touched files zero hits · real `~/.lokma`
+    untouched (startup-env temp HOME + refuse-guards).
+  - **Honest scope:** native function-calling not used (text blocks work on
+    every model, incl. ones without tool APIs); historic `role: 'tool'`
+    rows render as plain assistant text in the chat (readable JSON, no
+    dedicated renderer yet); cron fires stay text-only (runner reuse is a
+    follow-up); unanswered gates auto-deny after 10 min; no per-agent
+    state transitions or concurrency-cap checks yet.
+  - Next piece: Phase 2 FTS5 vault search (ranked-substring replacement).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

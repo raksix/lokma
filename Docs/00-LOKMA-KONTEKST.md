@@ -557,13 +557,19 @@
 - **Honest scope:** nothing calls the executor yet — WS streams text only, `permission_response` only logs; model-driven tool calls land in wave 2b.
 - **Sıradaki parça:** Phase 1 core-loop hardening wave 2b (WS tool/permission/ask frames via executor pending-gate resume).
 
+### 2026-09-04 — Phase 1 core-loop hardening wave 2b: WS tool/permission/ask frames DONE (core aaf9b7b + server 75efc63)
+- **Executor run:** agent döngüsü uçtan uca gerçek — model `<tool>`/`<ask>` bloklarıyla 5 builtin'i sürüyor, stream'de blok markup'ı filtreleniyor (first-`<` holdback bug'ı 1-char probe ile yakalandı), gate'ler `permission_response` ile resume oluyor (`always` kuralı persist ediliyor), sorular `ask_response` ile, sonuçlar follow-up turn'e akıyor, her sonuç JSONL'de `role: 'tool'` satırı. Probe'lar: parse 37/37, loop 27/27 (stub SSE), WS e2e 12/12 (gerçek socket: 2 gate + ask + done/complete + disk + approvals + transcript).
+- **Gates:** root tsc 0 · core+server clean · web build green (dokunulmadı) · mock grep temiz · gerçek `~/.lokma`'ya dokunulmadı.
+- **Dürüst kapsam:** native function-calling yok (text-block her modelde çalışır); tool satırları geçmişte düz metin render olur; cron fire'lar hâlâ text-only; cevapsız gate 10 dk'da auto-deny.
+- **Sıradaki parça:** Phase 2 FTS5 vault araması (ranked-substring yerine gerçek FTS5).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-04 (Phase 1 core-loop hardening wave 2a: core tool foundation DONE — core 1f95d06)
-- **Son işlem:** Her agent tool çağrısının geçeceği tek yol artık var, testli, export'lu — permission gate (deny>allow>defaultMode) + 5 workspace-jailed builtin (read/list/search/write/run_command) + gate→emit→run executor (WS frame'lerini aynalayan event'ler). Probe 46/46. WS henüz frame üretmiyor (wave 2b).
+- **Son güncelleme:** 2026-09-04 (Phase 1 core-loop hardening wave 2b: WS tool/permission/ask frames DONE — core aaf9b7b + server 75efc63)
+- **Son işlem:** Chat artık gerçek agent döngüsü — model dosya okuyup yazabiliyor, komut koşabiliyor, izin isteyip soru sorabiliyor; hepsi canlı WS frame'leriyle (tool_start/tool_result/permission_request/ask_user_question), transcript kanıtlı. Loop probu 27/27 + WS e2e 12/12.
 
 ## Sıradaki adım (Phase 1/2/3 follow-up'ları)
 - **Sıradaki adım:**
-  1. Phase 1: ~~`DELETE` endpoint'leri (bots ✅ 4a51723/cdd00b0 · archify ✅ 93d2e58/1fe2b6d · design ✅ 9a61b52/f6f9b1f · tests ✅ 1fbd616/1ba81d9 · vault ✅ 7cfdbe6/b0b5d9d — SERİ TAMAMLANDI)~~ + ~~cron firing daemon ✅ 9c879d3/6e4a584 (30s ticker + Run-now + `lastRunAt` + run history — WAVE 1 TAMAMLANDI)~~ + ~~gerçek provider streaming ✅ 98534e9/be7adb7 (mock echo öldü, key/baseUrl çözümleme + gerçek abort — WAVE 1 TAMAMLANDI)~~ + ~~core tool foundation ✅ 1f95d06 (gate + 5 builtin + executor + 46/46 probe — WAVE 2a TAMAMLANDI)~~ + WS tool/permission/ask frame'leri via executor pending-gate resume (sıradaki parça, run başına TEK parça)
+  1. Phase 1: ~~`DELETE` endpoint'leri (bots ✅ 4a51723/cdd00b0 · archify ✅ 93d2e58/1fe2b6d · design ✅ 9a61b52/f6f9b1f · tests ✅ 1fbd616/1ba81d9 · vault ✅ 7cfdbe6/b0b5d9d — SERİ TAMAMLANDI)~~ + ~~cron firing daemon ✅ 9c879d3/6e4a584 (30s ticker + Run-now + `lastRunAt` + run history — WAVE 1 TAMAMLANDI)~~ + ~~gerçek provider streaming ✅ 98534e9/be7adb7 (mock echo öldü, key/baseUrl çözümleme + gerçek abort — WAVE 1 TAMAMLANDI)~~ + ~~core tool foundation ✅ 1f95d06 (gate + 5 builtin + executor + 46/46 probe — WAVE 2a TAMAMLANDI)~~ + ~~WS tool/permission/ask frame'leri ✅ aaf9b7b/75efc63 (agent döngüsü canlı: `<tool>`/`<ask>` blokları + pending-gate resume + loop probu 27/27 + WS e2e 12/12 — WAVE 2b TAMAMLANDI)~~ (Phase 1 core-loop TAMAMLANDI)
   2. Phase 2: FTS5 vault araması + 3D vault grafiği + remote plugin marketplace + memory deep
   3. Phase 3: PNG/WebM export'ları (archify/design) + themes + sharing + cloud + mobile + perf + a11y
 

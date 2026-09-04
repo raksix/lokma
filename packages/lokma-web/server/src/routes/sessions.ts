@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { SessionStore } from 'lokma-core';
+import { SessionStore, compactSession, compactionStatus } from 'lokma-core';
 
 /**
  * Sessions — JSONL same files as CLI (SessionStore).
@@ -7,6 +7,10 @@ import { SessionStore } from 'lokma-core';
  * PATCH persists per-session model/title in the `<id>.meta.json` sidecar;
  * rewind truncates the transcript (server-side checkpoint restore);
  * merge appends one transcript into another; DELETE removes both files.
+ * Compaction (`GET|POST /:id/compaction`) runs the two-tier Docs/28 §1.3
+ * shrink (hygiene + extractive summary with `<id>.archive.jsonl`
+ * soft-archive) — below every threshold POST is an honest no-op
+ * (`{ ok: true, compacted: false }`), never an error.
  * `GET /api/sessions` returns enriched summaries (title/model/counts/dates)
  * for the Sessions sidebar — same shape as `SessionSummary` in lokma-core.
  * See Docs/22 §sessions.
@@ -160,5 +164,47 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     const store = new SessionStore(cwd);
     const result = await store.rewind(id, Math.floor(keep));
     return { ok: true, id: result.id, kept: result.kept };
+  });
+
+  app.get('/api/sessions/:id/compaction', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    try {
+      assertSessionId(id);
+    } catch {
+      return reply.status(400).send({ code: 'bad_session_id', message: 'Invalid session id' });
+    }
+    const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
+    try {
+      return await compactionStatus(cwd, id);
+    } catch (e) {
+      const err = e as { statusCode?: number; code?: string; message?: string };
+      return reply
+        .status(err.statusCode === 404 ? 404 : 500)
+        .send({ code: err.code ?? 'compaction_failed', message: err.message ?? 'Compaction status failed' });
+    }
+  });
+
+  app.post('/api/sessions/:id/compaction', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    try {
+      assertSessionId(id);
+    } catch {
+      return reply.status(400).send({ code: 'bad_session_id', message: 'Invalid session id' });
+    }
+    const body = (req.body ?? {}) as { mode?: unknown };
+    const mode = body.mode ?? 'full';
+    if (mode !== 'hygiene' && mode !== 'full') {
+      return reply.status(400).send({ code: 'bad_mode', message: 'POST accepts { mode: "hygiene" | "full" }' });
+    }
+    const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
+    try {
+      const report = await compactSession(cwd, id, { mode });
+      return { ok: true, ...report };
+    } catch (e) {
+      const err = e as { statusCode?: number; code?: string; message?: string };
+      return reply
+        .status(err.statusCode === 404 ? 404 : 500)
+        .send({ code: err.code ?? 'compaction_failed', message: err.message ?? 'Compaction failed' });
+    }
   });
 }

@@ -2253,6 +2253,40 @@ survives; never delete both at once). If even that serves stale code, escalate i
     UI yet (Memory tab shows the global store, not transcripts).
   - Next piece: Phase 2 memory-deep wave 3b (session_search FTS over
     transcripts + compaction pane UI).
+- 2026-09-04 — Phase 2 memory-deep wave 3b: session_search FTS + compaction pane UI DONE
+  (core c651b02 + server b8eaf4f + web 7363b61, all pushed).
+  - **Executor run:** transcripts are searchable and shrinkable from the
+    Memory tab — the read half of Docs/28 "infinite memory" is live.
+  - **Core:** `session/search.ts` (new: `searchSessionsDetailed(cwd, q,
+    {limit})` — FTS5 BM25 over `(sessionId, title, body)` in
+    `<sessions>/.fts5/sessions.db`, per-session-file incremental sync,
+    snippet + live-title resolve + `engine` reporting; `bun:sqlite`
+    missing → ranked-substring AND degrade with the same shape; empty
+    query `bad_query` 400, out-of-range limit `bad_limit` 400; reuses the
+    vault `buildMatchQuery` tokenizer DRY) + `session/index.ts` export +
+    `search.test.ts` 32/32 on real temp-HOME files (validation 6 +
+    FTS-path 12 + substring-path 4 + incremental-sync 2, engine fts5).
+  - **Server:** `GET /api/sessions/search?q=&limit=&cwd=` in `sessions.ts`
+    (`{hits, count, engine}`, static route wins over `/:id`); live
+    in-process probe 15/15 (400s, live title, AND, tool rows, empty,
+    limit caps, real `~/.lokma` untouched).
+  - **Web:** `api.ts` `SessionSearchHit/SearchRes` + `searchSessions()`
+    (URLSearchParams encoding); `components/memory/transcripts.ts` pure
+    helpers + `transcripts.test.ts` 30/30; new `transcript-tools.tsx`
+    (Search-transcripts card: live FTS search + engine badge + per-hit
+    role badge + Open-jump; Compact-a-session card: live session picker +
+    status tone + hygiene/full run + report line + archive-first footer)
+    wired into `MemoryPane` (new optional `onOpenSession`, passed through
+    by `inspector-host.tsx`) + barrel export.
+  - **Gates:** root `tsc --noEmit` 0 · core dist + server `tsc -p` clean ·
+    web build green · core suite 7/7 · web suite 33/33 · mock grep on
+    touched files clean (labeled input `placeholder=` attrs + one
+    anti-mock comment only, legit) · real `~/.lokma` untouched.
+  - **Honest scope:** search is project-scoped (`?cwd=`, same as the
+    sidebar — no cross-project global search yet); FTS titles re-resolve
+    live so renames surface without a resync; compaction still explicit
+    POST (no auto-trigger on append); summaries stay extractive (no LLM).
+  - Next piece: Phase 3 PNG/WebM exports (archify/design).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

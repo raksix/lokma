@@ -1825,6 +1825,38 @@ survives; never delete both at once). If even that serves stale code, escalate i
     critique snapshots die with the head dir (no cross-artifact refs).
   - Remaining DELETE pieces: tests (1 POST), vault ingest (1 POST).
     Next piece: `DELETE /api/tests/:id`.
+- 2026-09-04 — Phase 1 DELETE endpoints, piece 4/8: `DELETE /api/tests/:id` DONE
+  (server 1fbd616 + web 1ba81d9, both pushed).
+  - **Executor run:** fourth DELETE in the Phase 1 "DELETE for every POST
+    resource" series (archify/design-piece mirror). Core `deleteRun()`
+    (`testing/store.ts`: `assertRunId` 400 on bad shape, `readReport`
+    404 on unknown before touching disk, then `rm` of the whole `<id>/` dir —
+    the id is a single validated segment so `rm` can never escape the
+    test-runs root) + `DELETE /api/tests/:id` (`routes/tests.ts`, `{ ok, id }`,
+    same `TestError` mapping as the sibling routes). Plugin registry
+    `@lokma/plugin-testing` endpoints 4→5 (web `plugins.ts` footer example
+    comment 43→44). Web: `api.deleteTestRun()` + per-run Delete button in
+    the expanded report (two-click arm, Trash2 lucide, destructive on
+    confirm, resets the arm on expand/collapse; success collapses the
+    detail and reloads the list).
+  - **Gates:** root `tsc --noEmit` 0 · core dist emit + server `tsc -p`
+    clean + server dist rebuild (server reads core AND routes from dist) ·
+    web build green (1711 modules, 749k JS/gzip 197k) · testing helpers
+    probe 35/35 + plugins 32/32 + full web suite exit 0 · live probe
+    (in-process createApp + inject, startup-env temp HOME + refuse-guard)
+    15/15: empty list → run A+B → dir on disk → DELETE A `{ok,id}` →
+    dir gone → GET-after-delete 404 `test_not_found` → re-delete 404 →
+    list count 1 (only B) → sibling junit+get 200 → evil-id 400 `bad_id` →
+    unknown 404 → registry testing 5 incl. DELETE → real `~/.lokma`
+    untouched (probe ids only in temp HOME) · mock grep clean (anti-mock
+    comments + labelled input `placeholder` attrs, legit).
+  - **Honest scope:** no per-run ownership (all runs deletable — no
+    `deleteBlockReason` helper needed, same as archify/design; the existing
+    35 helper checks pin the contracts and the live probe pins the
+    endpoint); deleting a run drops its plan + report + junit together
+    (no cross-run refs to repair).
+  - Remaining DELETE pieces: vault ingest (1 POST).
+    Next piece: vault ingest undo (DELETE for ingested notes).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

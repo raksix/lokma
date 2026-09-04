@@ -522,13 +522,20 @@
   - **Gates:** root tsc 0 · core dist emit + server `tsc -p` clean + server dist rebuild (prob bayat-dist tuzağını yakaladı: route rebuild'e dek 404 — server core'u VE route'ları dist'ten okuyor) · web build green · design helpers 28/28 · live prob 12/12 (generate A+B → DELETE A → dizin gitti → GET 404 → re-delete 404 → liste 1 → sibling export/view 200 → evil 400 → unknown 404 → registry 10) · mock grep temiz (3 hit = etiketli input `placeholder`'ı, legit) · gerçek `~/.lokma`'ya dokunulmadı.
 - **Sıradaki parça:** `DELETE /api/tests/:id` (kalan: tests, vault).
 
+### 2026-09-04 — Phase 1 DELETE 4/5: `DELETE /api/tests/:id` DONE (server 1fbd616 + web 1ba81d9)
+- **Executor run:** Phase 1 DELETE serisinin dördüncü parçası (archify/design mirror).
+  - **Server:** core `deleteRun()` (`assertRunId` 400 + `readReport` 404 dokunmadan önce, sonra tüm `<id>/` dizinine `rm` — id tek segment validasyonlu, root dışına kaçamaz) + `DELETE /api/tests/:id` (`{ok,id}`); plugin registry testing 4→5 endpoint (footer 44; web `plugins.ts` footer yorum 43→44).
+  - **Web:** `api.deleteTestRun()` + expanded report'ta Delete butonu (two-click arm, Trash2 lucide, confirm'de destructive; expand/collapse'ta arm sıfırlanır, başarıda detay kapanır + liste yenilenir).
+  - **Gates:** root tsc 0 · core dist emit + server `tsc -p` clean + server dist rebuild · web build green (1711 modül, 749k JS) · testing helpers 35/35 + plugins 32/32 + full web suite exit 0 · live prob 15/15 (run A+B → DELETE A → dizin gitti → GET 404 → re-delete 404 → liste 1 → sibling junit/get 200 → evil 400 → unknown 404 → registry 5) · mock grep temiz (anti-mock yorumlar + etiketli input `placeholder`'ları, legit) · gerçek `~/.lokma`'ya dokunulmadı.
+- **Sıradaki parça:** vault ingest undo (kalan DELETE: vault).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-04 (Phase 1 DELETE 3/5: `DELETE /api/design/:id` DONE — server 9a61b52 + web f6f9b1f)
-- **Son işlem:** Phase 1 DELETE serisinin üçüncü parçası canlı — Design Studio header'da gerçek Delete butonu (two-click confirm), server'da `deleteArtifact()` + `DELETE /api/design/:id`; registry 10 endpoint; live prob 12/12; kalan DELETE'ler: tests, vault.
+- **Son güncelleme:** 2026-09-04 (Phase 1 DELETE 4/5: `DELETE /api/tests/:id` DONE — server 1fbd616 + web 1ba81d9)
+- **Son işlem:** Phase 1 DELETE serisinin dördüncü parçası canlı — Testing Lab'de expanded report'ta gerçek Delete butonu (two-click confirm), server'da `deleteRun()` + `DELETE /api/tests/:id`; registry 5 endpoint; live prob 15/15; kalan DELETE: vault.
 
 ## Sıradaki adım (Phase 1/2/3 follow-up'ları)
 - **Sıradaki adım:**
-  1. Phase 1: core loop + agent runner daemon (cron firing, `lastRunAt` canlanması) + `DELETE` endpoint'leri (~~bots ✅ 4a51723/cdd00b0~~ · ~~archify ✅ 93d2e58/1fe2b6d~~ · ~~design ✅ 9a61b52/f6f9b1f~~ → sıradaki: tests, sonra vault — run başına TEK parça)
+  1. Phase 1: core loop + agent runner daemon (cron firing, `lastRunAt` canlanması) + `DELETE` endpoint'leri (~~bots ✅ 4a51723/cdd00b0~~ · ~~archify ✅ 93d2e58/1fe2b6d~~ · ~~design ✅ 9a61b52/f6f9b1f~~ · ~~tests ✅ 1fbd616/1ba81d9~~ → sıradaki: vault ingest undo — run başına TEK parça)
   2. Phase 2: FTS5 vault araması + 3D vault grafiği + remote plugin marketplace + memory deep
   3. Phase 3: PNG/WebM export'ları (archify/design) + themes + sharing + cloud + mobile + perf + a11y
 

@@ -289,7 +289,7 @@ export type ExportFormat = 'svg' | 'html' | 'json' | 'card';
 export async function exportDiagram(idRaw: unknown, formatRaw: unknown): Promise<{ filename: string; contentType: string; body: string }> {
   const id = assertDiagramId(idRaw);
   if (formatRaw !== 'svg' && formatRaw !== 'html' && formatRaw !== 'json' && formatRaw !== 'card') {
-    throw new ArchifyError('bad_format', 'format must be svg|html|json|card', 400);
+    throw new ArchifyError('bad_format', 'format must be svg|html|json|card|png|webm', 400);
   }
   const format = formatRaw as ExportFormat;
   await readStoredIr(id); // 404 on unknown.

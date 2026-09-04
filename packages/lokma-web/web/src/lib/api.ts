@@ -735,6 +735,18 @@ export type PluginsRes = { plugins: Plugin[]; count: number };
 export type PluginDetailRes = { ok: boolean; plugin: Plugin };
 export type PluginMutationRes = { ok: boolean; plugin: Plugin };
 
+/** One remote marketplace hit — a real GitHub `lokma-plugin` repo. */
+export type MarketplaceItem = {
+  repo: string;
+  name: string;
+  author: string;
+  description: string;
+  stars: number;
+  url: string;
+  updatedAt: string;
+};
+export type MarketplaceRes = { items: MarketplaceItem[]; count: number; source: string };
+
 // ─── Observability (agent trace timeline + frozen share snapshots, W6-24) ───
 
 export type TraceEventKind =
@@ -1248,6 +1260,9 @@ export const api = {
   installPlugin: (url: string) => post<PluginMutationRes>('/api/plugins/install', { url }),
   /** URL records only — bundled rows answer 400 `bundled_readonly`. */
   deletePlugin: (id: string) => del<{ ok: boolean; id: string }>(`/api/plugins/${encodeURIComponent(id)}`),
+  /** Live GitHub `lokma-plugin` topic search (empty q browses the whole topic). */
+  searchMarketplace: (q = '') =>
+    get<MarketplaceRes>(`/api/plugins/marketplace${q ? `?q=${encodeURIComponent(q)}` : ''}`),
 
   // Observability — agent trace timeline + frozen share snapshots (W6-24).
   // Trace events are derived from durable state server-side (registry +

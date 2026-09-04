@@ -6,13 +6,15 @@
 import {
   categoryTone,
   filterPlugins,
+  formatStars,
   initials,
+  isMarketplaceInstalled,
   summarizeRegistry,
   tabCounts,
   tabOf,
   validatePluginUrl,
 } from './plugins';
-import type { Plugin } from '@/lib/api';
+import type { MarketplaceItem, Plugin } from '@/lib/api';
 
 let passed = 0;
 function check(name: string, cond: boolean): void {
@@ -92,5 +94,29 @@ check('private 192 rejected', validatePluginUrl('https://192.168.1.1/p') !== nul
 check('private 172 rejected', validatePluginUrl('https://172.16.0.1/p') !== null);
 check('public 172 allowed', validatePluginUrl('https://172.32.0.1/p') === null);
 check('public https allowed', validatePluginUrl('https://github.com/lokma/demo-plugin') === null);
+
+// ─── marketplace helpers (live GitHub rows, never invented) ──────────
+check('stars under 1000 plain', formatStars(42) === '42');
+check('stars zero plain', formatStars(0) === '0');
+check('stars 1000 is 1k', formatStars(1000) === '1k');
+check('stars 1500 is 1.5k', formatStars(1500) === '1.5k');
+check('stars 125000 is 125k', formatStars(125000) === '125k');
+check('stars 2.5M compact', formatStars(2500000) === '2.5M');
+check('stars negative falls back', formatStars(-3) === '0');
+const marketItem: MarketplaceItem = {
+  repo: 'acme/lokma-vault',
+  name: 'lokma-vault',
+  author: 'acme',
+  description: 'Vault sync plugin',
+  stars: 42,
+  url: 'https://github.com/acme/lokma-vault',
+  updatedAt: '2026-08-01T00:00:00Z',
+};
+check(
+  'url match counts as installed',
+  isMarketplaceInstalled(marketItem, [row({ source: 'url', url: marketItem.url })]) === true,
+);
+check('other urls are installable', isMarketplaceInstalled(marketItem, [row()]) === false);
+check('empty registry is installable', isMarketplaceInstalled(marketItem, []) === false);
 
 console.log(`\nplugins: ${passed} passed`);

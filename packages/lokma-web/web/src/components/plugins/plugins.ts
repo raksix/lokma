@@ -1,4 +1,4 @@
-import type { Plugin } from '@/lib/api';
+import type { MarketplaceItem, Plugin } from '@/lib/api';
 
 /**
  * PluginsPane pure helpers — Installed/Suspended tabs + search/category
@@ -100,4 +100,33 @@ export function summarizeRegistry(plugins: Plugin[]): string {
   const pluginWord = plugins.length === 1 ? 'plugin' : 'plugins';
   const suspendedPart = suspended === 0 ? 'none suspended' : `${suspended} suspended`;
   return `${plugins.length} ${pluginWord} · ${endpoints} endpoints · ${suspendedPart}`;
+}
+
+/**
+ * Compact star count for marketplace rows — the number is the live
+ * `stargazers_count`, only the rendering is shortened (1.2k, 3.4M).
+ */
+export function formatStars(stars: number): string {
+  if (!Number.isFinite(stars) || stars < 0) return '0';
+  if (stars >= 1_000_000) {
+    const m = stars / 1_000_000;
+    return `${m >= 100 ? Math.round(m) : Math.round(m * 10) / 10}M`;
+  }
+  if (stars >= 1000) {
+    const k = stars / 1000;
+    return `${k >= 100 ? Math.round(k) : Math.round(k * 10) / 10}k`;
+  }
+  return String(Math.floor(stars));
+}
+
+/**
+ * A marketplace hit is already installed when its exact `url` matches a
+ * registry record — the row then shows Installed instead of Install (the
+ * server would answer 409 `plugin_exists` anyway).
+ */
+export function isMarketplaceInstalled(
+  item: Pick<MarketplaceItem, 'url'>,
+  plugins: Pick<Plugin, 'url'>[],
+): boolean {
+  return plugins.some((p) => p.url === item.url);
 }

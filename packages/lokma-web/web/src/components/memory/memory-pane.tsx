@@ -12,6 +12,7 @@ import {
   MEMORY_TARGETS,
 } from './memory';
 import { validateAddForm, validateReplaceForm } from './memory';
+import { TranscriptTools } from './transcript-tools';
 
 function toast(message: string): void {
   window.dispatchEvent(new CustomEvent('lokma-toast', { detail: message }));
@@ -27,14 +28,15 @@ function errHint(e: unknown): string {
 
 /**
  * MemoryPane — the global §-delimited MEMORY.md / USER.md store (wave 2,
- * Docs/28 §5.2). Every control is live over `GET/POST/PATCH/DELETE`
- * `/api/memory`: target toggle with a live usage meter, search, add form,
- * inline replace editor, and two-click delete. The per-agent SOUL.md /
+ * Docs/28 §5.2) plus the wave 3b transcript tools (session_search over
+ * transcripts + per-session two-tier compaction). Every control is live over
+ * `GET/POST/PATCH/DELETE` `/api/memory`, `GET /api/sessions/search`, and
+ * `GET|POST /api/sessions/:id/compaction`. The per-agent SOUL.md /
  * MEMORY.md editors stay in the Agents tab (different store — agent-scoped).
  * NOT ported: nothing — the concept has no memory pane, so there is no
- * mock to drop; the 2-tier compression view lands in wave 3.
+ * mock to drop.
  */
-export function MemoryPane() {
+export function MemoryPane({ onOpenSession }: { onOpenSession?: (id: string) => void }) {
   const [target, setTarget] = React.useState<MemoryTarget>('memory');
   const [data, setData] = React.useState<MemoryUsageRes | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
@@ -347,6 +349,7 @@ export function MemoryPane() {
           <p className="text-[11px] text-muted-foreground">
             Per-agent SOUL.md / MEMORY.md files live in the Agents tab — this store is the global cross-session memory.
           </p>
+          <TranscriptTools onOpenSession={onOpenSession} />
         </>
       )}
     </div>

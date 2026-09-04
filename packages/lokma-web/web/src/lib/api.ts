@@ -239,6 +239,17 @@ export type CompactionRunRes = {
   anchors: CompactionAnchor[];
   summary: string | null;
 };
+export type SessionSearchHit = {
+  sessionId: string;
+  title: string;
+  role: string;
+  toolName?: string;
+  index: number;
+  excerpt: string;
+  timestamp: string;
+  score: number;
+};
+export type SessionSearchRes = { hits: SessionSearchHit[]; count: number; engine: 'fts5' | 'substring' };
 export type SlashCommandInfo = { id: string; name: string; hint: string; usage: string };
 export type CommandsRes = { commands: SlashCommandInfo[]; count: number };
 export type AgentInfo = { id: string; [k: string]: unknown };
@@ -967,6 +978,14 @@ export const api = {
         : `/api/sessions/${encodeURIComponent(id)}/compaction`,
       body?.mode ? { mode: body.mode } : {},
     ),
+  // Transcript search — FTS5 over one project's session transcripts (wave 3b,
+  // Docs/28 session_search). The `engine` field says which backend answered.
+  searchSessions: (q: string, opts?: { limit?: number; cwd?: string }) => {
+    const params = new URLSearchParams({ q });
+    if (opts?.limit !== undefined) params.set('limit', String(opts.limit));
+    if (opts?.cwd) params.set('cwd', opts.cwd);
+    return get<SessionSearchRes>(`/api/sessions/search?${params.toString()}`);
+  },
 
   // Slash commands — server-owned registry behind the Composer `/` palette.
   listCommands: () => get<CommandsRes>('/api/commands'),

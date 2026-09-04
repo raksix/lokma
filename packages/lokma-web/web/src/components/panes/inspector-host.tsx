@@ -65,7 +65,7 @@ export function InspectorHost({
   if (tab === 'plugins') return <PluginsPane />;
   if (tab === 'observability') return <ObservabilityPane />;
   if (tab === 'cron') return <CronApprovalsPane />;
-  if (tab === 'memory') return <MemoryPane />;
+  if (tab === 'memory') return <MemoryPane onOpenSession={onOpenSession} />;
   if (tab === 'extras') {
     return <ExtrasPane onOpenTab={(t: ExtrasTabId) => onOpenInspectorTab(t)} />;
   }

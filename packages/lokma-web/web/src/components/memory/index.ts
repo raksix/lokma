@@ -2,6 +2,7 @@
  * Memory barrel — single import point for the wave 2 Memory tab.
  */
 export { MemoryPane } from './memory-pane';
+export { TranscriptTools } from './transcript-tools';
 export {
   charsLeft,
   entryChars,

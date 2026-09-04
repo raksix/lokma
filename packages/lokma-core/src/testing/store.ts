@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, readdir, readFile, stat } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ensureDir, expandHome, writeAtomic } from '../utils/fs.js';
 import {
@@ -357,4 +357,18 @@ export async function readJunit(idRaw: unknown): Promise<{ filename: string; xml
   } catch {
     throw new TestError('test_not_found', `no test run: ${id}`, 404);
   }
+}
+
+/**
+ * Delete a run — removes its whole on-disk dir (`plan.json` +
+ * `report.json` + `junit.xml`). Unknown ids 404 via `readReport`
+ * before anything is touched; bad shapes 400 via `assertRunId`.
+ * The id is validated to a single path segment so `rm` can never
+ * escape the test-runs root.
+ */
+export async function deleteRun(idRaw: unknown): Promise<{ id: string }> {
+  const id = assertRunId(idRaw);
+  await readReport(id); // 404 on unknown before touching disk.
+  await rm(dirOf(id), { recursive: true, force: true });
+  return { id };
 }

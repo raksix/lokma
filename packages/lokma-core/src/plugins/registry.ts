@@ -111,6 +111,7 @@ const BUNDLED_PLUGINS: BundledDef[] = [
       'GET /api/tests/list',
       'GET /api/tests/:id',
       'GET /api/tests/:id/junit',
+      'DELETE /api/tests/:id',
     ],
   },
   {

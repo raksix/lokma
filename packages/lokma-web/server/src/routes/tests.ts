@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import {
   TestError,
+  deleteRun,
   getRun,
   listRuns,
   readJunit,
@@ -15,7 +16,9 @@ import {
  * stub; plus a Shannon secret scan over the plan + response bodies);
  * `GET /api/tests/list` (newest first, concept Runs parity);
  * `GET /api/tests/:id` (stored plan input + classified report);
- * `GET /api/tests/:id/junit` (Report-stage `junit.xml` download).
+ * `GET /api/tests/:id/junit` (Report-stage `junit.xml` download);
+ * `DELETE /api/tests/:id` (removes the whole on-disk dir — unknown 404,
+ * bad shapes 400).
  * Storage `~/.lokma/test-runs/<id>/` (`plan.json` + `report.json` +
  * `junit.xml`) — the same store the CLI will use. No Playwright/video here
  * (no headless browser dep) — the pane says so in its footer instead of
@@ -72,6 +75,17 @@ export async function testsRoutes(app: FastifyInstance): Promise<void> {
         .header('Content-Type', 'application/xml; charset=utf-8')
         .header('Content-Disposition', `attachment; filename="${filename}"`)
         .send(xml);
+    } catch (e) {
+      if (e instanceof TestError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      throw e;
+    }
+  });
+
+  app.delete('/api/tests/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    try {
+      const { id: deleted } = await deleteRun(id);
+      return { ok: true, id: deleted };
     } catch (e) {
       if (e instanceof TestError) return reply.status(e.status).send({ code: e.code, message: e.message });
       throw e;

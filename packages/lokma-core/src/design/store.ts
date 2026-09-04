@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, stat } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { ensureDir, expandHome, writeAtomic } from '../utils/fs.js';
 import { buildArtifactHtml } from './render.js';
@@ -276,6 +276,20 @@ export async function getArtifact(idRaw: unknown): Promise<DesignDetail> {
   const html = await readHtmlFile(id);
   const critique = await readCritiqueFile(id);
   return { id, manifest, html, critique };
+}
+
+/**
+ * Delete an artifact — removes its whole on-disk dir (`artifact.json` +
+ * `artifact.html` + `design.md` + `critique.json`). Unknown ids 404 via
+ * `readManifest` before anything is touched; bad shapes 400 via
+ * `assertArtifactId`. The id is validated to a single path segment so
+ * `rm` can never escape the design root.
+ */
+export async function deleteArtifact(idRaw: unknown): Promise<{ id: string }> {
+  const id = assertArtifactId(idRaw);
+  await readManifest(id); // 404 on unknown before touching disk.
+  await rm(dirOf(id), { recursive: true, force: true });
+  return { id };
 }
 
 /** Re-run the 5D critique over the stored HTML (persists the result). */

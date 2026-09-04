@@ -3,6 +3,7 @@ import {
   DESIGN_SYSTEM_META,
   DesignError,
   critiqueArtifact,
+  deleteArtifact,
   exportArtifact,
   generateArtifact,
   getArtifact,
@@ -20,6 +21,8 @@ import {
  * `GET /api/design/guard?cwd=` (real `.lokma/DESIGN.md` parse, always 200);
  * `GET /api/design/:id` (manifest + HTML + last critique);
  * `PUT /api/design/:id { html }` (pane Code tab — validates, re-critiques);
+ * `DELETE /api/design/:id` (removes the whole on-disk dir — unknown 404,
+ * bad shape 400);
  * `POST /api/design/:id/critique` (re-runs the 5D heuristic, always 200);
  * `GET /api/design/:id/export?format=html|zip|json` (real file downloads —
  * pdf/pptx/mp4 need a binary toolchain and answer 400 `needs_toolchain`,
@@ -88,6 +91,17 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     try {
       return { ok: true, ...(await critiqueArtifact(id)) };
+    } catch (e) {
+      if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      throw e;
+    }
+  });
+
+  app.delete('/api/design/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    try {
+      const { id: deleted } = await deleteArtifact(id);
+      return { ok: true, id: deleted };
     } catch (e) {
       if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
       throw e;

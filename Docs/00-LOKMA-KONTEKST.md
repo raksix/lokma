@@ -591,14 +591,22 @@
 - **Dürüst kapsam:** Memory pane yok (REST + per-agent editörler) — UI tab wave 2; 2-tier compression wave 3.
 - **Sıradaki parça:** Phase 2 memory-deep wave 2 (Memory UI) veya wave 3 (2-tier compression).
 
+### 2026-09-04 — Phase 2 memory-deep wave 2: Memory UI tab DONE (web 7d0841a)
+- **Executor run:** global MEMORY.md/USER.md store artık harness'te düzenlenebilir — 23. Inspector sekmesi (Brain ikonu) + tiling-bar girdisi + workspace tab-picker desteği (hepsi `INSPECTOR_TABS`'tan dinamik).
+- **Web:** `components/memory/` (saf helper'lar + `memory.test.ts` 39/39 + `memory-pane.tsx`: MEMORY.md/USER.md toggle, canlı usage meter, etiketli arama + ekleme formu, satır-içi replace editörü + iki-tıklı delete, hata kodlarına tamir ipucu; mutasyonlar server yanıtını direkt uygular) + barrel; `inspector-panel.tsx` + `inspector-host.tsx` + `panes.ts` (registry 23 + tiling 20) + `tiling-bar.tsx` + `panes.test.ts` (67 check).
+- **Gates:** root tsc 0 · web build green (770k JS) · full web suite 32/32 · mock grep temiz · canlı `/api/memory` 200 (2 gerçek entry).
+- **Dürüst kapsam:** per-agent SOUL.md/MEMORY.md Agents sekmesinde kalır (farklı store); 2-tier compression wave 3.
+- **Deploy:** web-only — dist + `pm2 restart lokma-web` → creds'le 200 taze `index-kdl-Fl94.js` (Memory pane'i içeriyor), creds'siz 401, `/health` 200; script path bun (stale-stack PASS); iki süreç online.
+- **Sıradaki parça:** Phase 2 memory-deep wave 3 (2-tier compression).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-04 (Phase 2 memory-deep wave 1: memory REST API DONE — core bfad761 + server ba8dc13 + web 22ec296)
-- **Son işlem:** `GET/POST/PATCH/DELETE /api/memory` canlı (kodlu hatalar + canlı usage + exact-dup idempotent). Core probu 34/34 + route probu 20/20 + web suite 31/31.
+- **Son güncelleme:** 2026-09-04 (Phase 2 memory-deep wave 2: Memory UI tab DONE — web 7d0841a)
+- **Son işlem:** Memory sekmesi canlı (23. Inspector sekmesi, MEMORY.md/USER.md toggle + usage meter + arama + ekle/düzenle/sil). Prob 39/39 + panes 67 + web suite 32/32.
 
 ## Sıradaki adım (Phase 1/2/3 follow-up'ları)
 - **Sıradaki adım:**
   1. Phase 1: ~~`DELETE` endpoint'leri (bots ✅ 4a51723/cdd00b0 · archify ✅ 93d2e58/1fe2b6d · design ✅ 9a61b52/f6f9b1f · tests ✅ 1fbd616/1ba81d9 · vault ✅ 7cfdbe6/b0b5d9d — SERİ TAMAMLANDI)~~ + ~~cron firing daemon ✅ 9c879d3/6e4a584 (30s ticker + Run-now + `lastRunAt` + run history — WAVE 1 TAMAMLANDI)~~ + ~~gerçek provider streaming ✅ 98534e9/be7adb7 (mock echo öldü, key/baseUrl çözümleme + gerçek abort — WAVE 1 TAMAMLANDI)~~ + ~~core tool foundation ✅ 1f95d06 (gate + 5 builtin + executor + 46/46 probe — WAVE 2a TAMAMLANDI)~~ + ~~WS tool/permission/ask frame'leri ✅ aaf9b7b/75efc63 (agent döngüsü canlı: `<tool>`/`<ask>` blokları + pending-gate resume + loop probu 27/27 + WS e2e 12/12 — WAVE 2b TAMAMLANDI)~~ (Phase 1 core-loop TAMAMLANDI)
-  2. Phase 2: ~~FTS5 vault araması ✅ 03b3e8f/95d6ed2/5543f20 (SQLite FTS5 + BM25 + snippet + `/api/vault/search` + SearchModal — TAMAMLANDI)~~ + ~~3D vault grafiği ✅ 2d4ad5f (bağımlılıksız canvas star-map, aynı canlı veri, sürükle-döndür + zoom + auto-rotate — TAMAMLANDI)~~ + ~~remote plugin marketplace ✅ 0850343/563ab98/78e59e6 (canlı GitHub topic araması + Marketplace sekmesi + Install wiring — TAMAMLANDI)~~ + memory deep wave 1 ✅ bfad761/ba8dc13/22ec296 (`GET/POST/PATCH/DELETE /api/memory` + MemoryError + usage — TAMAMLANDI) + memory deep wave 2 (Memory UI) + wave 3 (2-tier compression)
+  2. Phase 2: ~~FTS5 vault araması ✅ 03b3e8f/95d6ed2/5543f20 (SQLite FTS5 + BM25 + snippet + `/api/vault/search` + SearchModal — TAMAMLANDI)~~ + ~~3D vault grafiği ✅ 2d4ad5f (bağımlılıksız canvas star-map, aynı canlı veri, sürükle-döndür + zoom + auto-rotate — TAMAMLANDI)~~ + ~~remote plugin marketplace ✅ 0850343/563ab98/78e59e6 (canlı GitHub topic araması + Marketplace sekmesi + Install wiring — TAMAMLANDI)~~ + memory deep wave 1 ✅ bfad761/ba8dc13/22ec296 (`GET/POST/PATCH/DELETE /api/memory` + MemoryError + usage — TAMAMLANDI) + memory deep wave 2 ✅ 7d0841a (Memory UI sekmesi: toggle + usage meter + CRUD — TAMAMLANDI) + wave 3 (2-tier compression)
   3. Phase 3: PNG/WebM export'ları (archify/design) + themes + sharing + cloud + mobile + perf + a11y
 
 ---

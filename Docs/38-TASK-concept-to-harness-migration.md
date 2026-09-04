@@ -2185,6 +2185,38 @@ survives; never delete both at once). If even that serves stale code, escalate i
     is wave 3; Honcho stays pluggable-later per Docs/28.
   - Next piece: Phase 2 memory-deep wave 2 (Memory UI tab) or wave 3
     (2-tier compression) — runner picks one.
+- 2026-09-04 — Phase 2 memory-deep wave 2: Memory UI tab DONE
+  (web 7d0841a, pushed; server untouched — `GET/POST/PATCH/DELETE`
+  `/api/memory` already live from wave 1).
+  - **Executor run:** the global §-delimited MEMORY.md/USER.md store is now
+    editable in the harness — 23rd Inspector tab (Brain icon) + tiling-bar
+    entry + workspace tab-picker support (all dynamic off `INSPECTOR_TABS`).
+  - **Web:** `components/memory/` (`memory.ts` pure helpers: target
+    labels/hints, clamped usage ratio + 70/90 tone bands, entry filter,
+    add/replace validation mirroring the server 400s, per-code human hints
+    for all six `MemoryError` codes, chars-left + `memory.test.ts` 39/39 +
+    `memory-pane.tsx`: MEMORY.md/USER.md toggle, live usage meter
+    (progressbar + `chars/limit · left` + server `usage` string), labeled
+    search + add form (Enter submits), per-row inline replace editor +
+    two-click destructive delete, server errors shown with repair hints;
+    mutations apply the server response directly, no refetch) + barrel;
+    `inspector-panel.tsx` (Memory button + branch + doc comment),
+    `inspector-host.tsx` (tiling branch), `panes.ts` (registry 23 +
+    tiling 20), `tiling-bar.tsx` (Brain icon), `panes.test.ts` (23/20 +
+    memory presence, 67 checks).
+  - **Gates:** root `tsc --noEmit` 0 · web build green (770k JS) · memory
+    probe 39/39 · panes probe 67 checks · full web suite 32/32 exit 0 ·
+    mock grep on touched files clean (anti-mock comments + labeled input
+    `placeholder=` attrs only, legit) · live `/api/memory?target=memory`
+    200 with 2 real entries.
+  - **Honest scope:** per-agent SOUL.md/MEMORY.md stay in the Agents tab
+    (different store — pane footer says so); 2-tier compression
+    (85%/50% + 4-phase compaction + anchor index) is wave 3.
+  - **Deploy:** web-only — dist + `pm2 restart lokma-web` → `/` creds 200
+    fresh `index-kdl-Fl94.js` (contains the Memory pane), nocreds 401,
+    `/health` 200; `pm2 show lokma-web` script path is bun (stale-stack
+    PASS); both procs online.
+  - Next piece: Phase 2 memory-deep wave 3 (2-tier compression).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

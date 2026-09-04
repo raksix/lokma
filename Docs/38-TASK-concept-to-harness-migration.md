@@ -2112,6 +2112,45 @@ survives; never delete both at once). If even that serves stale code, escalate i
     physics (positions are deterministic, rotation is the only motion);
     touch drag not wired (mouse events only — mobile wave).
   - Next piece: Phase 2 remote plugin marketplace wiring.
+- 2026-09-04 — Phase 2 remote plugin marketplace wiring DONE
+  (core 0850343 + server 563ab98 + web 78e59e6, all pushed).
+  - **Executor run:** the Installed/Suspended pane grew a third live tab —
+    Marketplace, backed by the real GitHub `lokma-plugin` topic search
+    (Docs/23 §9; the `plugins.lokma.sh` registry does not exist yet, so
+    the topic is the live remote). Orphan sibling WIP (shared schema +
+    core `marketplace.ts` + index export) adopted as this run's single
+    piece: reviewed fresh, 1 REAL bug fixed (`parseMarketplaceRepo(null)`
+    threw instead of returning null — fail-open null-guard added, the
+    probe caught it), 1 probe-only fix (`+`-encoded spaces in the query
+    assertion), all gates re-run, three atomic commits.
+  - **Core:** `plugins/marketplace.ts` (`MARKETPLACE_TOPIC`, fixed
+    `api.github.com` host, 10s timeout, 10-result cap, optional
+    `GITHUB_TOKEN`, `normalizeMarketplaceQuery`/`buildMarketplaceQuery`/
+    `parseMarketplaceRepo`/`parseMarketplaceResponse`/`searchMarketplace`
+    with `marketplace_unavailable` 503 on network/rate-limit/bad-JSON) +
+    `marketplace.test.ts` 32/32 (pure + stubbed-fetch + best-effort live
+    hit: GitHub reachable, 0 repos carry the topic yet — honest empty
+    state). Shared `MarketplaceItemSchema` (`repo/name/author/description/
+    stars/updatedAt/url`, `url` feeds `POST /install` directly).
+  - **Server:** `GET /api/plugins/marketplace?q=` (static before `:id`,
+    guard hook already skips `/api/plugins/*`; `{items,count,source}`,
+    `MarketplaceError` → `{code,message}`) · live in-process probe 13/13
+    (stubbed mapping/q-forwarding/403→503/network→503, static-wins-over-
+    `:id`, sibling detail still 200, live GitHub via route 200 count=0).
+  - **Web:** `api.searchMarketplace()` + `MarketplaceItem/Res` types +
+    `formatStars`/`isMarketplaceInstalled` helpers + Marketplace tab
+    (first-open browses the whole topic, search + Retry, per-row stars +
+    Repo link + Install → same `POST /install`, already-installed rows
+    show disabled Installed) + plugins probe 42/42 (was 32).
+  - **Gates:** root `tsc --noEmit` 0 · shared+core+server dist clean · web
+    build green · full web suite 31/31 exit 0 · mock grep clean (labeled
+    input `placeholder=` attrs only, legit) · real `~/.lokma` untouched.
+  - **Honest scope:** topic is empty today, so the tab shows the honest
+    zero-state (publish a repo with the topic to list it); no version
+    compatibility check on Install (record ships 0.0.0 suspended, same as
+    Add-from-URL); rate-limit surfaces as a 503 with a retry hint
+    (`GITHUB_TOKEN` raises the quota).
+  - Next piece: Phase 2 memory deep (2-tier compression).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

@@ -573,14 +573,23 @@
   - **Dürüst kapsam:** canvas 2D (WebGL değil), force fiziği yok (konumlar deterministik, tek hareket rotasyon), touch-drag yok (mobile dalgası).
 - **Sıradaki parça:** Phase 2 remote plugin marketplace wiring.
 
+### 2026-09-04 — Phase 2 remote plugin marketplace wiring DONE (core 0850343 + server 563ab98 + web 78e59e6)
+- **Executor run:** Plugins pane'inde üçüncü canlı sekme — Marketplace, gerçek GitHub `lokma-plugin` topic araması üstünde (Docs/23 §9). Yetim sibling WIP'i bu run'ın tek parçası olarak devralındı: taze incelendi, 1 GERÇEK bug düzeltildi (`parseMarketplaceRepo(null)` fırlatıyordu → fail-open null-guard, probe yakaladı), tüm kapılar yeniden koşuldu, üç atomik commit.
+  - **Core:** `plugins/marketplace.ts` (sabit `api.github.com` host, 10s timeout, 10 sonuç cap, opsiyonel `GITHUB_TOKEN`, 503 `marketplace_unavailable`) + `marketplace.test.ts` 32/32 (canlı GitHub erişilebilir, topic'te 0 repo — dürüst boş durum). Shared `MarketplaceItemSchema` (`url` doğrudan `POST /install`'a gider).
+  - **Server:** `GET /api/plugins/marketplace?q=` (`{items,count,source}`) · canlı in-process prob 13/13 (stubbed eşleme + 403/network → 503 + static-`:id` önceliği + canlı GitHub 200 count=0).
+  - **Web:** `api.searchMarketplace()` + `formatStars`/`isMarketplaceInstalled` + Marketplace sekmesi (ilk açılışta tüm topic, arama + Retry, satırda yıldız + Repo linki + Install → aynı `POST /install`, kurulu satırlar disabled Installed) + plugins probu 42/42.
+- **Gates:** root tsc 0 · dist'ler clean · web build green · full suite 31/31 · mock grep temiz · gerçek `~/.lokma`'ya dokunulmadı.
+- **Dürüst kapsam:** topic bugün boş → sekme dürüst zero-state gösteriyor; Install'da versiyon uyumluluk kontrolü yok (0.0.0 suspended kayıt, Add-from-URL ile aynı); rate-limit 503 + retry ipucu.
+- **Sıradaki parça:** Phase 2 memory deep (2-tier compression).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-04 (Phase 2 3D vault grafik toggle DONE — web 2d4ad5f)
-- **Son işlem:** Vault 2D/3D düğmesi artık aynı canlı veri üstünde gerçek 3D star-map açıyor — Fibonacci-küre yerleşim, sürükle-döndür + zoom + auto-rotate, tıklayınca notu açıyor. Vault probu 56/56 + full suite 31/31.
+- **Son güncelleme:** 2026-09-04 (Phase 2 remote plugin marketplace wiring DONE — core 0850343 + server 563ab98 + web 78e59e6)
+- **Son işlem:** Plugins sekmesinde üçüncü canlı sekme Marketplace — gerçek GitHub `lokma-plugin` topic araması, satırda yıldız + Repo linki + Install (aynı `POST /install`). Core probu 32/32 + route probu 13/13 + web suite 31/31.
 
 ## Sıradaki adım (Phase 1/2/3 follow-up'ları)
 - **Sıradaki adım:**
   1. Phase 1: ~~`DELETE` endpoint'leri (bots ✅ 4a51723/cdd00b0 · archify ✅ 93d2e58/1fe2b6d · design ✅ 9a61b52/f6f9b1f · tests ✅ 1fbd616/1ba81d9 · vault ✅ 7cfdbe6/b0b5d9d — SERİ TAMAMLANDI)~~ + ~~cron firing daemon ✅ 9c879d3/6e4a584 (30s ticker + Run-now + `lastRunAt` + run history — WAVE 1 TAMAMLANDI)~~ + ~~gerçek provider streaming ✅ 98534e9/be7adb7 (mock echo öldü, key/baseUrl çözümleme + gerçek abort — WAVE 1 TAMAMLANDI)~~ + ~~core tool foundation ✅ 1f95d06 (gate + 5 builtin + executor + 46/46 probe — WAVE 2a TAMAMLANDI)~~ + ~~WS tool/permission/ask frame'leri ✅ aaf9b7b/75efc63 (agent döngüsü canlı: `<tool>`/`<ask>` blokları + pending-gate resume + loop probu 27/27 + WS e2e 12/12 — WAVE 2b TAMAMLANDI)~~ (Phase 1 core-loop TAMAMLANDI)
-  2. Phase 2: ~~FTS5 vault araması ✅ 03b3e8f/95d6ed2/5543f20 (SQLite FTS5 + BM25 + snippet + `/api/vault/search` + SearchModal — TAMAMLANDI)~~ + ~~3D vault grafiği ✅ 2d4ad5f (bağımlılıksız canvas star-map, aynı canlı veri, sürükle-döndür + zoom + auto-rotate — TAMAMLANDI)~~ + remote plugin marketplace + memory deep
+  2. Phase 2: ~~FTS5 vault araması ✅ 03b3e8f/95d6ed2/5543f20 (SQLite FTS5 + BM25 + snippet + `/api/vault/search` + SearchModal — TAMAMLANDI)~~ + ~~3D vault grafiği ✅ 2d4ad5f (bağımlılıksız canvas star-map, aynı canlı veri, sürükle-döndür + zoom + auto-rotate — TAMAMLANDI)~~ + ~~remote plugin marketplace ✅ 0850343/563ab98/78e59e6 (canlı GitHub topic araması + Marketplace sekmesi + Install wiring — TAMAMLANDI)~~ + memory deep
   3. Phase 3: PNG/WebM export'ları (archify/design) + themes + sharing + cloud + mobile + perf + a11y
 
 ---

@@ -70,7 +70,8 @@ function dirOf(id: string): string {
   return join(archifyRoot(), id);
 }
 
-async function readStoredIr(id: string): Promise<ArchifyIR> {
+/** Read + validate a stored IR (404 on unknown or corrupt). Exported for the PNG raster path. */
+export async function readStoredIr(id: string): Promise<ArchifyIR> {
   let raw: string;
   try {
     raw = await readFile(join(dirOf(id), 'ir.json'), 'utf-8');

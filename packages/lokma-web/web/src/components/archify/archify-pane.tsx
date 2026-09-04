@@ -42,9 +42,9 @@ import {
  * delta compares two real diagrams, exports download real files.
  * NOT ported: the concept's hardcoded ITEMS rows + mock IR preview, the
  * toast-only Validate/Build/Guide/Delta/Card/Export buttons, the mock
- * receipt table (the real 5-gate receipt renders instead), and WebM
- * export (it needs a video toolchain — a follow-up; the pane only offers
- * the formats the server actually serves, so there are no dead buttons).
+ * receipt table (the real 5-gate receipt renders instead); exports download
+ * real files (SVG/HTML/IR/card/PNG/WebM — the pane only offers what the
+ * server actually serves, so there are no dead buttons).
  * Delete removes the real dir (`DELETE /api/archify/:id`, two-click arm).
  */
 
@@ -735,6 +735,7 @@ export function ArchifyPane() {
                         { fmt: 'json' as const, desc: 'typed IR' },
                         { fmt: 'card' as const, desc: '1200×630 OG' },
                         { fmt: 'png' as const, desc: 'raster via Chromium' },
+                        { fmt: 'webm' as const, desc: '2s zoom via ffmpeg' },
                       ].map((x) => (
                         <Button
                           key={x.fmt}
@@ -777,7 +778,7 @@ export function ArchifyPane() {
                       <span>rasterizes the SVG with headless Chromium</span>
                     </div>
                     <div className="text-[11px] text-zinc-500">
-                      WebM needs a video toolchain — follow-up, not offered as a dead button.
+                      WebM is a 2s slow-zoom (12 frames at 6fps) — needs Chromium + ffmpeg on the server.
                     </div>
                   </div>
                 )}

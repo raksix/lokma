@@ -13,7 +13,7 @@ export type ArchifyTypeFilter = (typeof ARCHIFY_TYPES)[number] | 'all';
 
 export const ARCHIFY_PRESETS = ['signal-flow', 'blueprint', 'classic', 'minimal'] as const;
 
-export const ARCHIFY_EXPORTS = ['svg', 'html', 'json', 'card', 'png'] as const;
+export const ARCHIFY_EXPORTS = ['svg', 'html', 'json', 'card', 'png', 'webm'] as const;
 export type ArchifyExportFormat = (typeof ARCHIFY_EXPORTS)[number];
 
 export type NormalizedDiagram = {

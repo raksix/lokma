@@ -504,7 +504,7 @@ export type SaveDiagramRes = { ok: boolean; id: string; receipt: ArchifyReceiptR
 export type DiagramDiff = { added: string[]; removed: string[]; changed: string[]; rerouted: string[] };
 export type DiagramDeltaRes = { ok: boolean; diff: DiagramDiff; deltaHtml: string };
 export type ArchifyGuideRes = { ok: boolean; id: string; starter: string };
-export type ArchifyExportFormat = 'svg' | 'html' | 'json' | 'card' | 'png';
+export type ArchifyExportFormat = 'svg' | 'html' | 'json' | 'card' | 'png' | 'webm';
 
 // ─── Design Studio (6 artifact types over bundled systems + DESIGN.md guard, W5-18) ───
 

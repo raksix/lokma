@@ -529,13 +529,21 @@
   - **Gates:** root tsc 0 · core dist emit + server `tsc -p` clean + server dist rebuild · web build green (1711 modül, 749k JS) · testing helpers 35/35 + plugins 32/32 + full web suite exit 0 · live prob 15/15 (run A+B → DELETE A → dizin gitti → GET 404 → re-delete 404 → liste 1 → sibling junit/get 200 → evil 400 → unknown 404 → registry 5) · mock grep temiz (anti-mock yorumlar + etiketli input `placeholder`'ları, legit) · gerçek `~/.lokma`'ya dokunulmadı.
 - **Sıradaki parça:** vault ingest undo (kalan DELETE: vault).
 
+### 2026-09-04 — Phase 1 DELETE 5/5: `DELETE /api/vault/note` DONE (server 7cfdbe6 + web b0b5d9d — DELETE SERİSİ TAMAMLANDI)
+- **Executor run:** Phase 1 DELETE serisinin beşinci ve SON parçası (ingest undo — orphan `deleteNote()` WIP'i bu run'ın tek parçası olarak devralındı: taze incelendi, `readNote` guard'larıyla 1:1 mirror doğrulandı).
+  - **Server:** core `deleteNote()` (`bad_path` boşta + `not_a_note` non-`.md`'de + `resolveInVault` jail + disk'e dokunmadan önce `stat` 404, sonra tek-dosya `unlink` — dizin değil dosya siler, vault dışına kaçamaz) + `DELETE /api/vault/note?path=` (`{ok,path}`, `GET /api/vault/note?path=` ile aynı query şekli); plugin registry vault 4→5 endpoint (footer 45; web `plugins.ts` footer yorum 44→45).
+  - **Web:** `api.deleteVaultNote()` + açık not okuyucunun header'ında Delete butonu (two-click arm, Trash2 lucide, confirm'de destructive; not açma/kapamada arm sıfırlanır, başarıda okuyucu kapanır + seçim temizlenir + graf yeniden yüklenir).
+  - **Gates:** root tsc 0 · core dist emit + server `tsc -p` clean + server dist rebuild · web build green (750k JS) · vault helpers 40/40 + full web suite 31/31 exit 0 · live prob 16/16 (ingest A+B → DELETE A → dosya gitti → GET 404 → re-delete 404 → graf 1 → sibling 200 → bad_path/non-md/escape 400'leri → registry 5 → cleanup → graf boş) · mock grep temiz (etiketli input `placeholder`'ları + concept-parity yorumu, legit) · gerçek `~/.lokma`'ya dokunulmadı.
+- **Phase 1 DELETE SERİSİ TAMAMLANDI** (bots, archify, design, tests, vault — her POST kaynağının DELETE'i var).
+- **Sıradaki parça:** Phase 1 core loop + agent runner daemon (cron firing, `lastRunAt` canlanması).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-04 (Phase 1 DELETE 4/5: `DELETE /api/tests/:id` DONE — server 1fbd616 + web 1ba81d9)
-- **Son işlem:** Phase 1 DELETE serisinin dördüncü parçası canlı — Testing Lab'de expanded report'ta gerçek Delete butonu (two-click confirm), server'da `deleteRun()` + `DELETE /api/tests/:id`; registry 5 endpoint; live prob 15/15; kalan DELETE: vault.
+- **Son güncelleme:** 2026-09-04 (Phase 1 DELETE 5/5: `DELETE /api/vault/note` DONE — server 7cfdbe6 + web b0b5d9d — DELETE SERİSİ TAMAMLANDI)
+- **Son işlem:** Phase 1 DELETE serisinin son parçası canlı — Vault'ta açık not okuyucuda gerçek Delete butonu (two-click confirm), server'da `deleteNote()` + `DELETE /api/vault/note?path=`; registry 5 endpoint; live prob 16/16. Her POST kaynağının DELETE'i var (bots, archify, design, tests, vault).
 
 ## Sıradaki adım (Phase 1/2/3 follow-up'ları)
 - **Sıradaki adım:**
-  1. Phase 1: core loop + agent runner daemon (cron firing, `lastRunAt` canlanması) + `DELETE` endpoint'leri (~~bots ✅ 4a51723/cdd00b0~~ · ~~archify ✅ 93d2e58/1fe2b6d~~ · ~~design ✅ 9a61b52/f6f9b1f~~ · ~~tests ✅ 1fbd616/1ba81d9~~ → sıradaki: vault ingest undo — run başına TEK parça)
+  1. Phase 1: core loop + agent runner daemon (cron firing, `lastRunAt` canlanması) + ~~`DELETE` endpoint'leri (bots ✅ 4a51723/cdd00b0 · archify ✅ 93d2e58/1fe2b6d · design ✅ 9a61b52/f6f9b1f · tests ✅ 1fbd616/1ba81d9 · vault ✅ 7cfdbe6/b0b5d9d — SERİ TAMAMLANDI)~~ — run başına TEK parça)
   2. Phase 2: FTS5 vault araması + 3D vault grafiği + remote plugin marketplace + memory deep
   3. Phase 3: PNG/WebM export'ları (archify/design) + themes + sharing + cloud + mobile + perf + a11y
 

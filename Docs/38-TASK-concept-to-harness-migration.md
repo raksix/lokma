@@ -1857,6 +1857,42 @@ survives; never delete both at once). If even that serves stale code, escalate i
     (no cross-run refs to repair).
   - Remaining DELETE pieces: vault ingest (1 POST).
     Next piece: vault ingest undo (DELETE for ingested notes).
+- 2026-09-04 — Phase 1 DELETE endpoints, piece 5/5: `DELETE /api/vault/note` DONE
+  (server 7cfdbe6 + web b0b5d9d, both pushed).
+  - **Executor run:** fifth and FINAL DELETE in the Phase 1 "DELETE for every
+    POST resource" series (ingest undo). Core `deleteNote()`
+    (`vault/vault.ts`: `bad_path` on empty, `not_a_note` on non-`.md`,
+    `resolveInVault` jail, `stat` 404 on unknown before touching disk, then
+    single-file `unlink` — sibling/orphan WIP adopted as this run's piece:
+    re-read fresh, mirrors `readNote` guards 1:1, one DRY check done) +
+    `DELETE /api/vault/note?path=` (`routes/vault.ts`, `{ ok, path }`, same
+    `VaultError` mapping as the sibling routes; query-param shape matches
+    `GET /api/vault/note?path=`). Plugin registry `@lokma/plugin-vault`
+    endpoints 4→5 (web `plugins.ts` footer example comment 44→45). Web:
+    `api.deleteVaultNote()` + two-click Delete (Trash2 lucide, destructive
+    on arm) in the open note reader header (arm resets on note open/close;
+    success closes the reader, clears selection, reloads the graph).
+  - **Gates:** root `tsc --noEmit` 0 · core dist emit + server `tsc -p`
+    clean + server dist rebuild (server reads core AND routes from dist) ·
+    web build green (750k JS/gzip 197k) · vault helpers probe 40/40 +
+    plugins 32/32 + full web suite 31/31 exit 0 · live probe
+    (in-process createApp + inject, startup-env temp HOME + refuse-guard)
+    16/16: empty graph → ingest A+B → file on disk → DELETE A `{ok,path}`
+    → file gone → GET-after-delete 404 `note_not_found` → re-delete 404 →
+    graph count 1 (only B) → sibling note 200 → missing-path 400
+    `bad_path` → non-md 400 `not_a_note` → escape 400 → registry vault 5
+    incl. DELETE → DELETE B cleanup → graph empty again → real `~/.lokma`
+    untouched (probe files only in temp HOME) · mock grep clean (labelled
+    input `placeholder` attrs + concept-parity comment, legit).
+  - **Honest scope:** no per-note ownership (all notes deletable — no
+    `deleteBlockReason` helper needed, same as archify/design/tests; the
+    existing 40 helper checks pin the contracts and the live probe pins
+    the endpoint); deleting a note drops its wikilink edges with it
+    (graph rebuilds from disk, no cross-note refs to repair).
+  - **Phase 1 DELETE series COMPLETE** (bots, archify, design, tests,
+    vault — every POST resource now has its DELETE).
+    Next piece: Phase 1 core loop + agent runner daemon (cron firing,
+    `lastRunAt` coming alive).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

@@ -549,7 +549,7 @@ export type DesignGuard = {
   message: string;
 };
 export type DesignGuardRes = { ok: boolean; guard: DesignGuard };
-export type DesignExportFormat = 'html' | 'zip' | 'json';
+export type DesignExportFormat = 'html' | 'zip' | 'json' | 'png';
 
 // ─── Testing Lab (Plan→Run→Classify→Report over live handlers, W5-19) ───
 
@@ -1236,9 +1236,11 @@ export const api = {
   downloadDesignExport: async (
     id: string,
     format: DesignExportFormat,
+    scale?: 1 | 2,
   ): Promise<{ filename: string; blob: Blob }> => {
     const fallback = `${id}.${format}`;
-    const res = await authedFetch(`/api/design/${encodeURIComponent(id)}/export?format=${format}`);
+    const suffix = format === 'png' && scale !== undefined ? `&scale=${scale}` : '';
+    const res = await authedFetch(`/api/design/${encodeURIComponent(id)}/export?format=${format}${suffix}`);
     const blob = await res.blob();
     const disposition = res.headers.get('Content-Disposition') ?? '';
     const match = disposition.match(/filename="([^"]+)"/);

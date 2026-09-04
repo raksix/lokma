@@ -43,7 +43,7 @@ const rows: NormalizedArtifact[] = [
 {
   check('6 types', DESIGN_TYPES.length === 6 && (DESIGN_TYPES as readonly string[]).includes('hyperframe'));
   check('4 systems', DESIGN_SYSTEMS.length === 4 && (DESIGN_SYSTEMS as readonly string[]).includes('stripe-linear'));
-  check('3 exports', DESIGN_EXPORTS.length === 3 && (DESIGN_EXPORTS as readonly string[]).includes('zip'));
+  check('4 exports', DESIGN_EXPORTS.length === 4 && (DESIGN_EXPORTS as readonly string[]).includes('png'));
 }
 
 // validateGenerateForm — mirrors the server generate rules.

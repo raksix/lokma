@@ -13,7 +13,7 @@ export type DesignTypeFilter = (typeof DESIGN_TYPES)[number] | 'all';
 
 export const DESIGN_SYSTEMS = ['stripe-linear', 'omp-dark', 'paper-ink', 'minimal-geo'] as const;
 
-export const DESIGN_EXPORTS = ['html', 'zip', 'json'] as const;
+export const DESIGN_EXPORTS = ['html', 'zip', 'json', 'png'] as const;
 export type DesignExportFormat = (typeof DESIGN_EXPORTS)[number];
 
 export type NormalizedArtifact = {

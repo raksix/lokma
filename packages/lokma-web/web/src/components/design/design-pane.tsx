@@ -108,6 +108,8 @@ export function DesignPane() {
   const [saving, setSaving] = React.useState(false);
   const [critiquing, setCritiquing] = React.useState(false);
   const [exporting, setExporting] = React.useState<string | null>(null);
+  // PNG raster scale (1x/2x) — passed as `?scale=` to the export endpoint.
+  const [pngScale, setPngScale] = React.useState<1 | 2>(2);
   // Two-click delete arm (archify-pane pattern) + in-flight flag.
   const [confirmDelete, setConfirmDelete] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
@@ -241,7 +243,11 @@ export function DesignPane() {
       if (!selected || exporting) return;
       setExporting(format);
       try {
-        const { filename, blob } = await api.downloadDesignExport(selected, format);
+        const { filename, blob } = await api.downloadDesignExport(
+          selected,
+          format,
+          format === 'png' ? pngScale : undefined,
+        );
         saveBlob(filename, blob);
         toast(`Exported ${filename}`);
       } catch (e) {
@@ -250,7 +256,7 @@ export function DesignPane() {
         setExporting(null);
       }
     },
-    [selected, exporting],
+    [selected, exporting, pngScale],
   );
 
   const runDelete = React.useCallback(async () => {
@@ -559,7 +565,7 @@ export function DesignPane() {
                 <div className="pt-1 space-y-1">
                   <div className="flex gap-1 flex-wrap items-center">
                     <span className="text-[11px] text-zinc-500">Export:</span>
-                    {(['html', 'zip', 'json'] as DesignExportFormat[]).map((f) => (
+                    {(['html', 'zip', 'json', 'png'] as DesignExportFormat[]).map((f) => (
                       <Button
                         key={f}
                         variant="ghost"
@@ -572,6 +578,22 @@ export function DesignPane() {
                         {exporting === f ? '…' : ''}
                       </Button>
                     ))}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+                    <label htmlFor="design-png-scale" className="font-medium">
+                      PNG scale
+                    </label>
+                    <select
+                      id="design-png-scale"
+                      value={pngScale}
+                      onChange={(e) => setPngScale(e.target.value === '1' ? 1 : 2)}
+                      disabled={exporting !== null}
+                      className={inputClass}
+                    >
+                      <option value={1}>1x</option>
+                      <option value={2}>2x</option>
+                    </select>
+                    <span>rasterizes the page with headless Chromium</span>
                   </div>
                   <p className="text-[10px] text-zinc-400">
                     PDF/PPTX/MP4 need a binary toolchain (headless Chromium / PptxGenJS / ffmpeg) — follow-up.

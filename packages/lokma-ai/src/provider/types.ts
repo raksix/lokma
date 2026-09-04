@@ -14,6 +14,18 @@ export type ProviderMessage = {
   toolCallId?: string;
 };
 
+/** Options every adapter accepts — key/base/signal ride through stream(). */
+export type AdapterStreamOpts = {
+  model: string;
+  messages: ProviderMessage[];
+  /** Raw API key (server resolves it from the credentials store). */
+  apiKey?: string | null;
+  /** Upstream root (server resolves it from provider config + overrides). */
+  baseUrl?: string;
+  /** AbortSignal for real interrupt (WS `abort` cancels the HTTP call). */
+  signal?: AbortSignal;
+};
+
 export type StreamChunk =
   | { type: 'text_delta'; delta: string }
   | { type: 'tool_start'; tool: string; input: unknown; callId: string }
@@ -22,8 +34,8 @@ export type StreamChunk =
 
 export interface ProviderAdapter {
   id: ProviderId;
-  /** Stream chat completion — yields chunks. Real API in Phase 1, mock in Phase 0. */
-  stream(opts: { model: string; messages: ProviderMessage[]; apiKey?: string }): AsyncGenerator<StreamChunk>;
+  /** Stream chat completion — real HTTP upstream (keys arrive via opts). */
+  stream(opts: AdapterStreamOpts): AsyncGenerator<StreamChunk>;
   /** List models for this provider. */
   listModels(apiKey?: string): Promise<{ id: string; label: string }[]>;
 }

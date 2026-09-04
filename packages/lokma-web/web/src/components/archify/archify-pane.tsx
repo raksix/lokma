@@ -8,6 +8,7 @@ import {
   Monitor,
   Search,
   Share2,
+  Trash2,
   Workflow,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -44,6 +45,7 @@ import {
  * receipt table (the real 5-gate receipt renders instead), and PNG/WebM
  * exports (they need headless Chromium — a follow-up; the pane only offers
  * the formats the server actually serves, so there are no dead buttons).
+ * Delete removes the real dir (`DELETE /api/archify/:id`, two-click arm).
  */
 
 const inputClass =
@@ -89,6 +91,9 @@ export function ArchifyPane() {
   const [comparing, setComparing] = React.useState(false);
   const [viewerHash, setViewerHash] = React.useState('');
   const [exporting, setExporting] = React.useState<string | null>(null);
+  // Two-click delete arm (bots-pane pattern) + in-flight flag.
+  const [confirmDelete, setConfirmDelete] = React.useState<string | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
   const runRef = React.useRef(0);
   const searchRef = React.useRef<HTMLInputElement>(null);
 
@@ -259,6 +264,29 @@ export function ArchifyPane() {
     [selected, exporting],
   );
 
+  const runDelete = React.useCallback(async () => {
+    if (!selected || deleting) return;
+    if (confirmDelete !== selected) {
+      setConfirmDelete(selected);
+      return;
+    }
+    setConfirmDelete(null);
+    setDeleting(true);
+    try {
+      await api.deleteDiagram(selected);
+      toast(`Deleted ${selected}`);
+      setSelected(null);
+      setDetail(null);
+      setDetailError(null);
+      setIrEdit('');
+      await loadList();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'delete failed');
+    } finally {
+      setDeleting(false);
+    }
+  }, [selected, deleting, confirmDelete, loadList]);
+
   const filtered = React.useMemo(() => filterDiagrams(items, typeFilter as 'all' | (typeof ARCHIFY_TYPES)[number], q), [items, typeFilter, q]);
   const sel = selected ? (items.find((d) => d.id === selected) ?? null) : null;
   const counts = detail ? receiptCounts(detail.receipt) : null;
@@ -285,6 +313,18 @@ export function ArchifyPane() {
             onClick={() => setFormOpen((v) => !v)}
           >
             + New Diagram
+          </Button>
+          <Button
+            variant={confirmDelete === selected ? 'destructive' : 'ghost'}
+            size="sm"
+            className="h-5 text-[11px] gap-1"
+            aria-label={confirmDelete === selected ? 'Confirm diagram delete' : 'Delete diagram'}
+            title={confirmDelete === selected ? 'Click again to confirm delete' : 'Delete this diagram'}
+            disabled={!selected || deleting}
+            onClick={() => void runDelete()}
+          >
+            <Trash2 className="w-3 h-3" />
+            {confirmDelete === selected ? 'Confirm?' : deleting ? 'Deleting…' : 'Delete'}
           </Button>
         </span>
       </div>
@@ -415,7 +455,10 @@ export function ArchifyPane() {
               filtered.map((d) => (
                 <button
                   key={d.id}
-                  onClick={() => setSelected(d.id)}
+                  onClick={() => {
+                    setConfirmDelete(null);
+                    setSelected(d.id);
+                  }}
                   className={`w-full text-left p-2 rounded-lg border flex gap-2 transition ${selected === d.id ? 'bg-[#FDF0E6] border-[#F2D5C2] dark:bg-[#2A1E15]' : 'bg-white dark:bg-[#1E1E21] border-line hover:border-terracotta/20'}`}
                 >
                   <span

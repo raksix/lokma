@@ -1028,6 +1028,9 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ ir }),
     }),
+  /** Remove the whole on-disk dir (ir + viewer + exports + receipt + delta). */
+  deleteDiagram: (id: string) =>
+    del<{ ok: boolean; id: string }>(`/api/archify/${encodeURIComponent(id)}`),
   /** Before/Delta/After against another diagram (writes delta.html). */
   compareDiagrams: (id: string, baseId: string) =>
     post<DiagramDeltaRes>(`/api/archify/${encodeURIComponent(id)}/delta`, { baseId }),

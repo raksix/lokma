@@ -54,11 +54,13 @@ export class SessionStore {
     }
   }
 
-  /** List sessionIds for this project. */
+  /** List sessionIds for this project (compaction archives are not sessions). */
   async list(): Promise<string[]> {
     try {
       const files = await readdir(sessionDir(this.cwd));
-      return files.filter((f) => f.endsWith('.jsonl')).map((f) => f.replace('.jsonl', ''));
+      return files
+        .filter((f) => f.endsWith('.jsonl') && !f.endsWith('.archive.jsonl'))
+        .map((f) => f.replace('.jsonl', ''));
     } catch {
       return [];
     }

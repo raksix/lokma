@@ -2082,6 +2082,36 @@ survives; never delete both at once). If even that serves stale code, escalate i
     still lists path-ordered (no ranking needed); snippet is body-anchored
     (title/tag-only matches carry `snippet: ''`, like before).
   - Next piece: Phase 2 3D vault graph toggle with real data.
+- 2026-09-04 — Phase 2 3D vault graph toggle DONE
+  (web 2d4ad5f, pushed; no server commit — all endpoints reused).
+  - **Executor run:** the 2D/3D toggle now shows a REAL 3D star-map over
+    the SAME live graph payload (no `react-force-graph-3d` dep, zero new
+    packages). Orphan sibling WIP (3D helpers + canvas component + pane
+    wiring + 16 checks) adopted as this run's single piece: reviewed
+    fresh, 3 fixes applied (dropped the dead `frame` counter in the
+    auto-rotate effect; React `onWheel`+preventDefault → native
+    non-passive wheel listener so the console stays warning-free;
+    hit-test radius now reuses the exact renderer zoom math), all gates
+    re-run, single atomic web commit. Web `vault.ts` (new:
+    `layoutGraph3D` deterministic Fibonacci sphere + `rotatePoint`
+    yaw/pitch + `projectGraph3D` perspective camera with depth shade +
+    `clampPitch` + `hitTestProjected`, all pure and probe-covered) +
+    `vault-graph-3d.tsx` (new: DPR-aware canvas, drag-rotate, wheel zoom,
+    auto-rotate with pause/resume + reset, depth-sorted edges/nodes, same
+    2D palette/radii, click-to-open through the same `onOpenNote` path,
+    keyboard-readable aria label, lucide Play/Pause/RotateCcw only) +
+    pane (honest-notice box replaced by the live component; footer reads
+    `2D circle`/`3D sphere` per mode) + `vault.test.ts` 56/56 (40 were).
+  - **Gates:** root `tsc --noEmit` 0 · web build green (758k JS) ·
+    full web suite 31/31 PASS · bundle carries the star-map, zero
+    `_next/` refs, zero `react-force-graph` · mock grep on touched files
+    clean (anti-mock comment + labeled input `placeholder=` attrs only,
+    legit) · real `~/.lokma` untouched (no server code ran).
+  - **Honest scope:** canvas 2D, not WebGL — 500+ node vaults still
+    render (linear draw) but labels cap at 40 like the 2D view; no force
+    physics (positions are deterministic, rotation is the only motion);
+    touch drag not wired (mouse events only — mobile wave).
+  - Next piece: Phase 2 remote plugin marketplace wiring.
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

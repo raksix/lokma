@@ -543,13 +543,21 @@
 - **Dürüst kapsam:** fire'da agent state geçişi yok (public setState yok — core-loop hardening'de), `AGENT_MAX_CONCURRENT` kontrolü yok, `failed` run'lar gerçek provider key ister (pane dürüstçe toast'lar).
 - **Sıradaki parça:** Phase 1 core-loop hardening (WS üstünde tool/permission/ask frame'leri — server gerçekten üretecek, sadece acknowledge değil).
 
+### 2026-09-04 — Phase 1 core-loop hardening wave 1: real provider streaming DONE (ai 98534e9 + server be7adb7)
+- **Executor run:** döngüdeki mock echo öldü — chat ve cron çalışması artık gerçek HTTP upstream'lere gidiyor.
+  - **lokma-ai:** `provider/errors.ts` (yeni: stabil kodlu `ProviderError`), `provider/sse.ts` (yeni: paylaşılan bağımlılıksız SSE okuyucu + `isLocalBaseUrl`), `provider/openai.ts` (gerçek OpenAI-uyumlu streaming: POST `{base}/chat/completions`, Bearer, keyless sadece yerel base'lerde, `provider/` öneki sıyrılır), `provider/anthropic.ts` (gerçek Messages API streaming: `x-api-key` + versiyon header'ı, system ayrıştırma, `max_tokens` 4096, key her zaman şart), `stream.ts` passthrough (`apiKey/baseUrl/signal`), `provider/adapters.test.ts` 22/22.
+  - **Server:** `resolveProviderUpstream()` (`routes/providers.ts` — tek eşleme: anthropic→Anthropic, openai/deepseek/openrouter/ollama/custom→OpenAI adapter + config baseUrl; google/unknown dürüst hata), `routes/ws.ts` (prompt başına upstream çözümleme, eksik key `error` frame'i, run başına AbortController + 120s cap, `abort` HTTP çağrısını gerçekten iptal ediyor — tek `done/aborted`, kısmi çıktı korunur, hayalet usage yok), `cron-runner.ts` (aynı upstream).
+  - **Gates:** root tsc 0 · ai/server dist clean · web build green · ai probu 22/22 + full web suite 31/31 · canlı WS probu (temp HOME + temp port) 10/10 · mock grep temiz (anti-mock yorumları hariç) · gerçek `~/.lokma`'ya dokunulmadı.
+  - **Dürüst kapsam:** model-güdümlü tool/permission/ask frame'leri için gerçek tool loop şart (sonraki wave); google'da wire adapter yok (`provider_not_wired`); `listModels()` statik katalog olarak kalır; key'siz chat artık echo yerine dürüst hata verir (Settings → Providers).
+- **Sıradaki parça:** Phase 1 core-loop hardening wave 2 (agent tool loop — tool/permission/ask frame'lerini server gerçekten üretecek).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-04 (Phase 1 agent-runner daemon wave 1: cron firing DONE — server 9c879d3 + web 6e4a584)
-- **Son işlem:** Cron firing daemon canlı — due job'lar 30sn ticker ile schedule'da fire oluyor, Play butonu on-demand fire ediyor, her fire `lastRunAt` stamp + `cron-<job>-<ts>` session + run record üretiyor; pane'de last-run hücreleri + Recent-runs bölümü canlı. Live prob 27/27.
+- **Son güncelleme:** 2026-09-04 (Phase 1 core-loop hardening wave 1: real provider streaming DONE — ai 98534e9 + server be7adb7)
+- **Son işlem:** Döngüdeki mock echo öldü — chat ve cron çalışması artık gerçek HTTP upstream'lere gidiyor (Anthropic Messages + OpenAI-uyumlu SSE, key'ler credentials store'dan, baseUrl config override'dan); eksik key dürüst `error` frame'i veriyor, Stop butonu HTTP çağrısını gerçekten iptal ediyor. Unit prob 22/22, canlı WS probu 10/10.
 
 ## Sıradaki adım (Phase 1/2/3 follow-up'ları)
 - **Sıradaki adım:**
-  1. Phase 1: ~~`DELETE` endpoint'leri (bots ✅ 4a51723/cdd00b0 · archify ✅ 93d2e58/1fe2b6d · design ✅ 9a61b52/f6f9b1f · tests ✅ 1fbd616/1ba81d9 · vault ✅ 7cfdbe6/b0b5d9d — SERİ TAMAMLANDI)~~ + ~~cron firing daemon ✅ 9c879d3/6e4a584 (30s ticker + Run-now + `lastRunAt` + run history — WAVE 1 TAMAMLANDI)~~ + core-loop hardening (tool/permission/ask frame'leri — sıradaki parça, run başına TEK parça)
+  1. Phase 1: ~~`DELETE` endpoint'leri (bots ✅ 4a51723/cdd00b0 · archify ✅ 93d2e58/1fe2b6d · design ✅ 9a61b52/f6f9b1f · tests ✅ 1fbd616/1ba81d9 · vault ✅ 7cfdbe6/b0b5d9d — SERİ TAMAMLANDI)~~ + ~~cron firing daemon ✅ 9c879d3/6e4a584 (30s ticker + Run-now + `lastRunAt` + run history — WAVE 1 TAMAMLANDI)~~ + ~~gerçek provider streaming ✅ 98534e9/be7adb7 (mock echo öldü, key/baseUrl çözümleme + gerçek abort — WAVE 1 TAMAMLANDI)~~ + agent tool loop (tool/permission/ask frame'lerini server gerçekten üretecek — sıradaki parça, run başına TEK parça)
   2. Phase 2: FTS5 vault araması + 3D vault grafiği + remote plugin marketplace + memory deep
   3. Phase 3: PNG/WebM export'ları (archify/design) + themes + sharing + cloud + mobile + perf + a11y
 

@@ -1936,6 +1936,47 @@ survives; never delete both at once). If even that serves stale code, escalate i
     key to go green (the pane toasts `recorded as failed` honestly).
   - Next piece: Phase 1 core-loop hardening (tool/permission/ask frames
     over WS — server actually emitting them, not just acknowledging).
+- 2026-09-04 — Phase 1 core-loop hardening, wave 1: real provider streaming DONE
+  (ai 98534e9 + server be7adb7, both pushed).
+  - **Executor run:** the mock echo at the heart of the loop is dead — chat
+    and cron runs now hit real HTTP upstreams. `lokma-ai`:
+    `provider/errors.ts` (new: `ProviderError` with stable codes
+    `missing_api_key|unknown_provider|provider_not_wired|http_error|`
+    `network_error|bad_response`, messages surface in the chat `error`
+    frame), `provider/sse.ts` (new: shared dependency-free SSE reader
+    yielding `{event,data}` pairs + `isLocalBaseUrl` + capped error
+    snippets), `provider/openai.ts` (real OpenAI-compatible streaming:
+    POST `{base}/chat/completions`, Bearer key, keyless allowed only for
+    local bases like Ollama, `provider/` prefix stripped),
+    `provider/anthropic.ts` (real Messages API streaming: `x-api-key` +
+    version header, system extraction, `max_tokens` 4096, key always
+    required), `stream.ts` passthrough (`apiKey/baseUrl/signal`), and
+    `provider/adapters.test.ts` 22/22 (stub SSE servers assert paths,
+    headers, prefix-stripping, 401 mapping, key refusal). Server:
+    `resolveProviderUpstream()` in `routes/providers.ts` (single mapping —
+    anthropic→Anthropic adapter, openai/deepseek/openrouter/ollama/custom
+    baseUrl→OpenAI adapter with that id's configured base URL incl. PATCH
+    overrides, google/unknown→honest throw; reuses file-creds→env key
+    resolution), `routes/ws.ts` (upstream resolved per prompt, missing keys
+    fail as `error` frames, per-run AbortController + 120s cap, `abort`
+    really cancels the HTTP call — single `done/aborted`, partial output
+    kept, no phantom usage billing), `cron-runner.ts` (same upstream,
+    resolve failures become failed-run evidence as before).
+  - **Gates:** root `tsc --noEmit` 0 · ai dist + server `tsc -p`/dist clean ·
+    web build green · ai probe 22/22 + full web suite 31/31 · live probe
+    (temp HOME + temp port, real WS) 10/10: keyless anthropic → zero mock
+    text + honest key error → stub baseUrl override streams verbatim +
+    done/complete + cost → abort mid-hang → exactly one done/aborted, no
+    error, no cost · mock grep on touched files clean (anti-mock comments
+    only, legit) · real `~/.lokma` untouched (nothing after 18:00 UTC).
+  - **Honest scope:** model-driven tool/permission/ask frames still need a
+    real tool loop (next wave — the permission cards + ack path are
+    unchanged); google has no wire adapter yet (`provider_not_wired`);
+    `listModels()` stays a static catalog (flags overlay, not streaming);
+    chat with no configured key now errors honestly instead of echoing —
+    add keys in Settings → Providers (or provider env vars).
+  - Next piece: Phase 1 core-loop hardening wave 2 (agent tool loop —
+    server actually emitting tool/permission/ask frames).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

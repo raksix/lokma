@@ -140,6 +140,7 @@ const BUNDLED_PLUGINS: BundledDef[] = [
     routes: ['/api/vault'],
     endpoints: [
       'GET /api/vault/graph',
+      'GET /api/vault/search',
       'GET /api/vault/tree',
       'GET /api/vault/note',
       'POST /api/vault/ingest',

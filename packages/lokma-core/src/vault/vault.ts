@@ -8,8 +8,9 @@ import { expandHome, writeAtomic } from '../utils/fs.js';
  * Notes are `*.md` files: the title comes from frontmatter `title:` or the
  * first `# heading` or the file name; `[[wikilink]]` targets become graph
  * edges; frontmatter `provenance:` records which agent ingested the note.
- * Search is ranked substring over path + title + content (an FTS5 index is
- * a follow-up — the pane labels this honestly as search, not FTS5).
+ * Search is SQLite FTS5 (`./fts`) with weighted BM25 over path + title +
+ * tags + body; when FTS is unavailable on the runtime it degrades to ranked
+ * substring (the route reports which engine answered).
  * See Docs/28 §vault and Docs/29 (file vault wins, no Obsidian daemon).
  */
 
@@ -170,8 +171,8 @@ function firstHeading(body: string): string | null {
   return null;
 }
 
-/** Parse raw markdown into display metadata (links stay unresolved here). */
-function parseNote(rel: string, text: string, size: number, mtimeMs: number): VaultNote {
+/** Parse raw markdown into display metadata (links stay unresolved here). Exported for the FTS5 indexer (`./fts`) — same parser, no drift. */
+export function parseNote(rel: string, text: string, size: number, mtimeMs: number): VaultNote {
   const { meta, body } = splitFrontmatter(text);
   const base = basename(rel, '.md');
   const tags = parseTags(meta.tags);
@@ -194,8 +195,8 @@ function parseNote(rel: string, text: string, size: number, mtimeMs: number): Va
   };
 }
 
-/** Recursively collect `.md` files under `dir` (skips dotfiles, capped). */
-async function walkMarkdown(dir: string, root: string, out: string[]): Promise<void> {
+/** Recursively collect `.md` files under `dir` (skips dotfiles, capped). Exported for the FTS5 indexer (`./fts`) — same walk, no drift. */
+export async function walkMarkdown(dir: string, root: string, out: string[]): Promise<void> {
   if (out.length >= VAULT_MAX_FILES) return;
   let entries;
   try {
@@ -296,20 +297,14 @@ function resolveLinks(notes: VaultNote[]): Map<string, string[]> {
 }
 
 /**
- * Ranked substring search over path + title + content.
- * Title hits outrank path hits outrank body hits; empty query returns
- * every note (path order) so the pane doubles as a folder browser.
+ * Ranked substring search over path + title + content. Kept as the degrade
+ * path when FTS5 is unavailable on the runtime (see `./fts`).
+ * Title hits outrank path hits outrank body hits.
  */
-export async function searchNotes(query: unknown, folder = ''): Promise<VaultSearchHit[]> {
-  const q = typeof query === 'string' ? query.trim().toLowerCase() : '';
-  if (query !== undefined && query !== null && query !== '' && typeof query !== 'string') {
-    throw new VaultError('bad_query', 'q must be a string', 400);
-  }
-  const notes = await listNotes(folder);
+async function searchSubstring(notes: VaultNote[], q: string, root: string): Promise<VaultSearchHit[]> {
   if (!q) {
     return notes.slice(0, VAULT_SEARCH_MAX_HITS).map((note) => ({ ...note, score: 0, snippet: '' }));
   }
-  const root = vaultRoot();
   const hits: VaultSearchHit[] = [];
   for (const note of notes) {
     const titleAt = note.title.toLowerCase().indexOf(q);
@@ -331,6 +326,48 @@ export async function searchNotes(query: unknown, folder = ''): Promise<VaultSea
   }
   hits.sort((a, b) => b.score - a.score || a.path.localeCompare(b.path));
   return hits.slice(0, VAULT_SEARCH_MAX_HITS);
+}
+
+/** Which engine answered a vault search (the route reports it honestly). */
+export type VaultSearchEngine = 'fts5' | 'substring';
+
+/**
+ * Full-text search over path + title + tags + body. Prefers SQLite FTS5
+ * (weighted BM25, synced incrementally — see `./fts`); degrades to ranked
+ * substring when FTS is unavailable on the runtime. Empty query lists every
+ * note (path order) so the pane doubles as a folder browser.
+ */
+export async function searchNotesDetailed(
+  query: unknown,
+  folder = '',
+): Promise<{ hits: VaultSearchHit[]; engine: VaultSearchEngine }> {
+  const q = typeof query === 'string' ? query.trim().toLowerCase() : '';
+  if (query !== undefined && query !== null && query !== '' && typeof query !== 'string') {
+    throw new VaultError('bad_query', 'q must be a string', 400);
+  }
+  const { ftsAvailable, searchFts } = await import('./fts.js');
+  const engine: VaultSearchEngine = (await ftsAvailable()) ? 'fts5' : 'substring';
+  if (!q) {
+    const notes = await listNotes(folder);
+    return {
+      hits: notes.slice(0, VAULT_SEARCH_MAX_HITS).map((note) => ({ ...note, score: 0, snippet: '' })),
+      engine,
+    };
+  }
+  if (engine === 'fts5') {
+    const ftsHits = await searchFts(typeof query === 'string' ? query : '', folder);
+    if (ftsHits !== null) return { hits: ftsHits, engine: 'fts5' };
+  }
+  const notes = await listNotes(folder);
+  return { hits: await searchSubstring(notes, q, vaultRoot()), engine: 'substring' };
+}
+
+/**
+ * Ranked search (same contract as before — FTS5 under the hood).
+ * The graph builder seeds from this, so graph search is FTS-powered too.
+ */
+export async function searchNotes(query: unknown, folder = ''): Promise<VaultSearchHit[]> {
+  return (await searchNotesDetailed(query, folder)).hits;
 }
 
 /**

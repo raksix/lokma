@@ -264,6 +264,25 @@ export type VaultNoteRes = {
   content: string;
   truncated: boolean;
 };
+export type VaultSearchHit = {
+  path: string;
+  title: string;
+  tags: string[];
+  links: string[];
+  provenance: string | null;
+  size: number;
+  mtimeMs: number;
+  score: number;
+  snippet: string;
+};
+export type VaultSearchRes = {
+  ok: boolean;
+  q: string;
+  folder: string;
+  hits: VaultSearchHit[];
+  count: number;
+  engine: 'fts5' | 'substring';
+};
 export type VaultIngestBody = { path: string; content: string; provenance?: string };
 export type VaultIngestRes = { ok: boolean; path: string; bytes: number; created: boolean };
 export type UsageModelRow = {
@@ -918,6 +937,14 @@ export const api = {
     if (opts?.depth !== undefined) params.set('depth', String(opts.depth));
     const suffix = params.size > 0 ? `?${params.toString()}` : '';
     return get<VaultGraphRes>(`/api/vault/graph${suffix}`);
+  },
+  /** FTS5 full-text search (BM25 score + snippet) — cheaper than graph for typeaheads. */
+  searchVaultNotes: (query?: string, folder?: string) => {
+    const params = new URLSearchParams();
+    if (query) params.set('q', query);
+    if (folder) params.set('folder', folder);
+    const suffix = params.size > 0 ? `?${params.toString()}` : '';
+    return get<VaultSearchRes>(`/api/vault/search${suffix}`);
   },
   /** Nested dir/note tree for the vault folder browser. */
   getVaultTree: (folder?: string) =>

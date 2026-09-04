@@ -6,7 +6,8 @@ import { useSessionStore } from '@/stores';
 /**
  * SearchModal — global search (Ctrl/Cmd+K) over REAL harness data:
  * live sessions (`GET /api/sessions`, via sessionStore) + vault notes
- * (`GET /api/vault/graph?q=`). The concept's hardcoded DOCS array is gone —
+ * (`GET /api/vault/search` — FTS5 full-text, cheaper than the graph for a
+ * typeahead). The concept's hardcoded DOCS array is gone —
  * every row below comes from the server. Selecting a session switches to it;
  * selecting a note toasts its id (open it fully from the Vault tab).
  */
@@ -67,15 +68,16 @@ export function SearchModal({
     void refreshSessions();
   }, [open, refreshSessions]);
 
-  // Debounced live vault search as the user types.
+  // Debounced live vault search as the user types (FTS5 search endpoint —
+  // cheaper than the graph: no BFS, just ranked hits).
   React.useEffect(() => {
     if (!open) return;
     const query = q.trim();
     const timer = setTimeout(() => {
       api
-        .getVaultGraph(query || undefined)
+        .searchVaultNotes(query || undefined)
         .then((res) => {
-          setNoteNodes(Array.isArray(res.nodes) ? res.nodes : []);
+          setNoteNodes(Array.isArray(res.hits) ? res.hits : []);
           setNotesError(null);
         })
         .catch((e: unknown) => {
@@ -88,7 +90,10 @@ export function SearchModal({
 
   if (!open) return null;
   const sessionHits = filterSessionHits(sessions, q);
-  const noteHits = filterNoteHits(noteNodes, q);
+  // Server hits arrive pre-ranked by FTS5 (title + tags + body) — pass an
+  // empty query so `filterNoteHits` only coerces + caps instead of
+  // re-filtering on title + id (which would drop valid body-only matches).
+  const noteHits = filterNoteHits(noteNodes, '');
   const firstHit = sessionHits[0]?.id ?? noteHits[0]?.id ?? null;
 
   const openFirst = (): void => {

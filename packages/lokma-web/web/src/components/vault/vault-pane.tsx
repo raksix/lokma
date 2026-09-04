@@ -36,8 +36,9 @@ import {
  * barnesHut constants strip (ours is a deterministic circle layout — the
  * footer says so), the toast-only Full button, and the 3D star-map (no
  * `react-force-graph-3d` dep — the 3D toggle shows an honest notice, not
- * a fake graph). Search is ranked substring, not FTS5 yet — the footer
- * says that too instead of claiming otherwise.
+ * a fake graph). Search is SQLite FTS5 (weighted BM25 over path + title +
+ * tags + body) — graph seeds and typeaheads rank through it; the footer
+ * says so.
  */
 
 const inputClass =
@@ -536,7 +537,7 @@ export function VaultPane() {
           <div className="p-1.5 border-t border-line/50 bg-white/60 dark:bg-[#1E1E21]/60 text-[11px] text-zinc-500 flex gap-1 flex-wrap shrink-0">
             <span className="px-1.5 py-0.5 rounded bg-white border border-line">[[wikilink]] click → note</span>
             <span className="px-1.5 py-0.5 rounded bg-white border border-line">provenance: agentId</span>
-            <span className="ml-auto hidden sm:inline">ranked search (FTS5 follow-up) · circle layout</span>
+            <span className="ml-auto hidden sm:inline">FTS5 full-text · circle layout</span>
           </div>
         </div>
       </div>

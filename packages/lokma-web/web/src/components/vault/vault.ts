@@ -3,8 +3,9 @@
  * (probe: `bun src/components/vault/vault.test.ts`).
  * The pane shows the LIVE file vault (`~/.lokma/vault/`, same store the
  * CLI reads) over `GET /api/vault/graph|tree` + `GET /api/vault/note` +
- * `POST /api/vault/ingest`. Anything the server cannot do yet (FTS5
- * ranking, 3D force layout) stays out of this file — the pane labels
+ * `POST /api/vault/ingest`. Search ranks through SQLite FTS5
+ * (`GET /api/vault/search`); anything the server cannot do yet (3D force
+ * layout) stays out of this file — the pane labels
  * those honestly instead of faking them.
  * Node normalization, SVG layout and `[[wikilink]]` splitting live here
  * so the pane itself stays a thin view over `api.*` calls.

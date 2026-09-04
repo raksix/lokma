@@ -93,7 +93,7 @@ export function validatePluginUrl(raw: string): string | null {
   return null;
 }
 
-/** "6 plugins · 45 endpoints · 1 suspended" — footer strip over live rows. */
+/** "6 plugins · 46 endpoints · 1 suspended" — footer strip over live rows. */
 export function summarizeRegistry(plugins: Plugin[]): string {
   const endpoints = plugins.reduce((n, p) => n + p.endpoints.length, 0);
   const suspended = plugins.filter((p) => !p.enabled).length;

@@ -582,14 +582,23 @@
 - **Dürüst kapsam:** topic bugün boş → sekme dürüst zero-state gösteriyor; Install'da versiyon uyumluluk kontrolü yok (0.0.0 suspended kayıt, Add-from-URL ile aynı); rate-limit 503 + retry ipucu.
 - **Sıradaki parça:** Phase 2 memory deep (2-tier compression).
 
+### 2026-09-04 — Phase 2 memory-deep wave 1: memory REST API DONE (core bfad761 + server ba8dc13 + web 22ec296)
+- **Executor run:** global §-delimited MEMORY.md/USER.md store artık REST'te (Docs/28 §5.2 — tool core'da vardı ama route yoktu). Tek parça, üç atomik commit.
+  - **Core:** `MemoryError` (bad_target/empty_content/empty_old_text 400, no_match 404, ambiguous_match/memory_full 409) + `MEMORY_LIMITS` (20k/5k) + `readMemoryEntries()` (canlı `chars/limit` usage); add/replace/remove artık throw ediyor (tek kod yolu); `memory.test.ts` 34/34.
+  - **Server:** `GET /api/memory?target=` + `POST` (exact-dup idempotent) + `PATCH` + `DELETE` (JSON body) + `app.ts` kaydı; canlı in-process prob 20/20; gerçek `~/.lokma`'ya dokunulmadı.
+  - **Web:** `api.ts` Memory tipleri + `getMemory/addMemory/replaceMemory/deleteMemory`.
+- **Gates:** root tsc 0 (önce stale-dist TS2305 — core build ile çözüldü) · core+server dist clean · web build green · full web suite 31/31 · mock grep sıfır.
+- **Dürüst kapsam:** Memory pane yok (REST + per-agent editörler) — UI tab wave 2; 2-tier compression wave 3.
+- **Sıradaki parça:** Phase 2 memory-deep wave 2 (Memory UI) veya wave 3 (2-tier compression).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-04 (Phase 2 remote plugin marketplace wiring DONE — core 0850343 + server 563ab98 + web 78e59e6)
-- **Son işlem:** Plugins sekmesinde üçüncü canlı sekme Marketplace — gerçek GitHub `lokma-plugin` topic araması, satırda yıldız + Repo linki + Install (aynı `POST /install`). Core probu 32/32 + route probu 13/13 + web suite 31/31.
+- **Son güncelleme:** 2026-09-04 (Phase 2 memory-deep wave 1: memory REST API DONE — core bfad761 + server ba8dc13 + web 22ec296)
+- **Son işlem:** `GET/POST/PATCH/DELETE /api/memory` canlı (kodlu hatalar + canlı usage + exact-dup idempotent). Core probu 34/34 + route probu 20/20 + web suite 31/31.
 
 ## Sıradaki adım (Phase 1/2/3 follow-up'ları)
 - **Sıradaki adım:**
   1. Phase 1: ~~`DELETE` endpoint'leri (bots ✅ 4a51723/cdd00b0 · archify ✅ 93d2e58/1fe2b6d · design ✅ 9a61b52/f6f9b1f · tests ✅ 1fbd616/1ba81d9 · vault ✅ 7cfdbe6/b0b5d9d — SERİ TAMAMLANDI)~~ + ~~cron firing daemon ✅ 9c879d3/6e4a584 (30s ticker + Run-now + `lastRunAt` + run history — WAVE 1 TAMAMLANDI)~~ + ~~gerçek provider streaming ✅ 98534e9/be7adb7 (mock echo öldü, key/baseUrl çözümleme + gerçek abort — WAVE 1 TAMAMLANDI)~~ + ~~core tool foundation ✅ 1f95d06 (gate + 5 builtin + executor + 46/46 probe — WAVE 2a TAMAMLANDI)~~ + ~~WS tool/permission/ask frame'leri ✅ aaf9b7b/75efc63 (agent döngüsü canlı: `<tool>`/`<ask>` blokları + pending-gate resume + loop probu 27/27 + WS e2e 12/12 — WAVE 2b TAMAMLANDI)~~ (Phase 1 core-loop TAMAMLANDI)
-  2. Phase 2: ~~FTS5 vault araması ✅ 03b3e8f/95d6ed2/5543f20 (SQLite FTS5 + BM25 + snippet + `/api/vault/search` + SearchModal — TAMAMLANDI)~~ + ~~3D vault grafiği ✅ 2d4ad5f (bağımlılıksız canvas star-map, aynı canlı veri, sürükle-döndür + zoom + auto-rotate — TAMAMLANDI)~~ + ~~remote plugin marketplace ✅ 0850343/563ab98/78e59e6 (canlı GitHub topic araması + Marketplace sekmesi + Install wiring — TAMAMLANDI)~~ + memory deep
+  2. Phase 2: ~~FTS5 vault araması ✅ 03b3e8f/95d6ed2/5543f20 (SQLite FTS5 + BM25 + snippet + `/api/vault/search` + SearchModal — TAMAMLANDI)~~ + ~~3D vault grafiği ✅ 2d4ad5f (bağımlılıksız canvas star-map, aynı canlı veri, sürükle-döndür + zoom + auto-rotate — TAMAMLANDI)~~ + ~~remote plugin marketplace ✅ 0850343/563ab98/78e59e6 (canlı GitHub topic araması + Marketplace sekmesi + Install wiring — TAMAMLANDI)~~ + memory deep wave 1 ✅ bfad761/ba8dc13/22ec296 (`GET/POST/PATCH/DELETE /api/memory` + MemoryError + usage — TAMAMLANDI) + memory deep wave 2 (Memory UI) + wave 3 (2-tier compression)
   3. Phase 3: PNG/WebM export'ları (archify/design) + themes + sharing + cloud + mobile + perf + a11y
 
 ---

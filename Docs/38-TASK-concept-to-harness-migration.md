@@ -2151,6 +2151,40 @@ survives; never delete both at once). If even that serves stale code, escalate i
     Add-from-URL); rate-limit surfaces as a 503 with a retry hint
     (`GITHUB_TOKEN` raises the quota).
   - Next piece: Phase 2 memory deep (2-tier compression).
+- 2026-09-04 — Phase 2 memory-deep wave 1: memory REST API DONE
+  (core bfad761 + server ba8dc13 + web 22ec296, all pushed).
+  - **Executor run:** the global §-delimited MEMORY.md/USER.md store is now
+    reachable over REST (Docs/28 §5.2 — the tool existed in core but no
+    route served it). Single piece, three atomic commits.
+  - **Core:** `manager.ts` grew `MemoryError` (`bad_target` 400 /
+    `empty_content` 400 / `empty_old_text` 400 / `no_match` 404 /
+    `ambiguous_match` 409 / `memory_full` 409 — same contract shape as
+    `VaultError`/`SkillError`) + `MEMORY_LIMITS` (20k/5k Hermes parity) +
+    `readMemoryEntries()` (entries + live `chars/limit` usage string);
+    `memoryAdd/Replace/Remove` now throw instead of returning
+    `{ok:false}` (no other callers — verified by grep — so the agent
+    loop and the route share one path; overflow echoes the repair hint).
+    `memory.test.ts` 34/34 (temp-HOME startup env + refuse-guard).
+  - **Server:** `routes/memory.ts` (`GET /api/memory?target=` entries +
+    usage, `POST` add idempotent on exact-dup, `PATCH` replace,
+    `DELETE` remove with JSON body) + `app.ts` registration; live
+    in-process probe 20/20 (CRUD + idempotent dup + store independence +
+    all 400/404/409 codes + user-target overflow + real `~/.lokma`
+    untouched). DELETE-with-body parses fine on Fastify 5.
+  - **Web:** `api.ts` types (`MemoryTarget/UsageRes/Add/Replace/Remove`)
+    + `getMemory/addMemory/replaceMemory/deleteMemory` (DELETE via
+    `request()` with JSON body — `del()` sends none).
+  - **Gates:** root `tsc --noEmit` 0 (stale-dist TS2305 first — fixed by
+    building core before the root check, known composite-reference trap)
+    · core+server dist clean · web build green · full web suite 31/31 ·
+    mock grep on touched files zero · core probe re-run after the
+    `instanceof`-narrow catch fix.
+  - **Honest scope:** no Memory pane yet (entries editable via REST +
+    the per-agent SOUL/MEMORY editors only) — UI tab is wave 2;
+    2-tier compression (85%/50% + 4-phase compaction + anchor index)
+    is wave 3; Honcho stays pluggable-later per Docs/28.
+  - Next piece: Phase 2 memory-deep wave 2 (Memory UI tab) or wave 3
+    (2-tier compression) — runner picks one.
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

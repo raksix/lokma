@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { SessionStore, compactSession, compactionStatus } from 'lokma-core';
+import { SessionStore, compactSession, compactionStatus, searchSessionsDetailed } from 'lokma-core';
 
 /**
  * Sessions — JSONL same files as CLI (SessionStore).
@@ -13,6 +13,9 @@ import { SessionStore, compactSession, compactionStatus } from 'lokma-core';
  * (`{ ok: true, compacted: false }`), never an error.
  * `GET /api/sessions` returns enriched summaries (title/model/counts/dates)
  * for the Sessions sidebar — same shape as `SessionSummary` in lokma-core.
+ * `GET /api/sessions/search` runs full-text search over one project's
+ * transcripts (FTS5 BM25, substring degrade — the `engine` field says which;
+ * Phase 2 memory-deep wave 3b, Docs/28 session_search).
  * See Docs/22 §sessions.
  */
 
@@ -35,6 +38,19 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     const store = new SessionStore(cwd);
     const sessions = await store.listSummaries();
     return { sessions, count: sessions.length };
+  });
+
+  app.get('/api/sessions/search', async (req, reply) => {
+    const q = (req.query as { q?: unknown; cwd?: string; limit?: unknown }) ?? {};
+    const cwd = typeof q.cwd === 'string' && q.cwd ? q.cwd : process.cwd();
+    try {
+      return await searchSessionsDetailed(cwd, q.q, { limit: q.limit });
+    } catch (e) {
+      const err = e as { statusCode?: number; code?: string; message?: string };
+      return reply
+        .status(err.statusCode === 400 ? 400 : 500)
+        .send({ code: err.code ?? 'search_failed', message: err.message ?? 'Session search failed' });
+    }
   });
 
   app.get('/api/sessions/:id', async (req) => {

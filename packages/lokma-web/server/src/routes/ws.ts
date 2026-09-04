@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { SessionStore, TerminalError, UsageLedger, estimateCost, estimateTokens, onAgentEvent, recordApprovalDecision, resolveInRoot, terminalManager } from 'lokma-core';
 import { stream as aiStream } from 'lokma-ai';
 import { decodeClientMessage, encodeServerMessage } from 'lokma-shared';
+import { resolveProviderUpstream } from './providers.js';
 
 /**
  * WS /ws/:sessionId — streams `lokma-ai stream()` into typed server frames.
@@ -18,6 +19,8 @@ import { decodeClientMessage, encodeServerMessage } from 'lokma-shared';
 const DEFAULT_MODEL = 'anthropic/claude-sonnet-4-5';
 const MAX_CONTEXT_FILES = 5;
 const MAX_CONTEXT_BYTES = 20 * 1024;
+/** Upper bound for one model call — the socket stays open, the run ends. */
+const PROMPT_TIMEOUT_MS = 120_000;
 
 /** Read workspace-relative paths into `<context>` blocks (real file content). */
 async function readContextBlocks(cwd: string, paths: string[] | undefined): Promise<string> {
@@ -89,6 +92,10 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
       );
     });
 
+    // Real interrupt: `abort` cancels the in-flight HTTP call below (it used
+    // to only send `done` while the stream kept running + billing usage).
+    let currentAbort: AbortController | null = null;
+
     socket.on('message', async (raw: Buffer) => {
       const msg = decodeClientMessage(raw.toString());
       if (!msg) {
@@ -114,12 +121,30 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
         const contextPrefix = await readContextBlocks(cwd, msg.contextPaths);
         const effectivePrompt = contextPrefix ? `${contextPrefix}${prompt}` : prompt;
 
+        // Wire-level upstream: credentials store + provider config decide the
+        // key and base URL (never a mock echo — missing keys fail honestly).
+        let upstream: { provider: 'anthropic' | 'openai'; baseUrl: string; apiKey: string | null };
+        try {
+          upstream = await resolveProviderUpstream(provider);
+        } catch (e) {
+          socket.send(
+            encodeServerMessage({ type: 'error', message: e instanceof Error ? e.message : String(e), sessionId }),
+          );
+          return;
+        }
+
+        const ctrl = new AbortController();
+        currentAbort = ctrl;
+        const timer = setTimeout(() => ctrl.abort(), PROMPT_TIMEOUT_MS);
         let full = '';
         try {
           for await (const chunk of aiStream({
-            provider,
+            provider: upstream.provider,
             model,
             messages: [{ role: 'user', content: effectivePrompt }],
+            apiKey: upstream.apiKey,
+            baseUrl: upstream.baseUrl,
+            signal: ctrl.signal,
           })) {
             if (chunk.type === 'text_delta') {
               full += chunk.delta;
@@ -128,6 +153,7 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
               break;
             }
           }
+          if (currentAbort === ctrl) currentAbort = null;
           await store.append(sessionId, { role: 'assistant', content: full, timestamp: new Date().toISOString() });
           socket.send(encodeServerMessage({ type: 'done', sessionId, reason: 'complete' }));
           // Real accounting: token estimates from the core price table land
@@ -162,15 +188,32 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
             }),
           );
         } catch (e) {
+          clearTimeout(timer);
+          if (currentAbort === ctrl) currentAbort = null;
+          if (ctrl.signal.aborted) {
+            // Interrupted (Stop button or 120s cap): keep the partial output
+            // that really arrived, skip usage billing, end the run aborted.
+            if (full) {
+              await store.append(sessionId, { role: 'assistant', content: full, timestamp: new Date().toISOString() });
+            }
+            socket.send(encodeServerMessage({ type: 'done', sessionId, reason: 'aborted' }));
+            return;
+          }
           socket.send(
-            encodeServerMessage({ type: 'error', message: String(e), sessionId }),
+            encodeServerMessage({ type: 'error', message: e instanceof Error ? e.message : String(e), sessionId }),
           );
+          return;
         }
+        clearTimeout(timer);
       } else if (msg.type === 'abort') {
-        socket.send(encodeServerMessage({ type: 'done', sessionId, reason: 'aborted' }));
+        // Cancels the in-flight model call — the run's catch block sends the
+        // single `done/aborted` (no double-done, no phantom usage record).
+        if (currentAbort) currentAbort.abort();
+        else socket.send(encodeServerMessage({ type: 'done', sessionId, reason: 'aborted' }));
       } else if (msg.type === 'permission_response' || msg.type === 'ask_response') {
-        // No tool-approval loop runs server-side yet (lands with W1-2/W4) —
-        // acknowledge instead of dropping silently so the client can unblock.
+        // No tool loop emits gates server-side yet (it lands with the agent
+        // tool loop) — acknowledge instead of dropping silently so the client
+        // can unblock.
         // The answer is still real evidence: append it to the approvals
         // decision log (powers GET /api/approvals), best-effort so logging
         // never breaks chat.

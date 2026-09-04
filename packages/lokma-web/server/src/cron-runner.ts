@@ -19,6 +19,7 @@ import {
 } from 'lokma-core';
 import type { CronJob } from 'lokma-shared';
 import { stream as aiStream } from 'lokma-ai';
+import { resolveProviderUpstream } from './routes/providers.js';
 
 /**
  * Agent-runner daemon, wave 1: cron firing (Phase 1).
@@ -62,12 +63,23 @@ export async function fireCronJob(
   let status: CronRunRecord['status'] = 'ok';
   let chars = 0;
   let error: string | undefined;
+  let upstream: { provider: 'anthropic' | 'openai'; baseUrl: string; apiKey: string | null };
+  try {
+    upstream = await resolveProviderUpstream(provider);
+  } catch (e) {
+    upstream = { provider: provider === 'anthropic' ? 'anthropic' : 'openai', baseUrl: '', apiKey: null };
+    status = 'failed';
+    error = String(e instanceof Error ? e.message : e).slice(0, 500);
+  }
+  if (status !== 'failed') {
   try {
     let full = '';
     for await (const chunk of aiStream({
-      provider,
+      provider: upstream.provider,
       model: agent.model,
       messages: [{ role: 'user', content: job.task }],
+      apiKey: upstream.apiKey,
+      baseUrl: upstream.baseUrl,
     })) {
       if (chunk.type === 'text_delta') full += chunk.delta;
       else if (chunk.type === 'done') break;
@@ -97,6 +109,7 @@ export async function fireCronJob(
     status = 'failed';
     error = String(e).slice(0, 500);
     app.log.warn(`[cron] fire failed job=${job.id}: ${error}`);
+  }
   }
 
   const finishedAt = new Date().toISOString();

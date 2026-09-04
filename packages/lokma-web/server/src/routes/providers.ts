@@ -106,7 +106,7 @@ export async function listProviderViews(): Promise<ProviderView[]> {
 }
 
 /** Resolve the raw key for probing (file creds first, then conventional env vars). */
-async function resolveApiKey(id: string): Promise<string | null> {
+export async function resolveApiKey(id: string): Promise<string | null> {
   const creds = await loadCredentials();
   const fileKey = (creds.providers[id] as { apiKey?: string } | undefined)?.apiKey;
   if (fileKey) return fileKey;
@@ -115,6 +115,34 @@ async function resolveApiKey(id: string): Promise<string | null> {
     if (envKey) return envKey;
   }
   return null;
+}
+
+/**
+ * Wire-level upstream for a harness provider id — the single place that maps
+ * ids to real adapters (DRY: WS chat + cron-runner share it).
+ * `anthropic` rides the Anthropic adapter; every OpenAI-compatible id
+ * (openai/deepseek/openrouter/ollama/any custom entry with a baseUrl) rides
+ * the OpenAI adapter with that id's configured base URL (built-in default or
+ * `PATCH /api/providers/:id` override). Anything else throws — the caller
+ * surfaces it as an honest `error` frame, never mock output.
+ */
+export async function resolveProviderUpstream(
+  id: string,
+): Promise<{ provider: 'anthropic' | 'openai'; baseUrl: string; apiKey: string | null }> {
+  const views = await listProviderViews();
+  const view = views.find((v) => v.id === id);
+  const apiKey = await resolveApiKey(id);
+  if (id === 'anthropic') {
+    return { provider: 'anthropic', baseUrl: view?.baseUrl ?? BUILTINS.anthropic.baseUrl, apiKey };
+  }
+  if (id === 'openai' || id === 'deepseek' || id === 'openrouter' || id === 'ollama' || (view && view.baseUrl)) {
+    return { provider: 'openai', baseUrl: view?.baseUrl ?? BUILTINS.openai.baseUrl, apiKey };
+  }
+  const err = new Error(
+    `Provider "${id}" is not wired for chat yet (wired: anthropic, openai, deepseek, openrouter, ollama, custom OpenAI-compatible) — configure it in Settings → Providers.`,
+  );
+  (err as Error & { code?: string }).code = 'provider_not_wired';
+  throw err;
 }
 
 /** Live connection check against the provider's real models endpoint. */

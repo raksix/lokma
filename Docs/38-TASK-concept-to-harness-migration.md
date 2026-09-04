@@ -1794,6 +1794,37 @@ survives; never delete both at once). If even that serves stale code, escalate i
     cross-diagram refs to repair).
   - Remaining DELETE pieces: design (2 POST), tests (1 POST), vault ingest
     (1 POST). Next piece: `DELETE /api/design/:id`.
+- 2026-09-04 — Phase 1 DELETE endpoints, piece 3/8: `DELETE /api/design/:id` DONE
+  (server 9a61b52 + web f6f9b1f, both pushed).
+  - **Executor run:** third DELETE in the Phase 1 "DELETE for every POST
+    resource" series (archify-piece mirror). Core `deleteArtifact()`
+    (`design/store.ts`: `assertArtifactId` 400 on bad shape, `readManifest`
+    404 on unknown before touching disk, then `rm` of the whole `<id>/` dir —
+    the id is a single validated segment so `rm` can never escape the design
+    root) + `DELETE /api/design/:id` (`routes/design.ts`, `{ ok, id }`, same
+    `DesignError` mapping as the sibling routes). Plugin registry
+    `@lokma/plugin-design` endpoints 9→10 (web `plugins.ts` footer example
+    comment 42→43). Web: `api.deleteDesign()` + header Delete button
+    (two-click arm, Trash2 lucide, destructive on confirm, resets the arm
+    on row select; success clears selection/detail/html-edit and reloads
+    the list).
+  - **Gates:** root `tsc --noEmit` 0 · core dist emit + server `tsc -p`
+    clean + server dist rebuild (probe caught the stale-dist trap: route
+    404 until rebuilt — server reads core AND routes from dist) · web build
+    green · design helpers probe 28/28 · live probe (in-process createApp +
+    inject, startup-env temp HOME + refuse-guard) 12/12: empty list →
+    generate A+B → DELETE A `{ok,id}` → GET-after-delete 404
+    `design_not_found` → re-delete 404 → list count 1 (only B) →
+    sibling export+view 200 → evil-id 400 `bad_id` → unknown 404 →
+    registry design 10 incl. DELETE · mock grep clean (3 hits = labelled
+    input `placeholder` attrs, legit + anti-mock comments) · real `~/.lokma`
+    untouched.
+  - **Honest scope:** no per-artifact ownership (all artifacts deletable —
+    no `deleteBlockReason` helper needed, same as archify; the existing 28
+    helper checks pin the contracts and the live probe pins the endpoint);
+    critique snapshots die with the head dir (no cross-artifact refs).
+  - Remaining DELETE pieces: tests (1 POST), vault ingest (1 POST).
+    Next piece: `DELETE /api/tests/:id`.
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

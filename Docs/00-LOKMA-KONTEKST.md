@@ -515,13 +515,20 @@
   - **Gates:** root tsc 0 · core dist emit + server `tsc -p` clean (server core'u dist'ten okuyor — rebuild şarttı) · web build green (747k JS) · archify helpers 33/33 · live prob 18/18 (generate A+B → DELETE A → dizin gitti → GET 404 → re-delete 404 → liste 1 → sibling export/view 200 → evil 400 → unknown 404 → dotdot 404 → registry 10) · mock grep temiz (tek hit = pre-existing anti-mock yorum) · gerçek `~/.lokma`'ya dokunulmadı.
 - **Sıradaki parça:** `DELETE /api/design/:id` (kalan: design, tests, vault).
 
+### 2026-09-04 — Phase 1 DELETE 3/5: `DELETE /api/design/:id` DONE (server 9a61b52 + web f6f9b1f)
+- **Executor run:** Phase 1 DELETE serisinin üçüncü parçası (archify mirror).
+  - **Server:** core `deleteArtifact()` (`assertArtifactId` 400 + `readManifest` 404 dokunmadan önce, sonra tüm `<id>/` dizinine `rm` — id tek segment validasyonlu, root dışına kaçamaz) + `DELETE /api/design/:id` (`{ok,id}`); plugin registry design 9→10 endpoint (footer 43; web `plugins.ts` footer yorum 42→43).
+  - **Web:** `api.deleteDesign()` + header Delete butonu (two-click arm, Trash2 lucide, confirm'de destructive; seçim değişince arm sıfırlanır, başarıda seçim/detay/html-edit temizlenir + liste yenilenir).
+  - **Gates:** root tsc 0 · core dist emit + server `tsc -p` clean + server dist rebuild (prob bayat-dist tuzağını yakaladı: route rebuild'e dek 404 — server core'u VE route'ları dist'ten okuyor) · web build green · design helpers 28/28 · live prob 12/12 (generate A+B → DELETE A → dizin gitti → GET 404 → re-delete 404 → liste 1 → sibling export/view 200 → evil 400 → unknown 404 → registry 10) · mock grep temiz (3 hit = etiketli input `placeholder`'ı, legit) · gerçek `~/.lokma`'ya dokunulmadı.
+- **Sıradaki parça:** `DELETE /api/tests/:id` (kalan: tests, vault).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-04 (Phase 1 DELETE 2/5: `DELETE /api/archify/:id` DONE — server 93d2e58 + web 1fe2b6d)
-- **Son işlem:** Phase 1 DELETE serisinin ikinci parçası canlı — Archify header'da gerçek Delete butonu (two-click confirm), server'da `deleteDiagram()` + `DELETE /api/archify/:id`; registry 10 endpoint; live prob 18/18; kalan DELETE'ler: design, tests, vault.
+- **Son güncelleme:** 2026-09-04 (Phase 1 DELETE 3/5: `DELETE /api/design/:id` DONE — server 9a61b52 + web f6f9b1f)
+- **Son işlem:** Phase 1 DELETE serisinin üçüncü parçası canlı — Design Studio header'da gerçek Delete butonu (two-click confirm), server'da `deleteArtifact()` + `DELETE /api/design/:id`; registry 10 endpoint; live prob 12/12; kalan DELETE'ler: tests, vault.
 
 ## Sıradaki adım (Phase 1/2/3 follow-up'ları)
 - **Sıradaki adım:**
-  1. Phase 1: core loop + agent runner daemon (cron firing, `lastRunAt` canlanması) + `DELETE` endpoint'leri (~~bots ✅ 4a51723/cdd00b0~~ · ~~archify ✅ 93d2e58/1fe2b6d~~ → sıradaki: design, sonra tests, vault — run başına TEK parça)
+  1. Phase 1: core loop + agent runner daemon (cron firing, `lastRunAt` canlanması) + `DELETE` endpoint'leri (~~bots ✅ 4a51723/cdd00b0~~ · ~~archify ✅ 93d2e58/1fe2b6d~~ · ~~design ✅ 9a61b52/f6f9b1f~~ → sıradaki: tests, sonra vault — run başına TEK parça)
   2. Phase 2: FTS5 vault araması + 3D vault grafiği + remote plugin marketplace + memory deep
   3. Phase 3: PNG/WebM export'ları (archify/design) + themes + sharing + cloud + mobile + perf + a11y
 

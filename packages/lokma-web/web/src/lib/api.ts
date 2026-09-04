@@ -205,6 +205,40 @@ export type RenameSessionRes = { ok: boolean; id: string; model: string; title: 
 export type DeleteSessionRes = { ok: boolean; id: string };
 export type MergeSessionRes = { ok: boolean; id: string; from: string; appended: number };
 export type RewindSessionRes = { ok: boolean; id: string; kept: number };
+export type CompactionAnchor = { role: string; toolName?: string; excerpt: string; timestamp: string };
+export type CompactionStatusRes = {
+  id: string;
+  messages: number;
+  chars: number;
+  hygieneNeeded: boolean;
+  summaryNeeded: boolean;
+  last: {
+    compactedAt: string;
+    mode: string;
+    compacted: boolean;
+    beforeMessages: number;
+    afterMessages: number;
+    beforeChars: number;
+    afterChars: number;
+    archived: number;
+    archiveMessages: number;
+  } | null;
+};
+export type CompactionRunRes = {
+  ok: boolean;
+  id: string;
+  compactedAt: string;
+  mode: string;
+  compacted: boolean;
+  beforeMessages: number;
+  afterMessages: number;
+  beforeChars: number;
+  afterChars: number;
+  archived: number;
+  archiveMessages: number;
+  anchors: CompactionAnchor[];
+  summary: string | null;
+};
 export type SlashCommandInfo = { id: string; name: string; hint: string; usage: string };
 export type CommandsRes = { commands: SlashCommandInfo[]; count: number };
 export type AgentInfo = { id: string; [k: string]: unknown };
@@ -918,6 +952,21 @@ export const api = {
     post<MergeSessionRes>(`/api/sessions/${encodeURIComponent(intoId)}/merge`, { from: fromId }),
   rewindSession: (id: string, keepMessages: number) =>
     post<RewindSessionRes>(`/api/sessions/${encodeURIComponent(id)}/rewind`, { keepMessages }),
+  // Compaction — two-tier Docs/28 §1.3 shrink (wave 3a: REST + client only,
+  // pane UI rides with session_search in wave 3b).
+  getCompactionStatus: (id: string, cwd?: string) =>
+    get<CompactionStatusRes>(
+      cwd
+        ? `/api/sessions/${encodeURIComponent(id)}/compaction?cwd=${encodeURIComponent(cwd)}`
+        : `/api/sessions/${encodeURIComponent(id)}/compaction`,
+    ),
+  runCompaction: (id: string, body?: { mode?: 'hygiene' | 'full'; cwd?: string }) =>
+    post<CompactionRunRes>(
+      body?.cwd
+        ? `/api/sessions/${encodeURIComponent(id)}/compaction?cwd=${encodeURIComponent(body.cwd)}`
+        : `/api/sessions/${encodeURIComponent(id)}/compaction`,
+      body?.mode ? { mode: body.mode } : {},
+    ),
 
   // Slash commands — server-owned registry behind the Composer `/` palette.
   listCommands: () => get<CommandsRes>('/api/commands'),

@@ -44,3 +44,29 @@ export const PluginRecordSchema = z.object({
 });
 
 export type PluginRecord = z.infer<typeof PluginRecordSchema>;
+
+/**
+ * One remote marketplace hit — a REAL GitHub repo carrying the
+ * `lokma-plugin` topic (Docs/23 §9, Phase 2 marketplace wiring). Stars and
+ * descriptions come straight from the GitHub Search API; nothing is
+ * invented. `url` is the repo `html_url`, which the existing
+ * add-from-URL installer accepts (github.com is a public https host).
+ */
+export const MarketplaceItemSchema = z.object({
+  /** `owner/repo` — stable identity for install dedupe. */
+  repo: z.string().min(1).max(120),
+  /** Repo name (short label for the row). */
+  name: z.string().min(1).max(120),
+  /** Owner login (shown as the author). */
+  author: z.string().min(1).max(120),
+  /** Repo description (may be empty upstream). */
+  description: z.string().max(500),
+  /** Live `stargazers_count` — never invented. */
+  stars: z.number().int().nonnegative(),
+  /** Repo `html_url` — feeds `POST /api/plugins/install` directly. */
+  url: z.string().url().max(500),
+  /** Repo `updated_at` ISO string (freshness signal). */
+  updatedAt: z.string().min(1).max(40),
+});
+
+export type MarketplaceItem = z.infer<typeof MarketplaceItemSchema>;

@@ -285,6 +285,19 @@ export type VaultSearchRes = {
 };
 export type VaultIngestBody = { path: string; content: string; provenance?: string };
 export type VaultIngestRes = { ok: boolean; path: string; bytes: number; created: boolean };
+export type MemoryTarget = 'memory' | 'user';
+export type MemoryUsageRes = {
+  ok: boolean;
+  target: MemoryTarget;
+  entries: string[];
+  count: number;
+  chars: number;
+  limit: number;
+  usage: string;
+};
+export type MemoryAddBody = { target?: MemoryTarget; content: string };
+export type MemoryReplaceBody = { target?: MemoryTarget; old_text: string; content: string };
+export type MemoryRemoveBody = { target?: MemoryTarget; old_text: string };
 export type UsageModelRow = {
   model: string;
   family: string;
@@ -968,6 +981,18 @@ export const api = {
   /** Delete a `.md` note — the undo for ingest. */
   deleteVaultNote: (path: string) =>
     del<{ ok: boolean; path: string }>(`/api/vault/note?path=${encodeURIComponent(path)}`),
+
+  // Memory — global §-delimited MEMORY.md / USER.md store (Docs/28 §5.2).
+  /** Entries plus the live `chars/limit` budget line. */
+  getMemory: (target: MemoryTarget = 'memory') =>
+    get<MemoryUsageRes>(`/api/memory?target=${encodeURIComponent(target)}`),
+  /** Append an entry (exact-dup is an idempotent ok; overflow is 409 `memory_full`). */
+  addMemory: (body: MemoryAddBody) => post<MemoryUsageRes>('/api/memory', body),
+  /** Replace the single entry containing `old_text` (0 → 404, 2+ → 409). */
+  replaceMemory: (body: MemoryReplaceBody) => patch<MemoryUsageRes>('/api/memory', body),
+  /** Remove the single entry containing `old_text` (0 → 404, 2+ → 409). */
+  deleteMemory: (body: MemoryRemoveBody) =>
+    request<MemoryUsageRes>('/api/memory', { method: 'DELETE', body: JSON.stringify(body) }),
 
   // Usage — real token/cost accounting (W2-7). The ledger fills from WS runs.
   getUsageSummary: (range: UsageRange = '7d', cwd?: string) =>

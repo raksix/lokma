@@ -2050,6 +2050,38 @@ survives; never delete both at once). If even that serves stale code, escalate i
     follow-up); unanswered gates auto-deny after 10 min; no per-agent
     state transitions or concurrency-cap checks yet.
   - Next piece: Phase 2 FTS5 vault search (ranked-substring replacement).
+- 2026-09-04 — Phase 2 FTS5 vault search DONE
+  (core 03b3e8f + server 95d6ed2 + web 5543f20, all pushed).
+  - **Executor run:** ranked substring is gone from the hot path — search is
+    SQLite FTS5 (`bun:sqlite`, zero native deps) with weighted BM25
+    (path 5 / title 10 / tags 3 / body 1) + 12-token `snippet()` + AND
+    semantics with last-term `*` prefix. Core `vault/fts.ts` (new:
+    `buildMatchQuery`, per-call open/sync/close `syncVaultIndex()` at
+    `<vault>/.fts5/vault.db` — dot-dir, never walked as notes — stat-based
+    incremental, `searchFts()` with a sargable meta-table folder-prefix
+    range filter, dynamic import so plain-node degrades to substring and
+    reports `engine: 'substring'`), `vault.ts` (`walkMarkdown`/`parseNote`
+    exported for single-parser/single-walk DRY, `searchSubstring` kept as
+    the degrade path, new `searchNotesDetailed()` + same-contract
+    `searchNotes()` wrapper so graph seeds are FTS-powered too),
+    `fts.test.ts` 29/29 (startup-env temp HOME + refuse-guard; title beats
+    body, AND narrows, prefix completes, folder scoping, edit/delete sync,
+    bad_query/bad_folder). Server `GET /api/vault/search?q=&folder=`
+    (`{hits,count,engine}`, plugin registry vault 5→6 endpoints). Web
+    `api.searchVaultNotes()` + global SearchModal on the search endpoint
+    (pre-ranked hits bypass the client substring re-filter, which used to
+    drop body-only matches) + vault footer now reads `FTS5 full-text`.
+  - **Gates:** root `tsc --noEmit` 0 · core+server `tsc -p`/dist clean ·
+    web build green · fts probe 29/29 + full web suite 31/31 · live
+    in-process probe 21/21 (engine fts5, ranking, folder scoping, evil
+    folder 400, registry, no stale rows) · mock grep on touched files zero
+    (labeled input `placeholder=` attrs only, legit) · real `~/.lokma`
+    untouched (mkdtemp HOME everywhere).
+  - **Honest scope:** punctuation-only queries return zero hits (FTS5
+    tokenizes them away — substring used to match literally); empty `q`
+    still lists path-ordered (no ranking needed); snippet is body-anchored
+    (title/tag-only matches carry `snippet: ''`, like before).
+  - Next piece: Phase 2 3D vault graph toggle with real data.
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

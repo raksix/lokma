@@ -563,14 +563,19 @@
 - **Dürüst kapsam:** native function-calling yok (text-block her modelde çalışır); tool satırları geçmişte düz metin render olur; cron fire'lar hâlâ text-only; cevapsız gate 10 dk'da auto-deny.
 - **Sıradaki parça:** Phase 2 FTS5 vault araması (ranked-substring yerine gerçek FTS5).
 
+### 2026-09-04 — Phase 2 FTS5 vault araması DONE (core 03b3e8f + server 95d6ed2 + web 5543f20)
+- **Executor run:** vault araması artık gerçek SQLite FTS5 (`bun:sqlite`, sıfır native dep) — ağırlıklı BM25 (path 5 / title 10 / tags 3 / body 1) + snippet + AND + son-terim prefix. İndeks `<vault>/.fts5/vault.db`'de, stat-tabanlı artımlı sync; plain-node'da substring'e düşer (`engine` raporlanır). Yeni `GET /api/vault/search?q=&folder=` (`{hits,count,engine}`, registry vault 5→6). Global SearchModal artık bu endpoint'te (client substring re-filtre kalktı — body-only eşleşmeler düşmüyordu); graph seed'leri de FTS-güçlü; footer `FTS5 full-text`.
+- **Gates:** root tsc 0 · core+server clean · web build green · fts probu 29/29 + web suite 31/31 · canlı in-process prob 21/21 · mock grep temiz · gerçek `~/.lokma`'ya dokunulmadı.
+- **Sıradaki parça:** Phase 2 3D vault grafiği (gerçek veriyle toggle).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-04 (Phase 1 core-loop hardening wave 2b: WS tool/permission/ask frames DONE — core aaf9b7b + server 75efc63)
-- **Son işlem:** Chat artık gerçek agent döngüsü — model dosya okuyup yazabiliyor, komut koşabiliyor, izin isteyip soru sorabiliyor; hepsi canlı WS frame'leriyle (tool_start/tool_result/permission_request/ask_user_question), transcript kanıtlı. Loop probu 27/27 + WS e2e 12/12.
+- **Son güncelleme:** 2026-09-04 (Phase 2 FTS5 vault araması DONE — core 03b3e8f + server 95d6ed2 + web 5543f20)
+- **Son işlem:** Vault araması ranked-substring'den SQLite FTS5'e geçti — BM25 sıralı, snippet'li, folder-filtreli; yeni `GET /api/vault/search` canlı, SearchModal bağlı. FTS probu 29/29 + canlı prob 21/21.
 
 ## Sıradaki adım (Phase 1/2/3 follow-up'ları)
 - **Sıradaki adım:**
   1. Phase 1: ~~`DELETE` endpoint'leri (bots ✅ 4a51723/cdd00b0 · archify ✅ 93d2e58/1fe2b6d · design ✅ 9a61b52/f6f9b1f · tests ✅ 1fbd616/1ba81d9 · vault ✅ 7cfdbe6/b0b5d9d — SERİ TAMAMLANDI)~~ + ~~cron firing daemon ✅ 9c879d3/6e4a584 (30s ticker + Run-now + `lastRunAt` + run history — WAVE 1 TAMAMLANDI)~~ + ~~gerçek provider streaming ✅ 98534e9/be7adb7 (mock echo öldü, key/baseUrl çözümleme + gerçek abort — WAVE 1 TAMAMLANDI)~~ + ~~core tool foundation ✅ 1f95d06 (gate + 5 builtin + executor + 46/46 probe — WAVE 2a TAMAMLANDI)~~ + ~~WS tool/permission/ask frame'leri ✅ aaf9b7b/75efc63 (agent döngüsü canlı: `<tool>`/`<ask>` blokları + pending-gate resume + loop probu 27/27 + WS e2e 12/12 — WAVE 2b TAMAMLANDI)~~ (Phase 1 core-loop TAMAMLANDI)
-  2. Phase 2: FTS5 vault araması + 3D vault grafiği + remote plugin marketplace + memory deep
+  2. Phase 2: ~~FTS5 vault araması ✅ 03b3e8f/95d6ed2/5543f20 (SQLite FTS5 + BM25 + snippet + `/api/vault/search` + SearchModal — TAMAMLANDI)~~ + 3D vault grafiği + remote plugin marketplace + memory deep
   3. Phase 3: PNG/WebM export'ları (archify/design) + themes + sharing + cloud + mobile + perf + a11y
 
 ---

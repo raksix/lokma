@@ -2362,6 +2362,53 @@ survives; never delete both at once). If even that serves stale code, escalate i
     404 (new branch live — old code answered `bad_format` 400).
   - Next piece: Phase 3 WebM exports (archify/design), then themes,
     sharing, cloud, mobile, perf + a11y.
+- 2026-09-04 — Phase 3 archify WebM export DONE
+  (core 2313b60 + server bd690b4 + web 2f6a840, all pushed).
+  - **Executor run:** the Export tab offers a sixth live format — WebM
+    encodes the deterministic SVG as a 2s slow-zoom (12 frames at 6fps:
+    per-frame HTML with baked CSS zoom+drift, one headless-Chromium
+    `--screenshot` per frame, single ffmpeg libvpx-vp9 pass, no new
+    dependencies). The sibling run left core+server pushed with a 4-file
+    web WIP dirty — adopted as this run's single piece: reviewed fresh
+    (no fixes needed: `runExport` already passes `scale` for png only,
+    the generic blob downloader covers webm, the pane footer was already
+    honest), all gates re-run, single atomic web commit.
+  - **Core:** `archify/webm.ts` (new: `WEBM_FRAMES=12`/`WEBM_FPS=6`/
+    `WEBM_MAX_EDGE=1280`/`WEBM_TIMEOUT_MS=300s`, `LOKMA_FFMPEG_BIN`-first
+    `findFfmpegBinary()`, `buildWebmFrameHtml()` zoom 1.00→1.20 with
+    left→right drift, `exportDiagramWebm()` with `bad_id` 400 /
+    `design_not_found`-style 404 / `needs_toolchain` 400 (names the
+    missing binary) / `raster_failed`+`encode_failed` 500 + EBML-magic
+    verification; reuses archify `findChromeBinary` DRY) +
+    `webm.test.ts` 23/23 (frame-shell contract + validation 400s/404
+    without toolchain + end-to-end encode with real Chrome 146 +
+    ffmpeg 6.1.1: EBML signature, non-trivial bytes, fps/frames/dims).
+  - **Server:** `GET /api/archify/:id/export?format=webm` in
+    `archify.ts` (`video/webm` attachment `<id>.webm` +
+    `X-Video-Width/Height/Fps/Frames` headers; the png `?scale=` branch
+    is untouched). No plugin-registry change (the single
+    `GET /api/archify/:id/export` entry already covers every format).
+  - **Web:** `ArchifyExportFormat` + `ARCHIFY_EXPORTS` gain `webm`;
+    Export tab gains a WEBM button (same `runExport` path, no scale
+    param); `archify.test.ts` 6-format check; footer now describes the
+    real 2s clip instead of the follow-up note.
+  - **Gates:** root `tsc --noEmit` 0 · server `tsc -p` + dist clean ·
+    web build green · web suite 33/33 files PASS (archify 33 checks) ·
+    mock grep on touched files clean (anti-mock comments + labeled
+    input `placeholder=`s, legit) · real `~/.lokma` untouched.
+  - **Live socket probe** (temp server :3499, temp HOME): generate →
+    `export?format=webm` 200 `video/webm` + `<id>.webm` disposition +
+    1811 real bytes with EBML magic `1a45dfa3` + 248x134/6fps/12f
+    headers; unknown id 404 `diagram_not_found`; `?format=avi` still
+    400 `bad_format`; svg sibling still 200. Probe lesson:
+    light-my-request stringifies binary bodies (UTF-8 replacement
+    chars) — byte assertions need a real socket or curl, `inject`
+    only proves status/headers.
+  - **Honest scope:** archify only (design WebM is the next piece);
+    12 cold Chrome launches ≈ 13-17s per encode; box without Chromium
+    or ffmpeg gets an honest `needs_toolchain` 400 toast.
+  - Next piece: Phase 3 design WebM export, then themes, sharing,
+    cloud, mobile, perf + a11y.
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

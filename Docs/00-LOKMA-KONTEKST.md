@@ -631,17 +631,26 @@
 - **Web:** `DesignExportFormat`/`DESIGN_EXPORTS` + `png`; `downloadDesignExport(id, format, scale?)`; Export tab'ında PNG butonu + etiketli 1x/2x select; footer artık sadece PDF/PPTX/MP4'ü follow-up sayıyor.
 - **Gates:** root tsc 0 · core dist + server clean · web build green · design 28/28 + full web suite 33/33 · mock grep temiz (anti-mock yorumlar + etiketli `placeholder`'lar, legit) · gerçek `~/.lokma`'ya dokunulmadı.
 - **Dürüst kapsam:** sadece PNG (PDF print-to-PDF toolchain ister, PPTX/MP4 PptxGenJS/ffmpeg); viewport sabit 1280x800 (artifact'lar tam-sayfa doküman, archify SVG'si gibi ölçülü canvas değil).
-- **Sıradaki parça:** Phase 3 WebM export'ları (archify/design), sonra themes, sharing, cloud, mobile, perf + a11y.
+
+### 2026-09-04 — Phase 3 archify WebM export DONE (core 2313b60 + server bd690b4 + web 2f6a840)
+- **Executor run:** Export sekmesinde altıncı canlı format — WebM, deterministik SVG'yi 2sn'lik slow-zoom klip olarak encode ediyor (12 frame @ 6fps, frame başına headless Chromium `--screenshot` + tek ffmpeg libvpx-vp9 pass, sıfır yeni bağımlılık). Sibling run core+server'ı push'layıp 4 dosyalık web WIP'i kirli bırakmıştı — bu run'ın tek parçası olarak devralındı: taze incelendi (düzeltme gerekmedi), tüm kapılar yeniden koşuldu, tek atomic web commit.
+- **Core:** `archify/webm.ts` (yeni: `WEBM_FRAMES=12`/`WEBM_FPS=6`/`WEBM_MAX_EDGE=1280`, `LOKMA_FFMPEG_BIN`-öncelikli `findFfmpegBinary()`, `buildWebmFrameHtml()` 1.00→1.20 zoom + drift, `exportDiagramWebm()` + EBML-magic doğrulaması) + `webm.test.ts` 23/23 (gerçek Chrome 146 + ffmpeg 6.1.1 ile e2e encode dahil).
+- **Server:** `GET /api/archify/:id/export?format=webm` (`video/webm` attachment + `X-Video-*` header'ları); plugin registry değişmedi (tek export entry tüm formatları kapsıyor).
+- **Web:** `ARCHIFY_EXPORTS` + pane'e WEBM butonu (aynı `runExport` yolu, scale yok); footer artık gerçek 2sn'lik klibi anlatıyor.
+- **Gates:** root tsc 0 · server clean · web build green · web suite 33/33 · mock grep temiz · gerçek `~/.lokma`'ya dokunulmadı.
+- **Canlı soket probu** (temp :3499): webm 200 + 1811 gerçek byte EBML `1a45dfa3` + 248x134/6fps/12f; unknown 404; `avi` 400; svg 200. Prob dersi: light-my-request binary body'yi UTF-8 ile bozar — byte assertion için gerçek soket/curl şart.
+- **Dürüst kapsam:** sadece archify (design WebM sonraki parça); encode başına ~13-17sn (12 cold Chrome); toolchain'siz kutuda dürüst `needs_toolchain` 400.
+- **Sıradaki parça:** Phase 3 design WebM export, sonra themes, sharing, cloud, mobile, perf + a11y.
 
 ## Son Durum
-- **Son güncelleme:** 2026-09-04 (Phase 3 design PNG export DONE — core c3318d6 + server 454e0f4 + web dbd33e0)
-- **Son işlem:** Export sekmesinde dördüncü canlı format — PNG raster (`GET /api/design/:id/export?format=png[&scale=1|2]`, headless Chromium, 1x/2x select). Core probu 15/15 + server 17/17 + design 28/28.
+- **Son güncelleme:** 2026-09-04 (Phase 3 archify WebM export DONE — core 2313b60 + server bd690b4 + web 2f6a840)
+- **Son işlem:** Export sekmesinde altıncı canlı format — WebM slow-zoom klip (`GET /api/archify/:id/export?format=webm`, 12 frame @ 6fps, Chromium + ffmpeg). Core probu 23/23 + canlı soket probu EBML `1a45dfa3`.
 
 ## Sıradaki adım (Phase 1/2/3 follow-up'ları)
 - **Sıradaki adım:**
   1. Phase 1: ~~`DELETE` endpoint'leri (bots ✅ 4a51723/cdd00b0 · archify ✅ 93d2e58/1fe2b6d · design ✅ 9a61b52/f6f9b1f · tests ✅ 1fbd616/1ba81d9 · vault ✅ 7cfdbe6/b0b5d9d — SERİ TAMAMLANDI)~~ + ~~cron firing daemon ✅ 9c879d3/6e4a584 (30s ticker + Run-now + `lastRunAt` + run history — WAVE 1 TAMAMLANDI)~~ + ~~gerçek provider streaming ✅ 98534e9/be7adb7 (mock echo öldü, key/baseUrl çözümleme + gerçek abort — WAVE 1 TAMAMLANDI)~~ + ~~core tool foundation ✅ 1f95d06 (gate + 5 builtin + executor + 46/46 probe — WAVE 2a TAMAMLANDI)~~ + ~~WS tool/permission/ask frame'leri ✅ aaf9b7b/75efc63 (agent döngüsü canlı: `<tool>`/`<ask>` blokları + pending-gate resume + loop probu 27/27 + WS e2e 12/12 — WAVE 2b TAMAMLANDI)~~ (Phase 1 core-loop TAMAMLANDI)
   2. Phase 2: ~~FTS5 vault araması ✅ 03b3e8f/95d6ed2/5543f20 (SQLite FTS5 + BM25 + snippet + `/api/vault/search` + SearchModal — TAMAMLANDI)~~ + ~~3D vault grafiği ✅ 2d4ad5f (bağımlılıksız canvas star-map, aynı canlı veri, sürükle-döndür + zoom + auto-rotate — TAMAMLANDI)~~ + ~~remote plugin marketplace ✅ 0850343/563ab98/78e59e6 (canlı GitHub topic araması + Marketplace sekmesi + Install wiring — TAMAMLANDI)~~ + memory deep wave 1 ✅ bfad761/ba8dc13/22ec296 (`GET/POST/PATCH/DELETE /api/memory` + MemoryError + usage — TAMAMLANDI) + memory deep wave 2 ✅ 7d0841a (Memory UI sekmesi: toggle + usage meter + CRUD — TAMAMLANDI) + wave 3a ✅ c30c8aa/6ba9d9f/2695474 (2-tier transcript compaction: hygiene + extractive summary + archive + `GET|POST /:id/compaction` — TAMAMLANDI) + wave 3b ✅ c651b02/b8eaf4f/7363b61 (session_search FTS + compaction pane UI: `GET /api/sessions/search` + Search-transcripts kartı + Compact-a-session kartı — TAMAMLANDI, Phase 2 memory-deep TAMAMLANDI)
-  3. Phase 3: archify PNG ✅ ab5c1e7/5866a89/42413ca (headless-Chromium raster + `?scale=1|2` + Export tab'ında PNG butonu — TAMAMLANDI) + design PNG ✅ c3318d6/454e0f4/dbd33e0 (stored HTML'i 1280x800 viewport'ta raster + `?scale=1|2` + Export tab'ında PNG butonu — TAMAMLANDI) + WebM + themes + sharing + cloud + mobile + perf + a11y
+  3. Phase 3: archify PNG ✅ ab5c1e7/5866a89/42413ca (headless-Chromium raster + `?scale=1|2` + Export tab'ında PNG butonu — TAMAMLANDI) + design PNG ✅ c3318d6/454e0f4/dbd33e0 (stored HTML'i 1280x800 viewport'ta raster + `?scale=1|2` + Export tab'ında PNG butonu — TAMAMLANDI) + archify WebM ✅ 2313b60/bd690b4/2f6a840 (12 frame @ 6fps slow-zoom klip, Chromium + ffmpeg, `?format=webm` + Export tab'ında WEBM butonu — TAMAMLANDI) + design WebM + themes + sharing + cloud + mobile + perf + a11y
 
 ---
 *Bu dosya otomatik yönetilir. Elle silme.*

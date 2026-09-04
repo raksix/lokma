@@ -1068,6 +1068,9 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ html }),
     }),
+  /** Remove the whole on-disk dir (artifact.json + html + design.md + critique). */
+  deleteDesign: (id: string) =>
+    del<{ ok: boolean; id: string }>(`/api/design/${encodeURIComponent(id)}`),
   /** Re-run the 5D heuristic critique over the stored HTML. */
   critiqueDesign: (id: string) => post<CritiqueDesignRes>(`/api/design/${encodeURIComponent(id)}/critique`, {}),
   /** 4 bundled system cards (name/preset/tokens for the picker). */

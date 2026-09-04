@@ -13,6 +13,7 @@ import {
   Search,
   Smartphone,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +46,7 @@ import {
  * Critique tab shows the real 5-dimension heuristic
  * (`POST /api/design/:id/critique`), exports download real files, and the
  * DESIGN.md strip parses the real `.lokma/DESIGN.md` (`GET /api/design/guard`).
+ * Delete removes the real dir (`DELETE /api/design/:id`, two-click arm).
  * NOT ported: the concept's toast-only Generate/Preview/Export buttons and
  * its static preview copy — the viewer is always the live build, and the
  * pane only offers the export formats the server actually serves
@@ -106,6 +108,9 @@ export function DesignPane() {
   const [saving, setSaving] = React.useState(false);
   const [critiquing, setCritiquing] = React.useState(false);
   const [exporting, setExporting] = React.useState<string | null>(null);
+  // Two-click delete arm (archify-pane pattern) + in-flight flag.
+  const [confirmDelete, setConfirmDelete] = React.useState<string | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
   const runRef = React.useRef(0);
   const searchRef = React.useRef<HTMLInputElement>(null);
 
@@ -248,6 +253,29 @@ export function DesignPane() {
     [selected, exporting],
   );
 
+  const runDelete = React.useCallback(async () => {
+    if (!selected || deleting) return;
+    if (confirmDelete !== selected) {
+      setConfirmDelete(selected);
+      return;
+    }
+    setConfirmDelete(null);
+    setDeleting(true);
+    try {
+      await api.deleteDesign(selected);
+      toast(`Deleted ${selected}`);
+      setSelected(null);
+      setDetail(null);
+      setDetailError(null);
+      setHtmlEdit('');
+      await loadList();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'delete failed');
+    } finally {
+      setDeleting(false);
+    }
+  }, [selected, deleting, confirmDelete, loadList]);
+
   const filtered = React.useMemo(
     () => filterArtifacts(items, typeFilter as 'all' | (typeof DESIGN_TYPES)[number], q),
     [items, typeFilter, q],
@@ -282,6 +310,18 @@ export function DesignPane() {
           <span className="px-1.5 py-0.5 rounded-full bg-terracotta text-white text-[10px]">BYOK</span>
           <Button variant="ghost" size="sm" className="h-5 text-[11px] gap-1" onClick={() => setFormOpen((v) => !v)}>
             + New
+          </Button>
+          <Button
+            variant={confirmDelete === selected ? 'destructive' : 'ghost'}
+            size="sm"
+            className="h-5 text-[11px] gap-1"
+            aria-label={confirmDelete === selected ? 'Confirm artifact delete' : 'Delete artifact'}
+            title={confirmDelete === selected ? 'Click again to confirm delete' : 'Delete this artifact'}
+            disabled={!selected || deleting}
+            onClick={() => void runDelete()}
+          >
+            <Trash2 className="w-3 h-3" />
+            {confirmDelete === selected ? 'Confirm?' : deleting ? 'Deleting…' : 'Delete'}
           </Button>
         </span>
       </div>
@@ -396,7 +436,10 @@ export function DesignPane() {
               return (
                 <button
                   key={d.id}
-                  onClick={() => setSelected(d.id)}
+                  onClick={() => {
+                    setConfirmDelete(null);
+                    setSelected(d.id);
+                  }}
                   title={`${d.brief} · ${d.system} · ${overallLabel(d.overall)}`}
                   className={`inline-flex items-center gap-1 h-6 px-2 rounded-md border text-[11px] ${
                     active ? 'border-terracotta/50 bg-terracotta/10' : 'border-line bg-white dark:bg-[#1E1E21]'

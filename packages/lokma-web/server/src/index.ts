@@ -1,4 +1,5 @@
 import { createApp } from './app.js';
+import { startCronTicker } from './cron-runner.js';
 
 /**
  * Lokma server entry — Fastify 5 + WS.
@@ -11,6 +12,9 @@ export async function startServer(opts: { port?: number; host?: string } = {}): 
   const host = opts.host ?? '127.0.0.1';
   const app = await createApp();
   await app.listen({ port, host });
+  // Agent-runner daemon, wave 1: fire due cron jobs every 30s.
+  // Started here (never in createApp) so in-process probes stay inert.
+  startCronTicker(app);
   console.log(`[lokma-server] listening on http://${host}:${port} — health at /health`);
 }
 

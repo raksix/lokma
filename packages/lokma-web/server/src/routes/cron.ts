@@ -9,8 +9,10 @@ import {
   listAgentCronJobs,
   listApprovalDecisions,
   listCronJobs,
+  listRunRecords,
   updateCronJob,
 } from 'lokma-core';
+import { fireCronJob } from '../cron-runner.js';
 
 /**
  * Per-agent cron + approvals for the CronApprovals pane (W6-25,
@@ -21,11 +23,17 @@ import {
  * the id; bad schedules fail closed with 400 `bad_schedule`),
  * `PATCH /api/agents/:id/cron/:jobId` (schedule/task/enabled subset,
  * empty → 400 `empty_patch`), `DELETE` (unknown → 404, never silent),
+ * `POST /api/agents/:id/cron/:jobId/run` (fire NOW — streams the agent's
+ * model into a real `cron-<job>-<ts>` session, stamps `lastRunAt`,
+ * appends a run record; answers `{ ok, job, run }` where `ok` is false
+ * when the model call failed — the failure is recorded, never thrown),
+ * `GET /api/cron/runs` (newest-first run history, `?limit=` capped 500),
  * `GET /api/approvals` (newest-first WS decision history — the log fills
  * as real `permission_response` / `ask_response` frames arrive; the
  * Allow/Deny/Always RULES live in `PATCH /api/config` permissions, the
  * same store the chat card writes — one store, two views).
- * Firing jobs (a daemon) is a later wave: `lastRunAt` stays null.
+ * Firing is live: the server ticker (`cron-runner.ts`, every 30s) fires
+ * due jobs on schedule; the pane's Run button fires on demand.
  * All failures answer `{ code, message }` (never raw stacks or secrets).
  */
 
@@ -83,6 +91,23 @@ export async function cronRoutes(app: FastifyInstance): Promise<void> {
     } catch (e) {
       return cronErr(reply, e);
     }
+  });
+
+  app.post('/api/agents/:id/cron/:jobId/run', async (req, reply) => {
+    const { id, jobId } = req.params as { id: string; jobId: string };
+    try {
+      const { job, run } = await fireCronJob(app, id, jobId, 'manual');
+      return { ok: run.status === 'ok', job, run };
+    } catch (e) {
+      return cronErr(reply, e);
+    }
+  });
+
+  app.get('/api/cron/runs', async (req) => {
+    const query = req.query as { limit?: unknown };
+    const limit = typeof query.limit === 'string' && query.limit.trim() !== '' ? Number(query.limit) : 100;
+    const runs = await listRunRecords(Number.isSafeInteger(limit) ? (limit as number) : 100);
+    return { runs, count: runs.length };
   });
 
   app.get('/api/approvals', async (req) => {

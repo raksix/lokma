@@ -5,9 +5,9 @@ import { ensureDir, readJson, writeAtomic } from '../utils/fs.js';
 
 /**
  * Per-agent cron jobs (W6-25, Docs/30 §5 cron per agent). Jobs persist in
- * `~/.lokma/cron/jobs.json` (scoped to `agentId`, same shape the future
- * agent runner will fire). Firing jobs (a daemon) is a later wave —
- * `lastRunAt` stays null until then, and the pane says so.
+ * `~/.lokma/cron/jobs.json` (scoped to `agentId`). The agent-runner daemon
+ * (Phase 1, `cron/runner.ts` + server ticker) fires due jobs and stamps
+ * `lastRunAt` via `recordJobRun()` — every fire lands a `CronRunRecord`.
  */
 
 /** Typed cron failure — routes map it straight to `{ code, message }`. */
@@ -132,13 +132,13 @@ export function assertValidTask(task: unknown): asserts task is string {
 
 type CronParts = { minute: string; hour: string; dom: string; month: string; dow: string };
 
-function splitSchedule(schedule: string): CronParts {
+export function splitSchedule(schedule: string): CronParts {
   const [minute, hour, dom, month, dow] = schedule.trim().split(/\s+/);
   return { minute, hour, dom, month, dow };
 }
 
 /** Expand one field into the matching numbers (dow normalized: 7 → 0). */
-function expandField(field: string, min: number, max: number, isDow: boolean): Set<number> {
+export function expandField(field: string, min: number, max: number, isDow: boolean): Set<number> {
   const out = new Set<number>();
   for (const item of field.split(',')) {
     const [range, stepRaw] = item.split('/');
@@ -165,7 +165,7 @@ function expandField(field: string, min: number, max: number, isDow: boolean): S
 }
 
 /** Standard cron day semantics: restricted dom+dow = OR, else the restricted one. */
-function dayMatches(parts: CronParts, year: number, month: number, day: number, dow: number): boolean {
+export function dayMatches(parts: CronParts, year: number, month: number, day: number, dow: number): boolean {
   const domRestricted = parts.dom !== '*';
   const dowRestricted = parts.dow !== '*';
   const domHit = expandField(parts.dom, 1, 31, false).has(day);
@@ -319,4 +319,22 @@ export async function deleteCronJob(agentId: string, jobId: string): Promise<{ i
   delete jobs[jobId];
   await writeJobsFile(jobs);
   return { id: jobId };
+}
+
+/**
+ * Stamp a job's `lastRunAt` after the runner fires it (scheduled or manual).
+ * Scoped by job id only — the runner already resolved the agent — but the
+ * id shape is still validated and unknown ids 404 (never silent).
+ */
+export async function recordJobRun(jobId: string, finishedAt: string): Promise<CronJob> {
+  assertJobIdShape(jobId);
+  const jobs = await readJobsFile();
+  const current = jobs[jobId];
+  if (!current) {
+    throw new CronError('cron_not_found', `no cron job ${jobId}`, 404);
+  }
+  const next: Omit<CronJob, 'nextRunAt'> = { ...current, lastRunAt: finishedAt, updatedAt: finishedAt };
+  jobs[jobId] = next;
+  await writeJobsFile(jobs);
+  return toView(next);
 }

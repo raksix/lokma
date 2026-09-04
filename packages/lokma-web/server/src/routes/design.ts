@@ -5,6 +5,7 @@ import {
   critiqueArtifact,
   deleteArtifact,
   exportArtifact,
+  exportArtifactPng,
   generateArtifact,
   getArtifact,
   listArtifacts,
@@ -24,7 +25,9 @@ import {
  * `DELETE /api/design/:id` (removes the whole on-disk dir — unknown 404,
  * bad shape 400);
  * `POST /api/design/:id/critique` (re-runs the 5D heuristic, always 200);
- * `GET /api/design/:id/export?format=html|zip|json` (real file downloads —
+ * `GET /api/design/:id/export?format=html|zip|json|png[&scale=1|2]` (real
+ * file downloads — PNG rasterizes the stored HTML with headless Chromium,
+ * answering `needs_toolchain` 400 when no browser is installed;
  * pdf/pptx/mp4 need a binary toolchain and answer 400 `needs_toolchain`,
  * so the pane only offers what exists here; no dead buttons);
  * `GET /api/design/:id/view` (stable viewer URL — the pane iframes this;
@@ -110,8 +113,19 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/api/design/:id/export', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const query = req.query as { format?: unknown };
+    const query = req.query as { format?: unknown; scale?: unknown };
     try {
+      if (query.format === 'png') {
+        // `?scale=` arrives as a string — garbage becomes NaN → bad_scale 400.
+        const scale = query.scale === undefined ? undefined : { scale: Number(query.scale) };
+        const png = await exportArtifactPng(id, scale);
+        return reply
+          .header('Content-Type', png.contentType)
+          .header('Content-Disposition', `attachment; filename="${png.filename}"`)
+          .header('X-Image-Width', String(png.width))
+          .header('X-Image-Height', String(png.height))
+          .send(png.body);
+      }
       const { filename, contentType, body } = await exportArtifact(id, query.format);
       return reply
         .header('Content-Type', contentType)

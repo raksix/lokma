@@ -3,7 +3,7 @@
  * No fetching here — the pane owns all I/O through `@/lib/api`.
  * Relative ages reuse `formatRunAgo` from the Testing pane (DRY).
  */
-import type { ApprovalDecisionView, CronJobView } from '@/lib/api';
+import type { ApprovalDecisionView, CronJobView, CronRunRecordView } from '@/lib/api';
 
 /** Client mirror of the server schedule rule (deep check is server-side). */
 export function validateScheduleInput(value: string): string | null {
@@ -76,10 +76,30 @@ export function jobTone(enabled: boolean): string {
 /** Next-run cell — disabled jobs never claim a future fire. */
 export function formatNextRun(job: CronJobView): string {
   if (!job.enabled) return 'paused';
-  if (!job.nextRunAt) return job.lastRunAt ? `last ${job.lastRunAt.slice(0, 10)}` : 'never (no daemon yet)';
+  if (!job.nextRunAt) return job.lastRunAt ? `last ${job.lastRunAt.slice(0, 10)}` : 'never';
   const d = new Date(job.nextRunAt);
   if (Number.isNaN(d.getTime())) return '—';
   return `next ${d.toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })}`;
+}
+
+/** Last-fire cell — alive once the runner daemon fires (scheduled or manual). */
+export function formatLastRun(job: CronJobView): string {
+  if (!job.lastRunAt) return 'not run yet';
+  const d = new Date(job.lastRunAt);
+  if (Number.isNaN(d.getTime())) return '—';
+  return `last run ${d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+}
+
+/** Run-record dot tone (concept parity: emerald ok, red failed). */
+export function runTone(status: CronRunRecordView['status']): string {
+  return status === 'ok' ? 'bg-emerald-500' : 'bg-red-500';
+}
+
+/** One-line run summary for the history list (trigger + outcome, honest). */
+export function runLabel(run: CronRunRecordView): string {
+  const when = run.trigger === 'manual' ? 'manual' : 'scheduled';
+  if (run.status === 'ok') return `${when} · ${run.chars} chars → ${run.sessionId}`;
+  return `${when} · failed${run.error ? ` — ${run.error.slice(0, 80)}` : ''}`;
 }
 
 /** Live search over the decision history (session/request/decision/answer). */

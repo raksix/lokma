@@ -783,8 +783,10 @@ export type ShareDetailRes = {
 
 // Cron + approvals — per-agent jobs + WS decision history (W6-25, Docs/30
 // §5 + §6). Schedules are server-validated 5-field cron; `nextRunAt` is
-// computed server-side (null when disabled); `lastRunAt` stays null until
-// the agent runner wave fires jobs. Decisions fill as real WS answers arrive.
+// computed server-side (null when disabled); `lastRunAt` is stamped by the
+// agent-runner daemon on every fire (scheduled tick + Run-now) and every
+// fire appends a `CronRunRecord` (see `GET /api/cron/runs`). Decisions
+// fill as real WS answers arrive.
 export type CronJobView = {
   id: string;
   agentId: string;
@@ -801,6 +803,20 @@ export type AgentCronRes = { jobs: CronJobView[]; count: number; agentId: string
 export type CronCreateBody = { schedule: string; task: string; enabled?: boolean };
 export type CronPatchBody = { schedule?: string; task?: string; enabled?: boolean };
 export type CronMutateRes = { ok: boolean; job: CronJobView };
+export type CronRunRecordView = {
+  runId: string;
+  jobId: string;
+  agentId: string;
+  sessionId: string;
+  trigger: 'schedule' | 'manual';
+  startedAt: string;
+  finishedAt: string;
+  status: 'ok' | 'failed';
+  chars: number;
+  error?: string;
+};
+export type CronRunsRes = { runs: CronRunRecordView[]; count: number };
+export type CronFireRes = { ok: boolean; job: CronJobView; run: CronRunRecordView };
 export type ApprovalDecisionView = {
   id: string;
   at: string;
@@ -1241,6 +1257,11 @@ export const api = {
   /** Delete a job (unknown → 404, never silent). */
   deleteCronJob: (agentId: string, jobId: string) =>
     del<{ ok: boolean; id: string }>(`/api/agents/${encodeURIComponent(agentId)}/cron/${encodeURIComponent(jobId)}`),
+  /** Fire a job NOW (streams the agent model into a cron session + stamps lastRunAt). */
+  runCronJob: (agentId: string, jobId: string) =>
+    post<CronFireRes>(`/api/agents/${encodeURIComponent(agentId)}/cron/${encodeURIComponent(jobId)}/run`, {}),
+  /** Newest-first run history (every fire lands one record). */
+  listCronRuns: () => get<CronRunsRes>('/api/cron/runs'),
   /** Newest-first WS decision history (fills as real answers arrive). */
   listApprovals: () => get<ApprovalsRes>('/api/approvals'),
 };

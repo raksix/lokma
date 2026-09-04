@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { Check, Clock3, Plus, RefreshCw, Search, ShieldAlert, Timer, Trash2, X } from 'lucide-react';
+import { Check, Clock3, Play, Plus, RefreshCw, Search, ShieldAlert, Timer, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { api, type AgentInfo, type ApprovalDecisionView, type CronJobView } from '@/lib/api';
+import { api, type AgentInfo, type ApprovalDecisionView, type CronJobView, type CronRunRecordView } from '@/lib/api';
 import { emitToast } from '@/components/shell';
 import { formatRunAgo } from '@/components/testing';
 import {
@@ -20,9 +20,12 @@ import {
   decisionTone,
   filterDecisions,
   filterJobs,
+  formatLastRun,
   formatNextRun,
   jobTone,
   removeRule,
+  runLabel,
+  runTone,
   validateCreateForm,
   validateScheduleInput,
   validateTaskInput,
@@ -33,19 +36,22 @@ import {
  * (W6-25, Docs/30 §5 cron per agent + §6 approvals). Concept layout 1:1
  * (header + Timer cron section + ShieldAlert approvals section), but every
  * control hits a live endpoint: `GET /api/cron` list, `POST/PATCH/DELETE
- * /api/agents/:id/cron` create/toggle/delete, `GET/PATCH /api/config`
+ * /api/agents/:id/cron` create/toggle/delete, `POST .../run` fire-now
+ * (streams the agent model into a real cron session + stamps `lastRunAt`),
+ * `GET /api/cron/runs` run history, `GET/PATCH /api/config`
  * permissions (the SAME rule store the chat permission card writes — one
  * store, two views), `GET /api/approvals` real WS decision history.
  * Concept mock CRONS/APPROVALS rows, the invented risk badges, the
  * auto-classifier copy, and the toast-only `+ Cron` / `Approve all` /
  * quick-approve input are NOT ported — no dead buttons, no fake data.
- * Honest scope: firing jobs needs a daemon (later wave — `lastRunAt`
- * stays null, rows show the computed next fire instead); the pending
- * queue stays empty until the agent tool loop emits permission frames
- * (answers are logged to history the moment they arrive over WS).
+ * Firing is live: the server ticker fires due jobs every ~30s (rows show
+ * the computed next fire + the stamped last run); the pending queue stays
+ * empty until the agent tool loop emits permission frames (answers are
+ * logged to history the moment they arrive over WS).
  */
 export function CronApprovalsPane() {
   const [jobs, setJobs] = React.useState<CronJobView[]>([]);
+  const [runs, setRuns] = React.useState<CronRunRecordView[]>([]);
   const [agents, setAgents] = React.useState<AgentInfo[]>([]);
   const [decisions, setDecisions] = React.useState<ApprovalDecisionView[]>([]);
   const [allow, setAllow] = React.useState<string[]>([]);
@@ -71,15 +77,17 @@ export function CronApprovalsPane() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [cronRes, agentsRes, approvalsRes, configRes] = await Promise.all([
+      const [cronRes, agentsRes, approvalsRes, configRes, runsRes] = await Promise.all([
         api.listCronJobs(),
         api.listAgents(),
         api.listApprovals(),
         api.getConfig(),
+        api.listCronRuns(),
       ]);
       setJobs(cronRes.jobs);
       setAgents(agentsRes.agents);
       setDecisions(approvalsRes.decisions);
+      setRuns(runsRes.runs);
       const perms = normalizeConfig(configRes).permissions;
       setAllow(perms.allow);
       setDeny(perms.deny);
@@ -97,9 +105,14 @@ export function CronApprovalsPane() {
   }, [load]);
 
   async function reloadJobs(): Promise<void> {
-    const [cronRes, approvalsRes] = await Promise.all([api.listCronJobs(), api.listApprovals()]);
+    const [cronRes, approvalsRes, runsRes] = await Promise.all([
+      api.listCronJobs(),
+      api.listApprovals(),
+      api.listCronRuns(),
+    ]);
     setJobs(cronRes.jobs);
     setDecisions(approvalsRes.decisions);
+    setRuns(runsRes.runs);
   }
 
   async function createJob(): Promise<void> {
@@ -145,6 +158,21 @@ export function CronApprovalsPane() {
       await reloadJobs();
     } catch (e) {
       emitToast(e instanceof Error ? e.message : 'Delete failed');
+    } finally {
+      setBusyJob(null);
+    }
+  }
+
+  async function runJob(job: CronJobView): Promise<void> {
+    setBusyJob(job.id);
+    try {
+      const res = await api.runCronJob(job.agentId, job.id);
+      if (!res.ok) {
+        emitToast(`Run recorded as failed: ${res.run.error ?? 'model call failed'} — see Recent runs`);
+      }
+      await reloadJobs();
+    } catch (e) {
+      emitToast(e instanceof Error ? e.message : 'Run failed');
     } finally {
       setBusyJob(null);
     }
@@ -252,7 +280,7 @@ export function CronApprovalsPane() {
                 {visibleJobs.length === 0 ? (
                   <div className="text-[11px] text-zinc-500 p-2 rounded-md border border-dashed border-line">
                     {total === 0
-                      ? 'No cron jobs yet — create one below (stored per agent, fired by the future agent runner).'
+                      ? 'No cron jobs yet — create one below (stored per agent, fired on schedule by the runner daemon).'
                       : 'No jobs match this filter.'}
                   </div>
                 ) : (
@@ -265,9 +293,19 @@ export function CronApprovalsPane() {
                           <span className="px-1 py-0 rounded bg-muted border border-line text-[11px] font-sans">{job.agentId}</span>
                           <span className="text-[11px] font-normal text-zinc-400 hidden sm:inline">{formatNextRun(job)}</span>
                         </div>
-                        <div className="text-xs text-zinc-500 truncate">{job.task} · id: {job.id}</div>
+                        <div className="text-xs text-zinc-500 truncate">{job.task} · id: {job.id} · {formatLastRun(job)}</div>
                       </div>
                       <span className="flex gap-1 shrink-0 items-start">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          title="Run now (fire this job immediately)"
+                          disabled={busyJob === job.id}
+                          onClick={() => void runJob(job)}
+                        >
+                          <Play className="w-3 h-3" />
+                        </Button>
                         <Button
                           variant={job.enabled ? 'default' : 'outline'}
                           size="sm"
@@ -341,7 +379,27 @@ export function CronApprovalsPane() {
                   {creating ? 'Creating…' : '+ Create cron job'}
                 </Button>
               </div>
-              <div className="text-[11px] text-zinc-500 mt-1 px-1">cron per agent → stored in `~/.lokma/cron/jobs.json`, scoped to agentId. No firing daemon yet — rows show the computed next fire.</div>
+              <div className="text-[11px] text-zinc-500 mt-1 px-1">cron per agent → stored in `~/.lokma/cron/jobs.json`, scoped to agentId. The runner daemon fires due jobs every ~30s (Play fires one now); every fire stamps `lastRunAt` + lands a run record below.</div>
+
+              <div className="mt-1.5">
+                <div className="text-[11px] font-medium px-1">Recent runs</div>
+                {runs.length === 0 ? (
+                  <div className="mt-1 p-2 rounded-md border border-dashed border-line text-[11px] text-zinc-500">
+                    No runs yet — due jobs fire on schedule, or press Play on a row to fire it now.
+                  </div>
+                ) : (
+                  <div className="mt-1 space-y-1">
+                    {runs.slice(0, 5).map((run) => (
+                      <div key={run.runId} className="flex gap-2 items-start p-1.5 rounded-md border border-line bg-white dark:bg-[#1E1E21]">
+                        <span className={`w-2 h-2 rounded-full mt-1 shrink-0 ${runTone(run.status)}`} />
+                        <div className="flex-1 min-w-0 text-[11px] text-zinc-500 truncate" title={run.sessionId}>
+                          {runLabel(run)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div>

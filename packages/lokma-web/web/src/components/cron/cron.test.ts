@@ -11,14 +11,17 @@ import {
   decisionTone,
   filterDecisions,
   filterJobs,
+  formatLastRun,
   formatNextRun,
   jobTone,
   removeRule,
+  runLabel,
+  runTone,
   validateCreateForm,
   validateScheduleInput,
   validateTaskInput,
 } from './cron';
-import type { ApprovalDecisionView, CronJobView } from '@/lib/api';
+import type { ApprovalDecisionView, CronJobView, CronRunRecordView } from '@/lib/api';
 
 let passed = 0;
 function check(name: string, cond: boolean): void {
@@ -104,7 +107,30 @@ check('off tone is zinc', jobTone(false) === 'bg-zinc-300');
 // ─── next-run cell ──────────────────────────────────────────────────────────
 check('paused never claims a fire', formatNextRun(job({ enabled: false })) === 'paused');
 check('live job shows next', formatNextRun(job()).startsWith('next '));
-check('null next is honest', formatNextRun(job({ nextRunAt: null })).includes('daemon'));
+check('null next without runs is honest', formatNextRun(job({ nextRunAt: null })) === 'never');
+check('null next with runs shows date', formatNextRun(job({ nextRunAt: null, lastRunAt: '2026-09-04T03:00:00.000Z' })).includes('2026-09-04'));
+
+// ─── last-run cell + run history ──────────────────────────────────────────
+check('never-run job is honest', formatLastRun(job()) === 'not run yet');
+check('fired job shows last run', formatLastRun(job({ lastRunAt: '2026-09-04T03:00:00.000Z' })).startsWith('last run '));
+check('bad lastRunAt is dash', formatLastRun(job({ lastRunAt: 'nope' })) === '—');
+check('ok run tone is emerald', runTone('ok') === 'bg-emerald-500');
+check('failed run tone is red', runTone('failed') === 'bg-red-500');
+const run = (over: Partial<CronRunRecordView> = {}): CronRunRecordView => ({
+  runId: 'r_abc12345',
+  jobId: 'c_abc12345',
+  agentId: 'reviewer-1',
+  sessionId: 'cron-c_abc12345-mftest',
+  trigger: 'manual',
+  startedAt: '2026-09-04T03:00:00.000Z',
+  finishedAt: '2026-09-04T03:00:10.000Z',
+  status: 'ok',
+  chars: 42,
+  ...over,
+});
+check('ok label shows trigger+chars+session', runLabel(run()) === 'manual · 42 chars → cron-c_abc12345-mftest');
+check('scheduled label shows trigger', runLabel(run({ trigger: 'schedule' })).startsWith('scheduled ·'));
+check('failed label shows reason', runLabel(run({ status: 'failed', chars: 0, error: 'boom' })).includes('failed — boom'));
 
 // ─── decisions ──────────────────────────────────────────────────────────────
 const hist = [decision(), decision({ id: 'ap_2', kind: 'question', decision: undefined, answer: 'yes, ship it' })];

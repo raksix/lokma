@@ -599,14 +599,21 @@
 - **Deploy:** web-only — dist + `pm2 restart lokma-web` → creds'le 200 taze `index-kdl-Fl94.js` (Memory pane'i içeriyor), creds'siz 401, `/health` 200; script path bun (stale-stack PASS); iki süreç online.
 - **Sıradaki parça:** Phase 2 memory-deep wave 3 (2-tier compression).
 
+### 2026-09-04 — Phase 2 memory-deep wave 3a: session-transcript compaction DONE (core c30c8aa + server 6ba9d9f + web 2695474)
+- **Executor run:** two-tier Docs/28 §1.3 shrink canlı — tier-1 hygiene (blank-drop + whitespace-collapse + same-role merge + marker'lı tool-result truncation) + tier-2 extractive summary (ilk user + son 20 verbatim, orta `lokma-compact` anchor bloğu + `<id>.archive.jsonl` soft-archive + `<id>.compaction.json` rapor). Eşik altı POST dürüst no-op.
+- **Tekrar-run tuzakları prob'la yakalandı:** anchor'lar stack'lenmiyor (her run yeniden türetiliyor), pin'li head boundary'de merge olmuyor, hygiene-only rewrite eski anchor'ı geri takıyor.
+- **Gates:** root tsc 0 · core probu 55/55 + core suite 6/6 · server in-process prob 26/26 (122-mesajlı tier-2 HTTP e2e dahil) · web suite 32/32 · mock grep temiz · gerçek `~/.lokma`'ya dokunulmadı.
+- **Dürüst kapsam:** özetler deterministik/extractive (LLM yok); otomatik tetik yok (explicit POST); session_search + pane UI wave 3b.
+- **Sıradaki parça:** Phase 2 memory-deep wave 3b (transcript üstünde session_search FTS + compaction pane UI).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-04 (Phase 2 memory-deep wave 2: Memory UI tab DONE — web 7d0841a)
-- **Son işlem:** Memory sekmesi canlı (23. Inspector sekmesi, MEMORY.md/USER.md toggle + usage meter + arama + ekle/düzenle/sil). Prob 39/39 + panes 67 + web suite 32/32.
+- **Son güncelleme:** 2026-09-04 (Phase 2 memory-deep wave 3a: session-transcript compaction DONE — core c30c8aa + server 6ba9d9f + web 2695474)
+- **Son işlem:** İki katmanlı transcript küçültme canlı (`GET|POST /api/sessions/:id/compaction` + archive sidecar + api client). Prob 55/55 + server 26/26 + web suite 32/32.
 
 ## Sıradaki adım (Phase 1/2/3 follow-up'ları)
 - **Sıradaki adım:**
   1. Phase 1: ~~`DELETE` endpoint'leri (bots ✅ 4a51723/cdd00b0 · archify ✅ 93d2e58/1fe2b6d · design ✅ 9a61b52/f6f9b1f · tests ✅ 1fbd616/1ba81d9 · vault ✅ 7cfdbe6/b0b5d9d — SERİ TAMAMLANDI)~~ + ~~cron firing daemon ✅ 9c879d3/6e4a584 (30s ticker + Run-now + `lastRunAt` + run history — WAVE 1 TAMAMLANDI)~~ + ~~gerçek provider streaming ✅ 98534e9/be7adb7 (mock echo öldü, key/baseUrl çözümleme + gerçek abort — WAVE 1 TAMAMLANDI)~~ + ~~core tool foundation ✅ 1f95d06 (gate + 5 builtin + executor + 46/46 probe — WAVE 2a TAMAMLANDI)~~ + ~~WS tool/permission/ask frame'leri ✅ aaf9b7b/75efc63 (agent döngüsü canlı: `<tool>`/`<ask>` blokları + pending-gate resume + loop probu 27/27 + WS e2e 12/12 — WAVE 2b TAMAMLANDI)~~ (Phase 1 core-loop TAMAMLANDI)
-  2. Phase 2: ~~FTS5 vault araması ✅ 03b3e8f/95d6ed2/5543f20 (SQLite FTS5 + BM25 + snippet + `/api/vault/search` + SearchModal — TAMAMLANDI)~~ + ~~3D vault grafiği ✅ 2d4ad5f (bağımlılıksız canvas star-map, aynı canlı veri, sürükle-döndür + zoom + auto-rotate — TAMAMLANDI)~~ + ~~remote plugin marketplace ✅ 0850343/563ab98/78e59e6 (canlı GitHub topic araması + Marketplace sekmesi + Install wiring — TAMAMLANDI)~~ + memory deep wave 1 ✅ bfad761/ba8dc13/22ec296 (`GET/POST/PATCH/DELETE /api/memory` + MemoryError + usage — TAMAMLANDI) + memory deep wave 2 ✅ 7d0841a (Memory UI sekmesi: toggle + usage meter + CRUD — TAMAMLANDI) + wave 3 (2-tier compression)
+  2. Phase 2: ~~FTS5 vault araması ✅ 03b3e8f/95d6ed2/5543f20 (SQLite FTS5 + BM25 + snippet + `/api/vault/search` + SearchModal — TAMAMLANDI)~~ + ~~3D vault grafiği ✅ 2d4ad5f (bağımlılıksız canvas star-map, aynı canlı veri, sürükle-döndür + zoom + auto-rotate — TAMAMLANDI)~~ + ~~remote plugin marketplace ✅ 0850343/563ab98/78e59e6 (canlı GitHub topic araması + Marketplace sekmesi + Install wiring — TAMAMLANDI)~~ + memory deep wave 1 ✅ bfad761/ba8dc13/22ec296 (`GET/POST/PATCH/DELETE /api/memory` + MemoryError + usage — TAMAMLANDI) + memory deep wave 2 ✅ 7d0841a (Memory UI sekmesi: toggle + usage meter + CRUD — TAMAMLANDI) + wave 3a ✅ c30c8aa/6ba9d9f/2695474 (2-tier transcript compaction: hygiene + extractive summary + archive + `GET|POST /:id/compaction` — TAMAMLANDI) + wave 3b (session_search FTS + compaction pane UI)
   3. Phase 3: PNG/WebM export'ları (archify/design) + themes + sharing + cloud + mobile + perf + a11y
 
 ---

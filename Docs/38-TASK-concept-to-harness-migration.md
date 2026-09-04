@@ -2217,6 +2217,42 @@ survives; never delete both at once). If even that serves stale code, escalate i
     `/health` 200; `pm2 show lokma-web` script path is bun (stale-stack
     PASS); both procs online.
   - Next piece: Phase 2 memory-deep wave 3 (2-tier compression).
+- 2026-09-04 — Phase 2 memory-deep wave 3a: session-transcript compaction DONE
+  (core c30c8aa + server 6ba9d9f + web 2695474, all pushed).
+  - **Executor run:** two-tier Docs/28 §1.3 shrink is live — tier-1 gateway
+    hygiene (blank-drop, whitespace-collapse, same-role merge, tool-result
+    truncation with an explicit marker) + tier-2 extractive summary (first
+    user message + last 20 kept verbatim, middle replaced by one
+    `role: 'tool' / toolName: 'lokma-compact'` anchor block with quoted
+    bullets + tool list; originals appended to `<id>.archive.jsonl`
+    soft-archive first; `<id>.compaction.json` anchor-index report).
+    Below every threshold POST is an honest no-op (`compacted: false`).
+  - **Core:** `session/compaction.ts` (`COMPACTION_LIMITS` 60k/120k/20/8k,
+    `hygienePass` pure + `hygienePinned` head-pin, `buildExtractiveSummary`
+    quotes-only, `compactSession`/`compactionStatus`, archive/report
+    sidecars) + `store.ts` `list()` skips `*.archive.jsonl` (no ghost
+    sessions) + `compaction.test.ts` 55/55 on real temp-HOME files.
+  - **Repeat-run traps caught by the probe:** stripped anchors never stack
+    (re-derived each run), the pinned head never merges across the anchor
+    boundary, and a hygiene-only rewrite re-attaches the prior anchor so
+    the archive pointer is never lost.
+  - **Server:** `GET /api/sessions/:id/compaction` (trigger status +
+    last report) + `POST /api/sessions/:id/compaction {mode}` (`bad_mode`
+    400, `session_not_found` 404, `{ok, ...report}`); in-process
+    createApp+inject probe 26/26 incl. a seeded 122-message tier-2 run
+    over HTTP (101 archived, 22-row rewrite, archive invisible in list).
+  - **Web:** `api.ts` `CompactionStatusRes`/`CompactionRunRes` +
+    `getCompactionStatus`/`runCompaction` (wave-1 precedent: REST + client
+    only, no UI yet).
+  - **Gates:** root `tsc --noEmit` 0 · core+server dist clean · web build
+    green · core probes 6/6 · web suite 32/32 · mock grep on touched
+    files zero · real `~/.lokma` untouched.
+  - **Honest scope:** summaries are extractive/deterministic (no LLM —
+    model-driven compression is agent-runner work); no auto-trigger on
+    append (explicit POST only); no session_search yet (wave 3b); no pane
+    UI yet (Memory tab shows the global store, not transcripts).
+  - Next piece: Phase 2 memory-deep wave 3b (session_search FTS over
+    transcripts + compaction pane UI).
 ---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Activity, BarChart3, Beaker, Bot, Clock3, Cpu, Folder, GitBranch, Globe, HardDrive, Info, Layers, Package, Paintbrush, Plug2, Puzzle, Settings, Shield, Star, Terminal, Users, Workflow } from 'lucide-react';
+import { Activity, BarChart3, Beaker, Bot, Brain, Clock3, Cpu, Folder, GitBranch, Globe, HardDrive, Info, Layers, Package, Paintbrush, Plug2, Puzzle, Settings, Shield, Star, Terminal, Users, Workflow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
@@ -23,6 +23,7 @@ import { PluginsPane } from '@/components/plugins';
 import { ObservabilityPane } from '@/components/observability';
 import { CronApprovalsPane } from '@/components/cron';
 import { ExtrasPane } from '@/components/extras';
+import { MemoryPane } from '@/components/memory';
 import { UsagePane } from '@/components/usage/usage-pane';
 
 /**
@@ -74,6 +75,8 @@ import { UsagePane } from '@/components/usage/usage-pane';
  * history over `GET /api/approvals`). Extras the real W6-26 pane (23 ranked
  * agent-system extras as a live feature-flag board over `GET/PATCH
  * /api/config` `features`, shipped rows opening their real Inspector tab).
+ * Memory the real memory-deep wave 2 pane (global MEMORY.md / USER.md
+ * entries + live usage meter over `GET/POST/PATCH/DELETE /api/memory`).
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
  */
@@ -86,7 +89,7 @@ export function InspectorPanel({
   sessionId?: string;
   ws?: UseWs;
 }) {
-  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault' | 'skills' | 'archify' | 'design' | 'testing' | 'bots' | 'auth' | 'setup' | 'plugins' | 'observability' | 'cron' | 'extras'>(
+  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault' | 'skills' | 'archify' | 'design' | 'testing' | 'bots' | 'auth' | 'setup' | 'plugins' | 'observability' | 'cron' | 'extras' | 'memory'>(
     'info',
   );
 
@@ -291,9 +294,20 @@ export function InspectorPanel({
           <Star className="h-3 w-3" />
           Extras
         </Button>
+        <Button
+          variant={tab === 'memory' ? 'default' : 'ghost'}
+          size="sm"
+          className="h-6 flex-1 gap-1.5 text-[11px]"
+          onClick={() => setTab('memory')}
+        >
+          <Brain className="h-3 w-3" />
+          Memory
+        </Button>
       </div>
       {tab === 'info' ? (
         <InfoPanel />
+      ) : tab === 'memory' ? (
+        <MemoryPane />
       ) : tab === 'extras' ? (
         <ExtrasPane onOpenTab={(t) => setTab(t)} />
       ) : tab === 'cron' ? (

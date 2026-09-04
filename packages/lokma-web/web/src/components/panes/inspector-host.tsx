@@ -25,6 +25,7 @@ import { ObservabilityPane } from '@/components/observability';
 import { CronApprovalsPane } from '@/components/cron';
 import { ExtrasPane } from '@/components/extras';
 import type { ExtrasTabId } from '@/components/extras/extras';
+import { MemoryPane } from '@/components/memory';
 import { UsagePane } from '@/components/usage/usage-pane';
 import type { InspectorTabId } from './panes';
 
@@ -64,6 +65,7 @@ export function InspectorHost({
   if (tab === 'plugins') return <PluginsPane />;
   if (tab === 'observability') return <ObservabilityPane />;
   if (tab === 'cron') return <CronApprovalsPane />;
+  if (tab === 'memory') return <MemoryPane />;
   if (tab === 'extras') {
     return <ExtrasPane onOpenTab={(t: ExtrasTabId) => onOpenInspectorTab(t)} />;
   }

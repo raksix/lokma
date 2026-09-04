@@ -66,11 +66,12 @@ check("file tab title is basename", f.title === "index.ts");
 check("tab id prefix", makeTabId("tab-x").startsWith("tab-x-"));
 check("pane id prefix unique", makePaneId().startsWith("p-") && makePaneId() !== makePaneId());
 
-/* 2 — registry mirrors the right Inspector (22 tabs); tiling bar keeps the 19 open actions. */
-check("registry has 22 entries", INSPECTOR_TABS.length === 22);
+/* 2 — registry mirrors the right Inspector (23 tabs); tiling bar keeps the 20 open actions. */
+check("registry has 23 entries", INSPECTOR_TABS.length === 23);
 check("registry has browser", INSPECTOR_TABS.some((t) => t.id === "browser"));
 check("registry has orchestration+agents pair", INSPECTOR_TABS.some((t) => t.id === "orchestration") && INSPECTOR_TABS.some((t) => t.id === "agents"));
-check("tiling bar has 19 entries", TILING_BAR_TABS.length === 19);
+check("registry has memory", INSPECTOR_TABS.some((t) => t.id === "memory"));
+check("tiling bar has 20 entries", TILING_BAR_TABS.length === 20);
 check("tiling bar all in registry", TILING_BAR_TABS.every(isInspectorTabId));
 check("inspectorLabel known", inspectorLabel("git") === "Git");
 check("isInspectorTabId rejects unknown", !isInspectorTabId("nope"));

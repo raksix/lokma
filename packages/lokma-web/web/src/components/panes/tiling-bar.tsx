@@ -4,6 +4,7 @@ import {
   BarChart3,
   Beaker,
   Bot,
+  Brain,
   Clock3,
   Cpu,
   Folder,
@@ -53,6 +54,7 @@ export const TAB_ICONS: Record<InspectorTabId, React.ReactNode> = {
   observability: <Activity className="h-3 w-3" />,
   cron: <Clock3 className="h-3 w-3" />,
   extras: <Star className="h-3 w-3" />,
+  memory: <Brain className="h-3 w-3" />,
 };
 
 // TilingBar: concept panes/TilingBar.tsx port. Every button opens a REAL

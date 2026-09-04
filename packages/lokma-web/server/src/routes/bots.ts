@@ -3,6 +3,7 @@ import {
   AgentError,
   BotError,
   createBot,
+  deleteBot,
   forkBot,
   getBot,
   listBots,
@@ -20,7 +21,9 @@ import {
  * `POST /api/bots/:id/fork` (clone + knowledge copy, `createdFrom`
  * provenance); `POST /api/bots/:id/publish` (visibility flip);
  * `POST /api/bots/:id/run { task }` (spawns a REAL agent with
- * `createdBy: bot:<id>` + a REAL session for playground chat).
+ * `createdBy: bot:<id>` + a REAL session for playground chat);
+ * `DELETE /api/bots/:id` (removes a user bot — bundled templates answer
+ * 400 `bundled_readonly`).
  * Storage `~/.lokma/bots/<id>/bot.json` — the same store the CLI uses.
  * All failures answer `{ code, message }`.
  */
@@ -150,6 +153,18 @@ export async function botsRoutes(app: FastifyInstance): Promise<void> {
         ...(typeof body.cwd === 'string' && body.cwd ? { cwd: body.cwd } : {}),
       });
       return { ok: true, agentId: agent.id, agent, sessionId };
+    } catch (e) {
+      const err = toBotError(e);
+      if (err) return reply.status(err.status).send({ code: err.code, message: err.message });
+      throw e;
+    }
+  });
+
+  app.delete('/api/bots/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    try {
+      const { id: deleted } = await deleteBot(id, optCwd(req));
+      return { ok: true, id: deleted };
     } catch (e) {
       const err = toBotError(e);
       if (err) return reply.status(err.status).send({ code: err.code, message: err.message });

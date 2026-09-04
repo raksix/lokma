@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, readdir, stat } from 'node:fs/promises';
+import { cp, mkdir, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { BotSchema, type Agent, type Bot } from 'lokma-shared';
@@ -453,6 +453,28 @@ export async function publishBot(id: string, visibility: unknown): Promise<Bot> 
   const next = BotSchema.parse({ ...bot, visibility: assertVisibility(visibility) });
   await writeAtomic(join(botDir(id), 'bot.json'), JSON.stringify(next, null, 2));
   return next;
+}
+
+/**
+ * Delete a user bot — removes its on-disk dir (project overlay when the
+ * bot resolves from `cwd`, else the global root). Bundled templates are
+ * read-only (400 `bundled_readonly`); unknown ids 404 via `requireBot`.
+ * Agents spawned from the bot keep running — the Gallery counter simply
+ * drops to zero (same semantics as deleting an agent with live locks).
+ */
+export async function deleteBot(id: string, cwd?: string): Promise<{ id: string }> {
+  const bot = await requireBot(assertBotId(id), cwd);
+  if (bot.source === 'bundled') {
+    throw new BotError('bundled_readonly', 'Bundled bots are read-only — fork to customize', 400);
+  }
+  // Reuse the shared resolver (project overlay when the bot resolves from
+  // `cwd`, else the global root) — never re-derive the path inline.
+  const dir = await sourceDirOf(bot, cwd);
+  if (!dir) {
+    throw new BotError('bundled_readonly', 'Bundled bots are read-only — fork to customize', 400);
+  }
+  await rm(dir, { recursive: true, force: true });
+  return { id: bot.id };
 }
 
 /** Same id scheme as POST /api/sessions (no central helper yet — keep in sync). */

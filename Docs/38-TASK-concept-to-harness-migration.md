@@ -2413,3 +2413,50 @@ survives; never delete both at once). If even that serves stale code, escalate i
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology
 + Son Durum, commit + push, mirror to memory vault.*
+- 2026-09-05 — Phase 3 design WebM export DONE (core d140aa4 + server 7a96dec + web 33b5a13)
+  - **Executor run:** Export tab gains a fifth live format — WebM, a 2s
+    slow-zoom clip over the stored self-contained `artifact.html`
+    (12 frames @ 6fps, per-frame zoom style injected before `</head>`
+    with `!important` so it wins over author styles, fixed 1280x800 CSS
+    viewport, headless Chromium `--screenshot` + one ffmpeg libvpx-vp9
+    pass, zero new dependencies — archify pattern 1:1).
+  - **Core:** `design/webm.ts` (new: `DESIGN_WEBM_TIMEOUT_MS`,
+    `buildDesignWebmFrameHtml()` 1.00→1.20 + drift, `exportArtifactWebm()`
+    + EBML-magic check; `findChromeBinary`/`findFfmpegBinary` DRY-reused
+    from archify; `bad_id`/`design_not_found`/`needs_toolchain`/
+    `raster_failed`/`encode_failed`) + `webm.test.ts` 23/23 (real Chrome
+    146 + ffmpeg 6.1.1 e2e encode included) + `index.ts` export +
+    `store.ts` `bad_format` message now lists `png|webm` (a252a43 mirror).
+    Name-collision lesson: archify already exports `WEBM_TIMEOUT_MS` +
+    `buildWebmFrameHtml` — design names carry a `DESIGN_`/`Design`
+    prefix (caught by core build, fixed before commit).
+  - **Server:** `GET /api/design/:id/export?format=webm` in `design.ts`
+    (`video/webm` attachment `<id>.webm` +
+    `X-Video-Width/Height/Fps/Frames` headers; the png `?scale=` branch
+    is untouched). No plugin-registry change (the single
+    `GET /api/design/:id/export` entry already covers every format).
+  - **Web:** `DesignExportFormat` (both `design.ts` helpers AND
+    `lib/api.ts` — the pane calls through `api.downloadDesignExport`,
+    whose own union missed `webm` and failed `tsc -b`; two-union trap) +
+    `DESIGN_EXPORTS` gain `webm`; Export tab gains a WEBM button (same
+    `runExport` path, no scale param); `design.test.ts` 5-format check;
+    footer now describes the real 2s clip (PDF/PPTX/MP4 stay follow-up).
+  - **Gates:** root `tsc --noEmit` 0 · core + server dist clean · web
+    build green · web suite 33/33 files PASS (design 28 checks) · mock
+    grep on touched files clean (3 hits = labeled input `placeholder=`s,
+    legit) · real `~/.lokma` untouched.
+  - **Live socket probe** (temp server :3499, temp HOME): generate →
+    `export?format=webm` 200 `video/webm` + `<id>.webm` disposition +
+    60999 real bytes with EBML magic `1a45dfa3` + 1280x800/6fps/12f
+    headers; unknown id 404 `design_not_found`; `?format=avi` still
+    400 `bad_format` (new message); png sibling still 200.
+  - **Honest scope:** fixed 1280x800 viewport (full-page documents, not
+    a measured canvas like archify SVG); 12 cold Chrome launches ≈ 18s
+    per encode; box without Chromium or ffmpeg gets an honest
+    `needs_toolchain` 400 toast.
+  - Next piece: Phase 3 themes polish, then sharing, cloud, mobile,
+    perf + a11y.
+---
+
+*Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology
++ Son Durum, commit + push, mirror to memory vault.*

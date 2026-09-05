@@ -327,7 +327,7 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-zinc-500 line-clamp-2 leading-4">{b.description}</div>
+                      <div className="text-[11px] text-zinc-500 line-clamp-2 leading-4" title={b.description}>{b.description}</div>
                       {/* Badges wrap instead of forcing the 255px Inspector column wider. */}
                       <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-zinc-400">
                         <span className="px-1 py-0 rounded bg-muted border border-line">{b.model}</span>

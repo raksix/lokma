@@ -346,7 +346,7 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
       ) : null}
 
       <div className="flex h-6 shrink-0 items-center gap-1.5 overflow-x-auto border-b border-white/5 bg-[#161618] px-2 text-[11px]">
-        <span className="truncate font-mono text-white/90">{selected ? selected.cwd : 'no terminal'}</span>
+        <span className="truncate font-mono text-white/90" title={selected ? selected.cwd : 'no terminal'}>{selected ? selected.cwd : 'no terminal'}</span>
         {selected ? (
           <span className="shrink-0 text-white/40" title={statusLabel(selected)}>
             · {statusLabel(selected)}

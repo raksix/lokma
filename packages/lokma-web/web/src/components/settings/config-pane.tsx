@@ -46,29 +46,29 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
         <div className="mt-2 grid grid-cols-1 gap-1.5 font-mono text-[11px]">
           <div className="flex gap-2 rounded border border-line/50 bg-muted/50 p-1.5">
             <span className="shrink-0 font-semibold">defaultModel</span>
-            <span className="truncate text-zinc-500">{config.defaultModel || '—'}</span>
+            <span className="truncate text-zinc-500" title={config.defaultModel ?? undefined}>{config.defaultModel || '—'}</span>
           </div>
           <div className="flex gap-2 rounded border border-line/50 bg-muted/50 p-1.5">
             <span className="shrink-0 font-semibold">defaultProvider</span>
-            <span className="truncate text-zinc-500">{config.defaultProvider || '—'}</span>
+            <span className="truncate text-zinc-500" title={config.defaultProvider ?? undefined}>{config.defaultProvider || '—'}</span>
           </div>
           <div className="flex gap-2 rounded border border-line/50 bg-muted/50 p-1.5">
             <span className="shrink-0 font-semibold">theme</span>
-            <span className="truncate text-zinc-500">{config.theme ?? '—'}</span>
+            <span className="truncate text-zinc-500" title={config.theme ?? undefined}>{config.theme ?? '—'}</span>
           </div>
           <div className="flex gap-2 rounded border border-line/50 bg-muted/50 p-1.5">
             <span className="shrink-0 font-semibold">agents</span>
-            <span className="truncate text-zinc-500">
+            <span className="truncate text-zinc-500" title={`max ${config.maxAgents ?? '—'} · concurrent ${config.maxConcurrent ?? '—'} · queue ${config.maxQueue ?? '—'}`}>
               max {config.maxAgents ?? '—'} · concurrent {config.maxConcurrent ?? '—'} · queue {config.maxQueue ?? '—'}
             </span>
           </div>
           <div className="flex gap-2 rounded border border-line/50 bg-muted/50 p-1.5">
             <span className="shrink-0 font-semibold">coordinator</span>
-            <span className="truncate text-zinc-500">{config.coordinatorMode || '—'}</span>
+            <span className="truncate text-zinc-500" title={config.coordinatorMode ?? undefined}>{config.coordinatorMode || '—'}</span>
           </div>
           <div className="flex gap-2 rounded border border-line/50 bg-muted/50 p-1.5">
             <span className="shrink-0 font-semibold">vault</span>
-            <span className="truncate text-zinc-500">{config.vaultHost ?? 'not configured'}</span>
+            <span className="truncate text-zinc-500" title={config.vaultHost ?? undefined}>{config.vaultHost ?? 'not configured'}</span>
           </div>
         </div>
       </div>

@@ -230,10 +230,10 @@ export function UsagePane({ onOpenSession }: { onOpenSession?: (id: string) => v
                     key={s.sessionId}
                     onClick={() => onOpenSession?.(s.sessionId)}
                     className="flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-muted/50"
-                    title={s.sessionId}
+                    title={`${s.title} · ${s.sessionId}`}
                   >
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-                    <span className="flex-1 truncate text-xs font-medium">{s.title}</span>
+                    <span className="flex-1 truncate text-xs font-medium" title={`${s.title} · ${s.sessionId}`}>{s.title}</span>
                     <span className="hidden rounded-full border border-line bg-muted px-1.5 py-0.5 text-[10px] @min-[420px]:inline-flex">
                       {shortModel(s.model)}
                     </span>

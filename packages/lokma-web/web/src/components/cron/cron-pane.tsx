@@ -293,7 +293,7 @@ export function CronApprovalsPane() {
                           <span className="px-1 py-0 rounded bg-muted border border-line text-[11px] font-sans">{job.agentId}</span>
                           <span className="text-[11px] font-normal text-zinc-400 hidden @min-[320px]:inline">{formatNextRun(job)}</span>
                         </div>
-                        <div className="text-xs text-zinc-500 truncate">{job.task} · id: {job.id} · {formatLastRun(job)}</div>
+                        <div className="text-xs text-zinc-500 truncate" title={`${job.task} · id: ${job.id} · ${formatLastRun(job)}`}>{job.task} · id: {job.id} · {formatLastRun(job)}</div>
                       </div>
                       <span className="flex gap-1 shrink-0 items-start">
                         <Button
@@ -392,7 +392,7 @@ export function CronApprovalsPane() {
                     {runs.slice(0, 5).map((run) => (
                       <div key={run.runId} className="flex gap-2 items-start p-1.5 rounded-md border border-line bg-white dark:bg-[#1E1E21]">
                         <span className={`w-2 h-2 rounded-full mt-1 shrink-0 ${runTone(run.status)}`} />
-                        <div className="flex-1 min-w-0 text-[11px] text-zinc-500 truncate" title={run.sessionId}>
+                        <div className="flex-1 min-w-0 text-[11px] text-zinc-500 truncate" title={`${runLabel(run)} · session ${run.sessionId}`}>
                           {runLabel(run)}
                         </div>
                       </div>
@@ -518,7 +518,7 @@ export function CronApprovalsPane() {
                         {d.kind === 'question' ? 'answered' : (d.decision ?? 'decided')}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs font-medium truncate">
+                        <div className="text-xs font-medium truncate" title={`${d.sessionId} → ${decisionLabel(d.kind, d.decision, d.answer)}`}>
                           {d.sessionId} → {decisionLabel(d.kind, d.decision, d.answer)}
                         </div>
                         <div className="text-[11px] text-zinc-500">{formatRunAgo(d.at)} · {d.kind} · {d.requestId}</div>

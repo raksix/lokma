@@ -73,7 +73,7 @@ export const EXTRAS: ExtraItem[] = [
   { n: 20, slug: 'session-drag-handoff', title: 'Session → agent drag handoff', why: 'UX', how: 'Sidebar drag → Hub', where: 'Sessions sidebar → Agent Hub (when the W7 pane system lands)', shipped: false, milestone: 'Needs the W7 pane system (drag session → agent card)' },
   { n: 21, slug: 'doctor-agents', title: 'lokma doctor --agents', why: 'Health', how: 'SetupWizard doctor 8 checks', where: 'Setup tab → Doctor terminal', shipped: true, tab: 'setup' },
   { n: 22, slug: 'vault-provenance', title: 'Vault graph provenance agentId', why: 'Who wrote what', how: 'VaultPane provenance pill', where: 'Vault tab → provenance badges', shipped: true, tab: 'vault' },
-  { n: 23, slug: 'trace-share', title: 'Per-agent trace share', why: 'Share debug', how: '/share/agent/<id>', where: 'Observability tab → Share', shipped: true, tab: 'observability' },
+  { n: 23, slug: 'trace-share', title: 'Per-agent trace share', why: 'Share debug', how: '/share/<token>', where: 'Observability tab → Share', shipped: true, tab: 'observability' },
 ];
 
 /** A row counts as shipped exactly when its surface exists in this checkout. */

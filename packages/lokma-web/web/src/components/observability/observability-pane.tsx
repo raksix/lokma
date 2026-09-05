@@ -388,7 +388,7 @@ export function ObservabilityPane() {
         <div className="p-2 rounded-md bg-[#FDF0E6] dark:bg-[#2A1E15] border border-[#F2D5C2] text-xs">
           <div className="flex items-center gap-2">
             <Eye className="w-3 h-3 text-terracotta" />
-            <span>Trace share — frozen snapshots, later edits never rewrite shared history</span>
+            <span>Trace share — frozen snapshots, later edits never rewrite shared history · links open without login</span>
             <span className="ml-auto flex gap-1">
               <Button variant="ghost" size="sm" className="h-5 text-[11px]" onClick={() => void shareTrace()} disabled={!trace || shareBusy}>Share trace</Button>
               <Button variant="ghost" size="sm" className="h-5 text-[11px]" onClick={() => void shareSession()} disabled={!replayId || shareBusy}>Share session</Button>
@@ -403,10 +403,10 @@ export function ObservabilityPane() {
                   <span className="text-[10px] px-1 rounded bg-white/5 border border-line text-zinc-500">{s.kind}</span>
                   <span className="text-[11px] font-medium truncate">{s.title}</span>
                   <span className="text-[10px] text-zinc-400 shrink-0">{s.size} {s.kind === 'agent' ? 'events' : 'rows'} · {formatAge(s.createdAt)}</span>
-                  <code className="hidden md:inline px-1 py-0 rounded bg-white dark:bg-[#161618] border border-line text-[10px] text-zinc-500 truncate">/share/{s.kind}/{s.token}</code>
+                  <code className="hidden md:inline px-1 py-0 rounded bg-white dark:bg-[#161618] border border-line text-[10px] text-zinc-500 truncate">/share/{s.token}</code>
                   <span className="ml-auto flex gap-1 shrink-0">
                     <Button variant="ghost" size="sm" className="h-5 text-[11px]" onClick={() => void openShare(s.token)}>Open</Button>
-                    <Button variant="ghost" size="sm" className="h-5 text-[11px]" onClick={() => void copyUrl(`/share/${s.kind}/${s.token}`)}>Copy</Button>
+                    <Button variant="ghost" size="sm" className="h-5 text-[11px]" onClick={() => void copyUrl(`/share/${s.token}`)}>Copy</Button>
                     <Button variant="ghost" size="sm" className="h-5 text-[11px]" onClick={() => void removeShare(s.token)}>
                       <Trash2 className="w-3 h-3" /> {confirmDelete === s.token ? 'Sure?' : ''}
                     </Button>

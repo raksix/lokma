@@ -1387,9 +1387,9 @@ export const api = {
   getAgentTrace: (id: string) => get<AgentTraceRes>(`/api/agents/${encodeURIComponent(id)}/trace`),
   /** Share metadata list (no snapshot bytes — loaded per share). */
   listShares: () => get<SharesRes>('/api/share'),
-  /** Freeze an agent trace — returns the copyable `/share/agent/<token>` URL. */
+  /** Freeze an agent trace — returns the public copyable `/share/<token>` URL. */
   shareAgent: (agentId: string) => post<ShareCreateRes>('/api/share/agent', { agentId }),
-  /** Freeze a session transcript — returns `/share/session/<token>`. */
+  /** Freeze a session transcript — returns the public `/share/<token>` URL. */
   shareSession: (sessionId: string, cwd?: string) =>
     post<ShareCreateRes>('/api/share/session', cwd ? { sessionId, cwd } : { sessionId }),
   /** Read one frozen snapshot (serves the copy, never re-derives). */

@@ -742,8 +742,13 @@
 - **Canlı** (lokma.fermag.com.tr): `/` creds'siz 401 → creds'li 200 (taze `index-Bmr_mgR8.js` diskle birebir, sıfır `_next/`) · `/health` 200 · `/api/themes` 200 · `/api/memory` 200 (2 gerçek entry) · `/api/share` 200 (boş) · iki PM2 proc online, bun path'ler (stale-stack PASS). Restart gerekmedi — deployed dist ağaçla eşitti.
 - **Roadmap:** Phase 1 + Phase 2 + Phase 3 TAMAMLANDI. Kalan follow-up'lar kod değil kullanıcı/kutu kararı ister: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry.
 
+### 2026-09-05 — TEST LOOP area D run 1: README + docs compliance, 4 real gaps fixed (7c6f9d9 + 75d9612)
+- **README** gerçek sistemi anlatacak şekilde baştan yazıldı (canlı URL, portlar :3456/:3457, basic auth, gerçek quick start, 23 pane, Docs 20-39 tam index, dürüst follow-up'lar, dual license). Her iddia yazılmadan önce canlı doğrulandı: 12/12 gerçek endpoint 200 (authed), `/` 401 anon, 23 sekme `inspector-host.tsx`'ten, stack sürümleri package.json'dan, CLI `--help` green.
+- **Fixed:** (1) `lokma config set` dokümante no-op'tu (help yazmayı vaat ediyor, kod pointer basıyordu) — artık `saveGlobal` ile gerçekten yazıyor (JSON coercion + schema round-trip guard; canlıda `permissions.mode` reddedildi, `theme dark` enum'dan reddedildi, sibling'ler korundu); (2) CLI help `Fastify + Next.js` diyordu → `Fastify + Vite SPA`; (3) `agent list` `Phase 0 stub` etiketliydi → live registry; (4) repoda LICENSE dosyası YOKTU (README MIT diyor, Docs/02 dual demiş) — `LICENSE` eklendi (core MIT + cloud proprietary).
+- **Gates:** core build 0 · root `tsc --noEmit` 0 · CLI tam matris startup-env temp HOME'da (gerçek `/root/.lokma`'ya dokunulmadı) · bayat-referans grep'i SIFIR hit. Restart gerekmedi (CLI dist git-ignored; server değişikliği comment-only).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area C run 1 — screenshots + design, 26 shots 0 errors, 3 fixes f27e6c1, sıradaki alan: D)
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area D run 1 — README rewrite + LICENSE + CLI config set, 4 gap fix 7c6f9d9/75d9612, sıradaki alan: E)
 - **Son işlem:** Final verification pass — tüm kapılar yeşil (root tsc 0, web build green, web 38/38, core 14/14, ai 22/22), canlı 401→200 + /health 200 + bundle disk-identical, Docs kapatıldı.
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)

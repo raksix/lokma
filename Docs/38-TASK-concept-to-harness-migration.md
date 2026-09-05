@@ -2768,3 +2768,28 @@ survives; never delete both at once). If even that serves stale code, escalate i
     `react-virtuoso` (zero new deps — roadmap item honored in spirit).
   - Next piece: Phase 3 perf + a11y wave 2c (focus trap in dialogs), then
     the roadmap is complete.
+---
+- 2026-09-05 — Phase 3 perf + a11y wave 2c: focus trap in dialogs DONE (web bf5449f)
+  - **Executor run:** every modal overlay now contains keyboard focus —
+    Tab / Shift+Tab wraps inside, Escape closes, focus enters on open and
+    restores on close. Single shared `shell/use-focus-trap.ts` (pure
+    `nextTrapIndex` wrap math + `FOCUSABLE_SELECTOR` contract +
+    `collectFocusable` + `useFocusTrap` hook) wired into all 6 overlays:
+    ShortcutsDialog (its hand-rolled Escape/autofocus replaced),
+    SearchModal (also gained the missing `role="dialog"` + `aria-modal` +
+    `aria-label` + Escape), AgentDialog + BotDialog (both gained
+    `role="dialog"` + `aria-modal` + `aria-label` + Escape), MCP dialog
+    (gained `aria-modal` + Escape), MobileDrawer (Tab trap; Escape was
+    already global). Barrel exports the trap contract.
+  - **Gates:** root `tsc --noEmit` 0 · web build green (index 444k, chunks
+    intact) · full web suite 38/38 files (was 37, +focus-trap 27/27) ·
+    a11y probe 33/33 with new Rule 6 (every `role="dialog"` file must wire
+    `useFocusTrap` + carry `aria-modal`/`aria-label`; negative control
+    verified both ways — trap check removed → FAIL with file, restored →
+    green) · mock grep on touched files clean (labeled-input
+    `placeholder`s only, legit) · server untouched.
+  - **Honest scope:** no real-device/AT test; popovers (composer model
+    picker) are non-modal and out of scope; provider dialog is inline
+    (no overlay, nothing to trap).
+  - Next piece: roadmap Phase 1+2+3 COMPLETE — final verification pass
+    (full gates + live deploy + Docs close-out).

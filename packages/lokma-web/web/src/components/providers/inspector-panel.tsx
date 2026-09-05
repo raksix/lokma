@@ -3,28 +3,31 @@ import { Activity, BarChart3, Beaker, Bot, Brain, Clock3, Cpu, Folder, GitBranch
 import { Button } from '@/components/ui/button';
 import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
-import { ModelsPane } from './models-pane';
-import { ProvidersPane } from './providers-pane';
-import { SettingsPane } from '@/components/settings';
-import { TerminalPane } from '@/components/terminal';
-import { GitPane } from '@/components/git';
-import { BrowserPane } from '@/components/browser';
-import { AgentsPane } from '@/components/agents';
-import { OrchestrationPane } from '@/components/orchestration';
-import { VaultPane } from '@/components/vault';
-import { SkillsPane } from '@/components/skills';
-import { ArchifyPane } from '@/components/archify';
-import { DesignPane } from '@/components/design';
-import { TestingPane } from '@/components/testing';
-import { BotsPane } from '@/components/bots';
-import { AuthPane } from '@/components/auth';
-import { SetupPane } from '@/components/setup';
-import { PluginsPane } from '@/components/plugins';
-import { ObservabilityPane } from '@/components/observability';
-import { CronApprovalsPane } from '@/components/cron';
-import { ExtrasPane } from '@/components/extras';
-import { MemoryPane } from '@/components/memory';
-import { UsagePane } from '@/components/usage/usage-pane';
+import {
+  LazyAgentsPane,
+  LazyArchifyPane,
+  LazyAuthPane,
+  LazyBotsPane,
+  LazyBrowserPane,
+  LazyCronApprovalsPane,
+  LazyDesignPane,
+  LazyExtrasPane,
+  LazyGitPane,
+  LazyMemoryPane,
+  LazyModelsPane,
+  LazyObservabilityPane,
+  LazyOrchestrationPane,
+  LazyPluginsPane,
+  LazyProvidersPane,
+  LazySettingsPane,
+  LazySetupPane,
+  LazySkillsPane,
+  LazyTerminalPane,
+  LazyTestingPane,
+  LazyUsagePane,
+  LazyVaultPane,
+  PaneFallback,
+} from '@/components/panes/lazy-panes';
 
 /**
  * InspectorPanel — right-sidebar tabs. Info stays the default; Providers is
@@ -304,63 +307,65 @@ export function InspectorPanel({
           Memory
         </Button>
       </div>
+      <React.Suspense fallback={<PaneFallback pane={tab} />}>
       {tab === 'info' ? (
         <InfoPanel />
       ) : tab === 'memory' ? (
-        <MemoryPane />
+        <LazyMemoryPane />
       ) : tab === 'extras' ? (
-        <ExtrasPane onOpenTab={(t) => setTab(t)} />
+        <LazyExtrasPane onOpenTab={(t) => setTab(t)} />
       ) : tab === 'cron' ? (
-        <CronApprovalsPane />
+        <LazyCronApprovalsPane />
       ) : tab === 'observability' ? (
-        <ObservabilityPane />
+        <LazyObservabilityPane />
       ) : tab === 'plugins' ? (
-        <PluginsPane />
+        <LazyPluginsPane />
       ) : tab === 'setup' ? (
-        <SetupPane />
+        <LazySetupPane />
       ) : tab === 'auth' ? (
-        <AuthPane />
+        <LazyAuthPane />
       ) : tab === 'bots' ? (
-        <BotsPane onOpenSession={onOpenSession} />
+        <LazyBotsPane onOpenSession={onOpenSession} />
       ) : tab === 'testing' ? (
-        <TestingPane />
+        <LazyTestingPane />
       ) : tab === 'design' ? (
-        <DesignPane />
+        <LazyDesignPane />
       ) : tab === 'archify' ? (
-        <ArchifyPane />
+        <LazyArchifyPane />
       ) : tab === 'skills' ? (
-        <SkillsPane />
+        <LazySkillsPane />
       ) : tab === 'vault' ? (
-        <VaultPane />
+        <LazyVaultPane />
       ) : tab === 'orchestration' ? (
-        <OrchestrationPane />
+        <LazyOrchestrationPane />
       ) : tab === 'agents' ? (
-        <AgentsPane />
+        <LazyAgentsPane />
       ) : tab === 'providers' ? (
-        <ProvidersPane />
+        <LazyProvidersPane />
       ) : tab === 'models' ? (
-        <ModelsPane />
+        <LazyModelsPane />
       ) : tab === 'usage' ? (
-        <UsagePane onOpenSession={onOpenSession} />
+        <LazyUsagePane onOpenSession={onOpenSession} />
       ) : tab === 'settings' ? (
-        <SettingsPane />
+        <LazySettingsPane />
       ) : tab === 'git' ? (
-        <GitPane key={sessionId ?? 'no-session'} sessionId={sessionId} />
+        <LazyGitPane key={sessionId ?? 'no-session'} sessionId={sessionId} />
       ) : tab === 'browser' ? (
         sessionId ? (
-          <BrowserPane key={sessionId} sessionId={sessionId} />
+          <LazyBrowserPane key={sessionId} sessionId={sessionId} />
         ) : (
           <div className="rounded border border-dashed p-3 text-xs text-muted-foreground">
             Open a session to use the browser.
           </div>
         )
       ) : sessionId && ws ? (
-        <TerminalPane key={sessionId} sessionId={sessionId} ws={ws} />
+        <LazyTerminalPane key={sessionId} sessionId={sessionId} ws={ws} />
       ) : (
         <div className="rounded border border-dashed p-3 text-xs text-muted-foreground">
           Open a session to use the terminal.
         </div>
       )}
+      </React.Suspense>
     </div>
   );
 }

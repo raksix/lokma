@@ -34,5 +34,16 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    // Phase 3 perf wave 2b: keep React in one shared chunk so the 22 lazy
+    // Inspector panes (see `components/panes/lazy-panes.tsx`) share it
+    // instead of each duplicating the runtime.
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+        },
+      },
+    },
   },
 });

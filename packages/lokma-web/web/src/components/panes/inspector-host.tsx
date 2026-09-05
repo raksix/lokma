@@ -4,29 +4,32 @@ import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
 import { useSessionStore } from '@/stores/session';
 import { emitToast } from '@/components/shell';
-import { ModelsPane } from '@/components/providers/models-pane';
-import { ProvidersPane } from '@/components/providers/providers-pane';
-import { SettingsPane } from '@/components/settings';
-import { TerminalPane } from '@/components/terminal';
-import { GitPane } from '@/components/git';
-import { BrowserPane } from '@/components/browser';
-import { AgentsPane } from '@/components/agents';
-import { OrchestrationPane } from '@/components/orchestration';
-import { VaultPane } from '@/components/vault';
-import { SkillsPane } from '@/components/skills';
-import { ArchifyPane } from '@/components/archify';
-import { DesignPane } from '@/components/design';
-import { TestingPane } from '@/components/testing';
-import { BotsPane } from '@/components/bots';
-import { AuthPane } from '@/components/auth';
-import { SetupPane } from '@/components/setup';
-import { PluginsPane } from '@/components/plugins';
-import { ObservabilityPane } from '@/components/observability';
-import { CronApprovalsPane } from '@/components/cron';
-import { ExtrasPane } from '@/components/extras';
 import type { ExtrasTabId } from '@/components/extras/extras';
-import { MemoryPane } from '@/components/memory';
-import { UsagePane } from '@/components/usage/usage-pane';
+import {
+  LazyAgentsPane,
+  LazyArchifyPane,
+  LazyAuthPane,
+  LazyBotsPane,
+  LazyBrowserPane,
+  LazyCronApprovalsPane,
+  LazyDesignPane,
+  LazyExtrasPane,
+  LazyGitPane,
+  LazyMemoryPane,
+  LazyModelsPane,
+  LazyObservabilityPane,
+  LazyOrchestrationPane,
+  LazyPluginsPane,
+  LazyProvidersPane,
+  LazySettingsPane,
+  LazySetupPane,
+  LazySkillsPane,
+  LazyTerminalPane,
+  LazyTestingPane,
+  LazyUsagePane,
+  LazyVaultPane,
+  PaneFallback,
+} from '@/components/panes/lazy-panes';
 import type { InspectorTabId } from './panes';
 
 // InspectorHost: renders one REAL Inspector pane inside a tiling tab.
@@ -48,32 +51,54 @@ export function InspectorHost({
   onOpenInspectorTab: (id: InspectorTabId) => void;
 }) {
   if (tab === 'info') return <InfoPanel />;
-  if (tab === 'providers') return <ProvidersPane />;
-  if (tab === 'models') return <ModelsPane />;
-  if (tab === 'usage') return <UsagePane onOpenSession={onOpenSession} />;
-  if (tab === 'settings') return <SettingsPane />;
-  if (tab === 'agents') return <AgentsPane />;
-  if (tab === 'orchestration') return <OrchestrationPane />;
-  if (tab === 'vault') return <VaultPane />;
-  if (tab === 'skills') return <SkillsPane />;
-  if (tab === 'archify') return <ArchifyPane />;
-  if (tab === 'design') return <DesignPane />;
-  if (tab === 'testing') return <TestingPane />;
-  if (tab === 'bots') return <BotsPane onOpenSession={onOpenSession} />;
-  if (tab === 'auth') return <AuthPane />;
-  if (tab === 'setup') return <SetupPane />;
-  if (tab === 'plugins') return <PluginsPane />;
-  if (tab === 'observability') return <ObservabilityPane />;
-  if (tab === 'cron') return <CronApprovalsPane />;
-  if (tab === 'memory') return <MemoryPane onOpenSession={onOpenSession} />;
+  return (
+    <React.Suspense fallback={<PaneFallback pane={tab} />}>
+      <LazyTab tab={tab} sessionId={sessionId} ws={ws} onOpenSession={onOpenSession} onOpenInspectorTab={onOpenInspectorTab} />
+    </React.Suspense>
+  );
+}
+
+// LazyTab — the tab switch itself stays synchronous (pure conditional), so
+// only the chunk download suspends inside the boundary above.
+function LazyTab({
+  tab,
+  sessionId,
+  ws,
+  onOpenSession,
+  onOpenInspectorTab,
+}: {
+  tab: InspectorTabId;
+  sessionId: string | null;
+  ws?: UseWs;
+  onOpenSession?: (id: string) => void;
+  onOpenInspectorTab: (id: InspectorTabId) => void;
+}) {
+  if (tab === 'providers') return <LazyProvidersPane />;
+  if (tab === 'models') return <LazyModelsPane />;
+  if (tab === 'usage') return <LazyUsagePane onOpenSession={onOpenSession} />;
+  if (tab === 'settings') return <LazySettingsPane />;
+  if (tab === 'agents') return <LazyAgentsPane />;
+  if (tab === 'orchestration') return <LazyOrchestrationPane />;
+  if (tab === 'vault') return <LazyVaultPane />;
+  if (tab === 'skills') return <LazySkillsPane />;
+  if (tab === 'archify') return <LazyArchifyPane />;
+  if (tab === 'design') return <LazyDesignPane />;
+  if (tab === 'testing') return <LazyTestingPane />;
+  if (tab === 'bots') return <LazyBotsPane onOpenSession={onOpenSession} />;
+  if (tab === 'auth') return <LazyAuthPane />;
+  if (tab === 'setup') return <LazySetupPane />;
+  if (tab === 'plugins') return <LazyPluginsPane />;
+  if (tab === 'observability') return <LazyObservabilityPane />;
+  if (tab === 'cron') return <LazyCronApprovalsPane />;
+  if (tab === 'memory') return <LazyMemoryPane onOpenSession={onOpenSession} />;
   if (tab === 'extras') {
-    return <ExtrasPane onOpenTab={(t: ExtrasTabId) => onOpenInspectorTab(t)} />;
+    return <LazyExtrasPane onOpenTab={(t: ExtrasTabId) => onOpenInspectorTab(t)} />;
   }
   if (tab === 'terminal' || tab === 'git' || tab === 'browser') {
     if (!sessionId || (tab === 'terminal' && !ws)) return <NeedsSessionPane pane={tab} onOpenSession={onOpenSession} />;
-    if (tab === 'terminal') return <TerminalPane key={sessionId} sessionId={sessionId} ws={ws as UseWs} />;
-    if (tab === 'git') return <GitPane key={sessionId} sessionId={sessionId} />;
-    return <BrowserPane key={sessionId} sessionId={sessionId} />;
+    if (tab === 'terminal') return <LazyTerminalPane key={sessionId} sessionId={sessionId} ws={ws as UseWs} />;
+    if (tab === 'git') return <LazyGitPane key={sessionId} sessionId={sessionId} />;
+    return <LazyBrowserPane key={sessionId} sessionId={sessionId} />;
   }
   return null;
 }

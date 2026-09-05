@@ -1,8 +1,14 @@
 import * as React from 'react';
-import { Copy, GitFork, History, Pencil, User } from 'lucide-react';
+import { ChevronUp, Copy, GitFork, History, Pencil, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { HeroSection } from './hero-section';
+import {
+  MESSAGE_WINDOW_INITIAL,
+  expandMessageWindow,
+  shouldResetMessageWindow,
+  visibleMessageWindow,
+} from './message-window';
 import {
   AssistantBody,
   PermissionCard,
@@ -149,20 +155,30 @@ function AssistantRow({
   );
 }
 
-function DotNav({ scrollRef, count }: { scrollRef: React.RefObject<HTMLDivElement | null>; count: number }) {
+function DotNav({
+  scrollRef,
+  start,
+  count,
+}: {
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  /** Real transcript index of the first rendered row (windowing offset). */
+  start: number;
+  /** Rendered rows (not the full transcript — dots only target live DOM). */
+  count: number;
+}) {
   if (count === 0) return null;
   return (
     <div className="sticky top-1/2 flex h-fit -translate-y-1/2 flex-col items-center gap-2 self-start rounded-full border border-line bg-white px-1 py-2 shadow-sm dark:bg-[#1E1E21]">
       {Array.from({ length: Math.min(count, 12) }).map((_, i) => (
         <button
-          key={i}
-          onClick={() => document.getElementById(`chat-msg-${i}`)?.scrollIntoView({ behavior: scrollBehavior(), block: 'center' })}
+          key={start + i}
+          onClick={() => document.getElementById(`chat-msg-${start + i}`)?.scrollIntoView({ behavior: scrollBehavior(), block: 'center' })}
           className={cn(
             'h-2 w-2 rounded-full transition hover:scale-[1.4]',
             i === 0 ? 'bg-terracotta shadow' : 'bg-zinc-300 hover:bg-terracotta dark:bg-zinc-600',
           )}
-          title={`Message ${i + 1}`}
-          aria-label={`Go to message ${i + 1}`}
+          title={`Message ${start + i + 1}`}
+          aria-label={`Go to message ${start + i + 1}`}
         />
       ))}
       <span className="my-1 h-4 w-px bg-line" />
@@ -215,6 +231,21 @@ export function SingleChatView({
 }) {
   const empty = transcript.length === 0 && pending.length === 0 && !stream;
 
+  // Perf wave 2b windowing: long transcripts render only their tail. The
+  // window collapses back to the initial tail when the transcript shrinks
+  // (session switch, rewind, edit+resend); growth keeps the user's window
+  // so the live tail keeps following. Indices are never remapped.
+  const [shownCount, setShownCount] = React.useState(MESSAGE_WINDOW_INITIAL);
+  const prevTotalRef = React.useRef(transcript.length);
+  React.useEffect(() => {
+    const prev = prevTotalRef.current;
+    prevTotalRef.current = transcript.length;
+    if (shouldResetMessageWindow(prev, transcript.length)) {
+      setShownCount(MESSAGE_WINDOW_INITIAL);
+    }
+  }, [transcript.length]);
+  const window = visibleMessageWindow(transcript.length, shownCount);
+
   return (
     <div className="relative flex gap-3">
       <div className="min-w-0 flex-1 space-y-5 pr-2">
@@ -222,13 +253,29 @@ export function SingleChatView({
           <HeroSection onStart={onStart} />
         ) : (
           <>
-            {transcript.map((m, i) =>
-              m.role === 'user' ? (
+            {window.hidden > 0 && (
+              <div className="flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-[11px]"
+                  title={`Reveal ${window.hidden} earlier messages`}
+                  aria-label={`Show earlier messages, ${window.hidden} hidden`}
+                  onClick={() => setShownCount((s) => expandMessageWindow(s, transcript.length))}
+                >
+                  <ChevronUp className="h-3 w-3" />
+                  Show earlier messages ({window.hidden} hidden)
+                </Button>
+              </div>
+            )}
+            {transcript.slice(window.start).map((m, k) => {
+              const i = window.start + k;
+              return m.role === 'user' ? (
                 <UserRow key={`${i}-${m.timestamp ?? ''}`} index={i} message={m} onEditSave={onEditSave} onRewindTo={onRewindTo} onCopy={onCopy} />
               ) : (
                 <AssistantRow key={`${i}-${m.timestamp ?? ''}`} index={i} message={m} onCopy={onCopy} onFork={onFork} onRewindTo={onRewindTo} />
-              ),
-            )}
+              );
+            })}
             {pending.map((p) => (
               <div key={p.key} className="flex gap-3 opacity-70">
                 <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full border border-line bg-muted">
@@ -272,7 +319,7 @@ export function SingleChatView({
           </>
         )}
       </div>
-      <DotNav scrollRef={scrollRef} count={transcript.length} />
+      <DotNav scrollRef={scrollRef} start={window.start} count={window.visible} />
     </div>
   );
 }

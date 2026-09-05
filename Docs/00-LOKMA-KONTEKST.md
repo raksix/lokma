@@ -800,9 +800,13 @@
 - **Fixed:** README `28 route files` → `27 route modules` (`index.ts` is a zero-route barrel).
 - **Infra:** HTTPS push auth broken on box (no credential helper) — origin switched to SSH, future runs push over SSH. No restart (docs-only).
 
+### 2026-09-05 — TEST LOOP area F run 3: regression + live, FULLY GREEN (docs-only, no code commit)
+- **Gates:** root `bun x tsc --noEmit` 0 · server `tsc -p` 0 · core `tsc -p` 0 · web `bun run build` green (8.11s, `index-7RJ68xce.js` + 22 pane chunks, dist content identical — restart yok) · core `bun test` taze temp HOME'da tüm satırlar PASS, 0 fail (refuse-guard temp HOME ister, gerçek `/root/.lokma`'ya dokunulmadı) · server log 197 satır, 0 level>=40 · canlı `/` 401/200 + `/health` 200 + `/api/bots` 401/200 + served index.html byte-identical + served bundle sha256 == disk · `/api/doctor` 8/8.
+- **Dürüst not:** eski F run'ları 53 dosyalık probe suite diyordu ama repoda probe dosyası YOK (ephemeral /tmp script'leriydi) — kalıcı regresyon = `bun test` + 3 tsc + build + doctor + live, hepsi yeşil. Tree temiz, PM2'ye dokunulmadı.
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area E run 3 — harness demo live proven, sıradaki alan: F)
-- **Son işlem:** Word-frequency demo `/tmp/lokma-demo/run3/` agent döngüsüyle kuruldu (4 tool, test exit 0, transcript 8 satır); muse-spark upstream'de hâlâ 500; WS driver `ws` modülü artık lokma node_modules'tan.
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area F run 3 — regression + live FULLY GREEN, sıradaki alan: A)
+- **Son işlem:** Tüm kapılar yeşil (3 tsc + build + core test + doctor 8/8 + canlı byte-identical); kod değişikliği yok, restart yok; F-green streak 1/3.
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):

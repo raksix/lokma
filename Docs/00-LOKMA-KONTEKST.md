@@ -731,6 +731,11 @@
 - **Fixed:** `GET /api/agents/:id` missing → was HTTP 200 `{ok:false}` — now 404 `{code:agent_not_found}` (matches PATCH/DELETE + registry.ts:231); `GET /api/sessions/:id` unknown id → was HTTP 200 fabricated empty session — now 404 `{code:session_not_found}` (matches fork/DELETE; real sessions still 200). Typecheck 0, dist rebuilt, single-proc restart via ecosystem file, live `/` 401→200 + `/health` 200 re-verified.
 - **By-design (no fix):** `/api/auth/me`+`/api/users` 401 unauthenticated; `/api/usage/export` 400 without `?format=` (200 csv/jsonl with real ledger rows); `/api/vault/note` 400 non-.md / 404 unknown; invalid session ids 400 via error hook (no 500).
 
+### 2026-09-05 — TEST LOOP area B run 1: browser flows, 1 real client bug class fixed (52a77a8)
+- **Headless Chromium click-through** (working recipe recorded in Docs/39: playwright-core + chromium-1234 + basic-auth creds file at runtime, fresh context): 23/23 Inspector tabs ok, 20/20 tiling-bar buttons ok (pane counter 4→23, Reset restores), 5/5 real sidebar sessions load transcripts, sessions list + server-up badge live, 0 mock hits, 0 pageerrors, 0 failed requests after fix.
+- **Fixed:** fresh boot fired 7x `GET /api/sessions/:fresh-id` → 404 (Chat 2x + every mounted Terminal/Git/Browser/Files/FilePreview pane 1x each for cwd). New `useKnownSession(id)` hook (stores/session.ts) resolves cwd/meta from the cached server list (`'loading'` waits, `null` = fresh session → empty defaults, no request); wired into chat + 5 panes; `force` post-stream reload bypasses the guard (WS loop creates the session server-side); inline SVG favicon kills /favicon.ico 404. Proof: stores probe ALL PASS + 5 new asserts, web tsc 0, dist rebuilt, lokma-web single-proc restart, live 401/200 re-verified.
+- **By-design (no fix):** pane drop-resolve keeps its list-first + GET-fallback (user-initiated, intentional); observability replay GETs a user-picked real id.
+
 ### 2026-09-05 — FINAL VERIFICATION PASS: roadmap Phase 1+2+3 COMPLETE (kaynak değişikliği yok, docs-only run)
 - **Executor run:** wave 2c sonrası §10'da kuyruğa giren final verification pass bu run'ın tek parçasıydı — tüm kapılar güncel duruma karşı taze koşuldu, canlı deploy byte-identical doğrulandı, Docs kapatıldı.
 - **Gates:** root tsc 0 · web build green (index 444k + vendor + 22 pane chunk) · server+core `tsc -p` clean · web suite 38/38 dosya exit 0 (sıfır fail) · core 14/14 dosya PASS (her proba taze startup-env temp HOME — `bun test` tek HOME paylaştırıp memory empty-read guard'ını tetikliyor; prob başlıklarındaki dokümante koşu pattern'i, kod regresyonu değil) · ai adapters 22/22 · mock grep temiz (anti-mock yorumlar, legit) · gerçek `~/.lokma`'ya dokunulmadı.
@@ -738,7 +743,7 @@
 - **Roadmap:** Phase 1 + Phase 2 + Phase 3 TAMAMLANDI. Kalan follow-up'lar kod değil kullanıcı/kutu kararı ister: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry.
 
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area A run 1 — backend sweep, 2 gerçek 404-contract bug'ı düzeltildi 29a0e3c, sıradaki alan: B)
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area B run 1 — browser flows, `useKnownSession` client fix 52a77a8, sıradaki alan: C)
 - **Son işlem:** Final verification pass — tüm kapılar yeşil (root tsc 0, web build green, web 38/38, core 14/14, ai 22/22), canlı 401→200 + /health 200 + bundle disk-identical, Docs kapatıldı.
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)

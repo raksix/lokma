@@ -781,8 +781,8 @@
 - 2026-09-05 — area F (regression + live, run 2): NOT green on arrival — 1 REAL test-isolation bug found + fixed (commit 0916e14). Whole-suite `bun test` in lokma-core failed 2 files: `cloud.test.ts` seeded `memories/MEMORY.md` + fake `vault/.fts5/vault.db` with no cleanup, breaking `memory.test.ts` empty-read + `fts.test.ts` sync (SQLite 'file is not a database'). Fix: cloud probe rms its 8 seeds, memory probe empties both targets. After fix: core suite exit 0/0 fail, web probes 38/38, ai probe 22/22, root/server/core tsc all 0, web build green (bundle hash unchanged), server log clean, live `/` 401/200 + `/health` 200 + `/api/bots` 401/200, served bundle byte-identical to disk. No restart (test-only, dist unchanged). Next area: A.
 
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area F run 2 — test isolation fix 0916e14, sıradaki alan: A)
-- **Son işlem:** regresyon + canlı tam yeşil; cloud/memory prob kalıntısı tüm-süit koşusunu bozuyordu, temizlik eklendi.
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area A run 3 — config patched-echo fix 60c0686 + 3 stale sweep residue cleaned, sıradaki alan: B)
+- **Son işlem:** backend sweep 156 route tam yeşil; PATCH /api/config phantom-`patched` yanıtı düzeltildi, önceki run'ların 3 kalıntısı temizlendi.
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):

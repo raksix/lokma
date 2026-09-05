@@ -2500,3 +2500,34 @@ survives; never delete both at once). If even that serves stale code, escalate i
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology
 + Son Durum, commit + push, mirror to memory vault.*
+- 2026-09-05 — Phase 3 sharing DONE (core c18fc1a + server 423671f + web a58938e)
+  - **Executor run:** share links are REAL public pages now — `GET
+    /share/:token` serves the frozen snapshot as self-contained HTML (zero
+    external assets, cream/terracotta inline, escaped, og meta), no login.
+  - **Core:** `observability/share-page.ts` (new: `escapeHtml()` +
+    `renderShareHtml(record|null)` — agent timeline / session transcript /
+    branded 404 bodies, `SHARE_PAGE_MAX_ROWS=500` cap with more-note) +
+    `share-page.test.ts` 20/20 (XSS escaping, meta, caps) + `index.ts`
+    export.
+  - **Server:** `GET /share/:token` (`text/html`; bad token HTML 400,
+    unknown HTML 404 — never JSON) + `GET /share/:kind/:token` 302 for
+    pre-Phase-3 `/share/agent|session/<token>` links (else HTML 404);
+    POST urls canonicalized to `/share/<token>`; in-process probe 19/19
+    (probe fixed twice: fresh sessions carry 1 marker row so share is 200
+    not 404; list count is 2 after agent+session shares).
+  - **Web:** list rows + Copy use canonical `/share/<token>` (server
+    `res.url` already does for new shares); Share header notes links open
+    without login; extras #23 `how` updated (`/share/<token>`).
+  - **Infra:** nginx `location /share/` (NO auth_basic — token is the
+    secret) → `lokma_server`; `nginx -t` + reload. `/api/*` stays gated.
+  - **Gates:** root tsc 0 · core 13/13 files · web 33/33 files · server
+    probe 19/19 + core probe 20/20 · mock grep clean (anti-mock comment +
+    todo filter labels, legit) · real `~/.lokma` untouched by probes.
+  - **Live** (lokma.fermag.com.tr): /health 200 · / 401→200 authed ·
+    temp agent+share created → public page 200 html no-auth (name present,
+    zero `_next/`) → legacy 302 → bad 400 → api-noauth 401 → share+agent
+    deleted, list back to 0. Both procs online, web script bun.
+  - **Honest scope:** pages are static snapshots (no live updates, no JS);
+    session pages cap at 500 rows + truncation note; token rotation /
+    expiry / password-gated shares are follow-ups.
+  - Next piece: Phase 3 cloud, then mobile, perf + a11y.

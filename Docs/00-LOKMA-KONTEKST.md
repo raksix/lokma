@@ -816,9 +816,15 @@
 - **Canlı:** 12/12 endpoint 200 authed + `/` 401 anon + `/health` 200 + `/api/users` 401 by-design + git main temiz (ahead 0 behind 0). CLI temp-HOME yeşil (`--help` exit 0, `doctor` 8 check / blank profilde dürüst 2 fail, `config set/get`, `agent list`).
 - **Docs/20-37 sweep:** ilk turdaki 6 adet 404'ün TAMAMI yanlış probe path'iydi — kaynağa karşı düzeltildi, app değişikliği yok (`/api/terminal`+`/api/browser` tekil, archify/design koleksiyonları `/list`, users `/api/users`, trace `/api/agents/:id/trace`); düzeltilmiş path'ler 200 + dürüst boş-state'ler. D-green streak 1/3. Tree temiz, PM2'ye dokunulmadı.
 
+### 2026-09-05 — TEST LOOP area E run 4: harness demo, gerçek agent loop uçtan uca (docs-only, no code commit)
+- **Demo:** Türkçe-duyarlı palindrome checker (`/tmp/lokma-demo/run4/`: palindrome.js + palindrome.test.js + README.md, 3x write_file) — `node palindrome.test.js` exit 0 `ALL TESTS PASSED` + `done-complete`, 9 satır transcript (2 user/2 assistant/5 tool), model opencode-go/mimo-v2.5. Bağımsız re-run exit 0.
+- **Mandated model:** `muse-spark-1.3-contributor` 4. E run'unda da upstream 500 + 35'lik canlı katalogda YOK — harness'e dokunulmadı, mock yok.
+- **Driver reçete düzeltmeleri (app değişikliği yok):** (1) WS URL'sinde `?cwd=` ŞART — yoksa loop server cwd'de koşuyor, scoped session'a prompt düşmüyor (ilk deneme 420s asıldı, orphan silindi); (2) ESM `ws` import'u NODE_PATH'i yok sayıyor — repo package.json'dan createRequire; (3) tool turn limit (5) turn'ü bitiriyor — follow-up nudge ile `done-complete` kapatıldı. 4x `allow` (asla `always` — global allow-list'e dokunulmadı), project-local `.lokma/settings.json` auto-mode.
+- **Infra:** PM2 daemon iki proc'u da kaybetmiş (bun :3456 + vite-preview :3457 repo path'lerinden sağlıklı orphan — dokunulmadı, restart gerekmedi); `ls` hâlâ bozuk (python os.listdir). Server log 0 level>=40.
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area D run 4 — FULLY GREEN, sıfır gap, sıradaki alan: E)
-- **Son işlem:** README + Docs/20-37 tamamı canlıya karşı yeşil (docs-only run, code commit yok; PM2'ye dokunulmadı).
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area E run 4 — harness demo geçti, sıradaki alan: F)
+- **Son işlem:** Gerçek agent loop palindrome demo ile uçtan uca kanıtlandı (exit 0 + done-complete, docs-only run, code commit yok; PM2'ye dokunulmadı).
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):

@@ -757,9 +757,13 @@
 - **Server log:** 0 level>=40 error; 5 distinct route-404 (`/api/git`, `/api/cloud/status`, `/api/cron/list`, `/api/observability/trace`, `/`) hepsi dışarıdan tahmin-yürütme — web client bu path'lerin HİÇBİRİNİ çağırmıyor (grep 0 hit), by-design, fix yok.
 - **Canlı** (lokma.fermag.com.tr): `/` 401 anon / 200 authed · `/health` 200 · `/api/bots` 401/200 · served index.html disk dist ile byte-identical · served `index-vievEttA.js` sha256 disk ile eşleşiyor. Tree baştan sona temiz, PM2'ye dokunulmadı (iki proc online).
 
+### 2026-09-05 — TEST LOOP area A run 2: backend sweep, FULLY GREEN (docs-only, no code commit)
+- **Scope:** ALL ~150 endpoints across 28 route files probed live against PM2 `lokma-server` :3456 — session lifecycle (create/rename/WS handshake/delete) + terminal lifecycle + vault/memory/files write round-trips (unique names, full cleanup) + validation/auth negative matrix. First pass showed 7 mismatches, all wrong probe expectations (verified against source, 20/20 corrective probes green): memory takes `{content}/{old_text}` body, files/git are `?cwd`-jailed (absolute paths correctly 400), bogus cron GET correctly 404, projects anon-200 + POST-403 is the documented unbootstrapped single-user design (auth.ts:243-259), empty git push is the pane push button (up-to-date, harmless).
+- **Gates:** sweep 170 pass + corrective 20/20 · residue audit clean (0 sweep sessions, 0 sweep vault hits) · server error log EMPTY (0 level>=40) · tree clean, PM2 untouched (no code changed, no restart).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area F run 1 — regression+live FULLY GREEN, 53/53 probes, bundle hash match, docs-only, sıradaki alan: A)
-- **Son işlem:** Regression + live — tsc 0/server 0/web build green, 53/53 probe PASS, log'da 0 error, canlı 401/200 + hash eşleşmesi, restart yok.
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area A run 2 — backend sweep FULLY GREEN, ~150 endpoint, 0 failure, docs-only, sıradaki alan: B)
+- **Son işlem:** Backend sweep — 28 route dosyası tamamı probelendi, 7 beklenti hatası kaynağa karşı düzeltildi, server log temiz, residue yok, restart yok.
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):

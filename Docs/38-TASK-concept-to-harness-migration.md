@@ -2738,3 +2738,33 @@ survives; never delete both at once). If even that serves stale code, escalate i
     real-device/AT test.
   - Next piece: Phase 3 perf + a11y wave 2b (code-split + virtualized
     chat), then the roadmap is complete.
+---
+- 2026-09-05 — Phase 3 perf + a11y wave 2b: code-split + virtualized chat DONE (web 1502b1f)
+  - **Executor run:** the initial bundle is 43% lighter and long chats stay
+    fast — 22 Inspector panes are on-demand chunks, transcripts render only
+    their tail. Single atomic web commit (server untouched).
+  - **Code-split:** new `components/panes/lazy-panes.tsx` (single DRY source:
+    22 `React.lazy` bindings importing each pane's own file — never a barrel
+    — plus an honest `PaneFallback` loading state with `role=status`); both
+    `InspectorPanel` (sidebar) and `InspectorHost` (tiling, via a sync
+    `LazyTab` switch under one `Suspense` boundary) render through it, so tab
+    bars stay mounted while only the pane area suspends. `vite.config.ts`
+    gains a shared `vendor` (react/react-dom) manualChunk.
+  - **Virtualized chat:** new `components/chat/message-window.ts` (pure
+    helpers: `visibleMessageWindow` tail-anchored slice, `expandMessageWindow`
+    +40-step capped at total, `shouldResetMessageWindow` only on shrink) +
+    `message-window.test.ts` probe 20/20. `SingleChatView` renders the last
+    40 rows behind a "Show earlier messages (N hidden)" control (ChevronUp
+    lucide, real `aria-label`); indices are never remapped (edit/rewind/copy
+    keys intact); `DotNav` now takes the window `start` offset so dots only
+    target live DOM (previously dots pointed at unrendered rows in long
+    chats — real bug fixed in the same pass).
+  - **Gates:** root `tsc --noEmit` 0 · web build green — index chunk
+    780k→444k JS (gzip 128k) + vendor 12k + 22 pane chunks (4k–28k each,
+    loaded on tab open) · full web suite 37/37 files (was 36,
+    +message-window) · mock grep on touched files clean · server untouched.
+  - **Honest scope:** no focus trap in dialogs yet (wave 2c); no
+    real-device/AT test; windowing is custom tail-collapse, not
+    `react-virtuoso` (zero new deps — roadmap item honored in spirit).
+  - Next piece: Phase 3 perf + a11y wave 2c (focus trap in dialogs), then
+    the roadmap is complete.

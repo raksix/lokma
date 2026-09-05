@@ -13,9 +13,11 @@ import {
   enabledIds,
   formatLatency,
   probeTone,
+  summarizeCloudImport,
   summarizeInit,
+  validateCloudFile,
 } from './setup';
-import type { DoctorCheckView, SetupFeatureView } from '@/lib/api';
+import type { CloudImportRes, DoctorCheckView, SetupFeatureView } from '@/lib/api';
 
 let passed = 0;
 function check(name: string, cond: boolean): void {
@@ -79,5 +81,25 @@ check('copy has one line per check plus footer', allPass.split('\n').length === 
 const mixed = doctorCopyText([probe(), probe({ name: 'models', ok: false, detail: 'none enabled' })]);
 check('copy ends with failing footer when mixed', mixed.endsWith('1/2 passed — see failing rows above'));
 check('copy keeps the failing row', mixed.includes('✗ models — none enabled'));
+
+// ─── cloud transfer ────────────────────────────────────────────────────
+const importRes = (over: Partial<CloudImportRes> = {}): CloudImportRes => ({
+  ok: true,
+  created: ['a', 'b'],
+  skipped: ['c'],
+  overwritten: [],
+  rejected: [],
+  count: 2,
+  ...over,
+});
+check('import summary counts restore/keep/replace', summarizeCloudImport(importRes()) === '2 restored · 1 kept · 0 replaced');
+check('import summary appends rejections', summarizeCloudImport(importRes({ rejected: [{ path: 'x', reason: 'y' }] })).endsWith('1 rejected'));
+check('import summary empty is zeros', summarizeCloudImport(importRes({ created: [], skipped: [] })) === '0 restored · 0 kept · 0 replaced');
+check('zip file passes the gate', validateCloudFile('lokma-state-2026-09-05.zip', 1024) === null);
+check('zip gate is case-insensitive', validateCloudFile('BUNDLE.ZIP', 1024) === null);
+check('non-zip is blocked', validateCloudFile('notes.md', 1024) === 'Pick a .zip bundle from Export');
+check('empty file is blocked', validateCloudFile('empty.zip', 0) === 'That file is empty');
+check('oversize bundle is blocked', validateCloudFile('big.zip', 64 * 1024 * 1024 + 1) === 'That bundle is larger than the 64MB import cap');
+check('cap boundary passes', validateCloudFile('edge.zip', 64 * 1024 * 1024) === null);
 
 console.log(`\nsetup probe: ${passed} passed`);

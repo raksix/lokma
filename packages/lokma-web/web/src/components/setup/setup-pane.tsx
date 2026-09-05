@@ -1,7 +1,7 @@
 import * as React from 'react';
-import { Check, Copy, Database, Globe, HardDrive, Plug2, Search, Sparkles, Terminal } from 'lucide-react';
+import { Check, Copy, Database, Download, Globe, HardDrive, Plug2, Search, Sparkles, Terminal, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ApiError, api, type DoctorRes, type SetupFeatureView, type SetupInitRes } from '@/lib/api';
+import { ApiError, api, type CloudImportRes, type DoctorRes, type SetupFeatureView, type SetupInitRes } from '@/lib/api';
 import {
   allOffMap,
   countPassed,
@@ -11,11 +11,24 @@ import {
   enabledIds,
   formatLatency,
   probeTone,
+  summarizeCloudImport,
   summarizeInit,
+  validateCloudFile,
 } from './setup';
 
 function toast(message: string): void {
   window.dispatchEvent(new CustomEvent('lokma-toast', { detail: message }));
+}
+
+function saveBlob(filename: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function errMessage(e: unknown): string {
@@ -39,17 +52,19 @@ const CREATED_FILES = [
 ];
 
 /**
- * SetupPane — `lokma init` + optional stack + `lokma doctor` (W6-22, Docs/32).
+ * SetupPane — `lokma init` + optional stack + `lokma doctor` + cloud transfer (W6-22, Docs/32, Phase 3 cloud prep).
  * Concept layout 1:1 (Init / Stack / Doctor steps), but every control is
  * live: `POST /api/setup/init` (creates the real dirs + configs),
  * `GET/POST /api/setup` (the real `features` map in `~/.lokma/config.json`),
- * `GET /api/doctor[?agents=1]` (8 real measured probes + the SOUL probe).
+ * `GET /api/doctor[?agents=1]` (8 real measured probes + the SOUL probe),
+ * `POST /api/cloud/export` (dated state-bundle download) +
+ * `POST /api/cloud/import` (restore with keep-by-default + overwrite opt-in).
  * NOT ported: the concept's hardcoded `doctorLines` (every row is measured
  * live now), the toast-only `Docs 32` button and the toast-only `Watcher`
  * button (config hot-reload is a follow-up — no dead buttons).
  */
 export function SetupPane() {
-  const [step, setStep] = React.useState<1 | 2 | 3>(1);
+  const [step, setStep] = React.useState<1 | 2 | 3 | 4>(1);
   const [features, setFeatures] = React.useState<SetupFeatureView[] | null>(null);
   const [checks, setChecks] = React.useState<Record<string, boolean>>({});
   const [setupError, setSetupError] = React.useState<string | null>(null);
@@ -60,6 +75,10 @@ export function SetupPane() {
   const [doctorLoading, setDoctorLoading] = React.useState(false);
   const [doctorError, setDoctorError] = React.useState<string | null>(null);
   const [withAgents, setWithAgents] = React.useState(false);
+  const [exporting, setExporting] = React.useState(false);
+  const [importing, setImporting] = React.useState(false);
+  const [overwrite, setOverwrite] = React.useState(false);
+  const [importResult, setImportResult] = React.useState<CloudImportRes | null>(null);
 
   const loadSetup = React.useCallback(async () => {
     setSetupError(null);
@@ -143,6 +162,45 @@ export function SetupPane() {
     }
   };
 
+  const runExport = async () => {
+    setExporting(true);
+    try {
+      const { filename, blob } = await api.downloadCloudExport();
+      saveBlob(filename, blob);
+      toast(`State exported — ${filename}`);
+    } catch (e) {
+      toast(`Export failed — ${errMessage(e)}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const runImportFile = async (file: File) => {
+    const gate = validateCloudFile(file.name, file.size);
+    if (gate) {
+      toast(`Import blocked — ${gate}`);
+      return;
+    }
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result ?? ''));
+        reader.onerror = () => reject(new Error('could not read that file'));
+        reader.readAsDataURL(file);
+      });
+      const zipBase64 = dataUrl.includes(',') ? dataUrl.slice(dataUrl.indexOf(',') + 1) : dataUrl;
+      const res = await api.importCloudState({ zipBase64, overwrite });
+      setImportResult(res);
+      toast(`Import done — ${summarizeCloudImport(res)}`);
+    } catch (e) {
+      toast(`Import failed — ${errMessage(e)}`);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const { passed, total } = countPassed(doctor?.checks ?? []);
   const allPass = doctor !== null && passed === total;
 
@@ -151,7 +209,7 @@ export function SetupPane() {
       <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0">
         <HardDrive className="w-3 h-3 text-terracotta" />
         <span className="text-xs font-semibold">Setup</span>
-        <span className="ml-1 text-[11px] text-zinc-400 hidden sm:inline">lokma init · optional stack · lokma doctor</span>
+        <span className="ml-1 text-[11px] text-zinc-400 hidden sm:inline">lokma init · optional stack · lokma doctor · cloud transfer</span>
         <span className="ml-auto flex gap-1">
           <Button variant={step === 1 ? 'default' : 'ghost'} size="sm" className="h-5 px-2 text-[11px]" onClick={() => setStep(1)}>
             1 Init
@@ -161,6 +219,9 @@ export function SetupPane() {
           </Button>
           <Button variant={step === 3 ? 'default' : 'ghost'} size="sm" className="h-5 px-2 text-[11px]" onClick={() => setStep(3)}>
             3 Doctor
+          </Button>
+          <Button variant={step === 4 ? 'default' : 'ghost'} size="sm" className="h-5 px-2 text-[11px]" onClick={() => setStep(4)}>
+            4 Cloud
           </Button>
         </span>
       </div>
@@ -338,6 +399,74 @@ export function SetupPane() {
             <Button size="sm" className="flex-1 h-6 text-xs gap-1" onClick={() => void runDoctor(withAgents)} disabled={doctorLoading}>
               <Terminal className="w-3 h-3" /> {doctorLoading ? 'Probing…' : 'Run doctor'}
             </Button>
+          </div>
+        </div>
+      )}
+
+      {step === 4 && (
+        <div className="flex-1 overflow-auto p-2 space-y-2">
+          <div className="text-xs font-medium px-1">Cloud transfer — pack this box, unpack on the next one</div>
+          <div className="rounded-lg bg-white dark:bg-[#1E1E21] border border-line p-3 space-y-2">
+            <div className="text-xs font-semibold flex items-center gap-1.5">
+              <Download className="w-3.5 h-3.5 text-terracotta" /> Export state
+            </div>
+            <p className="text-xs text-zinc-500 leading-5">
+              Packs the portable <code className="px-1 py-0 rounded bg-muted border border-line/60">~/.lokma</code> state
+              (config, memory, agents, bots, vault, archify, design, sessions, cron, plugins) into one dated{' '}
+              <code className="px-1 py-0 rounded bg-muted border border-line/60">.zip</code>. Provider keys and login
+              data never ride along — re-enter them on the new box.
+            </p>
+            <Button size="sm" className="h-7 text-xs gap-1" onClick={() => void runExport()} disabled={exporting}>
+              <Download className="w-3 h-3" /> {exporting ? 'Packing…' : 'Download state bundle'}
+            </Button>
+          </div>
+          <div className="rounded-lg bg-white dark:bg-[#1E1E21] border border-line p-3 space-y-2">
+            <div className="text-xs font-semibold flex items-center gap-1.5">
+              <Upload className="w-3.5 h-3.5 text-terracotta" /> Import state
+            </div>
+            <p className="text-xs text-zinc-500 leading-5">
+              Restores a bundle a previous Export produced. Existing files are kept unless you allow replacement;
+              crafted paths are rejected, and nothing is ever deleted.
+            </p>
+            <label htmlFor="lokma-cloud-import" className="text-xs font-medium">
+              State bundle (.zip, max 64MB)
+            </label>
+            <input
+              id="lokma-cloud-import"
+              type="file"
+              accept=".zip"
+              disabled={importing}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (file) void runImportFile(file);
+              }}
+              className="block w-full text-xs text-zinc-500 file:mr-2 file:h-7 file:px-3 file:rounded-md file:border-0 file:text-xs file:bg-[#C96442] file:text-white hover:file:opacity-90 disabled:opacity-50"
+            />
+            <label className="flex gap-2 items-center text-xs text-zinc-500 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={overwrite}
+                onChange={() => setOverwrite((v) => !v)}
+                className="accent-[#C96442]"
+              />
+              Replace files that already exist
+            </label>
+            {importing && <div className="text-xs text-zinc-500">Restoring bundle…</div>}
+            {importResult && (
+              <div className="rounded-lg bg-muted border border-line/60 p-2.5 text-xs leading-5">
+                <div className="font-medium">{summarizeCloudImport(importResult)}</div>
+                {importResult.rejected.length > 0 && (
+                  <div className="mt-1 font-mono text-[11px] text-amber-600 dark:text-amber-400">
+                    {importResult.rejected.map((r) => `${r.path} (${r.reason})`).join('\n')}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="text-[11px] text-zinc-500 px-1">
+            Secrets stay home: `credentials.json` + `auth/` are excluded and rejected. Per-project `.lokma/` travels
+            with the project checkout. Derived search indexes rebuild on demand.
           </div>
         </div>
       )}

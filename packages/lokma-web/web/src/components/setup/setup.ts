@@ -1,4 +1,4 @@
-import type { DoctorCheckView, SetupFeatureView } from '@/lib/api';
+import type { CloudImportRes, DoctorCheckView, SetupFeatureView } from '@/lib/api';
 
 /**
  * Pure helpers for the SetupPane (W6-22, Docs/32) — no React, no I/O.
@@ -61,4 +61,29 @@ export function doctorCopyText(checks: DoctorCheckView[]): string {
   const { passed, total } = countPassed(checks);
   const footer = passed === total ? `All checks passed · ${passed}/${total}` : `${passed}/${total} passed — see failing rows above`;
   return [...checks.map(doctorLine), footer].join('\n');
+}
+
+/** Largest bundle the import endpoint accepts (server `bodyLimit`). */
+export const CLOUD_IMPORT_MAX_BYTES = 64 * 1024 * 1024;
+
+/**
+ * Client-side gate for the import picker — mirrors the server caps so a
+ * hopeless file never uploads (`null` means the file may go up).
+ */
+export function validateCloudFile(name: string, size: number): string | null {
+  if (!name.toLowerCase().endsWith('.zip')) return 'Pick a .zip bundle from Export';
+  if (size <= 0) return 'That file is empty';
+  if (size > CLOUD_IMPORT_MAX_BYTES) return 'That bundle is larger than the 64MB import cap';
+  return null;
+}
+
+/** One-line import summary for the result banner. */
+export function summarizeCloudImport(res: CloudImportRes): string {
+  const parts = [
+    `${res.created.length} restored`,
+    `${res.skipped.length} kept`,
+    `${res.overwritten.length} replaced`,
+  ];
+  if (res.rejected.length > 0) parts.push(`${res.rejected.length} rejected`);
+  return parts.join(' · ');
 }

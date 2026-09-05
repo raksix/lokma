@@ -483,6 +483,19 @@ export type SetupInitRes = { ok: boolean; created: string[]; existed: string[] }
 export type DoctorCheckView = { name: string; ok: boolean; latencyMs: number; detail: string };
 export type DoctorRes = { checks: DoctorCheckView[]; passed: number; total: number };
 
+// ─── Cloud transfer (portable ~/.lokma export/import behind the SetupPane, Phase 3 cloud prep) ───
+
+export type CloudImportBody = { zipBase64: string; overwrite?: boolean };
+export type CloudRejectedEntry = { path: string; reason: string };
+export type CloudImportRes = {
+  ok: boolean;
+  created: string[];
+  skipped: string[];
+  overwritten: string[];
+  rejected: CloudRejectedEntry[];
+  count: number;
+};
+
 // ─── Archify diagrams (typed IR → validated HTML/SVG behind the ArchifyPane, W5-17) ───
 
 export type ArchifyNode = { id: string; label: string; kind?: string };
@@ -1361,6 +1374,17 @@ export const api = {
   initSetup: (body: SetupInitBody = {}) => post<SetupInitRes>('/api/setup/init', body),
   /** 8 subsystem probes (+ SOUL when `agents` is true) — all measured live. */
   getDoctor: (agents = false) => get<DoctorRes>(agents ? '/api/doctor?agents=1' : '/api/doctor'),
+  /** Portable state bundle — blob + server filename, auth via `authedFetch`. */
+  downloadCloudExport: async (): Promise<{ filename: string; blob: Blob }> => {
+    const fallback = 'lokma-state.zip';
+    const res = await authedFetch('/api/cloud/export', { method: 'POST' });
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') ?? '';
+    const match = disposition.match(/filename="([^"]+)"/);
+    return { filename: match?.[1] ?? fallback, blob };
+  },
+  /** Restore a state bundle (existing files are kept unless overwrite is true). */
+  importCloudState: (body: CloudImportBody) => post<CloudImportRes>('/api/cloud/import', body),
 
   // Plugins — kernel registry + hot toggle + add-from-URL (W6-23, Docs/23).
   // Toggle suspends the plugin's routes server-side (503), no restart.

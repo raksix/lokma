@@ -9,6 +9,7 @@
  * status tones, and human-readable report lines.
  */
 import type { CompactionRunRes, CompactionStatusRes, SessionSearchHit, SessionSummary } from '@/lib/api';
+import { messageCountLabel } from '../sessions/grouping';
 
 /** Search-form validation mirroring the server `bad_query` 400. */
 export function validateTranscriptSearch(form: { query: string }): string | null {
@@ -59,14 +60,14 @@ export function compactionTone(status: Pick<CompactionStatusRes, 'hygieneNeeded'
 /** One-line status: `12 msgs · 1,234 chars · hygiene due`. */
 export function formatCompactionStatus(status: Pick<CompactionStatusRes, 'messages' | 'chars' | 'hygieneNeeded' | 'summaryNeeded'>): string {
   const due = status.summaryNeeded ? 'summary due' : status.hygieneNeeded ? 'hygiene due' : 'no compaction needed';
-  return `${status.messages} msgs · ${formatChars(status.chars)} · ${due}`;
+  return `${messageCountLabel(status.messages)} · ${formatChars(status.chars)} · ${due}`;
 }
 
 /** One-line last-run: `full 2h ago: 122 → 22 msgs · 101 archived` (null when never). */
 export function formatLastRun(last: CompactionStatusRes['last']): string {
   if (!last) return 'Never compacted';
   const ago = formatAgo(last.compactedAt);
-  const shrunk = `${last.beforeMessages} → ${last.afterMessages} msgs`;
+  const shrunk = `${last.beforeMessages} → ${messageCountLabel(last.afterMessages)}`;
   const archived = last.archived > 0 ? ` · ${last.archived} archived` : '';
   return `${last.mode} ${ago}: ${shrunk}${archived}`;
 }
@@ -75,7 +76,7 @@ export function formatLastRun(last: CompactionStatusRes['last']): string {
 export function formatRunResult(run: Pick<CompactionRunRes, 'mode' | 'compacted' | 'beforeMessages' | 'afterMessages' | 'archived' | 'anchors'>): string {
   if (!run.compacted) return `${run.mode}: already lean — nothing to compact`;
   const anchors = run.anchors.length > 0 ? ` · ${run.anchors.length} anchors` : '';
-  return `${run.mode}: ${run.beforeMessages} → ${run.afterMessages} msgs · ${run.archived} archived${anchors}`;
+  return `${run.mode}: ${run.beforeMessages} → ${messageCountLabel(run.afterMessages)} · ${run.archived} archived${anchors}`;
 }
 
 /** Relative age (`just now`, `5m ago`, `3h ago`, `2d ago`) — pane display only. */
@@ -93,5 +94,5 @@ export function formatAgo(iso: string): string {
 /** Dropdown label for a session summary (`title · N msgs`, id fallback). */
 export function sessionOptionLabel(s: Pick<SessionSummary, 'id'> & { title?: string; messageCount?: number }): string {
   const title = s.title && s.title.trim() ? s.title : s.id;
-  return `${title} · ${s.messageCount ?? 0} msgs`;
+  return `${title} · ${messageCountLabel(s.messageCount ?? 0)}`;
 }

@@ -99,5 +99,14 @@ check(
   'option id fallback',
   sessionOptionLabel({ id: 'sess_1', title: '', messageCount: 3 }) === 'sess_1 · 3 msgs',
 );
+check(
+  'option singular',
+  sessionOptionLabel({ id: 'sess_1', title: 'One thing', messageCount: 1 }) === 'One thing · 1 msg',
+);
+check(
+  'status singular',
+  formatCompactionStatus({ messages: 1, chars: 40, hygieneNeeded: false, summaryNeeded: false }) ===
+    '1 msg · 40 chars · no compaction needed',
+);
 
 console.log(`PASS: all ${passed} transcript helper checks green`);

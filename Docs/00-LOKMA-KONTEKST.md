@@ -822,9 +822,14 @@
 - **Driver reçete düzeltmeleri (app değişikliği yok):** (1) WS URL'sinde `?cwd=` ŞART — yoksa loop server cwd'de koşuyor, scoped session'a prompt düşmüyor (ilk deneme 420s asıldı, orphan silindi); (2) ESM `ws` import'u NODE_PATH'i yok sayıyor — repo package.json'dan createRequire; (3) tool turn limit (5) turn'ü bitiriyor — follow-up nudge ile `done-complete` kapatıldı. 4x `allow` (asla `always` — global allow-list'e dokunulmadı), project-local `.lokma/settings.json` auto-mode.
 - **Infra:** PM2 daemon iki proc'u da kaybetmiş (bun :3456 + vite-preview :3457 repo path'lerinden sağlıklı orphan — dokunulmadı, restart gerekmedi); `ls` hâlâ bozuk (python os.listdir). Server log 0 level>=40.
 
+### 2026-09-05 — TEST LOOP area F run 4: regresyon + canlı, FULLY GREEN (docs-only, no code commit)
+- **Kapılar:** root `tsc --noEmit` 0 · server `tsc -p` 0 (dist hash aynı, restart yok) · core `tsc -p` 0 · lokma-ai `tsc --noEmit` 0 · web `bun run build` yeşil (7.91s, bundle adı+hash değişmedi `index-CrJnKSCP.js`, dist/index.html aynı, restart yok) · core `bun test` temp HOME'da exit 0 / 0 fail (gerçek `/root/.lokma`'ya dokunulmadı).
+- **Canlı:** `/` 401 anon/200 authed + `/health` 200 + `/api/bots` 401/200 + served index.html disk ile byte-identical + served bundle sha256 == disk + `/api/doctor` 8/8 (7/7 provider, 7/7 model, 11 session, 6 skill, 0 lock). Server log 200 satırda 0 level>=40.
+- **Sonuç:** sıfır failure, sıfır fix. F-green streak 2/3. Tree temiz, PM2'ye dokunulmadı (iki proc da online, bu run'da PM2 daemon her iki proc'u da sağlıklı listeliyor).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area E run 4 — harness demo geçti, sıradaki alan: F)
-- **Son işlem:** Gerçek agent loop palindrome demo ile uçtan uca kanıtlandı (exit 0 + done-complete, docs-only run, code commit yok; PM2'ye dokunulmadı).
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area F run 4 — regresyon + canlı FULLY GREEN, sıradaki alan: A)
+- **Son işlem:** Tüm regresyon kapıları yeşil (4 tsc + web build + core bun test 0 fail + doctor 8/8 + canlı bundle hash eşleşmesi), sıfır failure (docs-only run, code commit yok; PM2'ye dokunulmadı).
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):

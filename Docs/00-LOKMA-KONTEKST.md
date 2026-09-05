@@ -787,9 +787,15 @@
 - **Probe artifacts (mine, no app change):** (1) delete-last cleanup removed pre-existing `sess_pm2_test` — Phase-0 mock stub (321B, `Mock Anthropic ... Phase 0 streaming stub` per FTS index; sibling `sess_phase0_demo` already gone the same way); own session removed too, net -1 stub — future probes must diff id-sets, never delete-last; (2) substring `1 msgs` alarm was a false positive; (3) `opencode-go`/`mimo` needles missed because panes render display names. One `net::ERR_NETWORK_CHANGED` env flap discarded, clean re-run green.
 - **Gates:** tree clean, PM2 untouched (no code changed, no restart). Docs-only run, no code commit. B-green streak 2/3 (3 consecutive greens retires the area).
 
+### 2026-09-05 — TEST LOOP area C run 3: screenshots + design, systemic narrow-Inspector overflow fix (4f70593)
+- **Scope:** the 23-tab Inspector is a 280px sidebar — at desktop viewports every pane rendered desktop `sm:` layouts squeezed into ~255px (measured inner overflows up to 165px, 13 panes). Shot all tabs + true-dark (app boots `dark`) + 390px mobile to `/tmp/lokma-shots/2026-09-05-c3{c,d}/`; 0 pageerrors / 0 console errors / 0 failed requests throughout.
+- **Errors fixed (1 systemic class + 12 targeted):** `@container` on sidebar + tiling-pane wrappers; 39 `hidden sm:inline` → container `@min-[320px]:inline`; 12 pane grids `sm:grid-cols-N` → `@min-[420/520/720px]` (dialogs + chat surfaces untouched — not under a container); archify/skills/bots list-detail splits stack below 380px; testing filter bar + obs/design headers + bots tab strip scroll; bots detail grid 2-col; bots/providers badge wrap; skills truncate+title; setup button wrap; design preview scroll + break-words; git input min-w-0.
+- **Rejected (no invented work, all DOM/vision-verified):** truncate+title rows, git lock dots, blessed-scroll headers (gate-approved pattern), select scrollWidth quirk, unreproducible Usage pills (0/2 follow-up probes), provider `0 models` (API-correct: 7 = 4 openai + 3 anthropic).
+- **Gates:** web + root `tsc --noEmit` 0, narrow-layout gate 34/34 (1 new allowlist entry), vite rebuild + single-proc `lokma-web` restart via ecosystem file, reshoot Skills/Archify/Design/Git/Browser zeroed, vision-confirmed obs cards + bots detail + providers buttons + mobile 390/390 clean, live `/` 401/200 + `/health` 200 + `/api/bots` 401/200, served bundle sha256 == disk, server log level-30 only. Commit 4f70593 pushed. Next area: D.
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area B run 3 — browser flows fully green, docs-only, sıradaki alan: C)
-- **Son işlem:** 23/23 Inspector sekmesi 0 hatayla tıklandı, canlı veri API ile eşleşiyor; probe kalıntısı Phase-0 mock stub temizlendi.
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area C run 3 — narrow-Inspector overflow systemic fix, sıradaki alan: D)
+- **Son işlem:** 13 paneldeki dar-Inspector taşmaları container-query ile düzeltildi; tüm kapılar yeşil, canlı doğrulandı.
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):

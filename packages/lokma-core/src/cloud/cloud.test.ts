@@ -150,6 +150,25 @@ async function main(): Promise<void> {
   await expectCloudError(async () => assertImportableName('vault/../../x'), 'bad_entry', 'dotdot rejected');
   assert((await (async () => { assertImportableName('vault/a.md'); return true; })()), 'allowlisted name passes');
 
+  // --- cleanup: leave the shared home pristine for probes running after us
+  // (whole-suite `bun test` shares one HOME; seeded MEMORY.md would break
+  // `memory.test.ts`'s empty-read assert and the fake vault.db would break
+  // `fts.test.ts`'s index sync with "file is not a database") ---
+  const { rm: rmSeed } = await import('node:fs/promises');
+  const lokmaHome = join(homedir(), '.lokma');
+  await Promise.all(
+    [
+      'config.json',
+      'credentials.json',
+      'memories/MEMORY.md',
+      'agents/demo/SOUL.md',
+      'auth/users.json',
+      'vault/note.md',
+      'vault/blob.bin',
+      'vault/.fts5/vault.db',
+    ].map((rel) => rmSeed(join(lokmaHome, rel), { force: true })),
+  );
+
   console.log(`\ncloud probe: ${passed} passed`);
 }
 

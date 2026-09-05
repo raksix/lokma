@@ -17,6 +17,7 @@ import {
   memoryReplace,
   readMemory,
   readMemoryEntries,
+  writeMemory,
 } from './manager';
 
 const HOME = process.env.HOME ?? '';
@@ -127,6 +128,10 @@ async function main(): Promise<void> {
     (await readMemory('memory')).includes('multi\nline\nentry'),
     'multiline entries survive the § split',
   );
+
+  // --- cleanup: leave the shared home pristine for probes running after us ---
+  await writeMemory('memory', []);
+  await writeMemory('user', []);
 
   console.log(`\nOK: ${passed} checks passed`);
 }

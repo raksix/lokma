@@ -2617,3 +2617,33 @@ survives; never delete both at once). If even that serves stale code, escalate i
     narrow-optimized yet (pane-level pass is the next mobile wave).
   - Next piece: Phase 3 mobile wave 2 (pane-level narrow optimization),
     then perf + a11y.
+---
+- 2026-09-05 — Phase 3 mobile responsive wave 2: pane-level narrow pass DONE (web 80f2d0d)
+  - **Executor run:** every Inspector pane now stacks on narrow viewports —
+    no fixed multi-column grid squeezes below `sm` (640px) without review.
+  - **Web:** adopted the dirty-tree sibling WIP as this run's single piece
+    (11 one-line grid stacks across agents/auth/bots/git/observability/
+    settings/terminal/usage — verified fresh, pattern
+    `grid-cols-1 … sm:grid-cols-N` correct in each) and finished the sweep:
+    archify export buttons stack (`grid-cols-1 sm:grid-cols-2`), workspace
+    Tools picker 3→2 cols on phones (`grid-cols-2 sm:grid-cols-3`),
+    browser + orchestration forms normalized from the `col-span-2
+    sm:col-span-1` children idiom to the single parent pattern (identical
+    rendering, one idiom), archify receipt `<table` wrapped in
+    `overflow-x-auto` (`min-w-[320px]`). Deliberately left (documented):
+    login/invite toggle (2 tiny buttons, 360px card), drop-chooser buttons
+    (max-w-xs modal), models fixed columns (1fr + truncate + title).
+  - **Gate:** new `shell/narrow-layout.test.ts` source-scan probe (10/10) —
+    flags any unreviewed fixed `grid-cols-N` and any `<table` without an
+    `overflow-x-auto` scroller above it; the allowlist self-checks (dead
+    entries fail).
+  - **Gates:** root `tsc --noEmit` 0 · web build green (1719 modules,
+    789k JS) · full web suite 35/35 files (was 34, +narrow-layout) · mock
+    grep on touched files clean (anti-mock comments + labeled input
+    `placeholder`s only, legit) · server untouched.
+  - **Honest scope:** flex toolbars without `flex-wrap` (~70) are NOT part
+    of this pass — they render unclipped but may need horizontal room;
+    toolbar wrap audit is the next mobile piece. No real-device test
+    (unit + build + live HTTP only); no focus trap (wave 1 scope).
+  - Next piece: Phase 3 mobile wave 3 (toolbar flex-wrap audit), then
+    perf + a11y.

@@ -2457,6 +2457,46 @@ survives; never delete both at once). If even that serves stale code, escalate i
   - Next piece: Phase 3 themes polish, then sharing, cloud, mobile,
     perf + a11y.
 ---
+- 2026-09-05 — Phase 3 themes polish DONE (core c821991 + server 3afa9fa + web 136e187)
+  - **Executor run:** picking a theme now repaints the whole palette, not
+    just the light/dark family. The orphan sibling WIP (core registry +
+    `index.ts` export) was adopted as this run's single piece: verified
+    fresh (parity probe 63/63 against `themes/*.json`), then extended with
+    the server + web ends and committed atomically (core/server/web
+    separate).
+  - **Core:** `core/src/themes/` (new: `ThemeDef`/`ThemeMode`/`ThemeView`
+    + `listThemes()` gallery order default-first + `getThemeDef()`
+    exact/case-sensitive + `isThemeId()` + `defaultThemeForMode()` +
+    `themePreview()` derived from the def's own chalk +
+    `toThemeView()`; embedded consts locked 1:1 to `themes/*.json` by
+    `themes.test.ts` 63/63, so `dist` carries the data anywhere).
+  - **Server:** `server/src/routes/themes.ts` (new) + `app.ts` wiring:
+    `GET /api/themes` (`{ok,themes,count,default}`, all four defs +
+    previews, default omp first) + `GET /api/themes/:id`
+    (`{ok,theme}`; empty/slash/leading-dot 400 `bad_id`, unknown 404
+    `theme_not_found`); in-process probe 12/12 + real-socket round trip
+    (list 200 + midnight detail 200 + PATCH config persist verified).
+  - **Web:** `lib/api.ts` `ThemeView`/`ThemesRes`/`ThemeDetailRes` +
+    `listThemes()`/`getTheme()`; `shell/theme.ts` `applyThemeVars()`
+    (writes the full `--var` set inline on `<html>` + `.dark` per mode +
+    persists under the same `lokma-theme` key) + `clearThemeVars()`
+    (offline fallback) + `theme.test.ts` 17 checks; `settings.ts`
+    `themeCardFromView()` (server truth — fixes the drifted hardcoded
+    midnight/paper copy: navy+cyan, not true-black) + 5 checks;
+    Appearance tab renders LIVE cards (`GET /api/themes`, honest loading
+    state, hardcoded cards only as offline fallback) and applies the full
+    palette on pick; header boot-applies the persisted named theme's vars
+    best-effort (reload keeps the exact palette).
+  - **Gates:** root `tsc --noEmit` 0 · core + server `tsc -p` clean ·
+    web build green · web suite 33/33 files PASS (exit codes) · mock grep
+    on touched files clean (1 hit = anti-mock code comment, legit) ·
+    real `~/.lokma` untouched (all probes temp-HOME).
+  - **Honest scope:** inline vars override the stylesheet (no
+    `index.css` change needed); header toggle still flips the mode only
+    (full vars re-apply on next boot/pick); CLI `lokma theme set` reads
+    the same JSONs (no CLI change this run).
+  - Next piece: Phase 3 sharing, then cloud, mobile, perf + a11y.
+---
 
 *Single source stays `Docs/00-LOKMA-KONTEKST.md`. After each wave: update 00 chronology
 + Son Durum, commit + push, mirror to memory vault.*

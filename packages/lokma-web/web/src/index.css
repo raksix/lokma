@@ -164,7 +164,10 @@ body.resizing .pane { transition:none !important; }
 .dark .text-zinc-600 { color: #A8A8AD !important; }
 .dark .text-zinc-500 { color: #8E8E93 !important; }
 .dark .text-zinc-400 { color: #6E6E73 !important; }
-.dark .placeholder\:text-zinc-400::placeholder { color: #6E6E73 !important; }
+.dark .placeholder\:text-zinc-400::placeholder { color: #8E8E93 !important; }
+/* Readable placeholders everywhere in dark mode, independent of which
+   placeholder-* utility an input uses (area C screenshot review). */
+.dark ::placeholder { color: #8E8E93 !important; opacity: 1 !important; }
 .dark input,
 .dark textarea { color: #EDE9E2 !important; }
 .dark input.bg-white,

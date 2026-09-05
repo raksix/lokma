@@ -62,6 +62,11 @@ export function projectOf(s: SessionSummary): string {
   return parts[parts.length - 1] || cwd;
 }
 
+/** Sidebar count label with correct singular (`1 msg`, otherwise `N msgs`). */
+export function messageCountLabel(count: number): string {
+  return count === 1 ? '1 msg' : `${count} msgs`;
+}
+
 /** Case-insensitive substring match over title + id + model. */
 export function filterSessions(sessions: SessionSummary[], query: string): SessionSummary[] {
   const q = query.trim().toLowerCase();

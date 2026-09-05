@@ -7,6 +7,7 @@ import {
   displayTitle,
   filterSessions,
   groupSessions,
+  messageCountLabel,
   projectOf,
   relativeTime,
 } from './grouping';
@@ -77,6 +78,10 @@ check(
   'project groups by cwd basename, biggest first',
   projGroups.map((g) => `${g.key}:${g.items.length}`).join(',') === 'lokma:2,bounty:1,default:1',
 );
+
+// messageCountLabel (area C screenshot review: `1 msgs` read wrong)
+check('singular 1 msg', messageCountLabel(1) === '1 msg');
+check('plural 0/2 msgs', messageCountLabel(0) === '0 msgs' && messageCountLabel(2) === '2 msgs');
 
 console.log(`sessions probe: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

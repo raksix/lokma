@@ -70,6 +70,17 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     setActiveId(sessionId);
   }, [sessionId]);
 
+  // Shrinking a two-panel desktop layout below the mobile breakpoint would
+  // stack BOTH drawers over the chat (area C screenshot review). Collapse to
+  // a full-width chat instead, matching the fresh mobile boot state.
+  React.useEffect(() => {
+    if (isMobile) {
+      setSidebars((current) =>
+        current.left || current.right ? { left: false, right: false } : current,
+      );
+    }
+  }, [isMobile]);
+
   // Session list + server liveness (30s poll feeds FooterBar + Header pill).
   React.useEffect(() => {
     void refreshSessions();

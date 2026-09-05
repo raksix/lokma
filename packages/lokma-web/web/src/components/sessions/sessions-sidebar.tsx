@@ -21,6 +21,7 @@ import {
   displayTitle,
   filterSessions,
   groupSessions,
+  messageCountLabel,
   relativeTime,
 } from './grouping';
 
@@ -105,7 +106,7 @@ function SessionRow({
               </span>
             ) : null}
             {typeof session.messageCount === 'number' ? (
-              <span className="text-[11px] text-zinc-400">{session.messageCount} msgs</span>
+              <span className="text-[11px] text-zinc-400">{messageCountLabel(session.messageCount)}</span>
             ) : null}
             {session.updatedAt ? (
               <span className="text-[11px] text-zinc-400">· {relativeTime(session.updatedAt)}</span>

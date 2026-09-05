@@ -46,6 +46,44 @@ export function serverThemeToMode(theme: unknown): WebMode {
   return card ? card.mode : 'light';
 }
 
+/** Live card shape the Appearance tab renders (server truth, not a const). */
+export type ThemeCard = {
+  id: string;
+  name: string;
+  desc: string;
+  bg: string;
+  accent: string;
+  mode: WebMode;
+  cssVars: Record<string, string>;
+};
+
+/**
+ * Build a render card from one `GET /api/themes` view (Phase 3 themes
+ * polish). Description comes from the server def (the old hardcoded copy
+ * drifted: midnight is navy+cyan, not true-black). Unknown modes fall back
+ * to light; missing previews fall back to the chalk tokens.
+ */
+export function themeCardFromView(view: {
+  id: string;
+  name: string;
+  description: string;
+  mode: unknown;
+  cssVars: Record<string, string>;
+  chalk: Record<string, string>;
+  preview: { bg: string; accent: string };
+}): ThemeCard {
+  const mode: WebMode = view.mode === 'dark' ? 'dark' : 'light';
+  return {
+    id: view.id,
+    name: view.name,
+    desc: view.description,
+    bg: view.preview?.bg ?? view.chalk?.background ?? '#ffffff',
+    accent: view.preview?.accent ?? view.chalk?.primary ?? '#000000',
+    mode,
+    cssVars: view.cssVars,
+  };
+}
+
 /** Permission default modes the server accepts (`PermissionsSchema`). */
 export const PERMISSION_MODES = ['auto', 'manual', 'acceptEdits', 'plan', 'bypass'] as const;
 export type PermissionMode = (typeof PERMISSION_MODES)[number];

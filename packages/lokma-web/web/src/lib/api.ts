@@ -294,6 +294,19 @@ export type SkillFileRes = { ok: boolean; path: string; content: string };
 export type SkillPatchRes = { ok: boolean; skill: SkillInfo; bytes: number };
 export type SkillUseRes = { ok: boolean; id: string };
 export type SkillPatchBody = { old_string: string; new_string: string };
+/** One named theme from `GET /api/themes` (canonical core registry + card preview). */
+export type ThemeView = {
+  id: string;
+  name: string;
+  label: string;
+  description: string;
+  mode: 'light' | 'dark';
+  cssVars: Record<string, string>;
+  chalk: Record<string, string>;
+  preview: { bg: string; accent: string };
+};
+export type ThemesRes = { ok: boolean; themes: ThemeView[]; count: number; default: string | null };
+export type ThemeDetailRes = { ok: boolean; theme: ThemeView };
 export type VaultGraphRes = { nodes: unknown[]; links: unknown[]; count?: number; note?: string };
 export type VaultTreeEntry = { name: string; path: string; type: 'dir' | 'note'; children?: VaultTreeEntry[] };
 export type VaultTreeRes = { ok: boolean; tree: VaultTreeEntry[] };
@@ -1021,6 +1034,11 @@ export const api = {
     patch<SkillPatchRes>(`/api/skills/${encodeURIComponent(id)}`, body),
   /** Record a use event (web parity of the agent loop's use event). */
   recordSkillUse: (id: string) => post<SkillUseRes>(`/api/skills/${encodeURIComponent(id)}/use`, {}),
+
+  // Themes — canonical named-theme registry (Phase 3 themes polish).
+  listThemes: () => get<ThemesRes>('/api/themes'),
+  /** One theme def + preview (drives the Appearance cards + full var apply). */
+  getTheme: (id: string) => get<ThemeDetailRes>(`/api/themes/${encodeURIComponent(id)}`),
 
   // Vault — live file graph + note reads + ingest (W4-15).
   getVaultGraph: (query?: string, opts?: { folder?: string; depth?: number }) => {

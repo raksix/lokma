@@ -16,6 +16,7 @@ import {
   normalizeMcpEntry,
   normalizeMcpServers,
   serverThemeToMode,
+  themeCardFromView,
   validateMcpForm,
   THEME_CARDS,
 } from './settings';
@@ -41,6 +42,22 @@ check('midnight is dark', serverThemeToMode('midnight') === 'dark');
 check('unknown theme falls back to light', serverThemeToMode('neon') === 'light');
 check('isServerTheme accepts omp', isServerTheme('omp'));
 check('isServerTheme rejects neon', !isServerTheme('neon'));
+
+// themeCardFromView maps a live server view onto a render card.
+const midnightCard = themeCardFromView({
+  id: 'midnight',
+  name: 'Midnight',
+  description: 'Deep navy #0f172a + cyan #06b6d4 + slate — IDE dark, calm',
+  mode: 'dark',
+  cssVars: { background: '222 47% 11%' },
+  chalk: { primary: '#06b6d4', background: '#0f172a' },
+  preview: { bg: '#0f172a', accent: '#06b6d4' },
+});
+check('card keeps server description (navy+cyan)', midnightCard.desc.includes('navy'));
+check('card keeps server preview swatches', midnightCard.bg === '#0f172a' && midnightCard.accent === '#06b6d4');
+check('card keeps dark mode', midnightCard.mode === 'dark');
+check('card carries cssVars for apply', midnightCard.cssVars.background === '222 47% 11%');
+check('unknown mode falls back to light', themeCardFromView({ id: 'x', name: 'X', description: 'd', mode: 'neon', cssVars: {}, chalk: {}, preview: { bg: '', accent: '' } }).mode === 'light');
 check('isPermissionMode accepts plan', isPermissionMode('plan'));
 check('isPermissionMode rejects yes', !isPermissionMode('yes'));
 check('isMcpTransport accepts ws', isMcpTransport('ws'));

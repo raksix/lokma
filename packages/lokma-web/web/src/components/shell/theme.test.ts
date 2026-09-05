@@ -3,7 +3,7 @@
  * Run: `bun src/components/shell/theme.test.ts` (no DOM, no server —
  * localStorage/document are stubbed on globalThis).
  */
-import { applyTheme, getTheme, toggleTheme } from './theme';
+import { applyTheme, applyThemeVars, clearThemeVars, getTheme, toggleTheme } from './theme';
 
 let passed = 0;
 let failed = 0;
@@ -17,9 +17,10 @@ function check(name: string, cond: boolean): void {
   }
 }
 
-// Minimal browser stubs: a string store + a classList set.
+// Minimal browser stubs: a string store + a classList set + inline styles.
 const store = new Map<string, string>();
 const classes = new Set<string>();
+const inline = new Map<string, string>();
 
 (globalThis as Record<string, unknown>).localStorage = {
   getItem: (k: string) => (store.has(k) ? (store.get(k) as string) : null),
@@ -36,12 +37,17 @@ const classes = new Set<string>();
       },
       contains: (cls: string) => classes.has(cls),
     },
+    style: {
+      setProperty: (k: string, v: string) => void inline.set(k, v),
+      removeProperty: (k: string) => void inline.delete(k),
+    },
   },
 };
 
 function reset(): void {
   store.clear();
   classes.clear();
+  inline.clear();
 }
 
 // Default is light with no persisted value.
@@ -67,6 +73,20 @@ check('toggle back clears the class', !classes.has('dark'));
 // Unknown stored values fall back to light (never a broken theme).
 store.set('lokma-theme', 'midnight');
 check('unknown value falls back to light', getTheme() === 'light');
+
+// applyThemeVars writes the full var set inline + follows the mode.
+reset();
+applyThemeVars({ background: '222 47% 11%', primary: '199 89% 48%' }, 'dark');
+check('vars land inline on :root', inline.get('--background') === '222 47% 11%' && inline.get('--primary') === '199 89% 48%');
+check('dark mode adds the html class', classes.has('dark'));
+check('vars apply persists the mode', store.get('lokma-theme') === 'dark' && getTheme() === 'dark');
+applyThemeVars({ background: '40 33% 98%' }, 'light');
+check('light mode clears the html class', !classes.has('dark'));
+check('second theme overwrites the var', inline.get('--background') === '40 33% 98%');
+
+// clearThemeVars removes inlined vars (stylesheet values take over again).
+clearThemeVars({ background: '40 33% 98%', primary: '199 89% 48%' });
+check('clear removes every inlined var', inline.size === 0);
 
 console.log(`theme.test.ts: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

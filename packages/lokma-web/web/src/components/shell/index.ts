@@ -7,4 +7,4 @@ export { OfflineBanner } from './offline-banner';
 export { PaneErrorBoundary } from './pane-error-boundary';
 export { SearchModal, filterNoteHits, filterSessionHits, type NoteHit } from './search-modal';
 export { ToastHost, TOAST_EVENT, emitToast } from './toast';
-export { applyTheme, getTheme, toggleTheme, type ShellTheme } from './theme';
+export { applyTheme, applyThemeVars, clearThemeVars, getTheme, toggleTheme, type ShellTheme } from './theme';

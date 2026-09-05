@@ -3,7 +3,7 @@ import { Moon, PanelLeft, PanelRight, Search, Sun } from 'lucide-react';
 import type { CostTotal, WsStatus } from '@/lib/ws';
 import { api } from '@/lib/api';
 import { useProviderStore } from '@/stores';
-import { applyTheme, emitToast, getTheme, type ShellTheme } from '@/components/shell';
+import { applyTheme, applyThemeVars, emitToast, getTheme, type ShellTheme } from '@/components/shell';
 import { enabledModels } from '@/components/providers/models';
 
 /**
@@ -55,12 +55,26 @@ export function Header({
   const refreshProviders = useProviderStore((s) => s.refresh);
 
   // Sync persisted theme/model once; refresh the shared model cache.
+  // The stored mode applies instantly; then the persisted NAMED theme's
+  // full var set loads best-effort (Phase 3 themes polish) so a reload
+  // keeps the exact palette, not just the light/dark family.
   React.useEffect(() => {
     const stored = getTheme();
     applyTheme(stored);
     setTheme(stored);
     setModel(readModel());
     void refreshProviders();
+    void api
+      .getConfig()
+      .then((res) => {
+        const id = (res as { config?: { theme?: unknown } }).config?.theme;
+        if (typeof id !== 'string' || id.length === 0) return undefined;
+        return api.getTheme(id);
+      })
+      .then((res) => {
+        if (res) applyThemeVars(res.theme.cssVars, res.theme.mode === 'dark' ? 'dark' : 'light');
+      })
+      .catch(() => undefined);
   }, [refreshProviders]);
 
   const flipTheme = (): void => {

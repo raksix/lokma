@@ -43,3 +43,50 @@ export function toggleTheme(): ShellTheme {
   applyTheme(next);
   return next;
 }
+
+/**
+ * Apply a named theme's full CSS var set (Phase 3 themes polish).
+ * Every `--var` from the server def is written inline on `<html>`, so the
+ * whole palette changes — not just the light/dark family. The `.dark`
+ * class follows `mode` (drives the Tailwind dark variant + scrollbar
+ * overrides), and the mode persists under the same `lokma-theme` key the
+ * header toggle reads. Non-browser runtimes skip silently (probes, SSR).
+ */
+export function applyThemeVars(cssVars: Record<string, string>, mode: ShellTheme): void {
+  try {
+    if (typeof document !== 'undefined') {
+      const root = document.documentElement as unknown as {
+        classList: { toggle: (cls: string, force?: boolean) => void };
+        style?: { setProperty: (k: string, v: string) => void };
+      };
+      for (const [key, value] of Object.entries(cssVars)) {
+        root.style?.setProperty(`--${key}`, value);
+      }
+      root.classList.toggle('dark', mode === 'dark');
+    }
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(THEME_KEY, mode);
+    }
+  } catch {
+    // Non-browser runtimes (probes, SSR) skip DOM persistence.
+  }
+}
+
+/**
+ * Remove previously inlined theme vars (offline fallback path — the
+ * stylesheet `:root`/`.dark` values take over again).
+ */
+export function clearThemeVars(cssVars: Record<string, string>): void {
+  try {
+    if (typeof document !== 'undefined') {
+      const root = document.documentElement as unknown as {
+        style?: { removeProperty: (k: string) => void };
+      };
+      for (const key of Object.keys(cssVars)) {
+        root.style?.removeProperty(`--${key}`);
+      }
+    }
+  } catch {
+    // Non-browser runtimes (probes, SSR) skip silently.
+  }
+}

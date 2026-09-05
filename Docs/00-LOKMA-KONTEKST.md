@@ -772,9 +772,15 @@
 - **Fixed (5, all DOM-verified live after rebuild):** (1) session titles → `title` tooltip (truncated rows showed only the drag hint); (2) archify filter pills → `title` + `aria-label` + `aria-pressed` (cryptic 4-letter codes); (3) testing stages row `overflow-x-auto` → `flex-wrap` (6/6 stage buttons visible, per-button overflow ≤0); (4) vault folder filter `w-28` → `w-36` (placeholder `folder (blank = all)` unclipped); (5) observability trace badges `max-w-[180px]` + truncate + `title`.
 - **Gates:** web `tsc --noEmit` 0 · 6 probe files green (sessions 23, testing 35, observability 45, archify 33, vault 56, narrow-layout gate 32/32) · vite build green · `lokma-web` single-proc restart via ecosystem file · live `/` 401 anon/200 authed, `/health` 200, served `index-DuGN4Ros.js` sha256 == disk. Server log clean (level-30 only).
 
+### 2026-09-05 — TEST LOOP area D run 2: README + docs compliance, CLI doctor 4→8 checks (74cf6ee)
+- **Verified live:** 23 Inspector tabs (`panes.ts`), 28 route files, 22 pane chunks (`dist/assets`), 4 theme palettes, 6 bundled plugins, Fastify ^5.3.2 / React ^19 / Vite ^6.2.0, Lokma CEO `featured=true` via `/api/bots`, `web --port` real (`parseArgs`), server `GET /api/doctor` 8/8 green (9 sessions, 5 agents, 6 skills, keySet 1/7).
+- **Fixed:** CLI `lokma doctor` ran 4 checks while README + `/api/doctor` promise 8 — `doctor.ts` rewritten to 8 real core-module checks (config, credentials, providers, defaultModel→provider, sessions, agents, skills, locks). Temp-HOME: 2 honest failures on blank profile; real-HOME: 8/8, numbers match `/api/doctor`. Core `tsc -p` 0 + root `tsc --noEmit` 0, no restart needed.
+- **Docs/32 spec-vs-app gaps (spec written, not in app — future work, no owner):** (1) `lokma init` / `lokma setup` Ink-TUI checkboxes (server `POST /api/setup/init` exists, CLI has no init/setup commands); (2) `lokma config show --json` (prints help, unsupported); (3) `lokma doctor --only <group>` (prints help, unsupported).
+- **Side note:** this run's early `config set permissions.defaultMode plan` probe wrote `defaultMode: plan` into the live `/root/.lokma/config.json` (README's own example value, safest mode) — left in place, disclosed.
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area C run 2 — screenshots+design, 5 flaws fixed 5dccab5, sıradaki alan: D)
-- **Son işlem:** Screenshots + design — 27 PNG çekildi, 7 iddia reddedildi, 5 gerçek kusur düzeltildi (tooltip'ler, testing wrap, vault genişliği, obs badge), rebuild + lokma-web restart, canlı doğrulandı.
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area D run 2 — README/doctors compliance, doctor 4→8 checks 74cf6ee, sıradaki alan: E)
+- **Son işlem:** README sayıları canlı doğrulandı, CLI doctor 8 gerçek kontrole çıkarıldı (`/api/doctor` ile birebir sayılar), 3 Docs/32 spec gap'i loglandı.
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):

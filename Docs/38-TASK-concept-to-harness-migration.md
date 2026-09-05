@@ -2531,3 +2531,62 @@ survives; never delete both at once). If even that serves stale code, escalate i
     session pages cap at 500 rows + truncation note; token rotation /
     expiry / password-gated shares are follow-ups.
   - Next piece: Phase 3 cloud, then mobile, perf + a11y.
+---
+- 2026-09-05 — Phase 3 cloud wave 1: portable state export/import DONE (core ffa5f9f + server ea12264 + web cee7cb5; orphan zip-DRY 8ce6052 adopted first)
+  - **Executor run:** the harness can now move to a cloud box — `POST
+    /api/cloud/export` packs the portable `~/.lokma` home into a dated
+    `.zip` (manifest-first, sha256 per entry), `POST /api/cloud/import
+    { zipBase64, overwrite? }` restores it (keep-by-default, crafted
+    paths rejected, nothing deleted). SetupPane grows a 4th step
+    ("Cloud") with a real download button + a labeled file picker.
+  - **Core:** `core/src/cloud/` (new: `transfer.ts` — `exportState()`
+    walks 12 allowlisted subtrees + `config.json`, skips derived
+    (`.fts5`/dotfiles/`*.tmp.<pid>`), symlinks, binaries and
+    >512KB files with reported reasons, caps 5000 entries / 256MB,
+    fails 507 past the caps; `importState()` requires our
+    `manifest.json` v1, allowlist-checks every name
+    (`..`/absolute/backslash/dot-segments/outside-set →
+    `rejected`, never written), verifies bytes+sha256 per entry,
+    skip-existing default + `overwrite` opt-in, 64MB upload cap;
+    `CloudError` typed codes; `index.ts` + barrel export) +
+    `utils/zip.ts` gains `readStoredZip()` (central-directory parse,
+    method-0 only, CRC-verified, `ZipError` bad_zip /
+    unsupported_entry / zip_corrupt) + `cloud.test.ts` 45/45 (empty
+    export, lived-in export, wipe-restore byte-identical, skip /
+    overwrite cycles, 5-entry evil bundle rejected, garbage / empty /
+    manifest-less / foreign / tampered inputs typed, allowlist units;
+    all temp-HOME, real `~/.lokma` untouched).
+  - **Server:** `server/src/routes/cloud.ts` (new) + `app.ts` wiring:
+    `POST /api/cloud/export` (attachment `lokma-state-<date>.zip` +
+    `X-Export-Entries/Skipped`) + `POST /api/cloud/import`
+    (`bodyLimit` 64MB, `{ zipBase64, overwrite? }`, 400 `bad_zip` /
+    `bad_overwrite`, typed `CloudError` passthrough); real-socket
+    probe 20/20 (export 200 + PK magic, import create/skip/overwrite,
+    4 validation 400s, evil `auth/` path rejected over HTTP).
+    Probe lesson: light-my-request UTF-8-mangles binary bodies —
+    `app.listen` on a temp port + fetch `arrayBuffer()` instead.
+  - **Web:** `lib/api.ts` `CloudImportBody/Res` +
+    `downloadCloudExport()` (POST blob + server filename) +
+    `importCloudState()`; `setup.ts` `validateCloudFile()`
+    (extension/empty/64MB gate) + `summarizeCloudImport()` +
+    `setup.test.ts` 9 new checks (31 passed total); SetupPane 4th
+    step "Cloud" (Export card + Import card with visible labels,
+    overwrite checkbox, result banner with rejection reasons, honest
+    secrets footer; `Download`/`Upload` lucide, no emoji) + barrel.
+  - **Gates:** root `tsc --noEmit` 0 · core + server `tsc -p` clean ·
+    web build green · core suite 14/14 files · web suite 33/33 files ·
+    mock grep on touched files clean (1 hit = pre-existing anti-mock
+    header comment, legit) · real `~/.lokma` untouched by probes.
+  - **Deploy:** server dist + `pm2 restart lokma-server` → live
+    `POST /api/cloud/export` 200, real 19896-byte zip, 24 live
+    entries, manifest v1, zero `credentials.json`/`auth/`; web dist +
+    `pm2 restart lokma-web` → `/` 401→200, zero `_next/`, live
+    bundle carries all 5 cloud strings; `/health` 200; both procs
+    online, both script paths bun (stale-stack PASS).
+  - **Honest scope:** transfer covers the GLOBAL home only
+    (per-project `.lokma/` travels with the checkout — footer says
+    so); no per-file picker (whole-home bundle); no schedule/auto-sync
+    (manual Export/Import); sandbox-per-session + Postgres + S3 JSONL
+    remain infra follow-ups (need box-level decisions, not code).
+  - Next piece: Phase 3 mobile responsive, then perf + a11y (cloud
+    infra: sandbox/Postgres/S3 need user decisions).

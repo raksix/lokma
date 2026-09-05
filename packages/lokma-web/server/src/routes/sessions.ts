@@ -181,8 +181,16 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     }
     const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
     const store = new SessionStore(cwd);
-    const result = await store.rewind(id, Math.floor(keep));
-    return { ok: true, id: result.id, kept: result.kept };
+    try {
+      const result = await store.rewind(id, Math.floor(keep));
+      return { ok: true, id: result.id, kept: result.kept };
+    } catch (e) {
+      const err = e as { statusCode?: number; code?: string; message?: string };
+      const status = err.statusCode === 400 ? 400 : 404;
+      return reply
+        .status(status)
+        .send({ code: err.code ?? 'session_not_found', message: err.message ?? 'Rewind failed' });
+    }
   });
 
   app.get('/api/sessions/:id/compaction', async (req, reply) => {

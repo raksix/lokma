@@ -2715,3 +2715,26 @@ survives; never delete both at once). If even that serves stale code, escalate i
   - Next piece: Phase 3 perf + a11y wave 2 (full-repo button audit +
     code-splitting/virtualized chat), then sharing-cloud-mobile leftovers
     are done — remaining: perf + a11y completion.
+---
+- 2026-09-05 — Phase 3 perf + a11y wave 2a: full-repo button audit DONE (web cfad8f8)
+  - **Executor run:** every shipped view is now screen-reader-namable — 38
+    icon-only buttons across 14 files gained `aria-label` (`title` kept as
+    the tooltip; dynamic titles mirror the same expression). The probe that
+    caught them also grew up: `a11y.test.ts` scans EVERY `.tsx` view now
+    (was chat/shell/header/vault only), skips self-closing primitives
+    (`ui/button.tsx` forwards props — call sites are scanned instead), and
+    counts symbol-prefixed strings (`'✓ --agents'`) as visible text.
+  - **Probe caught 3 REAL cases on first full-repo run:** MCP-server delete
+    (conditional `Sure?` — genuinely nameless when idle, fixed with
+    `title` + `aria-label`), plus the two probe bugs above. Negative
+    control verified both ways (label removed → FAIL with file:line;
+    restored → green).
+  - **Gates:** root `tsc --noEmit` 0 · web build green · a11y probe 12/12 ·
+    full web suite 36/36 files · mock grep on touched files clean
+    (anti-mock comments + labeled-input `placeholder`s + todo filter
+    labels, legit) · server untouched.
+  - **Honest scope:** code-splitting (794k single chunk) + virtualized chat
+    remain — perf half of wave 2; no focus trap in dialogs yet; no
+    real-device/AT test.
+  - Next piece: Phase 3 perf + a11y wave 2b (code-split + virtualized
+    chat), then the roadmap is complete.

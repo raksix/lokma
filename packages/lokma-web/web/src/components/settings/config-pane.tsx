@@ -83,7 +83,7 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
             value={model}
             onChange={(e) => setModel(e.target.value)}
             placeholder="provider::model-id"
-            className="h-7 font-mono text-xs"
+            className="h-7 font-mono text-xs min-w-0"
           />
           <Button size="sm" className="h-7 shrink-0 text-xs" disabled={saving} onClick={handleSaveModel}>
             {saving ? 'Saving…' : 'Save'}

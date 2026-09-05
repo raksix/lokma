@@ -124,7 +124,7 @@ function ProviderRow({
           </div>
           <div className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-zinc-400">
             <Link2 className="h-3 w-3 shrink-0" />
-            <span className="truncate font-mono">{provider.baseUrl}</span>
+            <span className="truncate font-mono" title={provider.baseUrl}>{provider.baseUrl}</span>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -146,7 +146,8 @@ function ProviderRow({
           </button>
         </div>
       </div>
-      <div className="mt-2 flex items-center gap-1">
+      {/* Action row wraps instead of clipping Test/Edit/Delete in the narrow Inspector column. */}
+      <div className="mt-2 flex flex-wrap items-center gap-1">
         <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-zinc-500">
           <input
             type="checkbox"

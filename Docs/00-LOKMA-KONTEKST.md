@@ -827,9 +827,14 @@
 - **Canlı:** `/` 401 anon/200 authed + `/health` 200 + `/api/bots` 401/200 + served index.html disk ile byte-identical + served bundle sha256 == disk + `/api/doctor` 8/8 (7/7 provider, 7/7 model, 11 session, 6 skill, 0 lock). Server log 200 satırda 0 level>=40.
 - **Sonuç:** sıfır failure, sıfır fix. F-green streak 2/3. Tree temiz, PM2'ye dokunulmadı (iki proc da online, bu run'da PM2 daemon her iki proc'u da sağlıklı listeliyor).
 
+### 2026-09-05 — TEST LOOP area A run 5: backend sweep, FULLY GREEN (docs-only, no code commit)
+- **Sweep:** ALL ~153 route registrations live on PM2 lokma-server :3456 — part1 55/55 (38 collection GETs + csv/jsonl export + no-format 400 + 15 invalid-id/shape probes incl. rewind-bogus 404 + config-garbage `patched:[]`), part2 lifecycles 74 pass, part3 corrected + uncovered 53 pass, 4 corrections 5/5 ALL-OK, raw-socket WS 101, nginx perimeter `/` 401 anon/200 authed + `/health` 200 + `/api/bots` 401/200, served `index-CrJnKSCP.js` == disk, server log 0 level>=40, residue audit zero (sessions/terminals/tabs/shares 0, own 4 artifacts deleted).
+- **13 first-pass mismatches — ALL 13 proven wrong probe expectations against source, zero app change:** fork needs `?cwd=` (route reads cwd from query, unscoped 404 correct); `GET /:id` has no `createdAt` by design (fix lives in listSummaries, verified non-epoch); agents PATCH allows only name/model/budgets (`{label}` honestly 400 `empty_patch`); models PATCH is `{id,enabled}|{models:{id:bool}}` (unknown id honestly 400); fresh-tab back/forward honestly 409 `no_history` (200 after navigate); bare-host `not-a-url` normalizes to `https://not-a-url/` 200 (only `javascript:`-class schemes 400); files jail is on `path` not `cwd` (`?cwd=/etc` 200 by-design, `path=../../etc` 400 `outside_root`); malformed share token 400 vs wellformed-unknown 404 (by-design); skills file needs `?path=SKILL.md`; archify generate needs `{type: architecture|workflow|sequence|dataflow|lifecycle, prompt}`; plugin ids contain `/` so must be `encodeURIComponent`-ed.
+- **Sonuç:** sıfır failure, sıfır fix. A-green streak 1/3. Tree temiz, PM2'ye dokunulmadı (no restart — no code changed).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area F run 4 — regresyon + canlı FULLY GREEN, sıradaki alan: A)
-- **Son işlem:** Tüm regresyon kapıları yeşil (4 tsc + web build + core bun test 0 fail + doctor 8/8 + canlı bundle hash eşleşmesi), sıfır failure (docs-only run, code commit yok; PM2'ye dokunulmadı).
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area A run 5 — backend sweep FULLY GREEN, sıradaki alan: B)
+- **Son işlem:** ~153 route registration canlıda tarandı (55 + 74 + 53 + 5 düzeltme, WS 101, perimeter 401/200, log 0 error, residue 0), 13 ilk-geçiş uyumsuzluğunun tamamı kaynağa karşı yanlış prob beklentisi çıktı — sıfır failure, sıfır fix (docs-only run, code commit yok; PM2'ye dokunulmadı).
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):

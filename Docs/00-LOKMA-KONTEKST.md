@@ -743,7 +743,7 @@
 - **Roadmap:** Phase 1 + Phase 2 + Phase 3 TAMAMLANDI. Kalan follow-up'lar kod değil kullanıcı/kutu kararı ister: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry.
 
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area B run 1 — browser flows, `useKnownSession` client fix 52a77a8, sıradaki alan: C)
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area C run 1 — screenshots + design, 26 shots 0 errors, 3 fixes f27e6c1, sıradaki alan: D)
 - **Son işlem:** Final verification pass — tüm kapılar yeşil (root tsc 0, web build green, web 38/38, core 14/14, ai 22/22), canlı 401→200 + /health 200 + bundle disk-identical, Docs kapatıldı.
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)

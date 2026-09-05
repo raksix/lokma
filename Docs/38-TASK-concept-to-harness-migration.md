@@ -2590,3 +2590,30 @@ survives; never delete both at once). If even that serves stale code, escalate i
     remain infra follow-ups (need box-level decisions, not code).
   - Next piece: Phase 3 mobile responsive, then perf + a11y (cloud
     infra: sandbox/Postgres/S3 need user decisions).
+---
+- 2026-09-05 — Phase 3 mobile responsive wave 1: responsive shell DONE (web c2d69e6)
+  - **Executor run:** the harness is usable on narrow viewports — below
+    the `md` breakpoint (768px) both sidebars become exclusive slide-over
+    drawers over a full-width chat instead of squeezing it.
+  - **Web:** `shell/responsive.ts` (new: `MOBILE_BREAKPOINT=768`,
+    `isMobileWidth`/`mobileQuery`/`initialSidebarVisibility`/
+    `nextSidebarVisibility`/`closeAllSidebars`/`anyDrawerOpen` pure
+    helpers) + `shell/use-is-mobile.ts` (new: `matchMedia` subscription
+    hook, SSR-safe) + `shell/responsive.test.ts` 23/23 +
+    `shell/index.ts` barrel; `app-shell.tsx` single `sidebars` state,
+    `MobileDrawer` (backdrop + 85vw/max-320px panel + close button +
+    body scroll-lock + `role=dialog`, `md:hidden`), mobile boots with
+    both closed, opening one drawer closes the other, session-pick and
+    Escape dismiss drawers, `main` gains `min-w-0` + `p-2 sm:p-3`,
+    storage footnote hidden on phones; `sidebar.tsx` optional
+    `className` width override (desktop default unchanged).
+  - **Gates:** root `tsc --noEmit` 0 · web build green (788k JS) ·
+    full web suite 34/34 files pass (was 33, +responsive) · dist
+    carries drawer classes, zero `_next/` refs · mock grep on touched
+    files clean · server untouched.
+  - **Honest scope:** drawers have no focus trap (Escape/backdrop/close
+    button dismiss); no real-device test (unit + build + live HTTP
+    only); Inspector panes themselves are not individually
+    narrow-optimized yet (pane-level pass is the next mobile wave).
+  - Next piece: Phase 3 mobile wave 2 (pane-level narrow optimization),
+    then perf + a11y.

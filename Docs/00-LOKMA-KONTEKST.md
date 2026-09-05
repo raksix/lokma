@@ -726,6 +726,11 @@
 - **Executor run:** her modal overlay artık klavye odağını hapsediyor — tek paylaşılan `shell/use-focus-trap.ts` (saf `nextTrapIndex` + `FOCUSABLE_SELECTOR` + `useFocusTrap` hook) 6 overlay'e bağlandı: ShortcutsDialog (el-yapımı Escape/autofocus kalktı), SearchModal (eksik `role="dialog"` + `aria-modal` + Escape eklendi), Agent/Bot dialog'ları (`role="dialog"` + Escape eklendi), MCP dialog (`aria-modal` + Escape), MobileDrawer (Tab trap). Prob: focus-trap 27/27 + a11y Rule 6 (33/33, negatif kontrol iki yönlü) + full suite 38/38 + root tsc 0 + build green.
 - **Dürüst kapsam:** gerçek cihaz/AT testi yok; composer model picker non-modal popover (kapsam dışı); provider dialog inline (overlay yok).
 
+### 2026-09-05 — TEST LOOP area A run 1: backend sweep, 2 real 404-contract bugs fixed (29a0e3c)
+- **Probed ~70 live endpoints** on PM2 `lokma-server` :3456 — 45 collection GETs (41×200 first pass), 22 `:id` GETs, invalid-id probes, auth negatives, terminal create→get→delete + vault ingest→read→delete round-trips (zero residue). Server error log EMPTY.
+- **Fixed:** `GET /api/agents/:id` missing → was HTTP 200 `{ok:false}` — now 404 `{code:agent_not_found}` (matches PATCH/DELETE + registry.ts:231); `GET /api/sessions/:id` unknown id → was HTTP 200 fabricated empty session — now 404 `{code:session_not_found}` (matches fork/DELETE; real sessions still 200). Typecheck 0, dist rebuilt, single-proc restart via ecosystem file, live `/` 401→200 + `/health` 200 re-verified.
+- **By-design (no fix):** `/api/auth/me`+`/api/users` 401 unauthenticated; `/api/usage/export` 400 without `?format=` (200 csv/jsonl with real ledger rows); `/api/vault/note` 400 non-.md / 404 unknown; invalid session ids 400 via error hook (no 500).
+
 ### 2026-09-05 — FINAL VERIFICATION PASS: roadmap Phase 1+2+3 COMPLETE (kaynak değişikliği yok, docs-only run)
 - **Executor run:** wave 2c sonrası §10'da kuyruğa giren final verification pass bu run'ın tek parçasıydı — tüm kapılar güncel duruma karşı taze koşuldu, canlı deploy byte-identical doğrulandı, Docs kapatıldı.
 - **Gates:** root tsc 0 · web build green (index 444k + vendor + 22 pane chunk) · server+core `tsc -p` clean · web suite 38/38 dosya exit 0 (sıfır fail) · core 14/14 dosya PASS (her proba taze startup-env temp HOME — `bun test` tek HOME paylaştırıp memory empty-read guard'ını tetikliyor; prob başlıklarındaki dokümante koşu pattern'i, kod regresyonu değil) · ai adapters 22/22 · mock grep temiz (anti-mock yorumlar, legit) · gerçek `~/.lokma`'ya dokunulmadı.
@@ -733,7 +738,7 @@
 - **Roadmap:** Phase 1 + Phase 2 + Phase 3 TAMAMLANDI. Kalan follow-up'lar kod değil kullanıcı/kutu kararı ister: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry.
 
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (FINAL VERIFICATION PASS — roadmap Phase 1+2+3 COMPLETE, FULL PROJECT COMPLETE)
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area A run 1 — backend sweep, 2 gerçek 404-contract bug'ı düzeltildi 29a0e3c, sıradaki alan: B)
 - **Son işlem:** Final verification pass — tüm kapılar yeşil (root tsc 0, web build green, web 38/38, core 14/14, ai 22/22), canlı 401→200 + /health 200 + bundle disk-identical, Docs kapatıldı.
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)

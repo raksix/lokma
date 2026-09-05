@@ -38,6 +38,8 @@ export async function configRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ ok: false, code: 'validation_error', message: detail });
     }
     await saveGlobal(parsed.data);
-    return { ok: true, patched: Object.keys(patch) };
+    // Echo only the keys zod actually kept (unknown keys are stripped by the
+    // schema, so reporting the raw patch would claim phantom writes).
+    return { ok: true, patched: Object.keys(parsed.data) };
   });
 }

@@ -445,5 +445,5 @@ export async function exportArtifact(
       400,
     );
   }
-  throw new DesignError('bad_format', 'format must be one of html|zip|json', 400);
+  throw new DesignError('bad_format', 'format must be one of html|zip|json|png|webm', 400);
 }

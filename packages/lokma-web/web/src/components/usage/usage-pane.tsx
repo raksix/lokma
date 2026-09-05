@@ -95,11 +95,11 @@ export function UsagePane({ onOpenSession }: { onOpenSession?: (id: string) => v
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-lg border border-line bg-white dark:bg-[#161618]">
-      <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-line bg-[#FDFCFB] px-3 dark:bg-[#1E1E21]">
+      <div className="flex h-7 shrink-0 items-center gap-1.5 overflow-x-auto border-b border-line bg-[#FDFCFB] px-3 dark:bg-[#1E1E21]">
         <BarChart3 className="h-3 w-3 text-terracotta" />
         <span className="text-xs font-semibold">Usage</span>
-        <span className="text-[11px] text-zinc-400">tokens · cost · by model</span>
-        <span className="ml-auto flex items-center gap-1">
+        <span className="hidden sm:inline text-[11px] text-zinc-400">tokens · cost · by model</span>
+        <span className="ml-auto flex shrink-0 items-center gap-1">
           {RANGES.map((r) => (
             <Button
               key={r}

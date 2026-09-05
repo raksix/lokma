@@ -73,7 +73,7 @@ export function ExtrasPane({ onOpenTab }: { onOpenTab?: (tab: ExtrasTabId) => vo
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-[#161618] rounded-lg overflow-hidden border border-line">
-      <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0">
+      <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0 overflow-x-auto">
         <Star className="w-3 h-3 text-amber-500" />
         <span className="text-xs font-semibold">Extras — 23 ranked</span>
         <span className="ml-1 hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400">
@@ -82,7 +82,7 @@ export function ExtrasPane({ onOpenTab }: { onOpenTab?: (tab: ExtrasTabId) => vo
           </span>
           {done}/23 · {pct}%
         </span>
-        <span className="ml-auto flex gap-1">
+        <span className="ml-auto flex shrink-0 gap-1">
           {(['all', 'done', 'todo'] as const).map((f) => (
             <Button
               key={f}

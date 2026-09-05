@@ -95,7 +95,7 @@ export function InspectorPanel({
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-1">
+      <div className="flex flex-wrap gap-1">
         <Button
           variant={tab === 'info' ? 'default' : 'ghost'}
           size="sm"

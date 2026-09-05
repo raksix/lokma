@@ -508,14 +508,14 @@ export function ArchifyPane() {
 
         {/* Center: viewer */}
         <div className="flex-1 flex flex-col min-w-0 bg-[#FAF9F5] dark:bg-[#0F0F11]">
-          <div className="h-7 flex items-center gap-1 px-2 border-b border-line/50 bg-white/80 dark:bg-[#1E1E21]/80 backdrop-blur text-[11px] shrink-0">
+          <div className="h-7 flex items-center gap-1 px-2 overflow-x-auto border-b border-line/50 bg-white/80 dark:bg-[#1E1E21]/80 backdrop-blur text-[11px] shrink-0">
             <Eye className="w-3 h-3" /> Viewer — self-contained HTML
             {sel && (
               <span className="hidden sm:inline text-zinc-400">
                 · {sel.id} · ? M F / R L + - 0
               </span>
             )}
-            <span className="ml-auto flex gap-1">
+            <span className="ml-auto flex shrink-0 gap-1">
               <Button
                 variant="ghost"
                 size="sm"

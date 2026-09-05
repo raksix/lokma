@@ -236,14 +236,14 @@ export function OrchestrationPane() {
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-[#161618] rounded-lg overflow-hidden border border-line">
-      <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0">
+      <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0 overflow-x-auto">
         <Cpu className="w-3 h-3 text-terracotta" />
         <span className="text-xs font-semibold">Orchestration</span>
         <span className="ml-1 px-1.5 py-0.5 rounded-full bg-terracotta text-white text-[10px]">
           {counts.running} running · {counts.total} total
         </span>
         <span className="hidden lg:inline ml-1 text-[11px] text-zinc-400">live tree · fan-out · cancel</span>
-        <span className="ml-auto flex gap-1">
+        <span className="ml-auto flex shrink-0 gap-1">
           <Button
             variant="ghost"
             size="sm"

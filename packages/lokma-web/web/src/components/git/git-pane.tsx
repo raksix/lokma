@@ -169,7 +169,7 @@ export function GitPane({ sessionId }: { sessionId?: string }) {
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-[#161618] rounded-lg overflow-hidden border border-line">
-      <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0">
+      <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0 overflow-x-auto">
         <GitBranch className="w-3 h-3 text-zinc-500" />
         <span className="text-xs font-semibold">Git</span>
         {isRepo && branch && (
@@ -182,7 +182,7 @@ export function GitPane({ sessionId }: { sessionId?: string }) {
             {files.length} changed · {lockedCount} locked · {worktrees.length} worktree{worktrees.length === 1 ? '' : 's'}
           </span>
         )}
-        <span className="ml-auto flex items-center gap-1">
+        <span className="ml-auto flex shrink-0 items-center gap-1">
           <Button
             variant="ghost"
             size="sm"

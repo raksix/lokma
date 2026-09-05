@@ -181,13 +181,13 @@ export function PluginsPane() {
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-[#161618] rounded-lg overflow-hidden border border-line">
-      <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0">
+      <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0 overflow-x-auto">
         <Puzzle className="w-3 h-3 text-terracotta" />
         <span className="text-xs font-semibold">Plugins</span>
         <span className="ml-1 text-[11px] text-zinc-400 hidden sm:inline">
           Kernel manifest · hot toggle · no restart
         </span>
-        <span className="ml-auto flex gap-1">
+        <span className="ml-auto flex shrink-0 gap-1">
           <Button
             variant={tab === 'installed' && !marketOpen ? 'default' : 'ghost'}
             size="sm"

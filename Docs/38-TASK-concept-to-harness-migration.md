@@ -2647,3 +2647,31 @@ survives; never delete both at once). If even that serves stale code, escalate i
     (unit + build + live HTTP only); no focus trap (wave 1 scope).
   - Next piece: Phase 3 mobile wave 3 (toolbar flex-wrap audit), then
     perf + a11y.
+---
+- 2026-09-05 — Phase 3 mobile responsive wave 3: toolbar flex-wrap audit DONE (web 7175895)
+  - **Executor run:** every multi-button toolbar now survives a 320px pane —
+    audited all 77 `flex`+`gap` button-group candidates, fixed the real
+    overflow defects, allowlisted the squeeze-safe rows with reasons.
+  - **Web:** 8 pane headers scroll instead of clipping (`overflow-x-auto` +
+    `shrink-0` cluster, terminal-pane precedent: setup 4 step pills, git
+    refresh + 3 filter pills, extras/all-done-todo, usage ranges, vault
+    New/2D/3D, plugins tabs, orchestration fan-out/cancel, archify viewer
+    #hash shortcuts) + usage subtitle hidden on xs + InspectorPanel 23-tab
+    row wraps (`flex-wrap`, was crushed on all viewports) + observability
+    share explainer wraps + share-row title `min-w-0` truncate fix + share
+    meta hidden on xs.
+  - **Gate:** `shell/narrow-layout.test.ts` grows Rules 3+4 (32/32, was
+    10/10) — Rule 3 flags fixed `h-7/h-8/h-9` headers with 3+ buttons and no
+    scroll (0 violations post-fix); Rule 4 flags crowded button bars
+    (first button <=12 lines, 4+ in 30 lines) with a 9-entry reviewed
+    allowlist (squeeze pairs, 2-button rows, scrolled-header clusters,
+    text links; allowlist self-checks like grids).
+  - **Gates:** root `tsc --noEmit` 0 · web build green · full web suite
+    35/35 files · mock grep on touched files clean (labeled input
+    `placeholder`s + anti-mock comments + todo filter labels, legit) ·
+    server untouched.
+  - **Honest scope:** no real-device test (unit + build + live HTTP only);
+    scrolling headers keep every control reachable but off-screen on
+    320px; focus trap still open (wave 1 scope).
+  - Next piece: Phase 3 perf + a11y (mobile responsive COMPLETE: shell +
+    panes + toolbars).

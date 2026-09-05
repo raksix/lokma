@@ -766,9 +766,15 @@
 - **Live-data asserts (all green):** Providers (8 providers, Anthropic 3 models) · Models (7/7 enabled toggles) · Bots (Lokma CEO Featured, Mine 2) · Cron (0/0 enabled + approvals) · Usage (real 7d 282 in / 274 out + cost) · Git (main, clean tree, 1 worktree — matches live `git status`) · Design Studio (DESIGN.md, 6 types) · `1 msg` fix holds (zero `1 msgs`) · 8 real sessions listed with transcripts · composer present · zero mock hits.
 - **Flows:** scoped Design-tab click switches pane correctly; New Session 8→9 with new session visible; no leak from tab clicks (9→9). One probe artifact from an UNSCOPED `getByRole(name:'Design')` matching the tiling starter card (app correctly created a real session with the card brief — probe bug, not app bug; lesson: scope tab clicks to the inspector `aside`) + one flow-test session — both DELETE-verified, sessions back to 8. Server log 0 level>=40. Tree clean, PM2 untouched (no restart — no code changed).
 
+### 2026-09-05 — TEST LOOP area C run 2: screenshots + design, 5 real flaws fixed (5dccab5)
+- **Shots:** 27 PNGs to `/tmp/lokma-shots/2026-09-05-run2/` (23/23 Inspector tabs + default + forced-dark chat/providers + 390px mobile; 0 pageerrors / 0 console errors / 0 failed requests; doc-level overflow 0 on every tab, mobile 385<390).
+- **Vision review:** 7 shots reviewed (default/design/archify/vault/testing/observability/mobile) + 5 zoom re-checks. 7 claims REJECTED against code/DOM (chat-icon misalignment, Stack-A truncation, archify pill overlap, footer `[ ]` = kbd hints, tab-icon inconsistency, observability native-select/stats cuts, group spacing) — no fix, no invented work.
+- **Fixed (5, all DOM-verified live after rebuild):** (1) session titles → `title` tooltip (truncated rows showed only the drag hint); (2) archify filter pills → `title` + `aria-label` + `aria-pressed` (cryptic 4-letter codes); (3) testing stages row `overflow-x-auto` → `flex-wrap` (6/6 stage buttons visible, per-button overflow ≤0); (4) vault folder filter `w-28` → `w-36` (placeholder `folder (blank = all)` unclipped); (5) observability trace badges `max-w-[180px]` + truncate + `title`.
+- **Gates:** web `tsc --noEmit` 0 · 6 probe files green (sessions 23, testing 35, observability 45, archify 33, vault 56, narrow-layout gate 32/32) · vite build green · `lokma-web` single-proc restart via ecosystem file · live `/` 401 anon/200 authed, `/health` 200, served `index-DuGN4Ros.js` sha256 == disk. Server log clean (level-30 only).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area B run 2 — browser flows FULLY GREEN, 23/23 tab, 0 hata, docs-only, sıradaki alan: C)
-- **Son işlem:** Browser flows — 23 Inspector sekmesi tıklandı, pane başına canlı veri doğrulandı, New Session akışı çalıştı, probe artıkları silindi, client bug yok, restart yok.
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area C run 2 — screenshots+design, 5 flaws fixed 5dccab5, sıradaki alan: D)
+- **Son işlem:** Screenshots + design — 27 PNG çekildi, 7 iddia reddedildi, 5 gerçek kusur düzeltildi (tooltip'ler, testing wrap, vault genişliği, obs badge), rebuild + lokma-web restart, canlı doğrulandı.
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):

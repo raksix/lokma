@@ -843,9 +843,15 @@
 - **Fixes (one family — truncated live text without discoverable full text, 6 files):** session model badges `title={model}` (d=66 live); terminal cwd span title; 6 effective-config value spans titles (`?? undefined` so empty shows no tooltip; 2 genuinely clipped live d=51/58); cron job-task + recent-run rows (title was sessionId-only while visible text is the error label — now `label · session id`) + decision rows; usage session rows (button + inner span titles); bot list descriptions (`line-clamp-2` + title, full text also in detail pane).
 - **Gates:** web `tsc --noEmit` 0 · root `tsc --noEmit` 0 · shell/panes tests 211/211 (narrow-layout 34/34, a11y 33/33) · `build:web` green (`index-B4g57dtN.js`; note: root `bun run build` does NOT include web — `build:web`/`build:all` does) · single-proc `lokma-web` restart via ecosystem file · live `/` 401 anon/200 authed + `/health` 200 + served bundle == disk · post-fix re-shoot `truncNoTitle` 0 on all touched panes · server log 0 level>=40. F6/F7 rows have no live data (0 jobs/decisions) — code-verified only, noted honestly.
 
+### 2026-09-05 — TEST LOOP area E run 5: harness demo, Levenshtein agent loop live proven (docs-only, no code commit)
+- **Demo:** Levenshtein-distance helper (`/tmp/lokma-demo/run5/`: lev.js + lev.test.js + README.md, 3x write_file) — `node lev.test.js` exit 0 `ALL TESTS PASSED` + `done-complete` reason=complete, 10-row transcript (2 user/2 assistant/1 created/5 tool), model opencode-go/mimo-v2.5. Independent re-run exit 0.
+- **Mandated model:** `muse-spark-1.3-contributor` 5th consecutive E run upstream HTTP 500 `Internal server error` on direct curl (present in the 35-model public catalog — `/models` needs no auth — but broken server-side). Harness untouched, no mock output.
+- **Driver-recipe corrections (no app change):** (1) session CREATE reads cwd from the request BODY (`body.cwd`, sessions.ts:70-71), NOT `?cwd=` — first session landed in server cwd, DELETE-verified (`session_not_found` after); re-created with body cwd (WS URL still needs `?cwd=`); (2) `run_command` takes `{command,args}` split — single-string form honestly ENOENTs, model recovered honestly with split form; (3) tool turn limit (5) ends the turn after the 4th ok tool_result — follow-up nudge closes with `done-complete`. 5x `allow` (never `always`), project-local `.lokma/settings.json` auto-mode (global config untouched, `defaultMode` absent), run5 session absent from default-scope list (13), `/api/providers/opencode-go/test` 200 with 35 live models, server log 0 level>=40.
+- **Sonuç:** agent loop uçtan uca canlı kanıtlandı, sıfır failure, sıfır fix. Tree temiz, PM2'ye dokunulmadı (iki proc da online).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area D run 5 — README + docs compliance, fully green, sıradaki alan: E)
-- **Son işlem:** README/docs compliance (23 tabs, 22 chunks, 27 modules, 6 plugins, 4 palettes, 12/12 endpoints 200, CLI matrix green, Docs/20-37 sweep clean), zero gaps, docs-only, PM2 untouched (no restart — no code changed).
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area E run 5 — harness demo, Levenshtein agent loop live proven, sıradaki alan: F)
+- **Son işlem:** harness demo run 5 (`/tmp/lokma-demo/run5/`: lev.js + lev.test.js + README.md, exit 0 ALL TESTS PASSED, done-complete, 10-row transcript, opencode-go/mimo-v2.5; mandated model 5. kez upstream 500; 2 driver-reçete düzeltmesi, app değişikliği yok), docs-only, PM2 untouched (no restart — no code changed).
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):
@@ -856,6 +862,8 @@
 - 2026-09-05 test-loop C run 4: 23-tab Inspector CLIP/TRUNC/SCROLL DOM audit + vision review; fixed 4 real flaws live-verified (testing run-card title w=0→177 two-row header, providers action-row flex-wrap d=28→0, provider URL + git message title tooltips), rejected 5 claims against code/DOM (bots overlap, session tooltips present, spinner present, fork hint functional, scroll strips by-design); gates: web+root tsc 0, vite build green, served index-CrJnKSCP.js sha identical, mobile 385 clean, server log 0 errors. Commit 78f729c pushed. Next: D.
 
 - 2026-09-05 test-loop D run 5: README + docs compliance FULLY GREEN, zero gaps, zero fixes (all numbers re-verified live: 23 tabs, 22 chunks, 27 modules, 6 plugins, 4 palettes, 12/12 endpoints 200, CLI matrix green, Docs/20-37 sweep clean; 3 wrong probe paths corrected against source). Docs-only, PM2 untouched. Next: E.
+
+- 2026-09-05 test-loop E run 5: harness demo, Levenshtein agent loop live proven (lev.js + lev.test.js + README.md under /tmp/lokma-demo/run5/, node exit 0 ALL TESTS PASSED, done-complete reason=complete, 10-row transcript via opencode-go/mimo-v2.5; mandated model 5th consecutive upstream 500; session CREATE takes cwd from BODY not ?cwd=; run_command needs {command,args} split; 5x allow approvals, global config untouched, server log 0 errors). Docs-only, PM2 untouched. Next: F.
 
 ---
 *Bu dosya otomatik yönetilir. Elle silme.*

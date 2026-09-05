@@ -24,6 +24,98 @@ function crc32(data: Uint8Array): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
+/** Typed zip failure — readers map it straight to `{ code, message }`. */
+export class ZipError extends Error {
+  readonly code: string;
+  readonly status: number;
+
+  constructor(code: string, message: string, status = 400) {
+    super(message);
+    this.name = 'ZipError';
+    this.code = code;
+    this.status = status;
+  }
+}
+
+/** One entry parsed back out of a stored zip (method 0 only). */
+export type ZipReadEntry = { name: string; data: Buffer };
+
+const EOCD_SIG = 0x06054b50;
+const CENTRAL_SIG = 0x02014b50;
+const LOCAL_SIG = 0x04034b50;
+
+function readU16(view: DataView, off: number): number {
+  return view.getUint16(off, true);
+}
+
+function readU32(view: DataView, off: number): number {
+  return view.getUint32(off, true);
+}
+
+/**
+ * Parse a stored (uncompressed) zip back into entries — the inverse of
+ * `buildStoredZip`. Only method 0 is accepted (anything deflated answers
+ * `unsupported_entry`); CRC + lengths are verified, so a corrupt or
+ * hand-edited bundle fails closed instead of writing garbage.
+ */
+export function readStoredZip(input: Buffer): ZipReadEntry[] {
+  if (input.length < 22 || readU32(new DataView(input.buffer, input.byteOffset, 4), 0) !== LOCAL_SIG) {
+    throw new ZipError('bad_zip', 'not a zip bundle (bad magic or too short)');
+  }
+  // EOCD sits at the very end when there is no archive comment (our writer
+  // emits none) — still scan backwards to tolerate trailing bytes.
+  const scanFrom = Math.max(0, input.length - 22 - 65557);
+  let eocd = -1;
+  const view = new DataView(input.buffer, input.byteOffset, input.byteLength);
+  for (let off = input.length - 22; off >= scanFrom; off -= 1) {
+    if (readU32(view, off) === EOCD_SIG) {
+      eocd = off;
+      break;
+    }
+  }
+  if (eocd < 0) throw new ZipError('bad_zip', 'zip end-of-central-directory not found');
+  const centralCount = readU16(view, eocd + 10);
+  const centralSize = readU32(view, eocd + 12);
+  const centralOff = readU32(view, eocd + 16);
+  if (centralOff + centralSize > input.length) {
+    throw new ZipError('bad_zip', 'zip central directory runs past the end of the file');
+  }
+  const entries: ZipReadEntry[] = [];
+  let ptr = centralOff;
+  for (let i = 0; i < centralCount; i += 1) {
+    if (ptr + 46 > input.length || readU32(view, ptr) !== CENTRAL_SIG) {
+      throw new ZipError('bad_zip', `zip central entry ${i} is truncated`);
+    }
+    const method = readU16(view, ptr + 10);
+    const crc = readU32(view, ptr + 16);
+    const compSize = readU32(view, ptr + 20);
+    const nameLen = readU16(view, ptr + 28);
+    const extraLen = readU16(view, ptr + 30);
+    const commentLen = readU16(view, ptr + 32);
+    const localOff = readU32(view, ptr + 42);
+    const name = input.subarray(ptr + 46, ptr + 46 + nameLen).toString('utf-8');
+    ptr += 46 + nameLen + extraLen + commentLen;
+    if (method !== 0) {
+      throw new ZipError('unsupported_entry', `zip entry ${name || `#${i}`} uses method ${method} (only stored entries are supported)`);
+    }
+    if (localOff + 30 > input.length || readU32(view, localOff) !== LOCAL_SIG) {
+      throw new ZipError('zip_corrupt', `zip entry ${name || `#${i}`} has a bad local header`);
+    }
+    const localNameLen = readU16(view, localOff + 26);
+    const localExtraLen = readU16(view, localOff + 28);
+    const dataOff = localOff + 30 + localNameLen + localExtraLen;
+    if (dataOff + compSize > input.length) {
+      throw new ZipError('zip_corrupt', `zip entry ${name || `#${i}`} runs past the end of the file`);
+    }
+    const data = Buffer.from(input.subarray(dataOff, dataOff + compSize));
+    if (crc32(data) !== crc) {
+      throw new ZipError('zip_corrupt', `zip entry ${name || `#${i}`} failed its checksum`);
+    }
+    entries.push({ name, data });
+  }
+  return entries;
+}
+
 /** Build a stored ZIP bundle from in-memory text entries. */
 export function buildStoredZip(files: ZipEntry[]): Buffer {
   const encoder = new TextEncoder();

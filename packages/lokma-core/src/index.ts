@@ -75,5 +75,9 @@ export * from './cron/index.js';
 // Phase 3 themes polish)
 export * from './themes/index.js';
 
+// Cloud transfer (portable ~/.lokma export/import for the move to a cloud
+// box, Phase 3 cloud prep wave 1)
+export * from './cloud/index.js';
+
 // Utils (DRY — reuse from here, don't duplicate)
 export * from './utils/index.js';

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { api, type GitFileChange, type GitLockRow, type GitLogEntry } from '@/lib/api';
+import { useKnownSession } from '@/stores';
 import { emitToast } from '@/components/shell';
 import {
   changeBadge,
@@ -92,24 +93,21 @@ export function GitPane({ sessionId }: { sessionId?: string }) {
     }
   }, []);
 
-  // Session scope: resolve the repo root from the session, like FileBrowser.
+  // Session scope: resolve the repo root from the cached server list, like
+  // FileBrowser. Never a detail GET (fresh sessions used to 404 once per pane).
+  const known = useKnownSession(sessionId);
   React.useEffect(() => {
-    if (!sessionId) {
-      setCwd('');
-      void refresh('');
-      return;
-    }
-    api
-      .getSession(sessionId)
-      .then((detail) => {
-        setCwd(detail.cwd ?? '');
-        void refresh(detail.cwd ?? '');
-      })
-      .catch(() => {
+    if (!sessionId || known === 'loading') {
+      if (!sessionId) {
         setCwd('');
         void refresh('');
-      });
-  }, [sessionId, refresh]);
+      }
+      return;
+    }
+    const cwd = known?.cwd ?? '';
+    setCwd(cwd);
+    void refresh(cwd);
+  }, [sessionId, refresh, known]);
 
   const lockedPaths = React.useMemo(() => new Set(locks.map((l) => l.path)), [locks]);
   const worktreePaths = React.useMemo(() => {

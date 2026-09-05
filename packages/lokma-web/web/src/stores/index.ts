@@ -2,7 +2,7 @@
  * Stores barrel — single import point for harness state
  * (`@/stores` → session/pane/provider/agent caches).
  */
-export { useSessionStore, type SessionStore } from './session';
+export { useSessionStore, useKnownSession, type SessionStore, type KnownSession } from './session';
 export { usePaneStore, type LayoutNode, type OpenTab } from './pane';
 export { useProviderStore, PROVIDER_CACHE_TTL_MS, isCacheFresh, type ProviderStore } from './provider';
 export { useAgentStore, type AgentLock, type AgentStore } from './agent';

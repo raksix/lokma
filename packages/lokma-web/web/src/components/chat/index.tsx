@@ -6,7 +6,7 @@ import { Composer, type ComposerSend } from './composer';
 import { SingleChatView, type PendingMessage, type TranscriptMessage } from './single-chat-view';
 import { useWs, type UseWs } from '@/hooks/use-ws';
 import { api } from '@/lib/api';
-import { useProviderStore, useSessionStore } from '@/stores';
+import { useKnownSession, useProviderStore, useSessionStore } from '@/stores';
 import { emitToast } from '@/components/shell';
 import { FILE_DRAG_MIME, INSERT_MENTION_EVENT } from '@/components/files';
 import { formatCostBadge } from '@/components/header';
@@ -55,6 +55,7 @@ export function Chat({
   const doneSeen = React.useRef(false);
 
   const transcripts = useSessionStore((s) => s.transcripts);
+  const known = useKnownSession(sessionId);
   const loadTranscript = useSessionStore((s) => s.loadTranscript);
   const invalidateSession = useSessionStore((s) => s.invalidateSession);
   const storeModels = useProviderStore((s) => s.models);
@@ -66,17 +67,28 @@ export function Chat({
   const [answerBusy, setAnswerBusy] = React.useState<string | null>(null);
 
   // Transcript + session model (server meta wins, tab storage is fallback).
+  // While the server list is not in yet the effect re-runs when it flips —
+  // waiting avoids doomed GETs for locally generated ids the server never
+  // saw (fresh boots used to 404 twice per view).
   React.useEffect(() => {
     doneSeen.current = false;
     setPending([]);
     setStreamVisible(true);
+    void refreshProviders();
+    if (known === 'loading') {
+      setModel(readStoredModel());
+      return;
+    }
     void loadTranscript(sessionId);
+    if (!known) {
+      setModel(readStoredModel());
+      return;
+    }
     api
       .getSession(sessionId)
       .then((detail) => setModel(detail.model || readStoredModel()))
       .catch(() => setModel(readStoredModel()));
-    void refreshProviders();
-  }, [sessionId, loadTranscript, refreshProviders]);
+  }, [sessionId, loadTranscript, refreshProviders, known]);
 
   const transcript: TranscriptMessage[] = React.useMemo(() => {
     const raw = transcripts[sessionId] ?? [];
@@ -85,7 +97,9 @@ export function Chat({
 
   const reloadTranscript = React.useCallback(async () => {
     invalidateSession(sessionId);
-    await loadTranscript(sessionId);
+    // Forced: the finished stream created the session server-side even when
+    // the list cache predates it — never take the unknown-id empty shortcut.
+    await loadTranscript(sessionId, true);
   }, [invalidateSession, loadTranscript, sessionId]);
 
   // A finished stream means the server transcript grew — refetch, drop

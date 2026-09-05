@@ -77,6 +77,37 @@ useSessionStore.getState().invalidateSession('sess_1');
 assert(useSessionStore.getState().stale['sess_1'] === true, 'invalidate marks stale');
 assert(!('sess_1' in useSessionStore.getState().transcripts), 'invalidate drops the cache');
 
+// Unknown ids once the list is loaded: fresh empty session, no doomed GET.
+const callsBeforeUnknown = fetchCalls;
+await useSessionStore.getState().loadTranscript('sess_fresh_unknown');
+assert(fetchCalls === callsBeforeUnknown, 'unknown id skips the doomed GET once the list is loaded');
+assert(
+  Array.isArray(useSessionStore.getState().transcripts['sess_fresh_unknown']) &&
+    useSessionStore.getState().transcripts['sess_fresh_unknown'].length === 0,
+  'unknown id caches an empty transcript',
+);
+assert(useSessionStore.getState().lastError === null, 'unknown id surfaces no error');
+
+// Forced reload (post-stream) always refetches — the WS loop creates the
+// session server-side on the first prompt even when the list predates it.
+const callsBeforeForce = fetchCalls;
+await useSessionStore.getState().loadTranscript('sess_fresh_unknown', true);
+assert(fetchCalls === callsBeforeForce + 1, 'forced reload refetches even for unknown ids');
+
+globalThis.fetch = (async (url: unknown) => {
+  const path = String(url);
+  if (path === '/api/sessions') return json(200, { sessions: [{ id: 'sess_1' }], count: 1 });
+  return json(404, { code: 'session_not_found', message: 'Session not found' });
+}) as unknown as typeof fetch;
+await useSessionStore.getState().refreshSessions();
+await useSessionStore.getState().loadTranscript('sess_gone', true);
+assert(
+  Array.isArray(useSessionStore.getState().transcripts['sess_gone']) &&
+    useSessionStore.getState().transcripts['sess_gone'].length === 0,
+  'session_not_found caches an empty transcript',
+);
+assert(useSessionStore.getState().lastError === null, 'session_not_found surfaces no error');
+
 globalThis.fetch = (async () => json(200, { sessions: [], count: 0 })) as unknown as typeof fetch;
 await useSessionStore.getState().refreshSessions();
 assert(useSessionStore.getState().sessions.length === 0, 'refresh replaces the list');

@@ -5,7 +5,7 @@
  * stale when WS events signal server-side growth.
  */
 import { create } from 'zustand';
-import { api, type SessionSummary } from '@/lib/api';
+import { api, ApiError, type SessionSummary } from '@/lib/api';
 import type { ServerMessage } from 'lokma-shared/protocol/ws';
 
 export type SessionStore = {
@@ -15,12 +15,14 @@ export type SessionStore = {
   stale: Record<string, boolean>;
   loading: boolean;
   lastError: string | null;
+  /** True after the first successful list load — unknown ids are then local-only. */
+  listLoaded: boolean;
   /** Reload the session list from the server (replaces the cache). */
   refreshSessions: (cwd?: string) => Promise<void>;
   /** Switch the active session (URL + chat follow this id). */
   selectSession: (id: string | null) => void;
-  /** Fetch one transcript unless cached and fresh. */
-  loadTranscript: (id: string) => Promise<void>;
+  /** Fetch one transcript unless cached and fresh (`force` refetches after streams). */
+  loadTranscript: (id: string, force?: boolean) => Promise<void>;
   /** Drop one cached transcript so the next view refetches it. */
   invalidateSession: (id: string) => void;
   /** Create a session on the server, refresh the list, and select it. */
@@ -45,6 +47,7 @@ const initial = {
   stale: {} as Record<string, boolean>,
   loading: false,
   lastError: null as string | null,
+  listLoaded: false,
 };
 
 export const useSessionStore = create<SessionStore>()((set, get) => ({
@@ -62,6 +65,7 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
         stale: Object.fromEntries(Object.entries(prev.stale).filter(([id]) => ids.has(id))),
         activeSessionId: prev.activeSessionId && ids.has(prev.activeSessionId) ? prev.activeSessionId : null,
         loading: false,
+        listLoaded: true,
       }));
     } catch (e) {
       set({ loading: false, lastError: e instanceof Error ? e.message : 'session list failed' });
@@ -72,9 +76,23 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
     set({ activeSessionId: id });
   },
 
-  loadTranscript: async (id: string) => {
-    const { transcripts, stale } = get();
-    if (transcripts[id] && !stale[id]) return;
+  loadTranscript: async (id: string, force?: boolean) => {
+    const { transcripts, stale, sessions, listLoaded } = get();
+    if (!force && transcripts[id] && !stale[id]) return;
+    // A locally generated id the server list does not know is a fresh empty
+    // session — cache it empty WITHOUT firing a doomed GET (fresh boots used
+    // to 404 here once per view). Falls through while the list never loaded
+    // (deep links) so real sessions still resolve. `force` (post-stream
+    // reload) always refetches: the WS loop creates the session server-side
+    // on the first prompt, so it exists even when the list cache predates it.
+    if (!force && listLoaded && !sessions.some((s) => s.id === id)) {
+      set((prev) => ({
+        transcripts: { ...prev.transcripts, [id]: [] },
+        stale: { ...prev.stale, [id]: false },
+        loading: false,
+      }));
+      return;
+    }
     set({ loading: true, lastError: null });
     try {
       const detail = await api.getSession(id);
@@ -84,6 +102,15 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
         loading: false,
       }));
     } catch (e) {
+      // Deleted between list and fetch — same empty-session outcome, no error.
+      if (e instanceof ApiError && e.code === 'session_not_found') {
+        set((prev) => ({
+          transcripts: { ...prev.transcripts, [id]: [] },
+          stale: { ...prev.stale, [id]: false },
+          loading: false,
+        }));
+        return;
+      }
       set({ loading: false, lastError: e instanceof Error ? e.message : 'transcript load failed' });
     }
   },
@@ -176,3 +203,21 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
     set({ ...initial });
   },
 }));
+
+/**
+ * Known-session lookup for panes that only need list meta (cwd/model).
+ * - `'loading'` — server list not in yet: wait (the effect re-runs on flip),
+ *   never fire a detail GET for an id the server may not know.
+ * - `null` — list loaded and the id is unknown: a fresh local-only session,
+ *   use empty defaults with NO request (fresh boots used to 404 once per pane).
+ * - summary — cached meta wins, no GET needed (cwd is create-time immutable).
+ */
+export type KnownSession = SessionSummary | 'loading' | null;
+
+export function useKnownSession(id: string | undefined | null): KnownSession {
+  const listLoaded = useSessionStore((s) => s.listLoaded);
+  const sessions = useSessionStore((s) => s.sessions);
+  if (!id) return null;
+  if (!listLoaded) return 'loading';
+  return sessions.find((s) => s.id === id) ?? null;
+}

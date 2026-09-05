@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { api, type BrowserTab } from '@/lib/api';
 import { emitToast } from '@/components/shell';
-import { useAgentStore } from '@/stores';
+import { useAgentStore, useKnownSession } from '@/stores';
 import {
   BROWSER_BLANK_URL,
   canGoBack,
@@ -69,6 +69,9 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
   }, [sessionId]);
 
   // Session scope: cwd for new tabs + tab list; reset selection on switch.
+  // cwd comes from the cached server list — never a detail GET (fresh
+  // sessions used to 404 here once per mounted pane).
+  const known = useKnownSession(sessionId);
   React.useEffect(() => {
     setTabs([]);
     setSelectedId(null);
@@ -76,13 +79,11 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
     setArmedClose(null);
     setCreating(false);
     setLoading(true);
-    api
-      .getSession(sessionId)
-      .then((detail) => setCwd(detail.cwd ?? ''))
-      .catch(() => setCwd(''));
+    if (known === 'loading') return;
+    setCwd(known?.cwd ?? '');
     void refresh().finally(() => setLoading(false));
     void refreshAgents();
-  }, [sessionId, refresh, refreshAgents]);
+  }, [sessionId, refresh, refreshAgents, known]);
 
   // Keep a valid selection (first tab wins) and sync the address bar.
   const selected = tabs.find((t) => t.id === selectedId) ?? null;

@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ApiError, api, type FileEntry, type FileSearchHit } from '@/lib/api';
+import { useKnownSession } from '@/stores';
 import { emitToast } from '@/components/shell';
 import {
   FILE_DRAG_MIME,
@@ -115,8 +116,12 @@ export function FileBrowser({ sessionId }: { sessionId: string }) {
     [],
   );
 
-  // Session workspace root — the FileBrowser is always scoped to the open
-  // session's cwd (same root the chat `@mention` reader uses server-side).
+  // Session scope: the tree is always rooted at the open session's cwd (same
+  // root the chat `@mention` reader uses server-side). cwd comes from the
+  // cached server list — never a detail GET (fresh sessions used to 404 here
+  // on every boot). A fresh local-only session has no workspace yet: empty
+  // tree, no error, no request.
+  const known = useKnownSession(sessionId);
   React.useEffect(() => {
     setCwd(null);
     setCwdError(null);
@@ -128,21 +133,14 @@ export function FileBrowser({ sessionId }: { sessionId: string }) {
     setConflict(null);
     setQuery('');
     setHits([]);
-    let cancelled = false;
-    api
-      .getSession(sessionId)
-      .then((detail) => {
-        if (cancelled) return;
-        setCwd(detail.cwd);
-        void loadDir(detail.cwd, '.');
-      })
-      .catch((e: Error) => {
-        if (!cancelled) setCwdError(e.message);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionId, loadDir]);
+    if (known === 'loading') return;
+    if (!known) {
+      setCwd('');
+      return;
+    }
+    setCwd(known.cwd ?? '');
+    void loadDir(known.cwd ?? '', '.');
+  }, [sessionId, loadDir, known]);
 
   // Ctrl+P quick-open focus (dispatched by AppShell).
   React.useEffect(() => {

@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { api, type TerminalInfo } from '@/lib/api';
 import type { UseWs } from '@/hooks/use-ws';
 import { emitToast } from '@/components/shell';
-import { useAgentStore } from '@/stores';
+import { useAgentStore, useKnownSession } from '@/stores';
 import {
   appendCapped,
   copyText,
@@ -70,18 +70,19 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
   refreshRef.current = refresh;
 
   // Session scope: cwd for new shells + reset buffers on session switch.
+  // cwd comes from the cached server list — never a detail GET (fresh
+  // sessions used to 404 here once per mounted pane).
+  const known = useKnownSession(sessionId);
   React.useEffect(() => {
     setBuffers({});
     setSelectedId(null);
     setArmedKill(null);
     processedRef.current = 0;
-    api
-      .getSession(sessionId)
-      .then((detail) => setCwd(detail.cwd ?? ''))
-      .catch(() => setCwd(''));
+    if (known === 'loading') return;
+    setCwd(known?.cwd ?? '');
     void refresh();
     void refreshAgents();
-  }, [sessionId, refresh, refreshAgents]);
+  }, [sessionId, refresh, refreshAgents, known]);
 
   // Fold WS terminal frames into per-terminal scrollback (incremental, capped).
   React.useEffect(() => {

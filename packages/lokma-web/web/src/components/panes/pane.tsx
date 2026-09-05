@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import type { UseWs } from '@/hooks/use-ws';
-import { useSessionStore } from '@/stores/session';
+import { useKnownSession, useSessionStore } from '@/stores/session';
 import { emitToast, PaneErrorBoundary } from '@/components/shell';
 import { ChatWithSocket } from '@/components/chat';
 import { FILE_DRAG_MIME, emitInsertMention } from '@/components/files';
@@ -54,12 +54,20 @@ export function PaneFilePreview({ sessionId, path }: { sessionId: string; path: 
   const [content, setContent] = React.useState('');
   const [meta, setMeta] = React.useState<{ sha: string; size: number; truncated: boolean } | null>(null);
 
+  // cwd comes from the cached server list — never a detail GET (fresh
+  // sessions used to 404 here once per mounted file tab).
+  const known = useKnownSession(sessionId);
   const load = React.useCallback(async () => {
     setStatus('loading');
     setError('');
+    if (known === 'loading') return;
+    if (!known) {
+      setError('Session has no workspace yet');
+      setStatus('error');
+      return;
+    }
     try {
-      const detail = await api.getSession(sessionId);
-      const file = await api.readWorkspaceFile(detail.cwd, path);
+      const file = await api.readWorkspaceFile(known.cwd ?? '', path);
       setContent(file.content);
       setMeta({ sha: file.sha, size: file.size, truncated: file.truncated });
       setStatus('ok');
@@ -67,7 +75,7 @@ export function PaneFilePreview({ sessionId, path }: { sessionId: string; path: 
       setError(err instanceof Error ? err.message : 'Could not load the file');
       setStatus('error');
     }
-  }, [sessionId, path]);
+  }, [sessionId, path, known]);
 
   React.useEffect(() => {
     void load();

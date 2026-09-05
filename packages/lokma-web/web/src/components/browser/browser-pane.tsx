@@ -299,8 +299,8 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
       </div>
 
       {creating ? (
-        <div className="grid shrink-0 grid-cols-2 gap-2 border-b border-line/50 bg-[#FDFCFB] p-2 dark:bg-[#161618]">
-          <div className="col-span-2 sm:col-span-1">
+        <div className="grid shrink-0 grid-cols-1 gap-2 border-b border-line/50 bg-[#FDFCFB] p-2 sm:grid-cols-2 dark:bg-[#161618]">
+          <div>
             <label htmlFor="browser-new-url" className="mb-1 block text-[10px] uppercase tracking-wide text-zinc-500">
               Start address (optional)
             </label>
@@ -313,7 +313,7 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
               className="h-7 w-full rounded border border-line bg-white px-2 font-mono text-[11px] focus:border-terracotta/50 focus:outline-none dark:bg-[#1E1E21]"
             />
           </div>
-          <div className="col-span-2 sm:col-span-1">
+          <div>
             <label htmlFor="browser-new-agent" className="mb-1 block text-[10px] uppercase tracking-wide text-zinc-500">
               Agent (optional)
             </label>

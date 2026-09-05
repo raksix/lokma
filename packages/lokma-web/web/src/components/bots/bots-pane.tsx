@@ -403,7 +403,7 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
                     {confirmDelete === selected.id ? 'Confirm?' : deleting ? 'Deleting…' : 'Delete'}
                   </Button>
                 </div>
-                <div className="mt-3 grid grid-cols-4 gap-1">
+                <div className="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-4">
                   <Button size="sm" className="h-7 text-xs gap-1" disabled={running} onClick={() => void runSelected()}>
                     <Play className="w-3 h-3" /> {running ? 'Starting…' : 'Run'}
                   </Button>

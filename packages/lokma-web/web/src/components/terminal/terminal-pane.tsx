@@ -298,7 +298,7 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
       </div>
 
       {creating ? (
-        <div className="grid shrink-0 grid-cols-2 gap-2 border-b border-white/5 bg-[#161618] p-2">
+        <div className="grid shrink-0 grid-cols-1 gap-2 border-b border-white/5 bg-[#161618] p-2 sm:grid-cols-2">
           <div>
             <label htmlFor="terminal-cwd" className="mb-1 block text-[10px] uppercase tracking-wide text-white/40">
               Working directory

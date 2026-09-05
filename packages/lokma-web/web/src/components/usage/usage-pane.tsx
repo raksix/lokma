@@ -151,7 +151,7 @@ export function UsagePane({ onOpenSession }: { onOpenSession?: (id: string) => v
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-2 p-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-2 p-2 sm:grid-cols-2 lg:grid-cols-4">
               {kpis.map((k) => (
                 <div
                   key={k.label}

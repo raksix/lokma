@@ -708,7 +708,8 @@ export function ArchifyPane() {
                     <div className="text-xs font-medium flex items-center gap-1">
                       <Monitor className="w-3 h-3 text-terracotta" /> Validation receipt
                     </div>
-                    <table className="mt-2 w-full text-[11px]">
+                    <div className="mt-2 overflow-x-auto">
+                      <table className="mt-2 w-full min-w-[320px] text-[11px]">
                       <tbody className="divide-y divide-line/50">
                         {detail.receipt.map((r) => (
                           <tr key={r.gate}>
@@ -721,6 +722,7 @@ export function ArchifyPane() {
                         ))}
                       </tbody>
                     </table>
+                    </div>
                     <div className="mt-2 text-[11px] text-zinc-500">
                       receipt.json · fails closed (no deliver if invalid)
                     </div>
@@ -728,7 +730,7 @@ export function ArchifyPane() {
                 )}
                 {tab === 'export' && (
                   <div className="space-y-2">
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                       {[
                         { fmt: 'svg' as const, desc: 'deterministic' },
                         { fmt: 'html' as const, desc: 'self-contained' },

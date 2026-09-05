@@ -179,7 +179,7 @@ export function PermissionsPane({ config, onReload }: { config: NormalizedConfig
             ))}
           </div>
         )}
-        <div className="mt-1.5 grid grid-cols-[110px_1fr] gap-1">
+        <div className="mt-1.5 grid grid-cols-1 gap-1 sm:grid-cols-[110px_1fr]">
           <Input value={hookEvent} onChange={(e) => setHookEvent(e.target.value)} placeholder="PostToolUse" aria-label="Hook event" className="h-7 font-mono text-[11px]" />
           <Input value={hookMatcher} onChange={(e) => setHookMatcher(e.target.value)} placeholder="Edit|Write" aria-label="Hook matcher" className="h-7 font-mono text-[11px]" />
         </div>

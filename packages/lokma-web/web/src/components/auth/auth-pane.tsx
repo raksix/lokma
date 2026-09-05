@@ -667,7 +667,7 @@ export function AuthPane() {
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {ROLES.map((r) => (
             <div key={r.id} className={`rounded-lg border p-2.5 ${roleTone(r.id)}`}>
               <div className="text-xs font-semibold flex items-center gap-1">

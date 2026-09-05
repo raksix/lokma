@@ -416,7 +416,7 @@ export function AgentsPane() {
               <div className="p-2 space-y-2">
                 <div className="rounded-lg border border-line bg-white dark:bg-[#1E1E21] p-2.5">
                   <div className="text-xs font-medium">Name · model · budgets</div>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <div>
                       <label
                         htmlFor="hub-edit-name"

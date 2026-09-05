@@ -90,7 +90,7 @@ export function AgentDialog({
               maxLength={40}
             />
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div>
               <label
                 htmlFor="agent-persona"
@@ -131,7 +131,7 @@ export function AgentDialog({
               onChange={set('cwd')}
             />
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div>
               <label
                 htmlFor="agent-tokens"

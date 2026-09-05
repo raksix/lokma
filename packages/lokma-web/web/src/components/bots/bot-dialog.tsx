@@ -87,7 +87,7 @@ export function BotDialog({
               maxLength={500}
             />
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div>
               <label htmlFor="bot-model" className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
                 Model

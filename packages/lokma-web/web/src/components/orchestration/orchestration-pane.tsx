@@ -334,8 +334,8 @@ export function OrchestrationPane() {
             <p className="mt-0.5 text-[11px] text-zinc-500">
               One real registry entry per member (same validation as the Hub). {remaining} slot{remaining === 1 ? '' : 's'} left.
             </p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <div className="col-span-2 sm:col-span-1">
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
                 <label htmlFor="fanout-stem" className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
                   Name stem
                 </label>
@@ -348,7 +348,7 @@ export function OrchestrationPane() {
                   onChange={set('stem')}
                 />
               </div>
-              <div className="col-span-2 sm:col-span-1">
+              <div>
                 <label htmlFor="fanout-persona" className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
                   Persona
                 </label>
@@ -360,7 +360,7 @@ export function OrchestrationPane() {
                   ))}
                 </select>
               </div>
-              <div className="col-span-2 sm:col-span-1">
+              <div>
                 <label htmlFor="fanout-model" className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
                   Model
                 </label>

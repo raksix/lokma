@@ -208,7 +208,7 @@ export function PaneTabPicker({
       </div>
       <div>
         <div className="mb-1 text-[11px] text-muted-foreground">Tools</div>
-        <div className="grid grid-cols-3 gap-1">
+        <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
           {INSPECTOR_TABS.map((t) => (
             <Button
               key={t.id}

@@ -323,7 +323,7 @@ export function ObservabilityPane() {
           )}
         </div>
 
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
           <div className="rounded-lg border border-line bg-white dark:bg-[#1E1E21] p-2.5">
             <div className="text-xs font-medium flex items-center gap-1"><Cpu className="w-3 h-3" /> TokenLedger</div>
             <div className="mt-1 text-[11px] text-zinc-500">

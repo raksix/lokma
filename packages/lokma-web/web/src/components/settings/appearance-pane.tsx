@@ -59,7 +59,7 @@ export function AppearancePane({ config, onReload }: { config: NormalizedConfig;
       {cards === null ? (
         <div className="rounded-md border border-dashed border-line p-2 text-[11px] text-zinc-500">Loading themes…</div>
       ) : (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {cards.map((t) => (
             <button
               key={t.id}

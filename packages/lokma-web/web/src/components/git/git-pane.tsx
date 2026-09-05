@@ -325,7 +325,7 @@ export function GitPane({ sessionId }: { sessionId?: string }) {
               </div>
             </div>
 
-            <div className="m-2 grid grid-cols-2 gap-2">
+            <div className="m-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="rounded-lg border border-line bg-white dark:bg-[#1E1E21] p-2.5">
                 <div className="text-xs font-medium flex items-center gap-1">
                   <GitMerge className="w-3 h-3 text-terracotta" /> Merge — coordinator

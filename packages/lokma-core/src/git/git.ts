@@ -70,8 +70,18 @@ async function runGit(cwd: string, args: string[], timeout: number): Promise<{ s
     return await exec('git', args, { cwd, timeout, maxBuffer: 4 * 1024 * 1024 });
   } catch (e) {
     const err = e as { code?: unknown; stderr?: unknown; message?: string };
-    // `git rev-parse` exits 128 outside a repo — every caller maps it.
-    if (err?.code === 128) throw new GitError('not_a_repo', `${cwd} is not a git repository`, 400);
+    // `git` exits 128 both outside a repo AND for in-repo ref errors
+    // (unborn HEAD, no commits yet) — keep git's own diagnosis in the
+    // message so callers can tell the two apart (`log()` does).
+    if (err?.code === 128) {
+      const detail =
+        typeof err?.stderr === 'string' && err.stderr.trim() ? err.stderr.trim().split('\n').pop()! : '';
+      throw new GitError(
+        'not_a_repo',
+        detail ? `${cwd} is not a git repository (${detail.slice(0, 160)})` : `${cwd} is not a git repository`,
+        400,
+      );
+    }
     if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') {
       throw new GitError('git_missing', 'git binary not found on the server', 500);
     }
@@ -90,6 +100,27 @@ export async function isRepo(cwd: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Current branch name that also works on unborn HEAD (fresh `git init`
+ * with zero commits): `rev-parse --abbrev-ref HEAD` exits 128 there,
+ * but `symbolic-ref --short HEAD` reads the branch from `.git/HEAD`.
+ */
+async function currentBranch(root: string): Promise<string> {
+  try {
+    const { stdout } = await exec('git', ['symbolic-ref', '--short', 'HEAD'], { cwd: root, timeout: 5000 });
+    if (stdout.trim()) return stdout.trim();
+  } catch {
+    // Detached HEAD or old git — fall through to rev-parse.
+  }
+  try {
+    const { stdout } = await runGit(root, ['rev-parse', '--abbrev-ref', 'HEAD'], GIT_TIMEOUT_MS);
+    if (stdout.trim()) return stdout.trim();
+  } catch {
+    // Unborn HEAD on old git — last resort below.
+  }
+  return 'HEAD';
 }
 
 /** Split one porcelain v1 line into staged (X) + worktree (Y) columns. */
@@ -119,8 +150,7 @@ export class RepoGit {
   /** Branch + upstream + ahead/behind + staged/unstaged file list. */
   async status(): Promise<GitStatus | { repo: false; cwd: string }> {
     if (!(await isRepo(this.root))) return { repo: false as const, cwd: this.root };
-    const { stdout: branchOut } = await runGit(this.root, ['rev-parse', '--abbrev-ref', 'HEAD'], GIT_TIMEOUT_MS);
-    const branch = branchOut.trim() || 'HEAD';
+    const branch = await currentBranch(this.root);
     let upstream: string | null = null;
     let ahead = 0;
     let behind = 0;
@@ -166,12 +196,22 @@ export class RepoGit {
     const n = typeof max === 'number' && Number.isFinite(max)
       ? Math.max(1, Math.min(Math.floor(max), GIT_LOG_HARD_MAX))
       : GIT_LOG_DEFAULT_MAX;
-    const { stdout: branchOut } = await runGit(this.root, ['rev-parse', '--abbrev-ref', 'HEAD'], GIT_TIMEOUT_MS);
-    const { stdout } = await runGit(
-      this.root,
-      ['log', `-n${n}`, '--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI%x1e'],
-      GIT_TIMEOUT_MS,
-    );
+    const branch = await currentBranch(this.root);
+    let stdout: string;
+    try {
+      ({ stdout } = await runGit(
+        this.root,
+        ['log', `-n${n}`, '--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI%x1e'],
+        GIT_TIMEOUT_MS,
+      ));
+    } catch (e) {
+      // Fresh `git init` with zero commits: `git log` exits 128 ("does not
+      // have any commits yet") — that is an empty log, not a missing repo.
+      if (e instanceof GitError && /does not have any commits yet/.test(e.message)) {
+        return { branch, commits: [] };
+      }
+      throw e;
+    }
     const commits: GitLogEntry[] = [];
     for (const record of stdout.split('\x1e')) {
       const [hash, short, message, author, date] = record.split('\x1f');
@@ -184,7 +224,7 @@ export class RepoGit {
         date: (date ?? '').trim(),
       });
     }
-    return { branch: branchOut.trim() || 'HEAD', commits };
+    return { branch, commits };
   }
 
   /**

@@ -113,9 +113,17 @@ export class SessionStore {
   /**
    * Rewind a session — truncates the transcript to its first `keepLines`
    * lines (server-side checkpoint restore, not just UI scroll).
+   * Unknown ids throw `session_not_found` (same convention as merge/GET) —
+   * rewinding must never mint an empty transcript file for a bogus id.
    */
   async rewind(sessionId: string, keepLines: number): Promise<{ id: string; kept: number }> {
-    const messages = await this.read(sessionId);
+    const [messages, meta] = await Promise.all([this.read(sessionId), this.readMeta(sessionId)]);
+    if (messages.length === 0 && meta == null) {
+      throw Object.assign(new Error(`No transcript for ${sessionId}`), {
+        statusCode: 404,
+        code: 'session_not_found',
+      });
+    }
     const kept = messages.slice(0, Math.max(0, Math.floor(keepLines)));
     await writeFile(
       sessionPath(this.cwd, sessionId),
@@ -202,7 +210,10 @@ export class SessionStore {
     if (!createdAt || !updatedAt) {
       try {
         const info = await stat(sessionPath(this.cwd, sessionId));
-        createdAt = createdAt ?? info.birthtime.toISOString();
+        // Bun reports birthtimeMs 0 (no btime support) — epoch is never a
+        // real creation date, so fall back to mtime on runtimes without btime.
+        const birthMs = typeof info.birthtimeMs === 'number' ? info.birthtimeMs : 0;
+        createdAt = createdAt ?? (birthMs > 0 ? info.birthtime.toISOString() : info.mtime.toISOString());
         updatedAt = updatedAt ?? info.mtime.toISOString();
       } catch {
         // Brand-new session whose file is not flushed yet — fall back to now.

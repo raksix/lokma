@@ -761,9 +761,14 @@
 - **Scope:** ALL ~150 endpoints across 28 route files probed live against PM2 `lokma-server` :3456 — session lifecycle (create/rename/WS handshake/delete) + terminal lifecycle + vault/memory/files write round-trips (unique names, full cleanup) + validation/auth negative matrix. First pass showed 7 mismatches, all wrong probe expectations (verified against source, 20/20 corrective probes green): memory takes `{content}/{old_text}` body, files/git are `?cwd`-jailed (absolute paths correctly 400), bogus cron GET correctly 404, projects anon-200 + POST-403 is the documented unbootstrapped single-user design (auth.ts:243-259), empty git push is the pane push button (up-to-date, harmless).
 - **Gates:** sweep 170 pass + corrective 20/20 · residue audit clean (0 sweep sessions, 0 sweep vault hits) · server error log EMPTY (0 level>=40) · tree clean, PM2 untouched (no code changed, no restart).
 
+### 2026-09-05 — TEST LOOP area B run 2: browser flows, FULLY GREEN (docs-only, no code commit)
+- **Scope:** headless Chromium click-through of the RUNNING app (working recipe: `NODE_PATH=/root/test-hermes/node_modules` playwright-core + chromium-1234 under `--no-sandbox`, basic-auth creds file, fresh context, domcontentloaded + 6s settle) — 23/23 Inspector tabs clickable, 0 pageerrors / 0 console errors / 0 failed requests on every click; fresh-boot session-404 storm fix (B run 1) holds with sess404count 0.
+- **Live-data asserts (all green):** Providers (8 providers, Anthropic 3 models) · Models (7/7 enabled toggles) · Bots (Lokma CEO Featured, Mine 2) · Cron (0/0 enabled + approvals) · Usage (real 7d 282 in / 274 out + cost) · Git (main, clean tree, 1 worktree — matches live `git status`) · Design Studio (DESIGN.md, 6 types) · `1 msg` fix holds (zero `1 msgs`) · 8 real sessions listed with transcripts · composer present · zero mock hits.
+- **Flows:** scoped Design-tab click switches pane correctly; New Session 8→9 with new session visible; no leak from tab clicks (9→9). One probe artifact from an UNSCOPED `getByRole(name:'Design')` matching the tiling starter card (app correctly created a real session with the card brief — probe bug, not app bug; lesson: scope tab clicks to the inspector `aside`) + one flow-test session — both DELETE-verified, sessions back to 8. Server log 0 level>=40. Tree clean, PM2 untouched (no restart — no code changed).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area A run 2 — backend sweep FULLY GREEN, ~150 endpoint, 0 failure, docs-only, sıradaki alan: B)
-- **Son işlem:** Backend sweep — 28 route dosyası tamamı probelendi, 7 beklenti hatası kaynağa karşı düzeltildi, server log temiz, residue yok, restart yok.
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area B run 2 — browser flows FULLY GREEN, 23/23 tab, 0 hata, docs-only, sıradaki alan: C)
+- **Son işlem:** Browser flows — 23 Inspector sekmesi tıklandı, pane başına canlı veri doğrulandı, New Session akışı çalıştı, probe artıkları silindi, client bug yok, restart yok.
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):

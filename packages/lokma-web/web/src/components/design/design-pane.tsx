@@ -565,7 +565,7 @@ export function DesignPane() {
                 <div className="pt-1 space-y-1">
                   <div className="flex gap-1 flex-wrap items-center">
                     <span className="text-[11px] text-zinc-500">Export:</span>
-                    {(['html', 'zip', 'json', 'png'] as DesignExportFormat[]).map((f) => (
+                    {(['html', 'zip', 'json', 'png', 'webm'] as DesignExportFormat[]).map((f) => (
                       <Button
                         key={f}
                         variant="ghost"
@@ -596,7 +596,8 @@ export function DesignPane() {
                     <span>rasterizes the page with headless Chromium</span>
                   </div>
                   <p className="text-[10px] text-zinc-400">
-                    PDF/PPTX/MP4 need a binary toolchain (headless Chromium / PptxGenJS / ffmpeg) — follow-up.
+                    WebM is a 2s slow-zoom clip (Chromium + ffmpeg). PDF/PPTX/MP4 need a binary toolchain
+                    (PptxGenJS / print-to-PDF / ffmpeg) — follow-up.
                   </p>
                 </div>
               )}

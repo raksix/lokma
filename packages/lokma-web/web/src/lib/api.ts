@@ -549,7 +549,7 @@ export type DesignGuard = {
   message: string;
 };
 export type DesignGuardRes = { ok: boolean; guard: DesignGuard };
-export type DesignExportFormat = 'html' | 'zip' | 'json' | 'png';
+export type DesignExportFormat = 'html' | 'zip' | 'json' | 'png' | 'webm';
 
 // ─── Testing Lab (Plan→Run→Classify→Report over live handlers, W5-19) ───
 

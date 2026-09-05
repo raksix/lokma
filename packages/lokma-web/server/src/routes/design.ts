@@ -6,6 +6,7 @@ import {
   deleteArtifact,
   exportArtifact,
   exportArtifactPng,
+  exportArtifactWebm,
   generateArtifact,
   getArtifact,
   listArtifacts,
@@ -25,9 +26,10 @@ import {
  * `DELETE /api/design/:id` (removes the whole on-disk dir — unknown 404,
  * bad shape 400);
  * `POST /api/design/:id/critique` (re-runs the 5D heuristic, always 200);
- * `GET /api/design/:id/export?format=html|zip|json|png[&scale=1|2]` (real
+ * `GET /api/design/:id/export?format=html|zip|json|png|webm[&scale=1|2]` (real
  * file downloads — PNG rasterizes the stored HTML with headless Chromium,
- * answering `needs_toolchain` 400 when no browser is installed;
+ * WebM encodes a 2s slow-zoom clip with Chromium + ffmpeg, both answering
+ * `needs_toolchain` 400 when a binary is missing;
  * pdf/pptx/mp4 need a binary toolchain and answer 400 `needs_toolchain`,
  * so the pane only offers what exists here; no dead buttons);
  * `GET /api/design/:id/view` (stable viewer URL — the pane iframes this;
@@ -125,6 +127,17 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
           .header('X-Image-Width', String(png.width))
           .header('X-Image-Height', String(png.height))
           .send(png.body);
+      }
+      if (query.format === 'webm') {
+        const webm = await exportArtifactWebm(id);
+        return reply
+          .header('Content-Type', webm.contentType)
+          .header('Content-Disposition', `attachment; filename="${webm.filename}"`)
+          .header('X-Video-Width', String(webm.width))
+          .header('X-Video-Height', String(webm.height))
+          .header('X-Video-Fps', String(webm.fps))
+          .header('X-Video-Frames', String(webm.frames))
+          .send(webm.body);
       }
       const { filename, contentType, body } = await exportArtifact(id, query.format);
       return reply

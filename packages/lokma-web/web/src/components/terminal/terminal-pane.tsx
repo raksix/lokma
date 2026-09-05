@@ -299,7 +299,7 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
       </div>
 
       {creating ? (
-        <div className="grid shrink-0 grid-cols-1 gap-2 border-b border-white/5 bg-[#161618] p-2 sm:grid-cols-2">
+        <div className="grid shrink-0 grid-cols-1 gap-2 border-b border-white/5 bg-[#161618] p-2 @min-[420px]:grid-cols-2">
           <div>
             <label htmlFor="terminal-cwd" className="mb-1 block text-[10px] uppercase tracking-wide text-white/40">
               Working directory
@@ -454,7 +454,7 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
 
       <div className="flex h-6 shrink-0 items-center gap-1 overflow-x-auto border-t border-white/5 bg-[#161618] px-2 text-[10px]">
         <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5">shell · pipes</span>
-        <span className="hidden text-white/30 sm:inline">
+        <span className="hidden text-white/30 @min-[320px]:inline">
           {terminals.filter((t) => t.status === 'running').length}/{terminals.length} live · no pty yet (plain
           scrollback, follow-up: xterm.js)
         </span>

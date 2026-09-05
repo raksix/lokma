@@ -76,7 +76,7 @@ export function ExtrasPane({ onOpenTab }: { onOpenTab?: (tab: ExtrasTabId) => vo
       <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0 overflow-x-auto">
         <Star className="w-3 h-3 text-amber-500" />
         <span className="text-xs font-semibold">Extras — 23 ranked</span>
-        <span className="ml-1 hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400">
+        <span className="ml-1 hidden @min-[320px]:inline-flex items-center gap-1 text-[11px] text-zinc-400">
           <span className="w-16 h-1.5 rounded-full bg-line overflow-hidden">
             <span className="h-full block bg-terracotta" style={{ width: `${pct}%` }} />
           </span>
@@ -184,7 +184,7 @@ export function ExtrasPane({ onOpenTab }: { onOpenTab?: (tab: ExtrasTabId) => vo
         <span className="flex items-center gap-1">
           <Crown className="w-3 h-3" /> Phase 3 stretch — pick by value for coding harness
         </span>
-        <span className="ml-auto hidden sm:inline">Highest value: #1 templates · #3 eval · #4 fork · #5 cron · #6 approvals · #7 observability</span>
+        <span className="ml-auto hidden @min-[320px]:inline">Highest value: #1 templates · #3 eval · #4 fork · #5 cron · #6 approvals · #7 observability</span>
         <span className="w-full text-zinc-400">Toggles persist to ~/.lokma/config.json → features (same file the CLI reads); the runner wave lights them up.</span>
       </div>
     </div>

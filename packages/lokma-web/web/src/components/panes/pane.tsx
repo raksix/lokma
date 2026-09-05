@@ -708,9 +708,11 @@ function PaneTabContent({
   if (tab.kind === 'session' && tab.sessionId) {
     return <ChatWithSocket key={tab.sessionId} sessionId={tab.sessionId} />;
   }
+  // @container mirrors the Inspector sidebar so the same pane hides its
+  // subtitles/grids only when the tiling pane itself is narrow.
   if (tab.kind === 'inspector' && tab.inspectorId) {
     return (
-      <div className="h-full overflow-auto p-2">
+      <div className="h-full overflow-auto p-2 @container">
         <InspectorHost tab={tab.inspectorId} sessionId={ctx.sessionId} ws={ctx.ws} onOpenSession={onOpenSession} onOpenInspectorTab={onOpenInspectorTab} />
       </div>
     );

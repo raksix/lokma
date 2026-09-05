@@ -209,7 +209,7 @@ export function SetupPane() {
       <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0 overflow-x-auto">
         <HardDrive className="w-3 h-3 text-terracotta" />
         <span className="text-xs font-semibold">Setup</span>
-        <span className="ml-1 text-[11px] text-zinc-400 hidden sm:inline">lokma init · optional stack · lokma doctor · cloud transfer</span>
+        <span className="ml-1 text-[11px] text-zinc-400 hidden @min-[320px]:inline">lokma init · optional stack · lokma doctor · cloud transfer</span>
         <span className="ml-auto flex shrink-0 gap-1">
           <Button variant={step === 1 ? 'default' : 'ghost'} size="sm" className="h-5 px-2 text-[11px]" onClick={() => setStep(1)}>
             1 Init
@@ -236,7 +236,7 @@ export function SetupPane() {
               Pick the optional stack — the Ink TUI checkboxes, on the web. Everything is optional and can be changed later
               with <code className="px-1 py-0 rounded bg-white/10 border border-white/10">lokma setup</code>.
             </p>
-            <div className="mt-3 flex gap-1.5">
+            <div className="mt-3 flex flex-wrap gap-1.5">
               <Button size="sm" className="h-7 text-xs bg-white text-black hover:bg-white/90" onClick={() => setStep(2)}>
                 Start — pick the stack →
               </Button>
@@ -264,7 +264,7 @@ export function SetupPane() {
           </div>
           <div className="rounded-lg bg-white dark:bg-[#1E1E21] border border-line p-3">
             <div className="text-xs font-medium">What does it create?</div>
-            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs font-mono">
+            <div className="mt-2 grid grid-cols-1 @min-[420px]:grid-cols-2 gap-1.5 text-xs font-mono">
               {CREATED_FILES.map((f) => (
                 <span key={f} className="px-2 py-1.5 rounded bg-muted border border-line/60">
                   {f}

@@ -153,7 +153,7 @@ function AgentRow({
         </div>
         <div className="mt-1 flex items-center gap-2 text-[11px] text-zinc-400">
           <span>{formatBudget(agent.budgetTokens, agent.budgetUsd)}</span>
-          {agent.cwd ? <span className="truncate hidden sm:inline">{agent.cwd}</span> : null}
+          {agent.cwd ? <span className="truncate hidden @min-[320px]:inline">{agent.cwd}</span> : null}
         </div>
       </div>
     </button>
@@ -244,7 +244,7 @@ export function AgentsPane() {
         <span className="ml-1 px-1.5 py-0.5 rounded-full bg-terracotta text-white text-[10px]">
           {running} running · {rows.length} total
         </span>
-        <span className="hidden sm:inline ml-1 text-[11px] text-zinc-400">SOUL · MEMORY · model · caps · queue</span>
+        <span className="hidden @min-[320px]:inline ml-1 text-[11px] text-zinc-400">SOUL · MEMORY · model · caps · queue</span>
         <Button size="sm" className="ml-auto h-5 text-[11px] gap-1" onClick={() => setDialogOpen(true)}>
           <Plus className="w-3 h-3" /> Create
         </Button>
@@ -416,7 +416,7 @@ export function AgentsPane() {
               <div className="p-2 space-y-2">
                 <div className="rounded-lg border border-line bg-white dark:bg-[#1E1E21] p-2.5">
                   <div className="text-xs font-medium">Name · model · budgets</div>
-                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="mt-2 grid grid-cols-1 gap-2 @min-[420px]:grid-cols-2">
                     <div>
                       <label
                         htmlFor="hub-edit-name"

@@ -24,7 +24,10 @@ export function Sidebar({
         <span className="text-sm font-medium">{title}</span>
         <Badge variant="outline" className="ml-auto text-[10px]">{side}</Badge>
       </div>
-      <div className="flex-1 overflow-auto p-3">{children}</div>
+      {/* @container: Inspector panes use container queries (@min-*) instead of
+          viewport sm: so subtitles/grids adapt to this 280px column even on
+          wide viewports (area C run 3: sm:inline subtitles overflowed). */}
+      <div className="flex-1 overflow-auto p-3 @container">{children}</div>
     </aside>
   );
 }

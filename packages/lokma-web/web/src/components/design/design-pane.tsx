@@ -302,7 +302,7 @@ export function DesignPane() {
       <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0">
         <Paintbrush className="w-3 h-3 text-terracotta" />
         <span className="text-xs font-semibold">Design Studio</span>
-        <span className="ml-1 text-[11px] text-zinc-400 hidden sm:inline">
+        <span className="ml-1 text-[11px] text-zinc-400 hidden @min-[320px]:inline">
           .lokma/DESIGN.md · 6 types · design-systems/
         </span>
         <span className="ml-auto flex gap-1 items-center">
@@ -386,7 +386,7 @@ export function DesignPane() {
 
       <div className="px-2 pt-2 shrink-0 space-y-1.5">
         <div className="flex gap-1 flex-wrap items-center">
-          <span className="text-[11px] text-zinc-500 hidden sm:inline-flex items-center gap-1">
+          <span className="text-[11px] text-zinc-500 hidden @min-[320px]:inline-flex items-center gap-1">
             <Palette className="w-3 h-3" /> DESIGN.md →
           </span>
           {guardBadge && (
@@ -464,10 +464,10 @@ export function DesignPane() {
 
       <div className="flex-1 flex flex-col min-h-0">
         <div className="flex-1 m-2 rounded-lg border border-line bg-[#FAF9F5] dark:bg-[#0F0F11] overflow-hidden relative flex flex-col min-h-[180px]">
-          <div className="h-6 flex items-center gap-1 px-2 border-b border-line/50 bg-white/80 dark:bg-[#1E1E21]/80 text-[11px] shrink-0">
+          <div className="h-6 flex items-center gap-1 px-2 border-b border-line/50 bg-white/80 dark:bg-[#1E1E21]/80 text-[11px] shrink-0 overflow-x-auto">
             <Code2 className="w-3 h-3" />{' '}
             {sel ? `${sel.type} · ${sel.system} · ${formatUpdated(sel.updatedAt)}` : 'No artifact selected'}
-            <span className="ml-auto hidden sm:inline-flex items-center gap-1 text-zinc-400">
+            <span className="ml-auto hidden @min-[320px]:inline-flex items-center gap-1 text-zinc-400">
               sandbox iframe — stored HTML → live preview
             </span>
           </div>
@@ -487,7 +487,7 @@ export function DesignPane() {
             )}
             <div className="absolute top-2 right-2 flex gap-1">
               <span className="px-2 py-1 rounded-full bg-[#262624] text-white text-[10px] font-mono">sandbox</span>
-              {sel && <span className="hidden sm:inline px-2 py-1 rounded-full bg-white border border-line text-[10px]">{sel.type}</span>}
+              {sel && <span className="hidden @min-[320px]:inline px-2 py-1 rounded-full bg-white border border-line text-[10px]">{sel.type}</span>}
             </div>
           </div>
           <div className="shrink-0 border-t border-line bg-muted/20">
@@ -622,7 +622,7 @@ export function DesignPane() {
             <div className="text-xs font-medium flex items-center gap-1">
               <Sparkles className="w-3 h-3" /> 6 artifacts · {systems.length > 0 ? systems.length : 4} systems
             </div>
-            <div className="text-[11px] text-zinc-500 mt-1">
+            <div className="text-[11px] text-zinc-500 mt-1 break-words">
               Prototype/Deck/Mobile/Image/Document/HyperFrame{systemMeta ? ` — ${systemMeta.name} ${systemMeta.preset}` : ''}
             </div>
           </div>

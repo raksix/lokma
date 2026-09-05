@@ -239,7 +239,7 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
           AI visible
         </span>
         {selected ? (
-          <span className="hidden truncate font-mono text-[10px] text-zinc-400 sm:inline" title={selected.cwd ?? ''}>
+          <span className="hidden truncate font-mono text-[10px] text-zinc-400 @min-[420px]:inline" title={selected.cwd ?? ''}>
             · {shortScope(selected.cwd)}
           </span>
         ) : null}
@@ -294,13 +294,13 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
           <Plus className="h-3 w-3" />
           New tab
         </Button>
-        <span className="ml-auto hidden shrink-0 text-[11px] text-zinc-400 sm:inline">
+        <span className="ml-auto hidden shrink-0 text-[11px] text-zinc-400 @min-[420px]:inline">
           browser per agent · worktree-scoped
         </span>
       </div>
 
       {creating ? (
-        <div className="grid shrink-0 grid-cols-1 gap-2 border-b border-line/50 bg-[#FDFCFB] p-2 sm:grid-cols-2 dark:bg-[#161618]">
+        <div className="grid shrink-0 grid-cols-1 gap-2 border-b border-line/50 bg-[#FDFCFB] p-2 @min-[420px]:grid-cols-2 dark:bg-[#161618]">
           <div>
             <label htmlFor="browser-new-url" className="mb-1 block text-[10px] uppercase tracking-wide text-zinc-500">
               Start address (optional)

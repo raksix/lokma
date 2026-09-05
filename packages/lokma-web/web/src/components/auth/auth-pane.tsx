@@ -651,7 +651,7 @@ export function AuthPane() {
         <span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] flex items-center gap-1">
           <Check className="w-3 h-3" /> {me.name} · {me.role}
         </span>
-        <span className="hidden sm:inline ml-1 text-[11px] text-zinc-400">admin/member/viewer · project-scoped</span>
+        <span className="hidden @min-[320px]:inline ml-1 text-[11px] text-zinc-400">admin/member/viewer · project-scoped</span>
         <Button variant="ghost" size="sm" className="ml-auto h-5 text-[11px] gap-1" onClick={doLogout}>
           <LogOut className="w-3 h-3" /> Sign out
         </Button>
@@ -667,7 +667,7 @@ export function AuthPane() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 @min-[520px]:grid-cols-3">
           {ROLES.map((r) => (
             <div key={r.id} className={`rounded-lg border p-2.5 ${roleTone(r.id)}`}>
               <div className="text-xs font-semibold flex items-center gap-1">
@@ -718,7 +718,7 @@ export function AuthPane() {
         <div className="rounded-lg border border-line overflow-hidden">
           <div className="h-7 flex items-center px-3 bg-[#FDFCFB] dark:bg-[#1E1E21] border-b border-line text-xs font-medium gap-2">
             Projects — visibility & members
-            <span className="ml-auto text-[11px] font-normal text-zinc-400 hidden sm:inline">
+            <span className="ml-auto text-[11px] font-normal text-zinc-400 hidden @min-[320px]:inline">
               private default · public → read-only link
             </span>
           </div>

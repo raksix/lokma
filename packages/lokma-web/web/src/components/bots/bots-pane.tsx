@@ -246,7 +246,7 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
       <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0">
         <BotIcon className="w-3 h-3 text-terracotta" />
         <span className="text-xs font-semibold">Bots</span>
-        <span className="ml-1 text-[11px] text-zinc-400 hidden sm:inline">
+        <span className="ml-1 text-[11px] text-zinc-400 hidden @min-[320px]:inline">
           bot.json · persona→bot→agent · Gallery
         </span>
         <Button size="sm" className="ml-auto h-5 text-[11px] gap-1" onClick={() => { setCreateError(null); setShowCreate(true); }}>
@@ -254,7 +254,9 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
         </Button>
       </div>
 
-      <div className="flex items-center gap-1 p-1.5 border-b border-line/60 bg-muted/20 shrink-0">
+      {/* Tab strip scrolls instead of clipping (terminal-pane precedent); the
+          search box hides below 420px containers via its own @min rule. */}
+      <div className="flex items-center gap-1 p-1.5 border-b border-line/60 bg-muted/20 shrink-0 overflow-x-auto">
         {BOT_TABS.map((t) => (
           <Button
             key={t}
@@ -266,7 +268,7 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
             {t} · {counts[t]}
           </Button>
         ))}
-        <div className="relative ml-auto w-[160px] hidden sm:block">
+        <div className="relative ml-auto w-[160px] hidden @min-[420px]:block">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-400" />
           <Input
             aria-label="Search bots"
@@ -288,8 +290,9 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
         />
       )}
 
-      <div className="flex flex-1 min-h-0">
-        <div className="w-[44%] min-w-[180px] border-r border-line flex flex-col overflow-hidden">
+      {/* Narrow containers stack list over detail (same pattern as archify/skills). */}
+      <div className="flex flex-1 min-h-0 @max-[380px]:flex-col @max-[380px]:overflow-auto">
+        <div className="w-[44%] min-w-[180px] border-r border-line flex flex-col overflow-hidden @max-[380px]:w-full @max-[380px]:min-w-0 @max-[380px]:border-r-0 @max-[380px]:border-b @max-[380px]:max-h-72 @max-[380px]:shrink-0">
           <div className="flex-1 overflow-auto p-1.5 space-y-1.5">
             {loading ? (
               <div className="p-6 text-center text-xs text-zinc-400">Loading bots…</div>
@@ -325,7 +328,8 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
                         )}
                       </div>
                       <div className="text-[11px] text-zinc-500 line-clamp-2 leading-4">{b.description}</div>
-                      <div className="mt-1 flex items-center gap-1 text-[11px] text-zinc-400">
+                      {/* Badges wrap instead of forcing the 255px Inspector column wider. */}
+                      <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-zinc-400">
                         <span className="px-1 py-0 rounded bg-muted border border-line">{b.model}</span>
                         <span className="px-1 py-0 rounded bg-muted border border-line">v{b.version}</span>
                         <span className="ml-auto">
@@ -403,7 +407,7 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
                     {confirmDelete === selected.id ? 'Confirm?' : deleting ? 'Deleting…' : 'Delete'}
                   </Button>
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-4">
+                <div className="mt-3 grid grid-cols-2 gap-1 @min-[420px]:grid-cols-4">
                   <Button size="sm" className="h-7 text-xs gap-1" disabled={running} onClick={() => void runSelected()}>
                     <Play className="w-3 h-3" /> {running ? 'Starting…' : 'Run'}
                   </Button>

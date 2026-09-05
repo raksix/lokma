@@ -303,7 +303,7 @@ export function ArchifyPane() {
       <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0">
         <Workflow className="w-3 h-3 text-terracotta" />
         <span className="text-xs font-semibold">Archify</span>
-        <span className="ml-1 text-[11px] text-zinc-400 hidden sm:inline">
+        <span className="ml-1 text-[11px] text-zinc-400 hidden @min-[320px]:inline">
           typed JSON IR → HTML/SVG · 5 types · 4 presets · viewer
         </span>
         {counts && counts.fail === 0 && (
@@ -386,9 +386,11 @@ export function ArchifyPane() {
         </div>
       )}
 
-      <div className="flex flex-1 min-h-0">
+      {/* Narrow Inspector/tiling panes (<380px container) stack list over detail;
+          the fixed min-widths below only apply side-by-side when there is room. */}
+      <div className="flex flex-1 min-h-0 @max-[380px]:flex-col @max-[380px]:overflow-auto">
         {/* Left: list */}
-        <div className="w-[38%] min-w-[200px] border-r border-line flex flex-col overflow-hidden">
+        <div className="w-[38%] min-w-[200px] border-r border-line flex flex-col overflow-hidden @max-[380px]:w-full @max-[380px]:min-w-0 @max-[380px]:border-r-0 @max-[380px]:border-b @max-[380px]:max-h-72 @max-[380px]:shrink-0">
           <div className="p-2 border-b border-line/50 space-y-1.5 shrink-0">
             <div className="flex gap-1 flex-wrap">
               <Button
@@ -514,7 +516,7 @@ export function ArchifyPane() {
           <div className="h-7 flex items-center gap-1 px-2 overflow-x-auto border-b border-line/50 bg-white/80 dark:bg-[#1E1E21]/80 backdrop-blur text-[11px] shrink-0">
             <Eye className="w-3 h-3" /> Viewer — self-contained HTML
             {sel && (
-              <span className="hidden sm:inline text-zinc-400">
+              <span className="hidden @min-[320px]:inline text-zinc-400">
                 · {sel.id} · ? M F / R L + - 0
               </span>
             )}
@@ -622,7 +624,7 @@ export function ArchifyPane() {
                 <div className="absolute bottom-2 left-2 flex gap-1 text-[10px]">
                   <span className="px-1.5 py-0.5 rounded-full bg-[#262624] text-white">{form.preset}</span>
                   {sel && (
-                    <span className="px-1.5 py-0.5 rounded-full bg-white border border-line hidden sm:inline">
+                    <span className="px-1.5 py-0.5 rounded-full bg-white border border-line hidden @min-[320px]:inline">
                       {sel.type} · {sel.theme}
                     </span>
                   )}
@@ -640,7 +642,7 @@ export function ArchifyPane() {
             >
               <GitCompare className="w-3 h-3" /> {showDelta ? 'Hide delta' : 'Compare'}
             </Button>
-            <span className="hidden sm:inline-flex items-center gap-1 text-zinc-500">
+            <span className="hidden @min-[320px]:inline-flex items-center gap-1 text-zinc-500">
               <Share2 className="w-3 h-3" /> 1200×630 share card — #route / #reach
             </span>
             {sel && <span className="ml-auto hidden lg:inline text-zinc-400">~/.lokma/archify/{sel.id}/ir.json → index.html</span>}
@@ -733,7 +735,7 @@ export function ArchifyPane() {
                 )}
                 {tab === 'export' && (
                   <div className="space-y-2">
-                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-1.5 @min-[420px]:grid-cols-2">
                       {[
                         { fmt: 'svg' as const, desc: 'deterministic' },
                         { fmt: 'html' as const, desc: 'self-contained' },

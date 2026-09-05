@@ -70,7 +70,7 @@ function NoteReader({
       <div className="flex items-center gap-1.5 px-2 py-1 border-b border-line/50 text-[11px] shrink-0">
         <GitBranch className="w-3 h-3 text-zinc-400" />
         <span className="font-medium truncate">{note.title}</span>
-        <span className="text-zinc-400 truncate hidden sm:inline">{note.path}</span>
+        <span className="text-zinc-400 truncate hidden @min-[320px]:inline">{note.path}</span>
         {note.provenance ? (
           <span
             title="ingesting agent"
@@ -259,7 +259,7 @@ export function VaultPane() {
       <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0 overflow-x-auto">
         <Folder className="w-3 h-3 text-amber-600" />
         <span className="text-xs font-semibold">Vault</span>
-        <span className="ml-1 text-[11px] text-zinc-400 hidden sm:inline">
+        <span className="ml-1 text-[11px] text-zinc-400 hidden @min-[320px]:inline">
           file vault · {count} notes{folder.trim() ? ` · folder=${folder.trim()}` : ''}
         </span>
         <span className="ml-auto flex shrink-0 gap-1">
@@ -327,7 +327,7 @@ export function VaultPane() {
           onChange={(e) => setFolder(e.target.value)}
           className={`${inputClass} w-36`}
         />
-        <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-500">
+        <span className="hidden @min-[320px]:inline-flex items-center gap-1 text-[11px] text-zinc-500">
           <label htmlFor="vault-depth">depth</label>
           <input
             id="vault-depth"
@@ -535,7 +535,7 @@ export function VaultPane() {
           <div className="p-1.5 border-t border-line/50 bg-white/60 dark:bg-[#1E1E21]/60 text-[11px] text-zinc-500 flex gap-1 flex-wrap shrink-0">
             <span className="px-1.5 py-0.5 rounded bg-white border border-line">[[wikilink]] click → note</span>
             <span className="px-1.5 py-0.5 rounded bg-white border border-line">provenance: agentId</span>
-            <span className="ml-auto hidden sm:inline">FTS5 full-text · {mode === '3d' ? '3D sphere' : '2D circle'}</span>
+            <span className="ml-auto hidden @min-[320px]:inline">FTS5 full-text · {mode === '3d' ? '3D sphere' : '2D circle'}</span>
           </div>
         </div>
       </div>

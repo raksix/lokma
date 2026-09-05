@@ -184,7 +184,7 @@ export function PluginsPane() {
       <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0 overflow-x-auto">
         <Puzzle className="w-3 h-3 text-terracotta" />
         <span className="text-xs font-semibold">Plugins</span>
-        <span className="ml-1 text-[11px] text-zinc-400 hidden sm:inline">
+        <span className="ml-1 text-[11px] text-zinc-400 hidden @min-[320px]:inline">
           Kernel manifest · hot toggle · no restart
         </span>
         <span className="ml-auto flex shrink-0 gap-1">
@@ -415,11 +415,11 @@ export function PluginsPane() {
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold flex items-center gap-1.5 flex-wrap">
                     {plugin.name} <span className="text-[11px] font-normal text-zinc-400">· {plugin.version}</span>
-                    <span className={`hidden sm:inline px-1 py-0 rounded border text-[10px] ${categoryTone(plugin.category)}`}>
+                    <span className={`hidden @min-[320px]:inline px-1 py-0 rounded border text-[10px] ${categoryTone(plugin.category)}`}>
                       {plugin.category}
                     </span>
                     {plugin.source === 'url' && (
-                      <span className="hidden sm:inline px-1 py-0 rounded border text-[10px] bg-muted border-line">url</span>
+                      <span className="hidden @min-[320px]:inline px-1 py-0 rounded border text-[10px] bg-muted border-line">url</span>
                     )}
                     <span
                       className={`w-2 h-2 rounded-full ${plugin.enabled ? 'bg-emerald-500' : 'bg-zinc-300'}`}
@@ -431,7 +431,7 @@ export function PluginsPane() {
                     <span className="flex items-center gap-1">
                       <Layers className="w-3 h-3" /> {plugin.endpoints.length} endpoints
                     </span>
-                    <span className="hidden sm:inline">
+                    <span className="hidden @min-[320px]:inline">
                       {plugin.author} · {plugin.id}
                     </span>
                   </div>
@@ -498,7 +498,7 @@ export function PluginsPane() {
         <span className="flex items-center gap-1">
           <Layers className="w-3 h-3" /> {plugins ? summarizeRegistry(plugins) : 'Kernel: ctx.routes — emit/waterfall/bail'}
         </span>
-        <span className="ml-auto hidden sm:inline">suspend/resume without restart — marketplace is live GitHub search</span>
+        <span className="ml-auto hidden @min-[320px]:inline">suspend/resume without restart — marketplace is live GitHub search</span>
       </div>
     </div>
   );

@@ -176,7 +176,7 @@ export function GitPane({ sessionId }: { sessionId?: string }) {
           </span>
         )}
         {isRepo && (
-          <span className="ml-1 hidden sm:inline text-[11px] text-zinc-400">
+          <span className="ml-1 hidden @min-[320px]:inline text-[11px] text-zinc-400">
             {files.length} changed · {lockedCount} locked · {worktrees.length} worktree{worktrees.length === 1 ? '' : 's'}
           </span>
         )}
@@ -261,7 +261,7 @@ export function GitPane({ sessionId }: { sessionId?: string }) {
                           title={lock ? `locked by ${lock.owner}` : 'unlocked'}
                         />
                         {inWorktree && (
-                          <span className="hidden sm:inline px-1 py-0 rounded text-[10px] border bg-[#EEF2FF] border-[#C7D2FE] text-[#4F46E5]">
+                          <span className="hidden @min-[320px]:inline px-1 py-0 rounded text-[10px] border bg-[#EEF2FF] border-[#C7D2FE] text-[#4F46E5]">
                             worktree
                           </span>
                         )}
@@ -300,7 +300,7 @@ export function GitPane({ sessionId }: { sessionId?: string }) {
             <div className="mx-2 rounded-lg border border-line overflow-hidden">
               <div className="h-7 flex items-center gap-1.5 px-3 bg-[#FDFCFB] dark:bg-[#1E1E21] border-b border-line text-xs font-medium">
                 <GitCommit className="w-3 h-3" /> Log
-                <span className="ml-auto hidden sm:inline text-[11px] font-normal text-zinc-400">
+                <span className="ml-auto hidden @min-[320px]:inline text-[11px] font-normal text-zinc-400">
                   <FolderGit2 className="w-3 h-3 inline" /> {pushLabel(ahead, behind, upstream)}
                 </span>
               </div>
@@ -323,7 +323,7 @@ export function GitPane({ sessionId }: { sessionId?: string }) {
               </div>
             </div>
 
-            <div className="m-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="m-2 grid grid-cols-1 gap-2 @min-[420px]:grid-cols-2">
               <div className="rounded-lg border border-line bg-white dark:bg-[#1E1E21] p-2.5">
                 <div className="text-xs font-medium flex items-center gap-1">
                   <GitMerge className="w-3 h-3 text-terracotta" /> Merge — coordinator
@@ -357,7 +357,7 @@ export function GitPane({ sessionId }: { sessionId?: string }) {
                     if (e.key === 'Enter') void runCommit();
                   }}
                   placeholder="feat(web): what changed"
-                  className="flex-1 h-7 px-2 text-xs rounded-md border border-line bg-white dark:bg-[#1E1E21] placeholder:text-zinc-400"
+                  className="flex-1 min-w-0 h-7 px-2 text-xs rounded-md border border-line bg-white dark:bg-[#1E1E21] placeholder:text-zinc-400"
                 />
                 <Button size="sm" className="h-7 text-xs" disabled={busy !== null} onClick={() => void runCommit()}>
                   {busy === 'commit' ? 'Committing…' : 'Commit'}

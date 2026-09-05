@@ -54,7 +54,7 @@ export function SettingsPane() {
       <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-line bg-[#FDFCFB] px-3 dark:bg-[#1E1E21]">
         <Settings className="h-3 w-3 text-zinc-500" />
         <span className="text-xs font-semibold">Settings</span>
-        <span className="ml-1 hidden text-[11px] text-zinc-400 sm:inline">config · appearance · perms · mcp</span>
+        <span className="ml-1 hidden text-[11px] text-zinc-400 @min-[320px]:inline">config · appearance · perms · mcp</span>
       </div>
 
       <div className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-line/60 bg-muted/20 p-1.5">

@@ -166,7 +166,7 @@ export function PermissionsPane({ config, onReload }: { config: NormalizedConfig
               <div key={`${h.event}-${h.matcher}-${i}`} className="flex items-center gap-2 px-2 py-1.5 font-mono text-[11px]">
                 <span className="rounded border border-line bg-muted px-1.5 py-0.5">{h.event}</span>
                 <span className="text-zinc-500">{h.matcher}</span>
-                <span className="ml-auto hidden truncate sm:inline">{h.command}</span>
+                <span className="ml-auto hidden truncate @min-[320px]:inline">{h.command}</span>
                 <button
                   onClick={() => removeHook(i)}
                   disabled={saving}
@@ -179,7 +179,7 @@ export function PermissionsPane({ config, onReload }: { config: NormalizedConfig
             ))}
           </div>
         )}
-        <div className="mt-1.5 grid grid-cols-1 gap-1 sm:grid-cols-[110px_1fr]">
+        <div className="mt-1.5 grid grid-cols-1 gap-1 @min-[420px]:grid-cols-[110px_1fr]">
           <Input value={hookEvent} onChange={(e) => setHookEvent(e.target.value)} placeholder="PostToolUse" aria-label="Hook event" className="h-7 font-mono text-[11px]" />
           <Input value={hookMatcher} onChange={(e) => setHookMatcher(e.target.value)} placeholder="Edit|Write" aria-label="Hook matcher" className="h-7 font-mono text-[11px]" />
         </div>

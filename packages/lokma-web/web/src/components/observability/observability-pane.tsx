@@ -37,7 +37,7 @@ function TraceRow({ ev, baseTs, agentId }: { ev: TraceEventView; baseTs: string;
       <span className="text-white/40 w-10 shrink-0">{formatElapsed(ev.ts, baseTs)}</span>
       <span className={`px-1 py-0 rounded text-[10px] border shrink-0 max-w-[180px] truncate ${agentBadge(agentId)}`} title={agentId}>{agentId}</span>
       <span className="px-1 py-0 rounded bg-white/5 border border-white/10 text-white/80 max-w-[180px] truncate" title={ev.kind}>{ev.kind}</span>
-      <span className="text-white/60 truncate flex-1 hidden sm:inline" title={ev.detail ?? ev.label}>
+      <span className="text-white/60 truncate flex-1 hidden @min-[320px]:inline" title={ev.detail ?? ev.label}>
         {ev.label}
         {ev.detail ? ` — ${ev.detail}` : ''}
       </span>
@@ -279,10 +279,10 @@ export function ObservabilityPane() {
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-[#161618] rounded-lg overflow-hidden border border-line">
-      <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0">
+      <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0 overflow-x-auto">
         <Activity className="w-3 h-3 text-terracotta" />
         <span className="text-xs font-semibold">Observability</span>
-        <span className="ml-1 text-[11px] text-zinc-400 hidden sm:inline">trace timeline · per-agent · replay</span>
+        <span className="ml-1 text-[11px] text-zinc-400 hidden @min-[320px]:inline">trace timeline · per-agent · replay</span>
         <span className="ml-auto flex gap-1">
           {(['all', 'agent', 'tool'] as const).map((f) => (
             <Button key={f} variant={filter === f ? 'default' : 'ghost'} size="sm" className="h-5 px-2 text-[11px] capitalize" onClick={() => setFilter(f)}>{f}</Button>
@@ -323,7 +323,9 @@ export function ObservabilityPane() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+        {/* Single column in the narrow Inspector; 3 columns only when the pane
+            itself is wide (viewport sm: cannot tell a 255px pane apart). */}
+        <div className="grid grid-cols-1 gap-1.5 @min-[420px]:grid-cols-3">
           <div className="rounded-lg border border-line bg-white dark:bg-[#1E1E21] p-2.5">
             <div className="text-xs font-medium flex items-center gap-1"><Cpu className="w-3 h-3" /> TokenLedger</div>
             <div className="mt-1 text-[11px] text-zinc-500">
@@ -371,7 +373,7 @@ export function ObservabilityPane() {
                   <span className={`px-1 py-0 rounded border shrink-0 ${r.role === 'user' ? 'bg-terracotta text-white border-terracotta' : r.role === 'tool' ? 'bg-zinc-700 text-white border-zinc-600' : 'bg-white/5 text-white/80 border-white/10'}`}>{r.toolName ?? r.role}</span>
                   <button
                     type="button"
-                    className="text-white/60 truncate flex-1 text-left hidden sm:inline hover:text-white/90"
+                    className="text-white/60 truncate flex-1 text-left hidden @min-[320px]:inline hover:text-white/90"
                     title={expanded[i] ? 'Collapse' : 'Expand full text'}
                     onClick={() => setExpanded((prev) => ({ ...prev, [i]: !prev[i] }))}
                   >
@@ -402,7 +404,7 @@ export function ObservabilityPane() {
                 <div key={s.token} className="flex items-center gap-2 rounded bg-white dark:bg-[#1E1E21] border border-line px-2 py-1">
                   <span className="text-[10px] px-1 rounded bg-white/5 border border-line text-zinc-500">{s.kind}</span>
                   <span className="text-[11px] font-medium truncate min-w-0">{s.title}</span>
-                  <span className="hidden sm:inline text-[10px] text-zinc-400 shrink-0">{s.size} {s.kind === 'agent' ? 'events' : 'rows'} · {formatAge(s.createdAt)}</span>
+                  <span className="hidden @min-[320px]:inline text-[10px] text-zinc-400 shrink-0">{s.size} {s.kind === 'agent' ? 'events' : 'rows'} · {formatAge(s.createdAt)}</span>
                   <code className="hidden md:inline px-1 py-0 rounded bg-white dark:bg-[#161618] border border-line text-[10px] text-zinc-500 truncate">/share/{s.token}</code>
                   <span className="ml-auto flex gap-1 shrink-0">
                     <Button variant="ghost" size="sm" className="h-5 text-[11px]" onClick={() => void openShare(s.token)}>Open</Button>
@@ -427,7 +429,7 @@ export function ObservabilityPane() {
                 ? opened.replay.slice(0, 200).map((r, i) => (
                   <div key={i} className="flex gap-2">
                     <span className={`px-1 py-0 rounded border shrink-0 ${r.role === 'user' ? 'bg-terracotta text-white border-terracotta' : r.role === 'tool' ? 'bg-zinc-700 text-white border-zinc-600' : 'bg-white/5 text-white/80 border-white/10'}`}>{r.toolName ?? r.role}</span>
-                    <span className="text-white/60 truncate flex-1 hidden sm:inline" title={r.content}>{replayExcerpt(r.content)}</span>
+                    <span className="text-white/60 truncate flex-1 hidden @min-[320px]:inline" title={r.content}>{replayExcerpt(r.content)}</span>
                   </div>
                 ))
                 : (opened.events ?? []).map((ev, i) => (

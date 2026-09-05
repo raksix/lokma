@@ -215,7 +215,7 @@ export function SkillsPane() {
       <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0">
         <Puzzle className="w-3 h-3 text-terracotta" />
         <span className="text-xs font-semibold">Skills</span>
-        <span className="ml-1 text-[11px] text-zinc-400 hidden sm:inline">
+        <span className="ml-1 text-[11px] text-zinc-400 hidden @min-[320px]:inline">
           auto-discovery · Use when · skill_view · curator
         </span>
         <span className="ml-auto flex gap-1">
@@ -230,8 +230,9 @@ export function SkillsPane() {
         </span>
       </div>
 
-      <div className="flex flex-1 min-h-0">
-        <div className="w-[42%] min-w-[180px] border-r border-line flex flex-col">
+      {/* Narrow containers stack list over detail (same pattern as archify/bots). */}
+      <div className="flex flex-1 min-h-0 @max-[380px]:flex-col @max-[380px]:overflow-auto">
+        <div className="w-[42%] min-w-[180px] border-r border-line flex flex-col @max-[380px]:w-full @max-[380px]:min-w-0 @max-[380px]:border-r-0 @max-[380px]:border-b @max-[380px]:max-h-72 @max-[380px]:shrink-0">
           <div className="p-2 border-b border-line/50">
             <label htmlFor="skills-search" className="sr-only">
               Search skills
@@ -280,11 +281,11 @@ export function SkillsPane() {
                   className={`w-full text-left p-2 rounded-md border flex gap-2 transition ${selected === s.id ? 'bg-[#FDF0E6] border-[#F2D5C2] dark:bg-[#2A1E15] dark:border-[#3A2A1A]' : 'bg-white dark:bg-[#1E1E21] border-line hover:border-terracotta/20'}`}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium truncate flex items-center gap-1">
-                      {s.name}
-                      <SourceBadge source={s.source} />
+                    <div className="text-xs font-medium flex items-center gap-1 min-w-0">
+                      <span className="truncate" title={s.name}>{s.name}</span>
+                      <span className="shrink-0"><SourceBadge source={s.source} /></span>
                     </div>
-                    <div className="text-[11px] text-zinc-500 truncate">{s.description}</div>
+                    <div className="text-[11px] text-zinc-500 truncate" title={s.description}>{s.description}</div>
                     <div className="text-[11px] text-zinc-400 flex items-center gap-1 mt-0.5">
                       <History className="w-3 h-3" /> {formatUsage(usage[s.id] ?? usage[s.name])}
                     </div>

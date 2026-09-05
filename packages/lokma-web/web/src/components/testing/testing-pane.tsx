@@ -209,7 +209,7 @@ export function TestingPane() {
       <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0">
         <Beaker className="w-3 h-3 text-terracotta" />
         <span className="text-xs font-semibold">Testing Lab</span>
-        <span className="ml-1 text-[11px] text-zinc-400 hidden sm:inline">
+        <span className="ml-1 text-[11px] text-zinc-400 hidden @min-[320px]:inline">
           TestSprite-inspired · 6-stage · live handlers · Shannon
         </span>
         <Button size="sm" className="ml-auto h-5 text-[11px] gap-1" onClick={() => setShowForm((v) => !v)}>
@@ -300,9 +300,9 @@ export function TestingPane() {
         </div>
       )}
 
-      <div className="flex items-center gap-1 px-2 py-1.5 border-b border-line/50 shrink-0">
-        <span className="text-xs font-medium">Runs</span>
-        <span className="text-[11px] text-zinc-400">~/.lokma/test-runs/&lt;id&gt;/ (plan.json + report.json + junit.xml)</span>
+      <div className="flex items-center gap-1 px-2 py-1.5 border-b border-line/50 shrink-0 overflow-x-auto">
+        <span className="text-xs font-medium shrink-0">Runs</span>
+        <span className="text-[11px] text-zinc-400 hidden @min-[420px]:inline whitespace-nowrap">~/.lokma/test-runs/&lt;id&gt;/ (plan.json + report.json + junit.xml)</span>
         <span className="ml-auto flex items-center gap-1">
           <span className="relative">
             <Search className="w-3 h-3 absolute left-1.5 top-1/2 -translate-y-1/2 text-zinc-400" />

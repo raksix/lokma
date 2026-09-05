@@ -98,7 +98,7 @@ export function UsagePane({ onOpenSession }: { onOpenSession?: (id: string) => v
       <div className="flex h-7 shrink-0 items-center gap-1.5 overflow-x-auto border-b border-line bg-[#FDFCFB] px-3 dark:bg-[#1E1E21]">
         <BarChart3 className="h-3 w-3 text-terracotta" />
         <span className="text-xs font-semibold">Usage</span>
-        <span className="hidden sm:inline text-[11px] text-zinc-400">tokens · cost · by model</span>
+        <span className="hidden @min-[320px]:inline text-[11px] text-zinc-400">tokens · cost · by model</span>
         <span className="ml-auto flex shrink-0 items-center gap-1">
           {RANGES.map((r) => (
             <Button
@@ -151,7 +151,7 @@ export function UsagePane({ onOpenSession }: { onOpenSession?: (id: string) => v
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-2 p-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-2 p-2 @min-[420px]:grid-cols-2 @min-[720px]:grid-cols-4">
               {kpis.map((k) => (
                 <div
                   key={k.label}
@@ -162,7 +162,7 @@ export function UsagePane({ onOpenSession }: { onOpenSession?: (id: string) => v
                     <span className="ml-auto rounded bg-terracotta px-1 py-0 text-[11px] text-white">{range}</span>
                   </div>
                   <div className="mt-1 flex items-baseline gap-1 text-[18px] font-semibold tracking-tight">
-                    {k.value} <TrendingUp className="hidden h-3 w-3 text-emerald-500 sm:block" />
+                    {k.value} <TrendingUp className="hidden h-3 w-3 text-emerald-500 @min-[420px]:block" />
                   </div>
                   <div className="mt-0.5 text-[11px] text-zinc-400">{k.hint}</div>
                 </div>
@@ -222,7 +222,7 @@ export function UsagePane({ onOpenSession }: { onOpenSession?: (id: string) => v
                 <span className="ml-2 text-[11px] font-normal text-zinc-400">
                   {sessions.length} · click → session
                 </span>
-                <span className="ml-auto hidden text-[11px] font-normal text-zinc-400 sm:inline">model · cost</span>
+                <span className="ml-auto hidden text-[11px] font-normal text-zinc-400 @min-[420px]:inline">model · cost</span>
               </div>
               <div className="divide-y divide-line/60">
                 {sessions.map((s) => (
@@ -234,7 +234,7 @@ export function UsagePane({ onOpenSession }: { onOpenSession?: (id: string) => v
                   >
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
                     <span className="flex-1 truncate text-xs font-medium">{s.title}</span>
-                    <span className="hidden rounded-full border border-line bg-muted px-1.5 py-0.5 text-[10px] sm:inline-flex">
+                    <span className="hidden rounded-full border border-line bg-muted px-1.5 py-0.5 text-[10px] @min-[420px]:inline-flex">
                       {shortModel(s.model)}
                     </span>
                     <span className="hidden text-[11px] text-zinc-500 md:inline">{formatTokens(s.tokens)}</span>

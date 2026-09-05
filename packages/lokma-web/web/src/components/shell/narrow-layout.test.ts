@@ -57,6 +57,11 @@ const ALLOW_FIXED_GRIDS: Array<{ file: string; snippet: string; reason: string }
     snippet: 'grid-cols-[28px_1fr_90px_60px]',
     reason: 'model rows: flexible 1fr column with truncate + title tooltip',
   },
+  {
+    file: `bots${sep}bots-pane.tsx`,
+    snippet: 'grid grid-cols-2 gap-1 @min-[420px]:grid-cols-4',
+    reason: 'Run/Fork/Publish/bot.json actions: 2 columns fit the 255px Inspector, 4 only in wide panes (container query, area C run 3)',
+  },
 ];
 
 function collectTsx(dir: string, out: string[]): void {

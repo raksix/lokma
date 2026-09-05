@@ -105,7 +105,8 @@ function ProviderRow({
           title={status === 'idle' ? 'never tested' : status}
         />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 text-xs font-semibold">
+          {/* Badges wrap instead of overflowing the narrow Inspector column. */}
+          <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
             {provider.name}
             <span className="text-[11px] font-normal text-zinc-400">
               · {modelCount} model{modelCount === 1 ? '' : 's'}

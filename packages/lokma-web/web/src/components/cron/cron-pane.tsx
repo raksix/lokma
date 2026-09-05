@@ -224,7 +224,7 @@ export function CronApprovalsPane() {
       <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0">
         <Clock3 className="w-3 h-3 text-terracotta" />
         <span className="text-xs font-semibold">Cron & Approvals</span>
-        <span className="ml-1 text-[11px] text-zinc-400 hidden sm:inline">#5 per-agent cron · #6 human-in-the-loop</span>
+        <span className="ml-1 text-[11px] text-zinc-400 hidden @min-[320px]:inline">#5 per-agent cron · #6 human-in-the-loop</span>
         <Button variant="ghost" size="sm" className="ml-auto h-5 w-5 p-0" onClick={() => void load()} title="Reload cron jobs and approvals" aria-label="Reload cron jobs and approvals">
           <RefreshCw className="w-3 h-3" />
         </Button>
@@ -291,7 +291,7 @@ export function CronApprovalsPane() {
                         <div className="text-xs font-mono font-medium flex items-center gap-1.5 flex-wrap">
                           {job.schedule}{' '}
                           <span className="px-1 py-0 rounded bg-muted border border-line text-[11px] font-sans">{job.agentId}</span>
-                          <span className="text-[11px] font-normal text-zinc-400 hidden sm:inline">{formatNextRun(job)}</span>
+                          <span className="text-[11px] font-normal text-zinc-400 hidden @min-[320px]:inline">{formatNextRun(job)}</span>
                         </div>
                         <div className="text-xs text-zinc-500 truncate">{job.task} · id: {job.id} · {formatLastRun(job)}</div>
                       </div>

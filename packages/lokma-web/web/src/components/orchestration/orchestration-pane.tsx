@@ -247,7 +247,7 @@ export function OrchestrationPane() {
           <Button
             variant="ghost"
             size="sm"
-            className="h-5 text-[11px] hidden sm:inline-flex gap-1"
+            className="h-5 text-[11px] hidden @min-[320px]:inline-flex gap-1"
             title="Create N agents from one template (real POST /api/agents each)"
             onClick={() => setFanoutOpen((v) => !v)}
           >
@@ -334,7 +334,7 @@ export function OrchestrationPane() {
             <p className="mt-0.5 text-[11px] text-zinc-500">
               One real registry entry per member (same validation as the Hub). {remaining} slot{remaining === 1 ? '' : 's'} left.
             </p>
-            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="mt-2 grid grid-cols-1 gap-2 @min-[420px]:grid-cols-2">
               <div>
                 <label htmlFor="fanout-stem" className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
                   Name stem

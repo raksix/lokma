@@ -87,6 +87,7 @@ export function CodeBlock({
           onClick={() => onCopy(code)}
           className="grid h-5 w-5 place-items-center rounded text-white/60 hover:bg-white/10 hover:text-white"
           title="Copy code"
+          aria-label="Copy code block"
         >
           <Copy className="h-3 w-3" />
         </button>

@@ -19,11 +19,14 @@ import {
   OfflineBanner,
   PaneErrorBoundary,
   SearchModal,
+  ShortcutsDialog,
+  SHOW_SHORTCUTS_EVENT,
   ToastHost,
   anyDrawerOpen,
   closeAllSidebars,
   emitToast,
   initialSidebarVisibility,
+  isEditableTarget,
   mobileQuery,
   nextSidebarVisibility,
   useIsMobile,
@@ -34,8 +37,9 @@ import {
 /**
  * AppShell — harness frame: Header + sidebars + chat + footer.
  * Owns the single WS socket (status/cost feed the Header and the offline
- * banner), the session list (sessionStore cache), and the global shortcuts:
- * Ctrl/Cmd+K search, Ctrl+M model switch, `[`/`]` sidebars, Esc closes.
+ * banner), the session list (sessionStore cache), and the global shortcuts
+ * (SHORTCUTS registry: Ctrl/Cmd+K search, Ctrl+M model switch, `[`/`]`
+ * sidebars, `?` help, Esc closes).
  *
  * Responsive (Phase 3 mobile): below the `md` breakpoint both sidebars
  * become exclusive slide-over drawers over a full-width chat — mobile
@@ -53,6 +57,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     return initialSidebarVisibility(window.matchMedia(mobileQuery()).matches);
   });
   const [searchOpen, setSearchOpen] = React.useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
   const [serverUp, setServerUp] = React.useState<boolean | null>(null);
 
   const ws = useWs(activeId);
@@ -110,7 +115,8 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     [activeId, isMobile, refreshSessions, selectSession],
   );
 
-  // Global shortcuts — search, model switch, sidebar toggles, dismiss.
+  // Global shortcuts — every combo is listed in the SHORTCUTS registry so
+  // the help dialog (`?`) can never drift from what the keys actually do.
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
@@ -132,20 +138,31 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       }
       if (e.key === 'Escape') {
         setSearchOpen(false);
+        setShortcutsOpen(false);
         // Dismiss open drawers first so one keypress always reveals the chat.
         setSidebars((current) => closeAllSidebars(current));
         return;
       }
-      const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
+      if (isEditableTarget(e.target)) {
         return;
       }
       if (e.key === '[') toggleSidebar('left');
       if (e.key === ']') toggleSidebar('right');
+      if (e.key === '?') {
+        e.preventDefault();
+        setShortcutsOpen(true);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [isMobile, toggleSidebar]);
+
+  // Footer hint + panes open the dialog through this event (no prop drilling).
+  React.useEffect(() => {
+    const open = () => setShortcutsOpen(true);
+    window.addEventListener(SHOW_SHORTCUTS_EVENT, open);
+    return () => window.removeEventListener(SHOW_SHORTCUTS_EVENT, open);
+  }, []);
 
   const explorerContent = (
     <div className="space-y-4">
@@ -167,6 +184,12 @@ export function AppShell({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
+      <a
+        href="#lokma-chat"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-1 focus:left-1 focus:z-[70] focus:rounded-md focus:bg-[#262624] focus:px-3 focus:py-1.5 focus:text-xs focus:text-white"
+      >
+        Skip to chat
+      </a>
       <Header
         sessionId={activeId}
         serverUp={serverUp}
@@ -196,7 +219,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           )
         ) : null}
 
-        <main className="flex min-w-0 flex-1 flex-col overflow-hidden p-2 sm:p-3">
+        <main id="lokma-chat" tabIndex={-1} className="flex min-w-0 flex-1 flex-col overflow-hidden p-2 outline-none sm:p-3">
           <TilingToggle />
           <PaneErrorBoundary paneName="Chat">
             {tiling ? (
@@ -237,6 +260,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           emitToast(`Switched to ${id.slice(0, 24)}`);
         }}
       />
+      <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <ToastHost />
     </div>
   );
@@ -284,6 +308,7 @@ function MobileDrawer({
           onClick={onClose}
           title={`Close ${label}`}
           aria-label={`Close ${label}`}
+          autoFocus
           className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-[#F2F0EB]"
         >
           <X className="h-3.5 w-3.5" />

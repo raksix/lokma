@@ -113,6 +113,7 @@ export function Header({
         <button
           onClick={onToggleLeft}
           title="Toggle left panel ([)"
+          aria-label="Toggle left panel"
           className="grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-[#F2F0EB]"
         >
           <PanelLeft className="h-3.5 w-3.5" />
@@ -170,6 +171,7 @@ export function Header({
           <button
             onClick={flipTheme}
             title="Toggle theme"
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
             className="grid h-7 w-7 place-items-center rounded-md border border-[#E8E4DE] bg-white text-zinc-600 hover:bg-[#F2F0EB]"
           >
             {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
@@ -177,6 +179,7 @@ export function Header({
           <button
             onClick={onSearch}
             title="Search (Ctrl+K)"
+            aria-label="Search (Control K)"
             className="grid h-7 w-7 place-items-center rounded-md border border-[#E8E4DE] bg-white text-zinc-600 hover:bg-[#F2F0EB]"
           >
             <Search className="h-3.5 w-3.5" />
@@ -184,6 +187,7 @@ export function Header({
           <button
             onClick={onToggleRight}
             title="Toggle right panel (])"
+            aria-label="Toggle right panel"
             className="grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-[#F2F0EB]"
           >
             <PanelRight className="h-3.5 w-3.5" />

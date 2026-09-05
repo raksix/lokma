@@ -19,4 +19,13 @@ export {
 export { useIsMobile } from './use-is-mobile';
 export { SearchModal, filterNoteHits, filterSessionHits, type NoteHit } from './search-modal';
 export { ToastHost, TOAST_EVENT, emitToast } from './toast';
+export {
+  SHORTCUTS,
+  SHOW_SHORTCUTS_EVENT,
+  isEditableTarget,
+  requestShortcutsDialog,
+  type ShortcutDef,
+} from './shortcuts';
+export { ShortcutsDialog } from './shortcuts-dialog';
+export { prefersReducedMotion, usePrefersReducedMotion } from './use-prefers-reduced-motion';
 export { applyTheme, applyThemeVars, clearThemeVars, getTheme, toggleTheme, type ShellTheme } from './theme';

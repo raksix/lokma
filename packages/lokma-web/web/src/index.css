@@ -187,3 +187,16 @@ body.resizing .pane { transition:none !important; }
 .dark .pane-divider:hover { background: #3A3A3E !important; }
 .dark [class*="bg-[#FAF9F5]"] input,
 .dark [class*="bg-white"] input { color: #EDE9E2 !important; }
+
+/* Phase 3 a11y — honor the OS "reduce motion" setting: kill smooth
+   scrolling, CSS transitions/animations (the 3D graph auto-rotate is
+   additionally gated in JS via prefersReducedMotion()). */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

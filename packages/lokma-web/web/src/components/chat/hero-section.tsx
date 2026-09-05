@@ -28,8 +28,17 @@ export function HeroSection({ onStart }: { onStart: (prompt: string) => void }) 
         {STARTER_PROMPTS.map((c) => (
           <Card
             key={c.title}
-            className="cursor-pointer p-3 transition-shadow hover:shadow-md"
+            className="cursor-pointer p-3 transition-shadow hover:shadow-md focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
             onClick={() => onStart(c.prompt)}
+            role="button"
+            tabIndex={0}
+            aria-label={`Start: ${c.title} — ${c.desc}`}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onStart(c.prompt);
+              }
+            }}
           >
             <div className="text-xs font-semibold">{c.title}</div>
             <div className="text-xs text-zinc-500">{c.desc}</div>

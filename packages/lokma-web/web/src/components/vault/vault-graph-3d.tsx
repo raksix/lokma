@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Pause, Play, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { prefersReducedMotion } from '@/components/shell/use-prefers-reduced-motion';
 import {
   clampPitch,
   hitTestProjected,
@@ -36,7 +37,7 @@ export function VaultGraph3D({
   const wrapRef = React.useRef<HTMLDivElement | null>(null);
   const [rot, setRot] = React.useState<GraphRotation>({ yaw: 0.6, pitch: 0.35 });
   const [zoom, setZoom] = React.useState(1);
-  const [spinning, setSpinning] = React.useState(true);
+  const [spinning, setSpinning] = React.useState(() => !prefersReducedMotion());
   const [hoverPath, setHoverPath] = React.useState<string | null>(null);
   const dragRef = React.useRef<{ x: number; y: number; yaw: number; pitch: number } | null>(null);
   const stateRef = React.useRef({ rot, zoom, spinning, selected, hoverPath });

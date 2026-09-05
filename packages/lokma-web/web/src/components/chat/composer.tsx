@@ -287,6 +287,7 @@ export function Composer({
                 onClick={() => setText((t) => removeMention(t, p))}
                 className="grid h-3.5 w-3.5 place-items-center rounded-full hover:bg-white/10"
                 title={`Remove @${p}`}
+                aria-label={`Remove @${p} from context`}
               >
                 <X className="h-2.5 w-2.5" />
               </button>
@@ -303,6 +304,8 @@ export function Composer({
               size="sm"
               onClick={() => switchMode('steer')}
               title="Steer — send immediately"
+              aria-label="Steer mode — send immediately"
+              aria-pressed={mode === 'steer'}
               className={cn(
                 'h-6 w-6 rounded-full p-0',
                 mode === 'steer' ? 'bg-white text-ink hover:bg-white' : 'text-white/70 hover:bg-white/10 hover:text-white',
@@ -315,6 +318,8 @@ export function Composer({
               size="sm"
               onClick={() => switchMode('queue')}
               title="Queue — send when the stream finishes"
+              aria-label="Queue mode — send when the stream finishes"
+              aria-pressed={mode === 'queue'}
               className={cn(
                 'h-6 w-6 rounded-full p-0',
                 mode === 'queue' ? 'bg-white text-ink hover:bg-white' : 'text-white/70 hover:bg-white/10 hover:text-white',
@@ -415,6 +420,7 @@ export function Composer({
         <textarea
           ref={taRef}
           rows={1}
+          aria-label="Message Lokma"
           placeholder={socketOpen ? 'Ask Lokma — @file for context, / for commands' : 'Connecting…'}
           value={text}
           disabled={!socketOpen && !(mode === 'queue' && streaming)}
@@ -442,6 +448,7 @@ export function Composer({
                 <button
                   onClick={() => setAttachments((prev) => prev.filter((x) => x.name !== a.name))}
                   className="ml-1 grid h-4 w-4 place-items-center rounded-full hover:bg-black/5"
+                  aria-label={`Remove attachment ${a.name}`}
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -458,6 +465,7 @@ export function Composer({
                   onClick={() => setQueued((prev) => prev.filter((x) => x.key !== q.key))}
                   className="ml-auto grid h-4 w-4 shrink-0 place-items-center rounded-full hover:bg-black/5"
                   title="Remove from queue"
+                  aria-label={`Remove queued message: ${q.text.slice(0, 60)}`}
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -466,7 +474,7 @@ export function Composer({
           </div>
         )}
         <div className="mt-2 flex items-center gap-1.5">
-          <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} title="Attach text files (inlined into the prompt)" className="h-7 w-7 p-0">
+          <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} title="Attach text files (inlined into the prompt)" aria-label="Attach text files (inlined into the prompt)" className="h-7 w-7 p-0">
             <Paperclip className="h-3.5 w-3.5" />
           </Button>
           <input
@@ -485,6 +493,8 @@ export function Composer({
             size="sm"
             onClick={toggleMic}
             title="Dictate"
+            aria-label={recording ? 'Stop dictation' : 'Dictate with microphone'}
+            aria-pressed={recording}
             className={cn('h-7 w-7 p-0', recording && 'animate-pulse border-red-300 text-red-600')}
           >
             <Mic className="h-3.5 w-3.5" />

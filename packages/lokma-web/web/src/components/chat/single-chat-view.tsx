@@ -10,6 +10,12 @@ import {
   ThoughtTrace,
 } from './lokma-message';
 import type { PermissionRequest, QuestionRequest, ToolCallEntry } from '@/lib/ws';
+import { prefersReducedMotion } from '@/components/shell/use-prefers-reduced-motion';
+
+/** Instant jumps when the OS asks for reduced motion, smooth otherwise. */
+function scrollBehavior(): ScrollBehavior {
+  return prefersReducedMotion() ? 'auto' : 'smooth';
+}
 
 /**
  * SingleChatView — transcript ported from the concept chat shell.
@@ -150,19 +156,21 @@ function DotNav({ scrollRef, count }: { scrollRef: React.RefObject<HTMLDivElemen
       {Array.from({ length: Math.min(count, 12) }).map((_, i) => (
         <button
           key={i}
-          onClick={() => document.getElementById(`chat-msg-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+          onClick={() => document.getElementById(`chat-msg-${i}`)?.scrollIntoView({ behavior: scrollBehavior(), block: 'center' })}
           className={cn(
             'h-2 w-2 rounded-full transition hover:scale-[1.4]',
             i === 0 ? 'bg-terracotta shadow' : 'bg-zinc-300 hover:bg-terracotta dark:bg-zinc-600',
           )}
           title={`Message ${i + 1}`}
+          aria-label={`Go to message ${i + 1}`}
         />
       ))}
       <span className="my-1 h-4 w-px bg-line" />
       <button
-        onClick={() => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
+        onClick={() => scrollRef.current?.scrollTo({ top: 0, behavior: scrollBehavior() })}
         className="h-1.5 w-1.5 rounded-full bg-zinc-200 hover:bg-zinc-400 dark:bg-zinc-700"
         title="Back to top"
+        aria-label="Back to top"
       />
     </div>
   );

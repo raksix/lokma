@@ -383,10 +383,10 @@ export function Chat({
       <div className="flex h-9 items-center gap-2 border-b px-3 text-xs text-muted-foreground">
         <span className="font-mono">{sessionId}</span>
         <span className="ml-auto flex items-center gap-1">
-          <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" title="New session" onClick={() => runSlash('new', '')}>
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" title="New session" aria-label="New session" onClick={() => runSlash('new', '')}>
             <Plus className="h-3 w-3" />
           </Button>
-          <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" title="Fork session" onClick={forkHere}>
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" title="Fork session" aria-label="Fork session" onClick={forkHere}>
             <GitFork className="h-3 w-3" />
           </Button>
           <span className="capitalize">{status}</span>
@@ -414,6 +414,9 @@ export function Chat({
         />
       </div>
       <div className="p-3 pt-0">
+        <span role="status" aria-live="polite" className="sr-only">
+          {streaming ? 'Lokma is streaming a response.' : 'Response complete.'}
+        </span>
         <Composer
           model={model}
           streaming={streaming}

@@ -53,13 +53,16 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
-  app.get('/api/sessions/:id', async (req) => {
+  app.get('/api/sessions/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
     assertSessionId(id);
     const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
     const store = new SessionStore(cwd);
     const messages = await store.read(id);
     const meta = await store.readMeta(id);
+    if (messages.length === 0 && meta == null) {
+      return reply.status(404).send({ code: 'session_not_found', message: `No transcript for ${id}` });
+    }
     return { id, cwd, model: meta?.model ?? null, messages, count: messages.length };
   });
 

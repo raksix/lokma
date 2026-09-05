@@ -70,10 +70,10 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
-  app.get('/api/agents/:id', async (req) => {
+  app.get('/api/agents/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
     const agent = await getAgent(id);
-    if (!agent) return { ok: false, error: 'Not found' };
+    if (!agent) return reply.status(404).send({ code: 'agent_not_found', message: `Agent '${id}' not found` });
     return { agent };
   });
 

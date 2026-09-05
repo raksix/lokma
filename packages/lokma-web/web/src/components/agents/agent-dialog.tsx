@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
+import { useFocusTrap } from '@/components/shell/use-focus-trap';
 import { PERSONA_OPTIONS, emptyAgentForm, validateAgentForm, type AgentForm } from './agents';
 
 /**
@@ -29,6 +30,8 @@ export function AgentDialog({
 }) {
   const [form, setForm] = React.useState<AgentForm>(() => emptyAgentForm());
   const [localError, setLocalError] = React.useState<string | null>(null);
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  useFocusTrap(open, panelRef, { onEscape: onClose });
 
   React.useEffect(() => {
     if (open) {
@@ -67,8 +70,15 @@ export function AgentDialog({
     'w-full rounded-md border border-line bg-white px-2 py-1 text-xs text-zinc-800 dark:bg-[#1E1E21] dark:text-zinc-100';
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Create agent"
+    >
       <div
+        ref={panelRef}
         className="w-full max-w-md rounded-lg border border-line bg-white p-4 shadow-xl dark:bg-[#161618]"
         onClick={(e) => e.stopPropagation()}
       >

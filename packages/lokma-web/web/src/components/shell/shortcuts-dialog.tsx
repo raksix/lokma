@@ -1,27 +1,17 @@
 import * as React from 'react';
 import { Keyboard, X } from 'lucide-react';
 import { SHORTCUTS } from './shortcuts';
+import { useFocusTrap } from './use-focus-trap';
 
 /**
  * ShortcutsDialog — lists every global harness shortcut from the single
  * SHORTCUTS registry (never hand-duplicated). Opens on `?`, closes on
- * Escape, backdrop click, or the close button.
+ * Escape, backdrop click, or the close button. Focus is trapped inside
+ * while open (shared `useFocusTrap`).
  */
 export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const closeRef = React.useRef<HTMLButtonElement>(null);
-
-  React.useEffect(() => {
-    if (!open) return;
-    closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [open, onClose]);
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  useFocusTrap(open, panelRef, { onEscape: onClose });
 
   if (!open) return null;
   return (
@@ -33,6 +23,7 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () 
       onClick={onClose}
     >
       <div
+        ref={panelRef}
         className="w-full max-w-sm rounded-xl border border-line bg-white shadow-2xl dark:bg-[#1E1E21]"
         onClick={(e) => e.stopPropagation()}
       >
@@ -40,9 +31,9 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () 
           <Keyboard className="h-4 w-4 text-terracotta" />
           <span className="text-sm font-semibold">Keyboard shortcuts</span>
           <button
-            ref={closeRef}
             type="button"
             onClick={onClose}
+            data-autofocus
             aria-label="Close keyboard shortcuts"
             className="ml-auto grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-muted"
           >

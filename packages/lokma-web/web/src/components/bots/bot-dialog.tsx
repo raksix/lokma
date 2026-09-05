@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
+import { useFocusTrap } from '@/components/shell/use-focus-trap';
 import { emptyCreateForm, validateCreateForm, type CreateBotForm } from './bots';
 import type { BotVisibility } from '@/lib/api';
 
@@ -25,6 +26,10 @@ export function BotDialog({
 }) {
   const [form, setForm] = React.useState<CreateBotForm>(initial);
   const [localError, setLocalError] = React.useState<string | null>(null);
+  // Always mounted while the caller shows it — the trap stays engaged for
+  // the whole lifetime (open is constant-true, Escape cancels).
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  useFocusTrap(true, panelRef, { onEscape: onCancel });
 
   const set =
     (key: keyof CreateBotForm) =>
@@ -47,8 +52,15 @@ export function BotDialog({
     'w-full rounded-md border border-line bg-white px-2 py-1 text-xs text-zinc-800 dark:bg-[#1E1E21] dark:text-zinc-100';
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4" onClick={onCancel}>
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4"
+      onClick={onCancel}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Create bot"
+    >
       <div
+        ref={panelRef}
         className="w-full max-w-md rounded-lg border border-line bg-white p-4 shadow-xl dark:bg-[#161618]"
         onClick={(e) => e.stopPropagation()}
       >

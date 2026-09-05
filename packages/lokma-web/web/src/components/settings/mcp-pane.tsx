@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { emitToast } from '@/components/shell';
+import { useFocusTrap } from '@/components/shell/use-focus-trap';
 import {
   buildMcpPatch,
   isValidMcpName,
@@ -188,6 +189,9 @@ function McpDialog({
   const [url, setUrl] = React.useState(initial?.url ?? '');
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [saving, setSaving] = React.useState(false);
+  // Always mounted while the caller shows it — trap for the whole lifetime.
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  useFocusTrap(true, panelRef, { onEscape: onClose });
 
   async function handleSave(): Promise<void> {
     const errs = validateMcpForm({ name, transport, command, url });
@@ -209,9 +213,11 @@ function McpDialog({
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4" onClick={onClose}>
       <div
+        ref={panelRef}
         className="w-full max-w-sm space-y-2 rounded-lg border border-line bg-white p-3 dark:bg-[#1E1E21]"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
+        aria-modal="true"
         aria-label={initial ? 'Edit MCP server' : 'Add MCP server'}
       >
         <div className="text-xs font-semibold">{initial ? `Edit ${initial.name}` : 'Add MCP server'}</div>

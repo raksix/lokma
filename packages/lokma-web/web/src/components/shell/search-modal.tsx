@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { FileText, MessagesSquare, Search } from 'lucide-react';
 import { api, type SessionSummary } from '@/lib/api';
+import { useFocusTrap } from './use-focus-trap';
 import { useSessionStore } from '@/stores';
 
 /**
@@ -59,6 +60,8 @@ export function SearchModal({
   const [notesError, setNotesError] = React.useState<string | null>(null);
   const sessions = useSessionStore((s) => s.sessions);
   const refreshSessions = useSessionStore((s) => s.refreshSessions);
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  useFocusTrap(open, panelRef, { onEscape: onClose });
 
   // Refresh the session list every time the modal opens (fresh server data).
   React.useEffect(() => {
@@ -106,9 +109,17 @@ export function SearchModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[10vh]">
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[10vh]"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Search sessions and vault notes"
+    >
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative flex max-h-[70vh] w-full max-w-[640px] flex-col overflow-hidden rounded-xl border border-[#E8E4DE] bg-white shadow-2xl">
+      <div
+        ref={panelRef}
+        className="relative flex max-h-[70vh] w-full max-w-[640px] flex-col overflow-hidden rounded-xl border border-[#E8E4DE] bg-white shadow-2xl"
+      >
         <div className="border-b border-[#E8E4DE] p-3">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />

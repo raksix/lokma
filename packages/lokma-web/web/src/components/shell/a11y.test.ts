@@ -15,6 +15,10 @@
  *     `?`.
  *  5. Motion helper integrity — both exports exist; `prefersReducedMotion()`
  *     is DOM-free (returns false without window, so probes can call it).
+ *  6. Focus trap — every `role="dialog"` overlay wires the shared
+ *     `useFocusTrap` hook (Tab wraps, Escape closes, focus enters + is
+ *     restored), and every overlay carries `aria-modal="true"` + an
+ *     `aria-label`. Reviewed exceptions live in ALLOW_UNTRAPPED.
  * Reviewed exceptions live in ALLOW_NAMELESS with a reason; anything else
  * fails. Run: `bun src/components/shell/a11y.test.ts` (no DOM).
  */
@@ -275,6 +279,33 @@ check('footer links the dialog', readFileSync(join(SRC, 'components', 'shell', '
 
 // Rule 5 — motion helper integrity (real calls, DOM-free under bun).
 check('prefersReducedMotion() false without window', prefersReducedMotion() === false);
+
+// Rule 6 — focus trap: every dialog overlay traps Tab + closes on Escape.
+// Any file rendering `role="dialog"` must wire the shared `useFocusTrap`
+// hook and carry `aria-modal="true"` + an `aria-label`.
+const ALLOW_UNTRAPPED: Array<{ file: string; reason: string }> = [];
+const untrappedUsed = new Set<number>();
+for (const full of listTsx(SRC)) {
+  const rel = relative(SRC, full);
+  const src = readFileSync(full, 'utf8');
+  if (!src.includes('role="dialog"') && !src.includes("role={'dialog'}")) continue;
+  const allowedIdx = ALLOW_UNTRAPPED.findIndex((a) => rel === a.file);
+  if (allowedIdx >= 0) {
+    untrappedUsed.add(allowedIdx);
+    continue;
+  }
+  check(`${rel} dialog wires useFocusTrap`, src.includes('useFocusTrap'));
+  check(`${rel} dialog is aria-modal`, src.includes('aria-modal="true"'));
+  check(`${rel} dialog has aria-label`, src.includes('aria-label'));
+}
+ALLOW_UNTRAPPED.forEach((a, i) => {
+  check(`untrapped allowlist alive: ${a.file} (${a.reason})`, untrappedUsed.has(i));
+});
+// The hook module itself must export the trap contract the rule scans for.
+const trapSrc = readFileSync(join(SRC, 'components', 'shell', 'use-focus-trap.ts'), 'utf8');
+check('trap handles Tab', trapSrc.includes("'Tab'"));
+check('trap handles Escape', trapSrc.includes("'Escape'"));
+check('trap restores focus', trapSrc.includes('previouslyFocused'));
 
 console.log(`a11y: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

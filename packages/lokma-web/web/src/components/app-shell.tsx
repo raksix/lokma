@@ -33,6 +33,7 @@ import {
   type SidebarSide,
   type SidebarVisibility,
 } from '@/components/shell';
+import { useFocusTrap } from '@/components/shell/use-focus-trap';
 
 /**
  * AppShell — harness frame: Header + sidebars + chat + footer.
@@ -289,6 +290,10 @@ function MobileDrawer({
       document.body.style.overflow = prev;
     };
   }, []);
+  // Mounted only while the drawer is open — trap for the whole lifetime so
+  // Tab cannot reach the chat behind the overlay (shared `useFocusTrap`).
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  useFocusTrap(true, panelRef, { onEscape: onClose });
 
   return (
     <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label={label}>
@@ -299,6 +304,7 @@ function MobileDrawer({
         className="absolute inset-0 h-full w-full cursor-default bg-black/40"
       />
       <div
+        ref={panelRef}
         className={`absolute inset-y-0 h-full w-[85vw] max-w-[320px] bg-card shadow-2xl ${
           side === 'left' ? 'left-0' : 'right-0'
         }`}

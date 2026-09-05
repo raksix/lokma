@@ -28,4 +28,5 @@ export {
 } from './shortcuts';
 export { ShortcutsDialog } from './shortcuts-dialog';
 export { prefersReducedMotion, usePrefersReducedMotion } from './use-prefers-reduced-motion';
+export { FOCUSABLE_SELECTOR, collectFocusable, nextTrapIndex, useFocusTrap } from './use-focus-trap';
 export { applyTheme, applyThemeVars, clearThemeVars, getTheme, toggleTheme, type ShellTheme } from './theme';

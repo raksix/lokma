@@ -6,9 +6,20 @@ import { Badge } from '@/components/ui/badge';
  * One component with variant prop — DRY over two files.
  */
 
-export function Sidebar({ side, title, children }: { side: 'left' | 'right'; title: string; children: React.ReactNode }) {
+export function Sidebar({
+  side,
+  title,
+  children,
+  className,
+}: {
+  side: 'left' | 'right';
+  title: string;
+  children: React.ReactNode;
+  /** Width override (mobile drawers pass a fluid width; defaults to 280px). */
+  className?: string;
+}) {
   return (
-    <aside className={`flex w-[280px] shrink-0 flex-col border-${side === 'left' ? 'r' : 'l'} bg-card`}>
+    <aside className={`flex ${className ?? 'w-[280px]'} shrink-0 flex-col border-${side === 'left' ? 'r' : 'l'} bg-card`}>
       <div className="flex h-10 items-center border-b px-3">
         <span className="text-sm font-medium">{title}</span>
         <Badge variant="outline" className="ml-auto text-[10px]">{side}</Badge>

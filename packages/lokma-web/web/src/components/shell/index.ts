@@ -5,6 +5,18 @@
 export { FooterBar } from './footer-bar';
 export { OfflineBanner } from './offline-banner';
 export { PaneErrorBoundary } from './pane-error-boundary';
+export {
+  MOBILE_BREAKPOINT,
+  anyDrawerOpen,
+  closeAllSidebars,
+  initialSidebarVisibility,
+  isMobileWidth,
+  mobileQuery,
+  nextSidebarVisibility,
+  type SidebarSide,
+  type SidebarVisibility,
+} from './responsive';
+export { useIsMobile } from './use-is-mobile';
 export { SearchModal, filterNoteHits, filterSessionHits, type NoteHit } from './search-modal';
 export { ToastHost, TOAST_EVENT, emitToast } from './toast';
 export { applyTheme, applyThemeVars, clearThemeVars, getTheme, toggleTheme, type ShellTheme } from './theme';

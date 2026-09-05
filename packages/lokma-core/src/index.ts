@@ -71,5 +71,9 @@ export * from './observability/index.js';
 // CronApprovals pane, Docs/30 §5 + §6)
 export * from './cron/index.js';
 
+// Themes (canonical named-theme registry for CLI + server + web,
+// Phase 3 themes polish)
+export * from './themes/index.js';
+
 // Utils (DRY — reuse from here, don't duplicate)
 export * from './utils/index.js';

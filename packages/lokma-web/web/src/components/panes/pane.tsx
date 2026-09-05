@@ -198,7 +198,7 @@ export function PaneTabPicker({
                   className="h-6 w-6 shrink-0 p-0"
                   title={`Fork session ${s.id} (real POST /api/sessions/:id/fork)`}
                   onClick={() => onForkSession(s.id)}
-                >
+                 aria-label={`Fork session ${s.id} (real POST /api/sessions/:id/fork)`}>
                   <GitFork className="h-3 w-3" />
                 </Button>
               </div>
@@ -660,16 +660,16 @@ function PaneTabBar({
           );
         })}
       </div>
-      <Button variant="ghost" size="sm" className="h-5 w-5 shrink-0 p-0" title="Open a tab (live sessions and tools)" onClick={onAdd}>
+      <Button variant="ghost" size="sm" className="h-5 w-5 shrink-0 p-0" title="Open a tab (live sessions and tools)" onClick={onAdd} aria-label="Open a tab (live sessions and tools)">
         <Plus className="h-3 w-3" />
       </Button>
-      <Button variant="ghost" size="sm" className="h-5 w-5 shrink-0 p-0" title="Split into side-by-side columns" onClick={() => onArmSplit('row')}>
+      <Button variant="ghost" size="sm" className="h-5 w-5 shrink-0 p-0" title="Split into side-by-side columns" onClick={() => onArmSplit('row')} aria-label="Split into side-by-side columns">
         <Columns2 className="h-3 w-3" />
       </Button>
-      <Button variant="ghost" size="sm" className="h-5 w-5 shrink-0 p-0" title="Split into stacked rows" onClick={() => onArmSplit('col')}>
+      <Button variant="ghost" size="sm" className="h-5 w-5 shrink-0 p-0" title="Split into stacked rows" onClick={() => onArmSplit('col')} aria-label="Split into stacked rows">
         <Rows2 className="h-3 w-3" />
       </Button>
-      <Button variant="ghost" size="sm" className="h-5 w-5 shrink-0 p-0" title="Close this pane" onClick={onClosePane}>
+      <Button variant="ghost" size="sm" className="h-5 w-5 shrink-0 p-0" title="Close this pane" onClick={onClosePane} aria-label="Close this pane">
         <X className="h-3 w-3" />
       </Button>
     </div>

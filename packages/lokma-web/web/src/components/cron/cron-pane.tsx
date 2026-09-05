@@ -225,7 +225,7 @@ export function CronApprovalsPane() {
         <Clock3 className="w-3 h-3 text-terracotta" />
         <span className="text-xs font-semibold">Cron & Approvals</span>
         <span className="ml-1 text-[11px] text-zinc-400 hidden sm:inline">#5 per-agent cron · #6 human-in-the-loop</span>
-        <Button variant="ghost" size="sm" className="ml-auto h-5 w-5 p-0" onClick={() => void load()} title="Reload cron jobs and approvals">
+        <Button variant="ghost" size="sm" className="ml-auto h-5 w-5 p-0" onClick={() => void load()} title="Reload cron jobs and approvals" aria-label="Reload cron jobs and approvals">
           <RefreshCw className="w-3 h-3" />
         </Button>
       </div>
@@ -303,7 +303,7 @@ export function CronApprovalsPane() {
                           title="Run now (fire this job immediately)"
                           disabled={busyJob === job.id}
                           onClick={() => void runJob(job)}
-                        >
+                         aria-label="Run now (fire this job immediately)">
                           <Play className="w-3 h-3" />
                         </Button>
                         <Button
@@ -322,7 +322,7 @@ export function CronApprovalsPane() {
                           title={confirmDelete === job.id ? 'Click again to confirm delete' : 'Delete cron job'}
                           disabled={busyJob === job.id}
                           onClick={() => void deleteJob(job)}
-                        >
+                         aria-label={confirmDelete === job.id ? 'Click again to confirm delete' : 'Delete cron job'}>
                           <Trash2 className="w-3 h-3" />
                         </Button>
                       </span>

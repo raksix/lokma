@@ -249,7 +249,7 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
             title="Reload tab"
             disabled={!selected || busy}
             onClick={() => void step('reload')}
-          >
+           aria-label="Reload tab">
             <RefreshCw className="h-3 w-3" />
           </Button>
           <Button
@@ -258,7 +258,7 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
             title="Close selected tab"
             disabled={!selected || busy}
             onClick={() => selected && void close(selected.id)}
-          >
+           aria-label="Close selected tab">
             <X className="h-3 w-3" />
           </Button>
         </span>
@@ -343,7 +343,7 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
       ) : null}
 
       <div className="flex shrink-0 items-center gap-1 border-b border-line bg-[#FDFCFB] px-2 py-1.5 dark:bg-[#161618]">
-        <Button variant="ghost" size="sm" className="h-5 w-5 p-0" title="Back" disabled={backDisabled} onClick={() => void step('back')}>
+        <Button variant="ghost" size="sm" className="h-5 w-5 p-0" title="Back" disabled={backDisabled} onClick={() => void step('back')} aria-label="Back">
           <ChevronLeft className="h-3 w-3" />
         </Button>
         <Button
@@ -352,7 +352,7 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
           title="Forward"
           disabled={forwardDisabled}
           onClick={() => void step('forward')}
-        >
+         aria-label="Forward">
           <ChevronRight className="h-3 w-3" />
         </Button>
         <div className="flex h-7 flex-1 items-center gap-1.5 rounded-full border border-line bg-white px-2.5 dark:bg-[#1E1E21]">

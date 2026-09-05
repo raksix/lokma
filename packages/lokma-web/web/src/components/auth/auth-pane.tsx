@@ -793,7 +793,7 @@ export function AuthPane() {
                           size="sm"
                           className="h-5 text-[11px] text-red-600"
                           onClick={() => deleteProjectRow(p)}
-                        >
+                         title="Delete project" aria-label="Delete project">
                           <Trash2 className="w-3 h-3" />
                           {confirmDeleteProject === p.id ? 'Confirm?' : ''}
                         </Button>
@@ -910,7 +910,7 @@ export function AuthPane() {
                       Disable
                     </Button>
                   )}
-                  <Button variant="ghost" size="sm" className="h-6 text-[11px]" onClick={() => resetRowPassword(u)} title="Reset password">
+                  <Button variant="ghost" size="sm" className="h-6 text-[11px]" onClick={() => resetRowPassword(u)} title="Reset password" aria-label="Reset password">
                     <KeyRound className="w-3 h-3" />
                   </Button>
                   <Button
@@ -918,7 +918,7 @@ export function AuthPane() {
                     size="sm"
                     className="h-6 text-[11px] text-red-600"
                     onClick={() => deleteUserRow(u)}
-                  >
+                   title="Delete user" aria-label="Delete user">
                     <Trash2 className="w-3 h-3" />
                     {confirmDeleteUser === u.id ? 'Confirm?' : ''}
                   </Button>
@@ -974,7 +974,7 @@ export function AuthPane() {
                       void navigator.clipboard?.writeText(lastInviteLink).catch(() => undefined);
                       toast('Invite link copied');
                     }}
-                  >
+                   title="Copy invite link" aria-label="Copy invite link">
                     <Copy className="w-3 h-3" />
                   </Button>
                 </p>
@@ -991,7 +991,7 @@ export function AuthPane() {
                       void navigator.clipboard?.writeText(tempPassword.password).catch(() => undefined);
                       toast('Temp password copied');
                     }}
-                  >
+                   title="Copy temporary password" aria-label="Copy temporary password">
                     <Copy className="w-3 h-3" />
                   </Button>
                 </p>

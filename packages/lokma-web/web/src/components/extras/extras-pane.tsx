@@ -94,7 +94,7 @@ export function ExtrasPane({ onOpenTab }: { onOpenTab?: (tab: ExtrasTabId) => vo
               {f}
             </Button>
           ))}
-          <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => void load()} title="Reload flags from server">
+          <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => void load()} title="Reload flags from server" aria-label="Reload flags from server">
             <RefreshCw className="w-3 h-3" />
           </Button>
         </span>

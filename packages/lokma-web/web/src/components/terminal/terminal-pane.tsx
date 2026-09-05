@@ -264,7 +264,7 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
             className="h-6 w-6 p-0 text-white/60 hover:bg-white/10 hover:text-white"
             title="New terminal"
             onClick={() => setCreating((v) => !v)}
-          >
+           aria-label="New terminal">
             <Plus className="h-3 w-3" />
           </Button>
           <Button
@@ -273,7 +273,7 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
             className="h-6 w-6 p-0 text-white/60 hover:bg-white/10 hover:text-white"
             title="Refresh list"
             onClick={() => void refresh()}
-          >
+           aria-label="Refresh list">
             <RefreshCw className="h-3 w-3" />
           </Button>
           <Button
@@ -282,7 +282,7 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
             className="h-6 w-6 p-0 text-white/60 hover:bg-white/10 hover:text-white"
             title="Copy scrollback"
             onClick={() => void copy()}
-          >
+           aria-label="Copy scrollback">
             <Copy className="h-3 w-3" />
           </Button>
           <Button
@@ -291,7 +291,7 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
             className="h-6 w-6 p-0 text-white/60 hover:bg-white/10 hover:text-white"
             title="Clear scrollback (local only)"
             onClick={clear}
-          >
+           aria-label="Clear scrollback (local only)">
             <Trash2 className="h-3 w-3" />
           </Button>
         </span>

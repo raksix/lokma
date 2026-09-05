@@ -326,7 +326,7 @@ export function MemoryPane({ onOpenSession }: { onOpenSession?: (id: string) => 
                           setRowError(null);
                           setRowHint(null);
                         }}
-                      >
+                       aria-label="Edit entry">
                         <Pencil className="h-3 w-3" />
                       </Button>
                       <Button

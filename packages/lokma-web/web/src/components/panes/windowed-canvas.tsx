@@ -44,10 +44,10 @@ export function WindowedCanvas({
               onPointerDown={(e) => onDragStart(pane.id, e.clientX, e.clientY)}
             >
               <span className="min-w-0 flex-1 truncate text-xs font-medium">{pane.title}</span>
-              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Maximize window" onClick={() => onMaximize(pane.id)}>
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Maximize window" onClick={() => onMaximize(pane.id)} aria-label="Maximize window">
                 <Maximize2 className="h-3 w-3" />
               </Button>
-              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Close window" onClick={() => onClose(pane.id)}>
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Close window" onClick={() => onClose(pane.id)} aria-label="Close window">
                 <X className="h-3 w-3" />
               </Button>
             </div>

@@ -357,7 +357,7 @@ export function FileBrowser({ sessionId }: { sessionId: string }) {
             void loadDir(cwd, '.');
             setExpanded(['.']);
           }}
-        >
+         aria-label="Reload workspace tree">
           <RefreshCw className="h-3 w-3" />
         </Button>
       </div>
@@ -464,7 +464,7 @@ export function FileBrowser({ sessionId }: { sessionId: string }) {
                 setView(null);
                 setEditing(false);
                 setConflict(null);
-              }}>
+              }} aria-label="Close file">
                 <X className="h-3 w-3" />
               </Button>
             )}

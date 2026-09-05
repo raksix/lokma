@@ -142,6 +142,8 @@ export function McpPane({ config, onReload }: { config: NormalizedConfig; onRelo
                   className={`h-6 px-1.5 text-[11px] ${confirmDelete === s.name ? 'text-red-600' : ''}`}
                   disabled={busy}
                   onClick={() => handleDelete(s.name)}
+                  title="Delete MCP server"
+                  aria-label="Delete MCP server"
                 >
                   {confirmDelete === s.name ? 'Sure?' : <Trash2 className="h-3 w-3" />}
                 </Button>

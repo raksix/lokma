@@ -119,7 +119,7 @@ function SessionRow({
             className="h-6 w-6"
             title="Rename"
             onClick={() => onAction('rename')}
-          >
+           aria-label="Rename">
             <Pencil className="w-3 h-3" />
           </Button>
           <Button
@@ -128,7 +128,7 @@ function SessionRow({
             className="h-6 w-6"
             title="Merge into another session…"
             onClick={() => onAction('merge')}
-          >
+           aria-label="Merge into another session…">
             <GitMerge className="w-3 h-3" />
           </Button>
           <Button
@@ -137,7 +137,7 @@ function SessionRow({
             className="h-6 w-6 hover:text-red-600"
             title="Delete"
             onClick={() => onAction('delete-confirm')}
-          >
+           aria-label="Delete">
             <Trash2 className="w-3 h-3" />
           </Button>
         </div>
@@ -162,7 +162,7 @@ function SessionRow({
             className="h-7 text-xs"
             aria-label="Session title"
           />
-          <Button variant="default" size="icon" className="h-7 w-7 shrink-0" title="Save">
+          <Button variant="default" size="icon" className="h-7 w-7 shrink-0" title="Save" aria-label="Save">
             <Check className="w-3 h-3" />
           </Button>
           <Button
@@ -172,7 +172,7 @@ function SessionRow({
             title="Cancel"
             onClick={onCancelAction}
             type="button"
-          >
+           aria-label="Cancel">
             <X className="w-3 h-3" />
           </Button>
         </form>
@@ -220,7 +220,7 @@ function SessionRow({
                 title="Cancel"
                 type="button"
                 onClick={onCancelAction}
-              >
+               aria-label="Cancel">
                 <X className="w-3 h-3" />
               </Button>
             </div>
@@ -359,7 +359,7 @@ export function SessionsSidebar({
             className="h-7 w-7"
             onClick={() => setGroupBy(groupBy === 'time' ? 'project' : 'time')}
             title={groupBy === 'time' ? 'Group by project' : 'Group by time'}
-          >
+           aria-label={groupBy === 'time' ? 'Group by project' : 'Group by time'}>
             <LayoutGrid className="w-3 h-3" />
           </Button>
         </div>

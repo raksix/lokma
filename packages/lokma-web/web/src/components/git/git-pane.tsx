@@ -189,7 +189,7 @@ export function GitPane({ sessionId }: { sessionId?: string }) {
             className="h-5 w-5 p-0"
             title="Refresh status"
             onClick={() => void refresh(cwd)}
-          >
+           aria-label="Refresh status">
             <RefreshCw className="w-3 h-3" />
           </Button>
           <Button

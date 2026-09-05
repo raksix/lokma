@@ -437,7 +437,7 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
                         value={task}
                         onChange={(e) => setTask(e.target.value)}
                       />
-                      <Button size="sm" className="h-7 text-xs shrink-0" disabled={running} onClick={() => void runSelected()}>
+                      <Button size="sm" className="h-7 text-xs shrink-0" disabled={running} onClick={() => void runSelected()} title="Run bot with task" aria-label="Run bot with task">
                         <Play className="w-3 h-3" />
                       </Button>
                     </div>

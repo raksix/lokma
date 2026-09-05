@@ -407,7 +407,7 @@ export function ObservabilityPane() {
                   <span className="ml-auto flex gap-1 shrink-0">
                     <Button variant="ghost" size="sm" className="h-5 text-[11px]" onClick={() => void openShare(s.token)}>Open</Button>
                     <Button variant="ghost" size="sm" className="h-5 text-[11px]" onClick={() => void copyUrl(`/share/${s.token}`)}>Copy</Button>
-                    <Button variant="ghost" size="sm" className="h-5 text-[11px]" onClick={() => void removeShare(s.token)}>
+                    <Button variant="ghost" size="sm" className="h-5 text-[11px]" onClick={() => void removeShare(s.token)} title="Delete share" aria-label="Delete share">
                       <Trash2 className="w-3 h-3" /> {confirmDelete === s.token ? 'Sure?' : ''}
                     </Button>
                   </span>

@@ -78,7 +78,7 @@ CLI (after build):
 packages/lokma-shared/       Zod schemas + WS protocol (single source of truth)
 packages/lokma-core/         Agent loop, sessions, providers, tools, vault, bots, cron, …
 packages/lokma-ai/           Multi-provider abstraction + streaming adapters
-packages/lokma-web/server/   Fastify API (28 route files) + WS multiplex
+packages/lokma-web/server/   Fastify API (27 route modules + WS multiplex)
 packages/lokma-web/web/      Vite 6 + React 19 + Tailwind v4 + shadcn/ui SPA
 bin/lokma                    CLI entry (wraps lokma-core dist)
 themes/                      Shared theme palettes (CLI + Web tokens)

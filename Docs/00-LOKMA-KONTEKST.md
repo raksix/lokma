@@ -752,9 +752,14 @@
 - **Mandated model upstream-500:** `muse-spark-1.3-contributor` katalogda VAR ama upstream HTTP 500 `Internal server error` dönüyor (direkt curl ile doğrulandı; harness bunu dürüstçe `error` frame olarak yüzeye çıkardı, mock üretmedi). Canlı `opencode-go/mimo-v2.5` ile devam edildi (direkt PING-OK 200).
 - **Gerçek WS agent döngüsü:** `/ws/:id` prompt'u `/tmp/lokma-demo/` altında hello-lokma kurdu — 3x write_file (index.js + test.js + README.md, hepsi permission-gated) + `run_command node test.js` exitCode 0 `ALL TESTS PASSED` → `done-complete`. Transcript kalıcı (7 satır, 4 tool satırı, model meta kayıtlı); bağımsız `node test.js` tekrarı ALL TESTS PASSED exit 0. Server error log temiz (sadece level-30); restart gerekmedi (config-only, live-reload).
 
+### 2026-09-05 — TEST LOOP area F run 1: regression + live, FULLY GREEN (docs-only, no code commit)
+- **Gates:** root `bun x tsc --noEmit` exit 0 · server `tsc -p` exit 0 (dist/index.js hash build öncesi/sonrası identical — restart yok) · web `bun run build` green (tsc -b + vite 4.42s, index 445k + 22 pane chunk, dist/index.html hash identical — restart yok) · full probe suite 53/53 PASS (15 core/ai + 38 web, her biri taze temp HOME'da `bun <file>` exit 0, gerçek `/root/.lokma`'ya dokunulmadı).
+- **Server log:** 0 level>=40 error; 5 distinct route-404 (`/api/git`, `/api/cloud/status`, `/api/cron/list`, `/api/observability/trace`, `/`) hepsi dışarıdan tahmin-yürütme — web client bu path'lerin HİÇBİRİNİ çağırmıyor (grep 0 hit), by-design, fix yok.
+- **Canlı** (lokma.fermag.com.tr): `/` 401 anon / 200 authed · `/health` 200 · `/api/bots` 401/200 · served index.html disk dist ile byte-identical · served `index-vievEttA.js` sha256 disk ile eşleşiyor. Tree baştan sona temiz, PM2'ye dokunulmadı (iki proc online).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area E run 1 — opencode-go wired, WS agent loop live proven via mimo-v2.5, spark-1.3 upstream-500, docs-only, sıradaki alan: F)
-- **Son işlem:** Harness demo — hello-lokma `/tmp/lokma-demo/` altında gerçek döngüyle kuruldu (3 write + 1 run, ALL TESTS PASSED, transcript 7 satır kalıcı).
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area F run 1 — regression+live FULLY GREEN, 53/53 probes, bundle hash match, docs-only, sıradaki alan: A)
+- **Son işlem:** Regression + live — tsc 0/server 0/web build green, 53/53 probe PASS, log'da 0 error, canlı 401/200 + hash eşleşmesi, restart yok.
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):

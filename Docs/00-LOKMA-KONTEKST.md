@@ -747,9 +747,14 @@
 - **Fixed:** (1) `lokma config set` dokümante no-op'tu (help yazmayı vaat ediyor, kod pointer basıyordu) — artık `saveGlobal` ile gerçekten yazıyor (JSON coercion + schema round-trip guard; canlıda `permissions.mode` reddedildi, `theme dark` enum'dan reddedildi, sibling'ler korundu); (2) CLI help `Fastify + Next.js` diyordu → `Fastify + Vite SPA`; (3) `agent list` `Phase 0 stub` etiketliydi → live registry; (4) repoda LICENSE dosyası YOKTU (README MIT diyor, Docs/02 dual demiş) — `LICENSE` eklendi (core MIT + cloud proprietary).
 - **Gates:** core build 0 · root `tsc --noEmit` 0 · CLI tam matris startup-env temp HOME'da (gerçek `/root/.lokma`'ya dokunulmadı) · bayat-referans grep'i SIFIR hit. Restart gerekmedi (CLI dist git-ignored; server değişikliği comment-only).
 
+### 2026-09-05 — TEST LOOP area E run 1: harness demo, agent loop live proven (docs-only, no code commit)
+- **opencode-go provider bağlandı** (baseUrl https://opencode.ai/zen/go/v1, key credentials store'da keySet=true — repoda/Docs'ta key YOK): POST 201 + PATCH 200 + test-probe 200 (35 canlı model). Kod değişikliği GEREKMEDİ — `resolveProviderUpstream`'daki generic custom OpenAI-compatible dalı zaten karşılıyor.
+- **Mandated model upstream-500:** `muse-spark-1.3-contributor` katalogda VAR ama upstream HTTP 500 `Internal server error` dönüyor (direkt curl ile doğrulandı; harness bunu dürüstçe `error` frame olarak yüzeye çıkardı, mock üretmedi). Canlı `opencode-go/mimo-v2.5` ile devam edildi (direkt PING-OK 200).
+- **Gerçek WS agent döngüsü:** `/ws/:id` prompt'u `/tmp/lokma-demo/` altında hello-lokma kurdu — 3x write_file (index.js + test.js + README.md, hepsi permission-gated) + `run_command node test.js` exitCode 0 `ALL TESTS PASSED` → `done-complete`. Transcript kalıcı (7 satır, 4 tool satırı, model meta kayıtlı); bağımsız `node test.js` tekrarı ALL TESTS PASSED exit 0. Server error log temiz (sadece level-30); restart gerekmedi (config-only, live-reload).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area D run 1 — README rewrite + LICENSE + CLI config set, 4 gap fix 7c6f9d9/75d9612, sıradaki alan: E)
-- **Son işlem:** Final verification pass — tüm kapılar yeşil (root tsc 0, web build green, web 38/38, core 14/14, ai 22/22), canlı 401→200 + /health 200 + bundle disk-identical, Docs kapatıldı.
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area E run 1 — opencode-go wired, WS agent loop live proven via mimo-v2.5, spark-1.3 upstream-500, docs-only, sıradaki alan: F)
+- **Son işlem:** Harness demo — hello-lokma `/tmp/lokma-demo/` altında gerçek döngüyle kuruldu (3 write + 1 run, ALL TESTS PASSED, transcript 7 satır kalıcı).
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):

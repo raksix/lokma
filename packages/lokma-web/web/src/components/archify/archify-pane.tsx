@@ -406,6 +406,9 @@ export function ArchifyPane() {
                   size="sm"
                   className="h-5 text-[11px] capitalize"
                   onClick={() => setTypeFilter(t)}
+                  title={t}
+                  aria-label={`Filter diagrams: ${t}`}
+                  aria-pressed={typeFilter === t}
                 >
                   {t.slice(0, 4)}
                 </Button>

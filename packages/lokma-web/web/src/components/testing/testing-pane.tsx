@@ -218,7 +218,7 @@ export function TestingPane() {
       </div>
 
       <div className="shrink-0 p-2 border-b border-line/50 bg-muted/20">
-        <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex items-center gap-1 flex-wrap">
           {TEST_STAGES.map((s) => {
             const Icon = STAGE_ICONS[s.n - 1];
             const selected = activeStage === s.n;

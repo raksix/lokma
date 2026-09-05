@@ -98,7 +98,7 @@ function SessionRow({
           )}
         />
         <div className="flex-1 min-w-0 cursor-pointer" onClick={onResume}>
-          <div className="text-xs font-medium truncate pr-1">{title}</div>
+          <div className="text-xs font-medium truncate pr-1" title={title}>{title}</div>
           <div className="flex items-center gap-1 mt-0.5">
             {model ? (
               <span className="px-1 py-0.5 rounded bg-muted border border-line text-[10px] truncate max-w-[140px]">

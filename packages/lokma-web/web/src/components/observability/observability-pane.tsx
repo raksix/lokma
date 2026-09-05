@@ -35,8 +35,8 @@ function TraceRow({ ev, baseTs, agentId }: { ev: TraceEventView; baseTs: string;
     <div className="relative flex gap-2">
       <span className={`absolute -left-[9px] top-1 w-2 h-2 rounded-full ${eventTone(ev.kind)}`} />
       <span className="text-white/40 w-10 shrink-0">{formatElapsed(ev.ts, baseTs)}</span>
-      <span className={`px-1 py-0 rounded text-[10px] border shrink-0 ${agentBadge(agentId)}`}>{agentId}</span>
-      <span className="px-1 py-0 rounded bg-white/5 border border-white/10 text-white/80">{ev.kind}</span>
+      <span className={`px-1 py-0 rounded text-[10px] border shrink-0 max-w-[180px] truncate ${agentBadge(agentId)}`} title={agentId}>{agentId}</span>
+      <span className="px-1 py-0 rounded bg-white/5 border border-white/10 text-white/80 max-w-[180px] truncate" title={ev.kind}>{ev.kind}</span>
       <span className="text-white/60 truncate flex-1 hidden sm:inline" title={ev.detail ?? ev.label}>
         {ev.label}
         {ev.detail ? ` — ${ev.detail}` : ''}

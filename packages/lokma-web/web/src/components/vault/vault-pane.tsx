@@ -325,7 +325,7 @@ export function VaultPane() {
           placeholder="folder (blank = all)"
           value={folder}
           onChange={(e) => setFolder(e.target.value)}
-          className={`${inputClass} w-28`}
+          className={`${inputClass} w-36`}
         />
         <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-500">
           <label htmlFor="vault-depth">depth</label>

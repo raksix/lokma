@@ -794,14 +794,15 @@
 - **Gates:** web + root `tsc --noEmit` 0, narrow-layout gate 34/34 (1 new allowlist entry), vite rebuild + single-proc `lokma-web` restart via ecosystem file, reshoot Skills/Archify/Design/Git/Browser zeroed, vision-confirmed obs cards + bots detail + providers buttons + mobile 390/390 clean, live `/` 401/200 + `/health` 200 + `/api/bots` 401/200, served bundle sha256 == disk, server log level-30 only. Commit 4f70593 pushed. Next area: D.
 
 ### 2026-09-05 — TEST LOOP area D run 3: README + docs compliance, route-count fix (7b5baf6)
+### 2026-09-05 — TEST LOOP area E run 3: harness demo, word-frequency agent loop live proven (docs-only, no code commit)
 - **README re-verified live:** 23 Inspector tabs (`panes.ts`), 22 pane chunks (dist), 6 bundled plugins + 4 themes + Lokma CEO featured, Fastify ^5.3.2 / React ^19 / Vite ^6.2.0 / Tailwind ^4, 12/12 endpoints 200 authed, `/` 401 anon, CLI matrix green (temp HOME, `doctor` 8/8), scripts + LICENSE present, zero stale `Next` refs, all 20 indexed Docs files exist.
 - **Docs/20-37 sweep:** 24/24 live paths 200 (3 first-pass 404s = wrong probe paths, corrected: trace = `/api/agents/:id/trace`, tests = `/api/tests/list`, cloud = POST-only; empty vault FTS5 = honest empty-state).
 - **Fixed:** README `28 route files` → `27 route modules` (`index.ts` is a zero-route barrel).
 - **Infra:** HTTPS push auth broken on box (no credential helper) — origin switched to SSH, future runs push over SSH. No restart (docs-only).
 
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area D run 3 — README route-count fix, sıradaki alan: E)
-- **Son işlem:** README sayıları canlı doğrulandı, `27 route modules` düzeltildi; origin SSH'a çevrildi (HTTPS push auth bozuk).
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area E run 3 — harness demo live proven, sıradaki alan: F)
+- **Son işlem:** Word-frequency demo `/tmp/lokma-demo/run3/` agent döngüsüyle kuruldu (4 tool, test exit 0, transcript 8 satır); muse-spark upstream'de hâlâ 500; WS driver `ws` modülü artık lokma node_modules'tan.
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):

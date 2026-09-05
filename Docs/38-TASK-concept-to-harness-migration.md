@@ -2675,3 +2675,43 @@ survives; never delete both at once). If even that serves stale code, escalate i
     320px; focus trap still open (wave 1 scope).
   - Next piece: Phase 3 perf + a11y (mobile responsive COMPLETE: shell +
     panes + toolbars).
+---
+- 2026-09-05 — Phase 3 perf + a11y wave 1: keyboard/motion/screen-reader DONE (web 9885c3a)
+  - **Executor run:** harness is keyboard- and screen-reader-operable on the
+    critical paths — one SHORTCUTS registry drives both the AppShell handler
+    and the new `?` help dialog (they cannot drift); reduced-motion is
+    honored in CSS + 3D auto-rotate + chat smooth-scroll; every icon-only
+    button in chat/shell/header/vault-graph carries an accessible name;
+    streaming status is announced via a live region; hero starter cards are
+    real keyboard buttons; drawers focus their close button on open.
+  - **Web:** new `shell/shortcuts.ts` (7-entry registry + SHOW_SHORTCUTS_EVENT
+    + isEditableTarget DRY) + `shell/shortcuts-dialog.tsx` (role=dialog,
+    autofocus close, Esc/backdrop dismiss, kbd styling) + `shell/use-prefers-
+    reduced-motion.ts` (DOM-free query + subscribing hook) + `shell/a11y.test.ts`
+    regression probe; app-shell (registry handler, `?`, skip link
+    `#lokma-chat`, dialog render, drawer autofocus); footer `?` hint button;
+    chat labels (DotNav, mention/attachment/queue remove, attach, mic +
+    aria-pressed, textarea, header New/Fork, code-copy, steer/queue +
+    aria-pressed); hero cards role=button + Enter/Space; chat `role=status`
+    live region; vault-graph-3d initial spin off under reduced motion;
+    index.css `prefers-reduced-motion` kill-switch.
+  - **Gate:** new probe `shell/a11y.test.ts` (nameless-button scan with
+    expression-text analysis — `{s.id}`/template text passes, `{dark ?
+    <Sun/> : <Moon/>}` fails, `=>` handlers excluded — plus skip-link,
+    reduced-motion, registry-integrity rules). Probe bug caught by negative
+    control: scope paths missed the `components/` prefix so header/sidebar/
+    vault were never scanned — fixed, then negative controls verified both
+    ways (label removed → FAIL with file:line; restored → green). The scan
+    also caught 2 REAL violations (steer/queue toggles, fixed with
+    aria-label + aria-pressed).
+  - **Gates:** root `tsc --noEmit` 0 · web build green (794k JS) · full web
+    suite 36/36 files (was 35, +a11y) · a11y probe 12/12 · mock grep on
+    touched files clean (labeled input `placeholder`s + anti-mock comment,
+    legit) · server untouched.
+  - **Honest scope:** probe covers chat/shell/header/vault-graph only —
+    full-repo icon-button audit is wave 2; no focus trap in dialogs (drawer
+    autofocus only); no real-device/AT test (unit + build + live HTTP);
+    bundle still single-chunk 794k (code-splitting is the perf wave).
+  - Next piece: Phase 3 perf + a11y wave 2 (full-repo button audit +
+    code-splitting/virtualized chat), then sharing-cloud-mobile leftovers
+    are done — remaining: perf + a11y completion.

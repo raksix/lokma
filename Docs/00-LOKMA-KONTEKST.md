@@ -811,9 +811,14 @@
 - **Fix 3 — fresh git repo:** sıfır commit'li `git init` reposuna status/log 400 `not_a_repo` diyordu (unborn HEAD'de rev-parse 128) — branch `symbolic-ref` ile, log `commits:[]` dönüyor.
 - **Regresyon:** `session/rewind.test.ts` (10) + `git/status.test.ts` (8) eklendi, temp HOME'da yeşil. Server log 0 level>=40, residue sıfır (sadece kendi artifact'larım silindi).
 
+### 2026-09-05 — TEST LOOP area D run 4: README + docs compliance, FULLY GREEN (docs-only, no code commit)
+- **README sayıları canlıya karşı:** 23 Inspector tab (panes.ts'te 24 `id:`, `root` tab değil) · 22 `*-pane-*.js` dist chunk · 27 route modülü (28 dosya − `index.ts` barrel) · 6 bundled `@lokma/plugin-*` · 4 tema (claude/midnight/omp/paper) · Fastify ^5.3.2 / React ^19 / Vite ^6.2 / Tailwind ^4 · Lokma CEO `featured=true` canlı · `build:all`/`dev:server`/`dev:web` script'leri + LICENSE mevcut · README'de sıfır Next.js refs · 46/46 Docs linki çözülüyor.
+- **Canlı:** 12/12 endpoint 200 authed + `/` 401 anon + `/health` 200 + `/api/users` 401 by-design + git main temiz (ahead 0 behind 0). CLI temp-HOME yeşil (`--help` exit 0, `doctor` 8 check / blank profilde dürüst 2 fail, `config set/get`, `agent list`).
+- **Docs/20-37 sweep:** ilk turdaki 6 adet 404'ün TAMAMI yanlış probe path'iydi — kaynağa karşı düzeltildi, app değişikliği yok (`/api/terminal`+`/api/browser` tekil, archify/design koleksiyonları `/list`, users `/api/users`, trace `/api/agents/:id/trace`); düzeltilmiş path'ler 200 + dürüst boş-state'ler. D-green streak 1/3. Tree temiz, PM2'ye dokunulmadı.
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area A run 4 — 3 bug fix canlı doğrulandı, sıradaki alan: B)
-- **Son işlem:** Core + server fix'leri rebuild + tek-proc restart ile canlıda yeşil (rewind 404, epoch 0/10, fresh-repo 200); commit 6aa447e + fdfcd1a push'landı.
+- **Son güncelleme:** 2026-09-05 (TEST LOOP area D run 4 — FULLY GREEN, sıfır gap, sıradaki alan: E)
+- **Son işlem:** README + Docs/20-37 tamamı canlıya karşı yeşil (docs-only run, code commit yok; PM2'ye dokunulmadı).
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):

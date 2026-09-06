@@ -886,8 +886,8 @@
 - **By-design (fix yok):** Anthropic keysiz cron fire dürüst uyarır (tek level-40 satırı, kendi probum); kardeş cascade-prune canlı tutuyor (DELETE agent, sahip olduğu cron job'u budadı). Rezidü sıfır (kendi cron-fire session'ımı sildim: default-scope 13, sweep-scope 0, agents/cron/terminal/browser 0, bots sadece lokma-ceo, shares 0). Canlı perimeter: / 401/200 + health 200 + bots 401/200, bundle index-Dsnd1lU1.js değişmedi. Kardeş dosyalarına dokunulmadı, PM2 untouched. A-green streak 2/3.
 
 ## Son Durum
-- **Son güncelleme:** 2026-09-06 (TEST LOOP area A run 9 — backend sweep fully green, sıradaki alan: B)
-- **Son işlem:** A run 9 (160 route canlı süpürme: part1 83 + part2 77 + part3 57 + part4 4 probun tamamı yeşil; 13 ilk-geçiş sapmasının hepsi yanlış probe beklentisi, kaynağa karşı doğrulandı; server log'da tek level-40 kendi cron-fire probumun dürüst uyarısı; rezidü sıfır; canlı perimeter 401/200), kod değişikliği yok, kardeş dosyalara dokunulmadı, PM2'ye dokunulmadı.
+- **Son güncelleme:** 2026-09-06 (TEST LOOP area C run 8 — screenshots + design, 5 tooltip fix canlı, sıradaki alan: D)
+- **Son işlem:** C run 8 (23 sekme + mobile + light-pass çekildi, 0 hata/overflow; 5 gerçek tooltip gap fix canlı doğrulandı: 2 plugin line-clamp açıklaması + 3 dar select — cron-new-agent/obs-replay/cron-agent-filter; web+root tsc 0, build green index-ETuPaOs0.js, served bundle identical, post-fix audit trunc/lineclamp 0 + 2/2 kırpık select titled; commit 0f76077 pushed, kardeş dosyalarına dokunulmadı, lokma-web single-proc restart).
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):
@@ -912,4 +912,6 @@
 
 ---
 *Bu dosya otomatik yönetilir. Elle silme.*
+- 2026-09-06 test-loop C run 8: screenshots + design, 23/23 sekme + default + 390px mobile + light-mode pass (/tmp/lokma-shots/2026-09-06-c8/, 0 pageerror/console/fail, overflow 0, mobile 385, toggle aria dogru); 8+ vizyon iddiasi reddedildi (Flaky tam render — stitch artefakti, truncations titled, kontrast subjektif); 5 gercek tooltip gap fix canli (2 plugin line-clamp + 3 dar select, canvas-olcumlu); gates: web+root tsc 0, build green, served bundle identical, server log 0 errors. Commit 0f76077 pushed. Next: D.
+
 - 2026-09-06 test-loop B run 8: browser flows FULLY GREEN, zero client bugs, zero fixes (23/23 tabs overflow 0, 20/20 tiling adds counter 3x1 to 23x21 + Reset, New Session id-diff + DELETE 200 back to 13 sessions, 4/4 transcripts, 6/6 pane asserts + usage 8 runs/1960 tok, 0 pageerrors/failed/5xx, server log clean; 5 first-pass alarms all probe bugs — tiling title selector, newId heuristic + DELETE cwd scope, self-inflicted scope 404s, wrong-tab assert, usage field shape).

@@ -849,9 +849,14 @@
 - **Driver-recipe corrections (no app change):** (1) session CREATE reads cwd from the request BODY (`body.cwd`, sessions.ts:70-71), NOT `?cwd=` — first session landed in server cwd, DELETE-verified (`session_not_found` after); re-created with body cwd (WS URL still needs `?cwd=`); (2) `run_command` takes `{command,args}` split — single-string form honestly ENOENTs, model recovered honestly with split form; (3) tool turn limit (5) ends the turn after the 4th ok tool_result — follow-up nudge closes with `done-complete`. 5x `allow` (never `always`), project-local `.lokma/settings.json` auto-mode (global config untouched, `defaultMode` absent), run5 session absent from default-scope list (13), `/api/providers/opencode-go/test` 200 with 35 live models, server log 0 level>=40.
 - **Sonuç:** agent loop uçtan uca canlı kanıtlandı, sıfır failure, sıfır fix. Tree temiz, PM2'ye dokunulmadı (iki proc da online).
 
+### 2026-09-06 — TEST LOOP area F run 5: regresyon + canlı, FULLY GREEN (docs-only, no code commit)
+- **Kapılar:** root `tsc --noEmit` 0 · core/server/ai/shared `tsc` 0 · web `bun run build` yeşil (5.85s, bundle adı+hash değişmedi `index-B4g57dtN.js` 9acf30f1, rebuild birebir aynı byte — restart yok) · core `bun test` temp HOME'da exit 0 / 0 FAIL (cloud/session-rewind/git-status/compact/fts/memory suitleri, gerçek `/root/.lokma`'ya dokunulmadı, doctor hâlâ 13 session).
+- **Canlı:** `/` 401 anon/200 authed + `/health` 200 + `/api/bots` 401/200 + served index.html disk ile byte-identical + served bundle sha256 == disk + `/api/doctor` 8/8 (7/7 provider, 7/7 model, 13 session, 6 skill, 0 lock). Server error log EMPTY (tek grep eşleşmesi log dosya adının kendisiydi).
+- **Sonuç:** sıfır failure, sıfır fix. F-green streak 3/3 — F alanı üst üste 3. kez yeşil, kanıtlanacak bir şey kalmadı. Tree temiz, PM2'ye dokunulmadı (iki proc da online).
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-05 (TEST LOOP area E run 5 — harness demo, Levenshtein agent loop live proven, sıradaki alan: F)
-- **Son işlem:** harness demo run 5 (`/tmp/lokma-demo/run5/`: lev.js + lev.test.js + README.md, exit 0 ALL TESTS PASSED, done-complete, 10-row transcript, opencode-go/mimo-v2.5; mandated model 5. kez upstream 500; 2 driver-reçete düzeltmesi, app değişikliği yok), docs-only, PM2 untouched (no restart — no code changed).
+- **Son güncelleme:** 2026-09-06 (TEST LOOP area F run 5 — regresyon + canlı FULLY GREEN, sıradaki alan: A)
+- **Son işlem:** regresyon + canlı run 5 (5 tsc 0, web build yeşil aynı hash, bun test exit 0 / 0 FAIL, error log boş, canlı 401/200 + byte-identical + doctor 8/8), docs-only, PM2 untouched (no restart — dist unchanged).
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):

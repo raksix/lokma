@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { AgentSchema, PersonaSchema, type Agent, type AgentState } from 'lokma-shared';
 import { emitAgentEvent } from './events.js';
+import { ensureDir, expandHome, readJson, writeAtomic } from '../utils/fs.js';
 
 /**
  * Agent registry — durable entities under ~/.lokma/agents/<id>/.
@@ -252,7 +253,37 @@ export async function deleteAgent(id: string): Promise<void> {
   // requireAgent validates the id shape first (no path traversal into rm).
   await requireAgent(id);
   await rm(agentDir(id), { recursive: true, force: true });
+  await deleteCronJobsForAgent(id);
   emitAgentEvent({ agentId: id, state: 'deleted', action: 'deleted' });
+}
+
+/**
+ * Cascade: prune every cron job owned by a deleted agent from
+ * `~/.lokma/cron/jobs.json`. Without this, jobs outlive their agent and the
+ * 30s ticker spams `Agent '<id>' not found` forever — and `deleteCronJob`
+ * can never remove them because it asserts the agent exists first (area A
+ * run 7). Lives here (not in `cron/`) because `cron/cron.ts` already imports
+ * this registry — the reverse import would be a module cycle. Path constant
+ * mirrors `JOBS_PATH` in `cron/cron.ts` (canonical).
+ */
+export async function deleteCronJobsForAgent(agentId: string): Promise<number> {
+  const path = expandHome('~/.lokma/cron/jobs.json');
+  const jobs = await readJson<Record<string, { agentId?: unknown }>>(path, (raw) => {
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {};
+    return raw as Record<string, { agentId?: unknown }>;
+  }, {});
+  let removed = 0;
+  for (const [jobId, job] of Object.entries(jobs)) {
+    if (job && job.agentId === agentId) {
+      delete jobs[jobId];
+      removed += 1;
+    }
+  }
+  if (removed > 0) {
+    await ensureDir(expandHome('~/.lokma/cron'));
+    await writeAtomic(path, JSON.stringify(jobs, null, 2));
+  }
+  return removed;
 }
 
 export type UpdateAgentPatch = {

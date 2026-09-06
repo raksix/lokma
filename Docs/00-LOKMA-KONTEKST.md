@@ -912,3 +912,4 @@
 
 ---
 *Bu dosya otomatik yönetilir. Elle silme.*
+- 2026-09-06 test-loop B run 8: browser flows FULLY GREEN, zero client bugs, zero fixes (23/23 tabs overflow 0, 20/20 tiling adds counter 3x1 to 23x21 + Reset, New Session id-diff + DELETE 200 back to 13 sessions, 4/4 transcripts, 6/6 pane asserts + usage 8 runs/1960 tok, 0 pageerrors/failed/5xx, server log clean; 5 first-pass alarms all probe bugs — tiling title selector, newId heuristic + DELETE cwd scope, self-inflicted scope 404s, wrong-tab assert, usage field shape).

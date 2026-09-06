@@ -871,8 +871,8 @@
 - **Kanıt:** web `tsc` 0 + root `tsc` 0 + vite build yeşil (`index-Cq2N_Lv5.js`) + single-proc `lokma-web` restart (ecosystem file) + fresh-boot canlı prob: dark=true + aria=`Switch to light theme` + Sun ikonu + 0 pageerror + served index.html/bundle sha256 == disk + `/` 401 anon + `/health` 200 + server log 0 level>=40. Commit 6e4e960 push'landı.
 
 ## Son Durum
-- **Son güncelleme:** 2026-09-06 (TEST LOOP area E run 6 — harness demo LRU-cache live proven incl. fabricated-result catch, sıradaki alan: F)
-- **Son işlem:** E run 6 (yeni LRU-cache görevi /tmp/lokma-demo/run6/'da uçtan uca kanıtlandı: 3 write_file + gerçek run_command exit 0 ALL TESTS PASSED 20 assertions + done-complete, transcript 14 satır; mandated model 6. kez üst üste upstream 500; ilk turda modelin metin içine sahte <tool_result> yazdığı bağımsız node koşusuyla yakalanıp aynı oturumda düzeltildi; approvals hep allow, global config'e dokunulmadı, server log temiz), kod değişikliği yok, PM2'ye dokunulmadı.
+- **Son güncelleme:** 2026-09-06 (TEST LOOP area A run 8 — backend sweep FULLY GREEN ~160 routes, sıradaki alan: B)
+- **Son işlem:** A run 8 (kardeş run-7 cascade işiyle eşzamanlı: tüm collection GET + invalid-id/shape + lifecycle + WS 101 + setup/models-bulk düzeltmeleri canlı doğrulandı, 17 ilk-geçiş uyuşmazlığının tamamı prob beklentisi çıktı; cascade-prune canlı PASS; server log 0 level>=40, doctor 8/8, residue sıfır, canlı bundle hash eşit), kod değişikliği yok, PM2ye dokunulmadı.
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):

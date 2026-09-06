@@ -875,9 +875,14 @@
 - **6 ilk-geçiş alarmının TAMAMI prob bug'ı çıktı (app değişikliği yok):** kısaltılmış JSON session listesi, son-sekme sonrası full-body iğneler, BUTTON-only satır seçici (satırlar DIV[onClick]), >500 chat eşiği (1-msg session'lar kısa render olur), maliyet/token format iğneleri ($0.0041/2.0k tam presizyon değil).
 - **Sonuç:** sıfır client bug, sıfır fix. B-green streak 4/3 — B alanı üst üste 4. kez yeşil, kanıtlanacak bir şey kalmadı. Kardeş cascade dosyalarına dokunulmadı, PM2 untouched (no restart — kod değişmedi).
 
+### 2026-09-06 — TEST LOOP area E run 7: harness demo, agent loop canlı kanıtlandı (docs-only, no code commit)
+- **Kapsam:** lokma'nın kendi agent döngüsüyle YENİ görev (retry-with-backoff: retry.js + retry.test.js + README.md, /tmp/lokma-demo/run7/, 3x write_file + gerçek run_command {command:node,args:[retry.test.js]} exit 0 ALL TESTS PASSED 15 assertions, done-complete, 8 satır transcript 1 user/3 assistant/4 tool, model opencode-go/mimo-v2.5, session sess_mtpczfhz_vpxp). Tek turda bitti (nudge gerekmedi, fabrication yok — her iddia gerçek tool_start/tool_result çiftiyle destekli; prompt'a <tool_result> benzeri metin yazma yasağı eklendi).
+- **Zorunlu model yine upstream'de kırık:** muse-spark-1.3-contributor direct curl HTTP 500 Internal server error (üst üste 7. E turu) — harness'a dokunulmadı, mock yok. (Not: python-urllib ile deneme CF 1010 yer — CF python'u bloklar, curl geçer; model durumu curl ile doğrulandı.)
+- **Kanıt:** bağımsız node retry.test.js tekrarı ALL TESTS PASSED exit 0, proje-yerel .lokma/settings.json auto-mode (global defaultMode:plan + allow:[] untouched), default-scope liste hâlâ 13 (run7 yok), /api/providers/opencode-go/test 200 (35 model), server log 0 level>=40. Kardeş cascade dosyalarına dokunulmadı, PM2 untouched.
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-06 (TEST LOOP area D run 7 — README + docs compliance FULLY GREEN, sıradaki alan: E)
-- **Son işlem:** D run 7 (tüm README sayıları kaynak + canlı uygulamaya karşı doğrulandı: 23 sekme, 22 chunk, 27 modül, 6 plugin, 4 palet, stack sürümleri, Lokma CEO featured, LICENSE 2137B, 24/24 link; 11/11 endpoint 200 + perimeter 401 by-design; CLI matrisi taze temp HOME'da yeşil; Docs/20-37 sweep temiz; 3 logged CLI gap hâlâ geçerli), kod değişikliği yok, kardeş dosyalara dokunulmadı, PM2ye dokunulmadı. D-green streak 4/3.
+- **Son güncelleme:** 2026-09-06 (TEST LOOP area E run 7 — harness demo agent loop canlı kanıtlandı, sıradaki alan: F)
+- **Son işlem:** E run 7 (retry-with-backoff demosu /tmp/lokma-demo/run7/: 3 dosya + gerçek run_command exit 0 15 assertions + done-complete + 8 satır transcript mimo-v2.5; zorunlu model 7. kez upstream 500; bağımsız tekrar exit 0; global config untouched; default-scope 13), kod değişikliği yok, kardeş dosyalara dokunulmadı, PM2'ye dokunulmadı.
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):
@@ -896,6 +901,7 @@
 
 - 2026-09-06 test-loop C run 7: screenshots + design, 23/23 sekme + mobile + light-pass cekildi (/tmp/lokma-shots/2026-09-06-c7x/, 0 hata/overflow); 1 gercek bug fix canli dogrulandi (git dosya-satiri title tooltip, commit 2f12e94 pushed); 12+ vizyon iddiasi kod/DOM karsisinda reddedildi (scroll-strip by-design dahil). Gates: web+root tsc 0, build green, served bundle identical, server log 0 errors. Sibling dosyalarina dokunulmadi. Next: D.
 - 2026-09-06 test-loop D run 7: README + docs compliance FULLY GREEN, zero gap, zero fix (23 sekme, 22 chunk index-Dsnd1lU1.js, 27 modul, 6 plugin, 4 palet, stack surumleri, Lokma CEO featured, LICENSE 2137B, 24/24 link; 11/11 endpoint 200 + health 200 + perimeter 401 by-design; CLI matrisi taze temp HOME'da yesil incl. doctor 8 check; Docs/20-37 sweep temiz: skills 6, providers 7, models 7, csv/cloud/design/git/cfg/auth 200; 3 logged CLI gap hala gecerli). Docs-only, sibling dosyalarina dokunulmadi, PM2 untouched. D-green streak 4/3. Next: E.
+- 2026-09-06 test-loop E run 7: harness demo, retry-with-backoff agent loop live proven (/tmp/lokma-demo/run7/: retry.js + retry.test.js + README.md, gercek run_command exit 0 ALL TESTS PASSED 15 assertions, done-complete, 8 satir transcript via opencode-go/mimo-v2.5; mandated model 7. kez upstream 500 curl-ile-dogrulandi; bagimsiz tekrar exit 0; global config untouched; default-scope 13). Docs-only, sibling dosyalarina dokunulmadi, PM2 untouched. Next: F.
 
 ---
 *Bu dosya otomatik yönetilir. Elle silme.*

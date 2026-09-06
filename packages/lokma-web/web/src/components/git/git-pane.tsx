@@ -254,7 +254,7 @@ export function GitPane({ sessionId }: { sessionId?: string }) {
                       className={`w-3 h-3 shrink-0 ${badge === 'M' ? 'text-amber-600' : badge === 'A' ? 'text-emerald-600' : 'text-zinc-400'}`}
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-mono truncate flex items-center gap-1.5">
+                      <div className="text-xs font-mono truncate flex items-center gap-1.5" title={f.path}>
                         {f.path}
                         <span
                           className={`w-1.5 h-1.5 rounded-full ${lock ? 'bg-amber-500' : 'bg-zinc-300'}`}

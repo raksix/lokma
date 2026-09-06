@@ -871,8 +871,8 @@
 - **Kanıt:** web `tsc` 0 + root `tsc` 0 + vite build yeşil (`index-Cq2N_Lv5.js`) + single-proc `lokma-web` restart (ecosystem file) + fresh-boot canlı prob: dark=true + aria=`Switch to light theme` + Sun ikonu + 0 pageerror + served index.html/bundle sha256 == disk + `/` 401 anon + `/health` 200 + server log 0 level>=40. Commit 6e4e960 push'landı.
 
 ## Son Durum
-- **Son güncelleme:** 2026-09-06 (TEST LOOP area C run 6 — screenshots + design, 1 theme-toggle fix, sıradaki alan: D)
-- **Son işlem:** C run 6 (23/23 sekme + mobile + light shot'ları, vision 14 iddianın 13'ü reddedildi, 1 gerçek bug: async named-theme sonrası header toggle stale — subscribeTheme fix + 6 probe assert, build + single-proc restart + canlı aria/Sun/bundle kanıtı), commit 6e4e960 push'landı.
+- **Son güncelleme:** 2026-09-06 (TEST LOOP area D run 6 — README + docs compliance fully green, sıradaki alan: E)
+- **Son işlem:** D run 6 (tüm README sayıları kaynağa + canlı uygulamaya karşı doğrulandı: 23 sekme, 22 chunk, 27 modül, 6 plugin, 4 palet, Fastify/React/Vite/Tailwind sürümleri, Lokma CEO featured live, LICENSE mevcut, 23/23 Docs linki çözülüyor; 11/11 endpoint 200 + perimeter 401'ler by-design; CLI matrisi taze temp HOME'da yeşil; Docs/20-37 sweep 10/10 temiz; 3 logged CLI gap hâlâ geçerli; D-green streak 3/3), kod değişikliği yok, PM2'ye dokunulmadı.
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):
@@ -885,6 +885,7 @@
 - 2026-09-05 test-loop D run 5: README + docs compliance FULLY GREEN, zero gaps, zero fixes (all numbers re-verified live: 23 tabs, 22 chunks, 27 modules, 6 plugins, 4 palettes, 12/12 endpoints 200, CLI matrix green, Docs/20-37 sweep clean; 3 wrong probe paths corrected against source). Docs-only, PM2 untouched. Next: E.
 
 - 2026-09-05 test-loop E run 5: harness demo, Levenshtein agent loop live proven (lev.js + lev.test.js + README.md under /tmp/lokma-demo/run5/, node exit 0 ALL TESTS PASSED, done-complete reason=complete, 10-row transcript via opencode-go/mimo-v2.5; mandated model 5th consecutive upstream 500; session CREATE takes cwd from BODY not ?cwd=; run_command needs {command,args} split; 5x allow approvals, global config untouched, server log 0 errors). Docs-only, PM2 untouched. Next: F.
+- 2026-09-06 test-loop D run 6: README + docs compliance FULLY GREEN, zero gaps, zero fixes (tüm README sayıları canlı doğrulandı: 23 sekme, 22 chunk, 27 modül, 6 plugin, 4 palet, stack sürümleri, Lokma CEO featured, LICENSE 2137B, 23/23 link; 11/11 endpoint 200 + health 200 + perimeter 401 by-design; CLI matrisi taze temp HOME'da yeşil incl. nested config round-trip; Docs/20-37 sweep 10/10 temiz, observability collection yok by-design; 3 logged CLI gap hâlâ geçerli; ls-box bozuk probe bug düzeltildi). Docs-only, PM2 untouched. D-green streak 3/3. Next: E.
 
 ---
 *Bu dosya otomatik yönetilir. Elle silme.*

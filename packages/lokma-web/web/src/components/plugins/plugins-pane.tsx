@@ -352,7 +352,7 @@ export function PluginsPane() {
                     <Star className="w-3 h-3" /> {formatStars(item.stars)}
                   </span>
                 </div>
-                <div className="text-xs text-zinc-500 leading-4 line-clamp-2">
+                <div className="text-xs text-zinc-500 leading-4 line-clamp-2" title={item.description || 'No description upstream.'}>
                   {item.description || 'No description upstream.'}
                 </div>
                 <div className="mt-1 text-[11px] text-zinc-400 font-mono truncate">{item.repo}</div>
@@ -426,7 +426,7 @@ export function PluginsPane() {
                       title={plugin.enabled ? 'Enabled' : 'Suspended'}
                     />
                   </div>
-                  <div className="text-xs text-zinc-500 leading-4 line-clamp-2">{plugin.description}</div>
+                  <div className="text-xs text-zinc-500 leading-4 line-clamp-2" title={plugin.description}>{plugin.description}</div>
                   <div className="mt-1 flex items-center gap-2 text-[11px] text-zinc-400">
                     <span className="flex items-center gap-1">
                       <Layers className="w-3 h-3" /> {plugin.endpoints.length} endpoints

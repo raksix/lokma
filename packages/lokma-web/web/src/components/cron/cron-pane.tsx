@@ -256,6 +256,7 @@ export function CronApprovalsPane() {
                     value={agentFilter}
                     onChange={(e) => setAgentFilter(e.target.value)}
                     className={`${inputClass} h-7`}
+                    title={agentFilter === 'all' ? `All agents (${total})` : (() => { const sel = agents.find((a) => a.id === agentFilter); return sel ? agentLabel(sel) : 'Filter by agent'; })()}
                   >
                     <option value="all">All agents ({total})</option>
                     {agents.map((a) => (
@@ -343,6 +344,7 @@ export function CronApprovalsPane() {
                     onChange={(e) => setFormAgent(e.target.value)}
                     className={`${inputClass}`}
                     disabled={agents.length === 0}
+                    title={(() => { const sel = agents.find((a) => a.id === formAgent); return agents.length === 0 ? 'No agents — create one in the Agents tab' : sel ? agentLabel(sel) : 'Select an agent'; })()}
                   >
                     {agents.length === 0 ? (
                       <option value="">No agents — create one in the Agents tab</option>

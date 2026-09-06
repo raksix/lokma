@@ -355,7 +355,7 @@ export function ObservabilityPane() {
           <div className="text-xs font-medium flex items-center gap-1"><Zap className="w-3 h-3" /> Replay</div>
           <div className="mt-1.5 flex items-center gap-2">
             <label htmlFor="obs-replay" className="text-[11px] font-medium text-zinc-500 shrink-0">Session</label>
-            <select id="obs-replay" className={selectClass} value={replayId} onChange={(e) => setReplayId(e.target.value)} disabled={sessions.length === 0}>
+            <select id="obs-replay" className={selectClass} value={replayId} onChange={(e) => setReplayId(e.target.value)} disabled={sessions.length === 0} title={(() => { const sel = sessions.find((s) => s.id === replayId); return sel ? (sel.title ?? sel.id) : 'Select a session'; })()}>
               {sessions.map((s) => (
                 <option key={s.id} value={s.id}>{s.title ?? s.id}</option>
               ))}

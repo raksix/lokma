@@ -876,8 +876,8 @@
 - **Sonuç:** sıfır client bug, sıfır fix. B-green streak 4/3 — B alanı üst üste 4. kez yeşil, kanıtlanacak bir şey kalmadı. Kardeş cascade dosyalarına dokunulmadı, PM2 untouched (no restart — kod değişmedi).
 
 ## Son Durum
-- **Son güncelleme:** 2026-09-06 (TEST LOOP area B run 7 — browser flows FULLY GREEN, sıradaki alan: C)
-- **Son işlem:** B run 7 (23/23 sekme + 25/25 tiling butonu + New Session 13→14→13 + 4/4 transcript eşleşmesi + canlı-veri assert'leri yeşil + 6 probda 0 hata + server log 0 level>=40 + kalıntı sıfır; 6 ilk-geçiş alarmı prob bug'ı çıktı), kod değişikliği yok, kardeş dosyalara dokunulmadı, PM2ye dokunulmadı.
+- **Son güncelleme:** 2026-09-06 (TEST LOOP area D run 7 — README + docs compliance FULLY GREEN, sıradaki alan: E)
+- **Son işlem:** D run 7 (tüm README sayıları kaynak + canlı uygulamaya karşı doğrulandı: 23 sekme, 22 chunk, 27 modül, 6 plugin, 4 palet, stack sürümleri, Lokma CEO featured, LICENSE 2137B, 24/24 link; 11/11 endpoint 200 + perimeter 401 by-design; CLI matrisi taze temp HOME'da yeşil; Docs/20-37 sweep temiz; 3 logged CLI gap hâlâ geçerli), kod değişikliği yok, kardeş dosyalara dokunulmadı, PM2ye dokunulmadı. D-green streak 4/3.
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):
@@ -895,6 +895,7 @@
 - 2026-09-06 test-loop B run 7: browser flows FULLY GREEN, zero client bugs, zero fixes (23/23 tabs clickable + 25/25 tiling-bar buttons 3→23 panes + Reset single-view by-design + New Session 13→14→13 exact-id DELETE + 4/4 transcript API-vs-render match + scoped GET 200s 0 sess404 + live asserts green incl. Usage 2.0k/$0.0041 + 6 probes 0 pageerror/console/fail/404/5xx + msg-label bad 0/27 + server log 0 errors + residue zero; 6 first-pass alarms all probe bugs). Docs-only, sibling files untouched, PM2 untouched. B-green streak 4/3. Next: C.
 
 - 2026-09-06 test-loop C run 7: screenshots + design, 23/23 sekme + mobile + light-pass cekildi (/tmp/lokma-shots/2026-09-06-c7x/, 0 hata/overflow); 1 gercek bug fix canli dogrulandi (git dosya-satiri title tooltip, commit 2f12e94 pushed); 12+ vizyon iddiasi kod/DOM karsisinda reddedildi (scroll-strip by-design dahil). Gates: web+root tsc 0, build green, served bundle identical, server log 0 errors. Sibling dosyalarina dokunulmadi. Next: D.
+- 2026-09-06 test-loop D run 7: README + docs compliance FULLY GREEN, zero gap, zero fix (23 sekme, 22 chunk index-Dsnd1lU1.js, 27 modul, 6 plugin, 4 palet, stack surumleri, Lokma CEO featured, LICENSE 2137B, 24/24 link; 11/11 endpoint 200 + health 200 + perimeter 401 by-design; CLI matrisi taze temp HOME'da yesil incl. doctor 8 check; Docs/20-37 sweep temiz: skills 6, providers 7, models 7, csv/cloud/design/git/cfg/auth 200; 3 logged CLI gap hala gecerli). Docs-only, sibling dosyalarina dokunulmadi, PM2 untouched. D-green streak 4/3. Next: E.
 
 ---
 *Bu dosya otomatik yönetilir. Elle silme.*

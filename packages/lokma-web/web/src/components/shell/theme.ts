@@ -11,7 +11,36 @@
 
 const THEME_KEY = 'lokma-theme';
 
+/** DOM event name — reserved for future cross-realm sync (header uses subscribeTheme). */
+export const THEME_EVENT = 'lokma:theme';
+
 export type ShellTheme = 'light' | 'dark';
+
+/** In-process subscribers notified on every effective-mode change. */
+const themeListeners = new Set<(mode: ShellTheme) => void>();
+
+/** Notify subscribers; one bad listener never breaks theming. */
+function emitTheme(mode: ShellTheme): void {
+  themeListeners.forEach((fn) => {
+    try {
+      fn(mode);
+    } catch {
+      // Listener errors stay local — the theme itself already applied.
+    }
+  });
+}
+
+/**
+ * Subscribe to effective-mode changes (`applyTheme` + `applyThemeVars` both
+ * emit). Returns an unsubscribe function. Works outside the browser
+ * (probes, SSR) — listeners are in-process, no DOM needed.
+ */
+export function subscribeTheme(fn: (mode: ShellTheme) => void): () => void {
+  themeListeners.add(fn);
+  return () => {
+    themeListeners.delete(fn);
+  };
+}
 
 /** Read the persisted theme without crashing outside the browser. */
 export function getTheme(): ShellTheme {
@@ -35,6 +64,7 @@ export function applyTheme(theme: ShellTheme): void {
   } catch {
     // Non-browser runtimes (probes, SSR) skip DOM persistence.
   }
+  emitTheme(theme);
 }
 
 /** Flip the current theme, apply + persist it, and return the new value. */
@@ -70,6 +100,7 @@ export function applyThemeVars(cssVars: Record<string, string>, mode: ShellTheme
   } catch {
     // Non-browser runtimes (probes, SSR) skip DOM persistence.
   }
+  emitTheme(mode);
 }
 
 /**

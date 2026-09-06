@@ -3,7 +3,7 @@
  * Run: `bun src/components/shell/theme.test.ts` (no DOM, no server —
  * localStorage/document are stubbed on globalThis).
  */
-import { applyTheme, applyThemeVars, clearThemeVars, getTheme, toggleTheme } from './theme';
+import { applyTheme, applyThemeVars, clearThemeVars, getTheme, subscribeTheme, toggleTheme } from './theme';
 
 let passed = 0;
 let failed = 0;
@@ -87,6 +87,32 @@ check('second theme overwrites the var', inline.get('--background') === '40 33% 
 // clearThemeVars removes inlined vars (stylesheet values take over again).
 clearThemeVars({ background: '40 33% 98%', primary: '199 89% 48%' });
 check('clear removes every inlined var', inline.size === 0);
+
+// subscribeTheme sees every effective-mode change (header-toggle contract:
+// the async named-theme load and Appearance picks must sync the toggle).
+reset();
+const seen: string[] = [];
+const off = subscribeTheme((m) => void seen.push(m));
+applyTheme('dark');
+check('subscriber sees applyTheme dark', seen.join(',') === 'dark');
+applyThemeVars({ background: '222 47% 11%' }, 'dark');
+check('subscriber sees applyThemeVars mode', seen.join(',') === 'dark,dark');
+applyThemeVars({ background: '40 33% 98%' }, 'light');
+check('subscriber sees vars light', seen.join(',') === 'dark,dark,light');
+check('toggleTheme emits too', (toggleTheme(), seen.join(',')) === 'dark,dark,light,dark');
+off();
+applyTheme('light');
+check('unsubscribed hears nothing', seen.length === 4);
+subscribeTheme(() => {
+  throw new Error('boom');
+});
+let threw = false;
+try {
+  applyTheme('dark');
+} catch {
+  threw = true;
+}
+check('bad listener never breaks apply', !threw && classes.has('dark'));
 
 console.log(`theme.test.ts: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

@@ -3,7 +3,7 @@ import { Moon, PanelLeft, PanelRight, Search, Sun } from 'lucide-react';
 import type { CostTotal, WsStatus } from '@/lib/ws';
 import { api } from '@/lib/api';
 import { useProviderStore } from '@/stores';
-import { applyTheme, applyThemeVars, emitToast, getTheme, type ShellTheme } from '@/components/shell';
+import { applyTheme, applyThemeVars, emitToast, getTheme, subscribeTheme, type ShellTheme } from '@/components/shell';
 import { enabledModels } from '@/components/providers/models';
 
 /**
@@ -57,11 +57,15 @@ export function Header({
   // Sync persisted theme/model once; refresh the shared model cache.
   // The stored mode applies instantly; then the persisted NAMED theme's
   // full var set loads best-effort (Phase 3 themes polish) so a reload
-  // keeps the exact palette, not just the light/dark family.
+  // keeps the exact palette, not just the light/dark family. The header
+  // toggle also subscribes to effective-mode changes, so the async named
+  // theme load (or an Appearance-pane pick) can never leave its icon and
+  // aria-label stale.
   React.useEffect(() => {
     const stored = getTheme();
     applyTheme(stored);
     setTheme(stored);
+    const unsubscribe = subscribeTheme((mode) => setTheme(mode));
     setModel(readModel());
     void refreshProviders();
     void api
@@ -75,6 +79,9 @@ export function Header({
         if (res) applyThemeVars(res.theme.cssVars, res.theme.mode === 'dark' ? 'dark' : 'light');
       })
       .catch(() => undefined);
+    return () => {
+      unsubscribe();
+    };
   }, [refreshProviders]);
 
   const flipTheme = (): void => {

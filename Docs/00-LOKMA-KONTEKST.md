@@ -864,9 +864,15 @@
 - **Temizlik (probe hijyeni, app bug değil):** önceki run'ların 2 sweep artığı silindi (A-run-6 fork bot `sweep-a6-bot-jcop-fork` + A-run-5 session `sweep-a5-renamed`, hepsi DELETE 200; session 14→13, botlar yine sadece lokma-ceo).
 - **Sonuç:** sıfır client bug, sıfır fix. B-green streak 3/3 — B alanı üst üste 3. kez yeşil, kanıtlanacak bir şey kalmadı. Tree temiz, PM2 untouched (no restart — kod değişmedi).
 
+### 2026-09-06 — TEST LOOP area C run 6: screenshots + design, 1 gerçek theme-toggle bug fix (6e4e960)
+- **Shot'lar:** 23/23 Inspector sekmesi + default + 390px mobile + light-mode pass → `/tmp/lokma-shots/2026-09-06-c6/` (ilk turda extras/memory buton eşleşmesi kaçtı — label case sorunu, `includes` ile yeniden çekildi 23/23). Her pass: 0 pageerror / 0 console error / 0 failed request, doc-overflow 0 tüm sekmelerde. Mobile 390 temiz (C-run-1 drawer fix'i tutuyor), dark boot doğrulanıyor.
+- **Vision:** 3 shot incelendi (mobile-390 CLEAN, light-testing 9 iddia, dark-git 5 iddia). 14 iddianın 13'ü kod/DOM'a karşı REDDEDİLDİ: session title tooltip'leri mevcut (title=true), testing step kartları wrap + tam görünür (h=81.5, whitespace normal), tab bar'da wrap yok (23/23 h=24, nowrap), `4 tests` pill'leri SPAN (tıklanabilir değil, cursor auto), greeting kontrastı büyük metinde ~4.5:1+ (AA 3:1 üstü), git truncate'ları title'lı (C-run-4 fix'i tutuyor), header/input hizalama + rozet kontrastı + run-detay çakışması ölçümde çıkmadı (tek non-trunc clip = bilinen C3 filter scroll-strip).
+- **GERÇEK bug (canlı kanıtlı):** dark boot'ta header theme butonu aria=`Switch to dark theme` + Moon ikonu gösteriyordu (DOM `.dark` aktifken). Kök neden: header mount effect'i önce `lokma-theme`'i uygulayıp state'e yazıyor, SONRA async `GET /api/config` → named theme (`omp`, dark) `applyThemeVars` ile DOM'a uygulanıyor ama header `theme` state'i eski kalıyordu. Fix: `theme.ts`'e in-process `subscribeTheme` (apply/vars her ikisi de emit eder, kötü listener theming'i bozamaz) + header subscribe + cleanup; `shell/index.ts` export'a eklendi; `theme.test.ts`'e 6 yeni assert (23/23 yeşil).
+- **Kanıt:** web `tsc` 0 + root `tsc` 0 + vite build yeşil (`index-Cq2N_Lv5.js`) + single-proc `lokma-web` restart (ecosystem file) + fresh-boot canlı prob: dark=true + aria=`Switch to light theme` + Sun ikonu + 0 pageerror + served index.html/bundle sha256 == disk + `/` 401 anon + `/health` 200 + server log 0 level>=40. Commit 6e4e960 push'landı.
+
 ## Son Durum
-- **Son güncelleme:** 2026-09-06 (TEST LOOP area B run 6 — browser flows FULLY GREEN, sıradaki alan: C)
-- **Son işlem:** browser flows run 6 (23/23 sekme + 20/20 tiling + New Session + transcript + canlı veri assert'leri yeşil, 0 hata sınıfı, 2 eski sweep artığı temizlendi, error log boş), docs-only, PM2 untouched (no restart — kod değişmedi).
+- **Son güncelleme:** 2026-09-06 (TEST LOOP area C run 6 — screenshots + design, 1 theme-toggle fix, sıradaki alan: D)
+- **Son işlem:** C run 6 (23/23 sekme + mobile + light shot'ları, vision 14 iddianın 13'ü reddedildi, 1 gerçek bug: async named-theme sonrası header toggle stale — subscribeTheme fix + 6 probe assert, build + single-proc restart + canlı aria/Sun/bundle kanıtı), commit 6e4e960 push'landı.
 
 ## Sıradaki adım — FULL PROJECT COMPLETE (2026-09-05 final verification pass)
 - **Sıradaki parça: YOK — Phase 1 + Phase 2 + Phase 3 TAMAMLANDI.** Kalanlar kod değil kullanıcı/kutu kararı: cloud sandbox/Postgres/S3 infra, gerçek cihaz/AT testi, share token rotation/expiry. Bitmiş iş log'u aşağıda (üstleri çizili = biten):

@@ -43,3 +43,4 @@
 - [REQ-022](REQ-022-ayarlar-modal.md) — Ayarlar modal olarak açılır — pending
 - [REQ-023](REQ-023-ikon-kucult.md) — Sol/sağ menü ikonları küçültülür — pending
 - [REQ-024](REQ-024-mobil-single.md) — Mobilde pane yok, single görünüm — pending
+- [REQ-025](REQ-025-agent-hub-tasarim.md) — Agent Hub tasarımı iyileşir — pending

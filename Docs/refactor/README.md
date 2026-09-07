@@ -54,5 +54,5 @@
 - [REQ-033](finished/REQ-033-tiling-bozuk.md) — Pane tiling sistemi çalışmıyor (concept'te çalışıyordu) — done
 - [REQ-034](finished/REQ-034-file-explorer-sadece-inspector.md) — File explorer sadece Inspector'da görünür — done
 - [REQ-035](finished/REQ-035-drop-modal-uste.md) — Dropped session modali üste çıkar — done
-- [REQ-036](REQ-036-crosshair-imlec.md) — Butonlarda crosshair imleç — pending
+- [REQ-036](finished/REQ-036-crosshair-imlec.md) — Butonlarda crosshair imleç — done
 - [REQ-037](REQ-037-browser-full-height.md) — Browser içeriği full height — pending

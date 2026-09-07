@@ -116,6 +116,14 @@ body.resizing .pane { transition:none !important; }
 .group:hover .drag-handle { opacity: 1; }
 .drag-handle:active { cursor: grabbing; }
 .crosshair { cursor: crosshair; }
+/* REQ-036: every button shows the crosshair cursor on hover (user asked
+   all buttons get the cross cursor). One rule covers the shared Button
+   component and all raw <button> elements (pane tab strip +, split, X
+   included). Guards: disabled buttons keep the default cursor, and the
+   mobile drawer backdrop (explicit cursor-default) is excluded so the
+   fullscreen overlay does not turn into a crosshair. Div-based rows,
+   resize handles, drag-grab surfaces, and text inputs are untouched. */
+button:not(:disabled):not(.cursor-default) { cursor: crosshair; }
 .cursor-grab { cursor: grab; }
 .cursor-grab:active { cursor: grabbing; }
 

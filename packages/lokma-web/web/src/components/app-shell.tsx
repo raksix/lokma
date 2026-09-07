@@ -48,11 +48,21 @@ import {
 import { useFocusTrap } from '@/components/shell/use-focus-trap';
 
 /**
+ * SettingsModal ships as its own chunk (lazy) — the settings dialog loads
+ * on first open, never in the initial bundle. The embedded Config /
+ * Appearance / Permissions / MCP panes ride that chunk; Providers / Models
+ * / Memory / Cron / Plugins keep their own existing pane chunks.
+ */
+const LazySettingsModal = React.lazy(() =>
+  import('@/components/settings/settings-modal').then((m) => ({ default: m.SettingsModal })),
+);
+
+/**
  * AppShell — harness frame: Header + sidebars + chat + footer.
  * Owns the single WS socket (status/cost feed the Header and the offline
  * banner), the session list (sessionStore cache), and the global shortcuts
- * (SHORTCUTS registry: Ctrl/Cmd+K search, Ctrl+M model switch, `[`/`]`
- * sidebars, `?` help, Esc closes).
+ * (SHORTCUTS registry: Ctrl/Cmd+K search, Ctrl+M model switch, `?` help,
+ * Ctrl+, settings, Esc closes).
  *
  * Responsive (Phase 3 mobile): below the `md` breakpoint both sidebars
  * become exclusive slide-over drawers over a full-width chat — mobile
@@ -84,6 +94,9 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   });
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
+  // REQ-022 — settings open as an OpenCode-style large modal (not a
+  // sidebar tab): header gear, activity/rail gear and Ctrl+, all land here.
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [serverUp, setServerUp] = React.useState<boolean | null>(null);
   // REQ-018 — status-bar numbers: gateway round-trip, host metrics, stream rate.
   const [latencyMs, setLatencyMs] = React.useState<number | null>(null);
@@ -111,9 +124,14 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   // REQ-008 — rail click reveals the panel that owns the key, then asks
   // the Inspector to switch tabs (prop-driven so a first click that mounts
   // the sidebar still lands on the right tab).
+  // REQ-022 — the settings key opens the modal instead (no sidebar change).
   const handleActivitySelect = React.useCallback(
     (key: ActivityKey) => {
       setActivity(key);
+      if (key === 'settings') {
+        setSettingsOpen(true);
+        return;
+      }
       const tab = activityInspectorTab(key);
       setInspectorTab(tab);
       if (tab === null) {
@@ -135,8 +153,14 @@ export function AppShell({ sessionId }: { sessionId: string }) {
 
   // REQ-010 — rail click asks the Inspector for the tab (prop-driven, same
   // as REQ-008) and reveals the wide Inspector panel next to the rail.
+  // REQ-022 — the settings rail icon opens the modal instead (the Inspector
+  // 'settings' tab itself stays reachable for deep-links).
   const handleInspectorRailSelect = React.useCallback(
     (tab: InspectorTab) => {
+      if (tab === 'settings') {
+        setSettingsOpen(true);
+        return;
+      }
       setInspectorTab(tab);
       setSidebars((current) =>
         isMobile
@@ -280,6 +304,12 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         window.dispatchEvent(new Event(FOCUS_FILES_EVENT));
         return;
       }
+      if (mod && e.key === ',') {
+        e.preventDefault();
+        // REQ-022 — Ctrl/Cmd+, opens the settings modal (`?` stays help).
+        setSettingsOpen(true);
+        return;
+      }
       if (e.key === 'Escape') {
         setSearchOpen(false);
         setShortcutsOpen(false);
@@ -359,7 +389,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         cost={ws.cost}
         wsStatus={ws.status}
         onSearch={() => setSearchOpen(true)}
-        onOpenSettings={() => handleInspectorRailSelect('settings')}
+        onOpenSettings={() => setSettingsOpen(true)}
         onToggleLeft={() => toggleSidebar('left')}
         onToggleRight={() => toggleSidebar('right')}
         explorerSide={explorerSide}
@@ -464,6 +494,15 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         }}
       />
       <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} explorerSide={explorerSide} />
+      {settingsOpen ? (
+        <React.Suspense fallback={null}>
+          <LazySettingsModal
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            explorerSide={explorerSide}
+          />
+        </React.Suspense>
+      ) : null}
       <ToastHost />
     </div>
   );

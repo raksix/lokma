@@ -3,12 +3,15 @@
  * Real `GET/PATCH /api/config` panes; no mock data (see Docs/38 W2-8).
  */
 export { SettingsPane } from './settings-pane';
+export { SettingsModal } from './settings-modal';
 export { ConfigPane } from './config-pane';
 export { AppearancePane } from './appearance-pane';
 export { PermissionsPane } from './permissions-pane';
 export { McpPane } from './mcp-pane';
 export { DoctorStrip } from './doctor-strip';
 export {
+  DEFAULT_SETTINGS_SECTION,
+  SETTINGS_SECTIONS,
   buildHooksPatch,
   buildMcpPatch,
   buildPermissionsPatch,
@@ -16,6 +19,7 @@ export {
   isMcpTransport,
   isPermissionMode,
   isServerTheme,
+  isSettingsSection,
   isValidMcpName,
   isValidRule,
   normalizeConfig,
@@ -35,5 +39,6 @@ export {
   type NormalizedConfig,
   type PermissionMode,
   type ServerTheme,
+  type SettingsSectionId,
   type WebMode,
 } from './settings';

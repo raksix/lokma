@@ -396,3 +396,36 @@ export function isValidSessionDefaultCwd(v: unknown): boolean {
 export function buildSessionsPatch(defaultCwd: string): Record<string, unknown> {
   return { sessions: { defaultCwd } };
 }
+
+/**
+ * Settings-modal sections (REQ-022) — the OpenCode-style large modal's
+ * left-nav categories in display order. Pure data (id + label only; icons
+ * and content live in `settings-modal.tsx`) so probes can cover the
+ * registry under bun with no DOM.
+ */
+export const SETTINGS_SECTIONS = [
+  { id: 'general', label: 'General' },
+  { id: 'appearance', label: 'Appearance' },
+  { id: 'providers', label: 'Providers' },
+  { id: 'models', label: 'Models' },
+  { id: 'permissions', label: 'Permissions' },
+  { id: 'mcp', label: 'MCP' },
+  { id: 'memory', label: 'Memory' },
+  { id: 'cron', label: 'Cron' },
+  { id: 'shortcuts', label: 'Shortcuts' },
+  { id: 'plugins', label: 'Plugins' },
+  { id: 'about', label: 'About' },
+] as const;
+
+export type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]['id'];
+
+/** First section shown every time the modal opens. */
+export const DEFAULT_SETTINGS_SECTION: SettingsSectionId = 'general';
+
+/** Narrow an unknown value to a modal section id (falls back to default). */
+export function isSettingsSection(v: unknown): v is SettingsSectionId {
+  return (
+    typeof v === 'string' &&
+    (SETTINGS_SECTIONS as readonly { id: string }[]).some((s) => s.id === v)
+  );
+}

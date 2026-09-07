@@ -12,7 +12,7 @@ import { sidebarPanelTitle, type ExplorerSide } from './responsive';
 
 export type ShortcutDef = {
   /** Stable id the AppShell handler switches on. */
-  id: 'search' | 'model' | 'explorer' | 'left' | 'right' | 'dismiss' | 'help';
+  id: 'search' | 'model' | 'explorer' | 'settings' | 'left' | 'right' | 'dismiss' | 'help';
   /** Human-readable key combo (shown in <kbd>). */
   keys: string[];
   /** One-line description for the help dialog and footer hint. */
@@ -23,6 +23,7 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: 'search', keys: ['Ctrl/⌘', 'K'], description: 'Search sessions, notes and commands' },
   { id: 'model', keys: ['Ctrl/⌘', 'M'], description: 'Open the composer model picker' },
   { id: 'explorer', keys: ['Ctrl/⌘', 'P'], description: 'Toggle Files panel and focus files' },
+  { id: 'settings', keys: ['Ctrl/⌘', ','], description: 'Open settings' },
   { id: 'left', keys: ['['], description: 'Toggle left sidebar (Inspector)' },
   { id: 'right', keys: [']'], description: 'Toggle right sidebar (Explorer)' },
   { id: 'dismiss', keys: ['Esc'], description: 'Close search, drawers and dialogs' },

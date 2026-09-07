@@ -35,3 +35,4 @@
 - [REQ-014](REQ-014-windowed-arka-plan.md) — Windowed panellere solid arka plan — pending
 - [REQ-015](REQ-015-pane-tab-tiklama.md) — Pane tabları seçilemiyor — pending
 - [REQ-016](REQ-016-alt-hint-kaldir.md) — Alttaki gereksiz ibareler kaldırılacak — pending
+- [REQ-017](REQ-017-sekmede-duzenle.md) — Dosya sekmeleri IDE gibi düzenlenebilir — pending

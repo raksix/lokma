@@ -219,6 +219,14 @@ export function normalizeConfig(raw: unknown): NormalizedConfig {
   };
 }
 
+/** Doctor summary as the Settings strip renders it (REQ-009, Docs/32 §7). Structural param on purpose — `DoctorCheckView` is assignable, so no api import is needed here. Separate from `setup.ts countPassed`: that returns passed/total only, this also names the failing probes. */
+export type DoctorSummary = { passed: number; total: number; failing: string[] };
+
+export function summarizeDoctor(checks: ReadonlyArray<{ name: string; ok: boolean } & { [key: string]: unknown }>): DoctorSummary {
+  const failing = checks.filter((c) => !c.ok).map((c) => c.name);
+  return { passed: checks.length - failing.length, total: checks.length, failing };
+}
+
 /** A permission rule is a non-empty tool pattern (same store the chat card writes). */
 export function isValidRule(rule: unknown): boolean {
   return typeof rule === 'string' && rule.trim().length > 0 && rule.trim().length <= 200;

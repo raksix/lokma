@@ -7,6 +7,7 @@ export { ConfigPane } from './config-pane';
 export { AppearancePane } from './appearance-pane';
 export { PermissionsPane } from './permissions-pane';
 export { McpPane } from './mcp-pane';
+export { DoctorStrip } from './doctor-strip';
 export {
   buildHooksPatch,
   buildMcpPatch,
@@ -21,11 +22,13 @@ export {
   normalizeMcpEntry,
   normalizeMcpServers,
   serverThemeToMode,
+  summarizeDoctor,
   validateMcpForm,
   MCP_TRANSPORTS,
   PERMISSION_MODES,
   SERVER_THEMES,
   THEME_CARDS,
+  type DoctorSummary,
   type HookRow,
   type McpEntry,
   type McpTransport,

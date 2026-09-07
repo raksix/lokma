@@ -16,6 +16,7 @@ import {
   normalizeMcpEntry,
   normalizeMcpServers,
   serverThemeToMode,
+  summarizeDoctor,
   themeCardFromView,
   validateMcpForm,
   THEME_CARDS,
@@ -134,6 +135,23 @@ const mcpPatch = buildMcpPatch([
 check('stdio entry keeps command, drops url', mcpPatch.mcp.servers.fs.command === 'npx x' && mcpPatch.mcp.servers.fs.url === undefined);
 check('ws entry keeps url, drops command', mcpPatch.mcp.servers.br.url === 'ws://h:9222' && mcpPatch.mcp.servers.br.command === undefined);
 check('disabled flag survives', mcpPatch.mcp.servers.br.enabled === false);
+
+// summarizeDoctor (REQ-009 doctor strip — structural input, DoctorCheckView assignable)
+const allOk = summarizeDoctor([
+  { name: 'provider', ok: true },
+  { name: 'browser', ok: true },
+]);
+check('all pass counts 2/2', allOk.passed === 2 && allOk.total === 2);
+check('all pass has no failing names', allOk.failing.length === 0);
+const mixed = summarizeDoctor([
+  { name: 'provider', ok: true, latencyMs: 12, detail: 'key set' },
+  { name: 'browser', ok: false, latencyMs: 3, detail: 'no chromium' },
+  { name: 'vault', ok: false, latencyMs: 0, detail: 'unreachable' },
+]);
+check('mixed counts 1/3', mixed.passed === 1 && mixed.total === 3);
+check('mixed names the failing probes', mixed.failing.join(',') === 'browser,vault');
+const none = summarizeDoctor([]);
+check('empty list is 0/0 with no failing', none.passed === 0 && none.total === 0 && none.failing.length === 0);
 
 console.log(`settings.test.ts: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

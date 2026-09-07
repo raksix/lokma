@@ -8,6 +8,7 @@ import { ConfigPane } from './config-pane';
 import { AppearancePane } from './appearance-pane';
 import { PermissionsPane } from './permissions-pane';
 import { McpPane } from './mcp-pane';
+import { DoctorStrip } from './doctor-strip';
 
 const TABS = [
   { id: 'config', label: 'Config', icon: Settings },
@@ -70,6 +71,8 @@ export function SettingsPane() {
           </Button>
         ))}
       </div>
+
+      <DoctorStrip />
 
       <div className="max-h-[420px] overflow-auto">
         {error !== null && config === null ? (

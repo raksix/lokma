@@ -119,8 +119,8 @@ export function Header({
       <div className="flex h-full w-full items-center gap-1.5 px-2 sm:px-3">
         <button
           onClick={onToggleLeft}
-          title="Toggle left panel ([)"
-          aria-label="Toggle left panel"
+          title="Toggle Inspector ([)"
+          aria-label="Toggle Inspector"
           className="grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-[#F2F0EB]"
         >
           <PanelLeft className="h-3.5 w-3.5" />
@@ -193,8 +193,8 @@ export function Header({
           </button>
           <button
             onClick={onToggleRight}
-            title="Toggle right panel (])"
-            aria-label="Toggle right panel"
+            title="Toggle Explorer (])"
+            aria-label="Toggle Explorer"
             className="grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-[#F2F0EB]"
           >
             <PanelRight className="h-3.5 w-3.5" />

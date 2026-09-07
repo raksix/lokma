@@ -121,7 +121,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       setActiveId(id);
       selectSession(id);
       // On mobile the Explorer is a drawer — dismiss it so the chat is visible.
-      if (isMobile) setSidebars((current) => ({ ...current, left: false }));
+      if (isMobile) setSidebars((current) => ({ ...current, right: false }));
       void refreshSessions();
     },
     [activeId, isMobile, refreshSessions, selectSession],
@@ -144,7 +144,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       }
       if (mod && (e.key === 'p' || e.key === 'P')) {
         e.preventDefault();
-        setSidebars((current) => nextSidebarVisibility(current, 'left', isMobile));
+        setSidebars((current) => nextSidebarVisibility(current, 'right', isMobile));
         window.dispatchEvent(new Event(FOCUS_FILES_EVENT));
         return;
       }
@@ -215,17 +215,17 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       <div className="flex flex-1 overflow-hidden">
         {sidebars.left ? (
           isMobile ? (
-            <MobileDrawer side="left" label="Explorer panel" onClose={closeDrawers}>
-              <PaneErrorBoundary paneName="Explorer">
-                <Sidebar side="left" title="Explorer" className="h-full w-full">
-                  {explorerContent}
+            <MobileDrawer side="left" label="Inspector panel" onClose={closeDrawers}>
+              <PaneErrorBoundary paneName="Inspector">
+                <Sidebar side="left" title="Inspector" className="h-full w-full">
+                  {inspectorContent}
                 </Sidebar>
               </PaneErrorBoundary>
             </MobileDrawer>
           ) : (
-            <PaneErrorBoundary paneName="Explorer">
-              <Sidebar side="left" title="Explorer">
-                {explorerContent}
+            <PaneErrorBoundary paneName="Inspector">
+              <Sidebar side="left" title="Inspector">
+                {inspectorContent}
               </Sidebar>
             </PaneErrorBoundary>
           )
@@ -247,17 +247,17 @@ export function AppShell({ sessionId }: { sessionId: string }) {
 
         {sidebars.right ? (
           isMobile ? (
-            <MobileDrawer side="right" label="Inspector panel" onClose={closeDrawers}>
-              <PaneErrorBoundary paneName="Inspector">
-                <Sidebar side="right" title="Inspector" className="h-full w-full">
-                  {inspectorContent}
+            <MobileDrawer side="right" label="Explorer panel" onClose={closeDrawers}>
+              <PaneErrorBoundary paneName="Explorer">
+                <Sidebar side="right" title="Explorer" className="h-full w-full">
+                  {explorerContent}
                 </Sidebar>
               </PaneErrorBoundary>
             </MobileDrawer>
           ) : (
-            <PaneErrorBoundary paneName="Inspector">
-              <Sidebar side="right" title="Inspector">
-                {inspectorContent}
+            <PaneErrorBoundary paneName="Explorer">
+              <Sidebar side="right" title="Explorer">
+                {explorerContent}
               </Sidebar>
             </PaneErrorBoundary>
           )

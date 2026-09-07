@@ -19,8 +19,8 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: 'search', keys: ['Ctrl/⌘', 'K'], description: 'Search sessions, notes and commands' },
   { id: 'model', keys: ['Ctrl/⌘', 'M'], description: 'Jump to the model picker' },
   { id: 'explorer', keys: ['Ctrl/⌘', 'P'], description: 'Toggle Explorer and focus files' },
-  { id: 'left', keys: ['['], description: 'Toggle left sidebar (Explorer)' },
-  { id: 'right', keys: [']'], description: 'Toggle right sidebar (Inspector)' },
+  { id: 'left', keys: ['['], description: 'Toggle left sidebar (Inspector)' },
+  { id: 'right', keys: [']'], description: 'Toggle right sidebar (Explorer)' },
   { id: 'dismiss', keys: ['Esc'], description: 'Close search, drawers and dialogs' },
   { id: 'help', keys: ['?'], description: 'Open this shortcut list' },
 ];

@@ -1,8 +1,8 @@
 /**
  * Responsive-shell helpers (pure, DOM-free — safe to probe with bun).
  *
- * The harness frame is a three-column desktop layout (Explorer | chat |
- * Inspector). Below MOBILE_BREAKPOINT the sidebars stop squeezing the chat
+ * The harness frame is a three-column desktop layout (Inspector | chat |
+ * Explorer). Below MOBILE_BREAKPOINT the sidebars stop squeezing the chat
  * and become exclusive slide-over drawers instead (see `useIsMobile` and
  * `AppShell`). All width thresholds live here so the hook, the shell, and
  * the tests share one source of truth.

@@ -66,7 +66,7 @@ check("file tab title is basename", f.title === "index.ts");
 check("tab id prefix", makeTabId("tab-x").startsWith("tab-x-"));
 check("pane id prefix unique", makePaneId().startsWith("p-") && makePaneId() !== makePaneId());
 
-/* 2 — registry mirrors the right Inspector (23 tabs); tiling bar keeps the 20 open actions. */
+/* 2 — registry mirrors the left Inspector (23 tabs); tiling bar keeps the 20 open actions. */
 check("registry has 23 entries", INSPECTOR_TABS.length === 23);
 check("registry has browser", INSPECTOR_TABS.some((t) => t.id === "browser"));
 check("registry has orchestration+agents pair", INSPECTOR_TABS.some((t) => t.id === "orchestration") && INSPECTOR_TABS.some((t) => t.id === "agents"));

@@ -7,8 +7,8 @@
 
 1. Kullanıcı chat'te bir istek yazar.
 2. Agent buraya yeni `REQ-XXX-<kısa-ad>.md` dosyası ekler (`pending`).
-3. Barizse direkt yapılır, muğlaksa tek kısa soru sorulur.
-4. Her istek ayrı atomic İngilizce commit + anında `git push origin main` + canlı doğrulama ile kapanır (`done`).
+3. **KURAL: kullanıcı "yap" demeden kod değişikliği YOK.** Agent sadece yazar, commit'ler, push'lar. Barizse bile sormadan implemente etmez; muğlaksa dosyaya not düşer, kullanıcı karar verir.
+4. Kullanıcı "yap" deyince istek `in-progress` olur, ayrı atomic İngilizce commit + anında `git push origin main` + canlı doğrulama ile kapanır (`done`).
 
 ## Durumlar
 

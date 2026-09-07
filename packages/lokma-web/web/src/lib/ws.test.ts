@@ -125,6 +125,7 @@ state = applyServerFrame(state, { type: 'done', sessionId: 's', reason: 'complet
 assert(state.done && state.doneReason === 'complete', 'done flips the flag');
 state = applyServerFrame(state, { type: 'error', message: 'boom', sessionId: 's' });
 assert(state.lastError === 'boom', 'error records the message');
+assert(state.done && state.doneReason === 'error', 'error ends the run (no stuck sending)');
 
 // 9. No stored token → URL passes through untouched.
 assert(withAuthToken('ws://127.0.0.1:3457/ws/abc') === 'ws://127.0.0.1:3457/ws/abc', 'no token leaves the URL alone');

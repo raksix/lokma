@@ -17,6 +17,7 @@ export type StreamOpts = {
   apiKey?: string | null;
   baseUrl?: string;
   signal?: AbortSignal;
+  extraHeaders?: Record<string, string>;
 };
 
 export async function* stream(opts: StreamOpts): AsyncGenerator<StreamChunk> {
@@ -33,5 +34,6 @@ export async function* stream(opts: StreamOpts): AsyncGenerator<StreamChunk> {
     apiKey: opts.apiKey,
     baseUrl: opts.baseUrl,
     signal: opts.signal,
+    extraHeaders: opts.extraHeaders,
   });
 }

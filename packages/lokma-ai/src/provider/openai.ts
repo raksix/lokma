@@ -12,6 +12,13 @@ import type { AdapterStreamOpts, ProviderAdapter, StreamChunk } from './types.js
 
 export const OPENAI_DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 
+/** Case-insensitive header lookup for optional caller-supplied headers. */
+function hasHeader(headers: Record<string, string> | undefined, name: string): boolean {
+  if (!headers) return false;
+  const want = name.toLowerCase();
+  return Object.keys(headers).some((k) => k.toLowerCase() === want);
+}
+
 /** Strip the `provider/` prefix the harness model ids carry. */
 export function shortModelId(model: string): string {
   const slash = model.indexOf('/');
@@ -31,6 +38,13 @@ export class OpenAIAdapter implements ProviderAdapter {
     }
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (opts.apiKey) headers.Authorization = `Bearer ${opts.apiKey}`;
+    // REQ-038: OpenCode Go routes efficiently only with an x-opencode-session
+    // header (missing → HTTP 400). Explicit value wins; otherwise mint a
+    // per-request id so Go never sees a headerless call.
+    if (base.includes('opencode.ai/zen/go') && !hasHeader(opts.extraHeaders, 'x-opencode-session')) {
+      headers['x-opencode-session'] = `lokma-${Date.now().toString(36)}-${Math.floor(Math.random() * 0xffff).toString(16)}`;
+    }
+    for (const [k, v] of Object.entries(opts.extraHeaders ?? {})) headers[k] = v;
     let res: Response;
     try {
       res = await fetch(`${base}/chat/completions`, {

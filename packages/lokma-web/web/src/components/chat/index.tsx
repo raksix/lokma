@@ -68,7 +68,7 @@ export function Chat({
   const storeModels = useProviderStore((s) => s.models);
   const refreshProviders = useProviderStore((s) => s.refresh);
 
-  const { status, stream, cost, done, toolCalls, permissions, questions, sendText, interrupt, answerPermission, answerQuestion } = ws;
+  const { status, stream, cost, done, lastError, toolCalls, permissions, questions, sendText, interrupt, answerPermission, answerQuestion } = ws;
   const socketOpen = status === 'open';
   const streaming = socketOpen && !done && stream.length > 0;
   const [answerBusy, setAnswerBusy] = React.useState<string | null>(null);
@@ -131,6 +131,15 @@ export function Chat({
     setPending([]);
     void reloadTranscript().then(() => setStreamVisible(false));
   }, [done, reloadTranscript]);
+
+  // REQ-038: upstream failures used to die silently (stuck "sending…").
+  // The run now ends on `error` frames — surface the reason as a toast.
+  const lastToastedError = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!lastError || lastToastedError.current === lastError) return;
+    lastToastedError.current = lastError;
+    emitToast(`Send failed: ${lastError}`);
+  }, [lastError]);
 
   // Starter cards / `/new <prompt>` hand a first prompt to the fresh session.
   React.useEffect(() => {

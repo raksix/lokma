@@ -175,6 +175,9 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
         apiKey: opts.upstream.apiKey,
         baseUrl: opts.upstream.baseUrl,
         signal: turnCtrl.signal,
+        // REQ-038: session-stable routing id for upstreams that need it
+        // (OpenCode Go 400s headerless calls).
+        extraHeaders: { 'x-opencode-session': `lokma-${opts.sessionId}` },
       })) {
         if (chunk.type === 'text_delta') {
           const visible = filter.push(chunk.delta);

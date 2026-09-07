@@ -24,6 +24,8 @@ export type AdapterStreamOpts = {
   baseUrl?: string;
   /** AbortSignal for real interrupt (WS `abort` cancels the HTTP call). */
   signal?: AbortSignal;
+  /** Extra HTTP headers for the upstream call (e.g. routing headers). */
+  extraHeaders?: Record<string, string>;
 };
 
 export type StreamChunk =

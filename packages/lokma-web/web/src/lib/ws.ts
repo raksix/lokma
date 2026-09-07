@@ -220,7 +220,11 @@ export function applyServerFrame(state: WsUiState, msg: ServerMessage): WsUiStat
     case 'done':
       return { ...state, done: true, doneReason: msg.reason };
     case 'error':
-      return { ...state, lastError: msg.message };
+      // REQ-038: an upstream failure used to leave the chat stuck on
+      // "sending…" forever — the server sends `error` with NO following
+      // `done`, and pending rows only clear on `done`. Ending the run here
+      // drops the optimistic row; the message stays visible via lastError.
+      return { ...state, lastError: msg.message, done: true, doneReason: 'error' };
   }
 }
 

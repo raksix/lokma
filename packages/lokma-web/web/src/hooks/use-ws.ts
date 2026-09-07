@@ -192,7 +192,7 @@ export function useWs(sessionId: string): UseWs {
     const text = prompt.trim();
     if (!text) return;
     // A new prompt starts a new run — clear the previous run's trace with it.
-    setUi((prev) => ({ ...prev, stream: '', done: false, doneReason: null, toolCalls: {} }));
+    setUi((prev) => ({ ...prev, stream: '', done: false, doneReason: null, lastError: null, toolCalls: {} }));
     socketSend(wsRef.current, promptMessage(text, sessionRef.current, opts));
   }, []);
 

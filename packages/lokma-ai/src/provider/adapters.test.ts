@@ -94,6 +94,43 @@ try {
   openAiStub.server.close();
 }
 
+// 2b. REQ-038: opencode-go base auto-sends x-opencode-session (explicit wins).
+const seenGo: { session: string | undefined; custom: string | undefined } = { session: undefined, custom: undefined };
+const goStub = await listen((req, res) => {
+  req.resume();
+  req.on('end', () => {
+    seenGo.session = req.headers['x-opencode-session'] as string | undefined;
+    seenGo.custom = req.headers['x-test-mark'] as string | undefined;
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    res.end(sseBody(['[DONE]']));
+  });
+});
+try {
+  await collectText(
+    new OpenAIAdapter().stream({
+      model: 'm',
+      messages: [{ role: 'user', content: 'hi' }],
+      apiKey: 'test-key',
+      baseUrl: `${goStub.base}/opencode.ai/zen/go/v1`,
+      extraHeaders: { 'x-test-mark': 'yes' },
+    }),
+  );
+  assert(typeof seenGo.session === 'string' && seenGo.session.startsWith('lokma-'), 'go base auto-mints x-opencode-session');
+  assert(seenGo.custom === 'yes', 'extraHeaders forwarded upstream');
+  await collectText(
+    new OpenAIAdapter().stream({
+      model: 'm',
+      messages: [{ role: 'user', content: 'hi' }],
+      apiKey: 'test-key',
+      baseUrl: `${goStub.base}/opencode.ai/zen/go/v1`,
+      extraHeaders: { 'x-opencode-session': 'keep-me' },
+    }),
+  );
+  assert(seenGo.session === 'keep-me', 'explicit x-opencode-session wins over mint');
+} finally {
+  goStub.server.close();
+}
+
 // 3. OpenAI-compatible upstream 401 surfaces as http_error with the status.
 const denyStub = await listen((_req, res) => {
   res.writeHead(401, { 'Content-Type': 'application/json' });

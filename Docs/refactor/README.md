@@ -48,3 +48,4 @@
 - [REQ-027](REQ-027-bot-sistemi.md) — Bot sistemi refaktörü (Grok + Hermes referanslı) — pending
 - [REQ-028](REQ-028-plugin-market.md) — Skill/plugin market + örnek plugin — pending
 - [REQ-029](REQ-029-drag-split-calismiyor.md) — Session drop'ta split yapmıyor — pending
+- [REQ-030](REQ-030-provider-modelleri-gorunsun.md) — Eklenen provider'ın modelleri listede görünsün — pending

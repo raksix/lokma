@@ -146,6 +146,15 @@ export async function authedFetch(path: string, init: RequestInit = {}): Promise
 // ─── Response types (mirror live server route shapes) ───────────────────────
 
 export type HealthRes = { ok: boolean; service: string; version: string };
+/** Live host numbers from `GET /api/metrics` (REQ-018 status bar). */
+export type MetricsRes = {
+  version: string;
+  uptimeSec: number;
+  /** System CPU % since the previous poll — null on the first sample. */
+  cpuPercent: number | null;
+  memory: { totalBytes: number; usedBytes: number };
+  process: { rssBytes: number; heapUsedBytes: number };
+};
 export type ConfigRes = {
   config: unknown;
   credentials: Record<string, { keySet: boolean; last4: string | null }>;
@@ -949,6 +958,8 @@ export type ApprovalsRes = { decisions: ApprovalDecisionView[]; count: number };
 export const api = {
   // Health + config
   health: () => get<HealthRes>('/api/health'),
+  /** Host metrics for the status bar (REQ-018: cpu/ram/version). */
+  getMetrics: () => get<MetricsRes>('/api/metrics'),
   getConfig: () => get<ConfigRes>('/api/config'),
   config: () => get<ConfigRes>('/api/config'),
   patchConfig: (patchBody: Record<string, unknown>) =>

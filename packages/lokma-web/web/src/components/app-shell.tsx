@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { usePaneStore } from '@/stores/pane';
 import { HealthBadge } from '@/components/status/health-badge';
 import { useWs } from '@/hooks/use-ws';
-import { api } from '@/lib/api';
+import { api, type MetricsRes } from '@/lib/api';
 import { useSessionStore } from '@/stores';
 import {
   FooterBar,
@@ -79,6 +79,11 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
   const [serverUp, setServerUp] = React.useState<boolean | null>(null);
+  // REQ-018 — status-bar numbers: gateway round-trip, host metrics, stream rate.
+  const [latencyMs, setLatencyMs] = React.useState<number | null>(null);
+  const [metrics, setMetrics] = React.useState<MetricsRes | null>(null);
+  const [tokensPerSec, setTokensPerSec] = React.useState<number | null>(null);
+  const rateRef = React.useRef<{ tokens: number; at: number } | null>(null);
   // REQ-007 — which physical side hosts the Explorer (persisted, survives reload).
   const [explorerSide, setExplorerSide] = React.useState<ExplorerSide>(() => readExplorerSide());
   // REQ-010 — the Inspector always lives opposite the Explorer; the thin
@@ -157,18 +162,34 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   }, [isMobile]);
 
   // Session list + server liveness (30s poll feeds FooterBar + Header pill).
+  // REQ-018 — the same tick also times the health round-trip (gateway
+  // latency) and pulls host metrics (cpu/ram/version) best-effort.
   React.useEffect(() => {
     void refreshSessions();
     selectSession(activeId);
     let cancelled = false;
     const checkHealth = (): void => {
+      const started = performance.now();
       api
         .health()
         .then(() => {
-          if (!cancelled) setServerUp(true);
+          if (cancelled) return;
+          setServerUp(true);
+          setLatencyMs(performance.now() - started);
+          api
+            .getMetrics()
+            .then((res) => {
+              if (!cancelled) setMetrics(res);
+            })
+            .catch(() => {
+              // Metrics are best-effort — the footer keeps the last sample.
+            });
         })
         .catch(() => {
-          if (!cancelled) setServerUp(false);
+          if (!cancelled) {
+            setServerUp(false);
+            setLatencyMs(null);
+          }
         });
     };
     checkHealth();
@@ -178,6 +199,31 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       clearInterval(timer);
     };
   }, [activeId, refreshSessions, selectSession]);
+
+  // REQ-018 — stream throughput from WS cost deltas: each accumulated-cost
+  // change yields an instant rate; 4s without growth falls back to idle.
+  const wsCost = ws.cost;
+  React.useEffect(() => {
+    const tokens = wsCost.inputTokens + wsCost.outputTokens;
+    const now = Date.now();
+    const prev = rateRef.current;
+    rateRef.current = { tokens, at: now };
+    if (!prev || now <= prev.at) return;
+    const gained = tokens - prev.tokens;
+    if (gained <= 0) return;
+    setTokensPerSec(gained / ((now - prev.at) / 1000));
+    const timer = setTimeout(() => setTokensPerSec(null), 4000);
+    return () => clearTimeout(timer);
+  }, [wsCost]);
+
+  // REQ-018 — selected project = basename of the active session cwd.
+  const sessions = useSessionStore((s) => s.sessions);
+  const projectName = React.useMemo(() => {
+    const active = sessions.find((s) => s.id === activeId);
+    if (!active || !active.cwd) return null;
+    const parts = active.cwd.split('/').filter((p) => p.length > 0);
+    return parts.length > 0 ? parts[parts.length - 1] : active.cwd;
+  }, [sessions, activeId]);
 
   const toggleSidebar = React.useCallback(
     (side: SidebarSide) => {
@@ -374,7 +420,16 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         {/* REQ-008 — VS Code-style activity rail, pinned at the far right. */}
         <ActivityBar active={activity} onSelect={handleActivitySelect} />
       </div>
-      <FooterBar serverUp={serverUp} />
+      <FooterBar
+        serverUp={serverUp}
+        latencyMs={latencyMs}
+        projectName={projectName}
+        cpuPercent={metrics?.cpuPercent ?? null}
+        memUsedBytes={metrics?.memory.usedBytes ?? null}
+        memTotalBytes={metrics?.memory.totalBytes ?? null}
+        tokensPerSec={tokensPerSec}
+        version={metrics?.version ?? null}
+      />
       <SearchModal
         open={searchOpen}
         onClose={() => setSearchOpen(false)}

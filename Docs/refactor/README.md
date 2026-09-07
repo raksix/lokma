@@ -36,7 +36,7 @@
 - [REQ-015](finished/REQ-015-pane-tab-tiklama.md) — Pane tabları seçilemiyor — done
 - [REQ-016](finished/REQ-016-alt-hint-kaldir.md) — Alttaki gereksiz ibareler kaldırılacak — done
 - [REQ-017](finished/REQ-017-sekmede-duzenle.md) — Dosya sekmeleri IDE gibi düzenlenebilir — done
-- [REQ-018](REQ-018-status-bar-metrik.md) — Status bar: gateway/proje/cpu/ram/token-s/sürüm — pending
+- [REQ-018](finished/REQ-018-status-bar-metrik.md) — Status bar: gateway/proje/cpu/ram/token-s/sürüm — done
 - [REQ-019](REQ-019-sidebar-resize.md) — Sol/sağ menüler resize edilebilir — pending
 - [REQ-020](REQ-020-inspector-liste-kaldir.md) — Inspector 23'lü liste kalkar (rail'e taşındı) — pending
 - [REQ-021](REQ-021-swap-rail-takip.md) — Swap'te mini menüler panelle birlikte taşınır — pending

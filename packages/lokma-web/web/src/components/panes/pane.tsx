@@ -315,13 +315,11 @@ export function formatBytes(n: number): string {
 // surface (a real session chat, a real Inspector pane); dragging a session
 // or file row onto the pane works too. Replaces the concept's mock tabs.
 export function PaneTabPicker({
-  splitArmed,
   onPickSession,
   onForkSession,
   onPickInspector,
   onCancel,
 }: {
-  splitArmed: { dir: 'row' | 'col' } | null;
   onPickSession: (id: string, title: string) => void;
   onForkSession: (id: string) => void;
   onPickInspector: (id: InspectorTabId) => void;
@@ -338,7 +336,7 @@ export function PaneTabPicker({
     <div className="flex h-full flex-col gap-3 overflow-auto p-3">
       <div className="flex items-center gap-2">
         <div className="text-xs font-medium">
-          {splitArmed ? `Choose content for the new ${splitArmed.dir === 'row' ? 'side' : 'below'} pane` : 'Open a tab'}
+          Open a tab
         </div>
         {onCancel ? (
           <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[11px]" onClick={onCancel}>
@@ -497,6 +495,7 @@ export function WorkspacePane({
   onFocus,
   onTabsChange,
   onSplit,
+  onSplitEmpty,
   onClosePane,
   onMoveTab,
   onOpenSession,
@@ -509,6 +508,7 @@ export function WorkspacePane({
   onFocus: (paneId: string) => void;
   onTabsChange: (paneId: string, tabs: PaneTab[], active: string | null) => void;
   onSplit: (targetPaneId: string, dir: 'row' | 'col', pos: 'before' | 'after', tab: PaneTab) => void;
+  onSplitEmpty: (targetPaneId: string, dir: 'row' | 'col') => void;
   onClosePane: (paneId: string) => void;
   onMoveTab: (tab: PaneTab, fromPaneId: string, toPaneId: string, split: { dir: 'row' | 'col'; pos: 'before' | 'after' } | null) => void;
   onOpenSession?: (id: string) => void;
@@ -516,7 +516,6 @@ export function WorkspacePane({
   const bodyRef = React.useRef<HTMLDivElement | null>(null);
   const [zone, setZone] = React.useState<DropZone | null>(null);
   const [pickerOpen, setPickerOpen] = React.useState(false);
-  const [splitArm, setSplitArm] = React.useState<{ dir: 'row' | 'col' } | null>(null);
   const [pending, setPending] = React.useState<PendingSession | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [maximized, setMaximized] = React.useState(false);
@@ -544,7 +543,6 @@ export function WorkspacePane({
     const next = tabs.some((t) => t.id === tab.id) ? tabs : [...tabs, tab];
     onTabsChange(id, next, tab.id);
     setPickerOpen(false);
-    setSplitArm(null);
   };
 
   const closeTab = (tabId: string) => {
@@ -581,7 +579,6 @@ export function WorkspacePane({
   const openSplit = (tab: PaneTab, dir: 'row' | 'col', pos: 'before' | 'after') => {
     onSplit(id, dir, pos, tab);
     setPickerOpen(false);
-    setSplitArm(null);
   };
 
   const handleDrop = async (e: React.DragEvent) => {
@@ -628,7 +625,6 @@ export function WorkspacePane({
         // Inspector: reveal this pane's live picker (real sessions +
         // tools) as its pane entry instead of a tool tab.
         setPickerOpen(true);
-        setSplitArm(null);
         return;
       }
       const tab = makeInspectorTab(railId);
@@ -713,15 +709,11 @@ export function WorkspacePane({
   };
 
   const pickSession = (sid: string, title: string) => {
-    const tab = makeSessionTab(sid, title);
-    if (splitArm) openSplit(tab, splitArm.dir, 'after');
-    else addTab(tab);
+    addTab(makeSessionTab(sid, title));
   };
 
   const pickInspector = (inspectorId: InspectorTabId) => {
-    const tab = makeInspectorTab(inspectorId);
-    if (splitArm) openSplit(tab, splitArm.dir, 'after');
-    else addTab(tab);
+    addTab(makeInspectorTab(inspectorId));
   };
 
   const showPicker = pickerOpen || tabs.length === 0;
@@ -747,13 +739,9 @@ export function WorkspacePane({
         onSelect={(tabId) => onTabsChange(id, tabs, tabId)}
         onClose={closeTab}
         onAdd={() => {
-          setSplitArm(null);
           setPickerOpen((v) => !v);
         }}
-        onArmSplit={(dir) => {
-          setSplitArm({ dir });
-          setPickerOpen(true);
-        }}
+        onSplitEmpty={(dir) => onSplitEmpty(id, dir)}
         onClosePane={() => onClosePane(id)}
       />
       <div
@@ -765,13 +753,11 @@ export function WorkspacePane({
       >
         {showPicker ? (
           <PaneTabPicker
-            splitArmed={splitArm}
             onPickSession={pickSession}
-            onForkSession={(sid) => void forkHere(sid, (tab) => (splitArm ? openSplit(tab, splitArm.dir, 'after') : addTab(tab)))}
+            onForkSession={(sid) => void forkHere(sid, (tab) => addTab(tab))}
             onPickInspector={pickInspector}
             onCancel={tabs.length === 0 ? null : () => {
               setPickerOpen(false);
-              setSplitArm(null);
             }}
           />
         ) : active ? (
@@ -841,7 +827,7 @@ function PaneTabBar({
   onSelect,
   onClose,
   onAdd,
-  onArmSplit,
+  onSplitEmpty,
   onClosePane,
 }: {
   tabs: PaneTab[];
@@ -851,7 +837,7 @@ function PaneTabBar({
   onSelect: (tabId: string) => void;
   onClose: (tabId: string) => void;
   onAdd: () => void;
-  onArmSplit: (dir: 'row' | 'col') => void;
+  onSplitEmpty: (dir: 'row' | 'col') => void;
   onClosePane: () => void;
 }) {
   return (
@@ -915,10 +901,10 @@ function PaneTabBar({
       <Button variant="ghost" size="sm" className="h-5 w-5 shrink-0 p-0" title="Open a tab (live sessions and tools)" onClick={onAdd} aria-label="Open a tab (live sessions and tools)">
         <Plus className="h-3 w-3" />
       </Button>
-      <Button variant="ghost" size="sm" className="h-5 w-5 shrink-0 p-0" title="Split into side-by-side columns" onClick={() => onArmSplit('row')} aria-label="Split into side-by-side columns">
+      <Button variant="ghost" size="sm" className="h-5 w-5 shrink-0 p-0" title="Split into side-by-side columns" onClick={() => onSplitEmpty('row')} aria-label="Split into side-by-side columns">
         <Columns2 className="h-3 w-3" />
       </Button>
-      <Button variant="ghost" size="sm" className="h-5 w-5 shrink-0 p-0" title="Split into stacked rows" onClick={() => onArmSplit('col')} aria-label="Split into stacked rows">
+      <Button variant="ghost" size="sm" className="h-5 w-5 shrink-0 p-0" title="Split into stacked rows" onClick={() => onSplitEmpty('col')} aria-label="Split into stacked rows">
         <Rows2 className="h-3 w-3" />
       </Button>
       <Button variant="ghost" size="sm" className="h-5 w-5 shrink-0 p-0" title="Close this pane" onClick={onClosePane} aria-label="Close this pane">

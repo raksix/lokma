@@ -146,6 +146,15 @@ export function TilingWorkspace({
     focusPane(newPaneId);
   };
 
+  // REQ-033 (concept parity): split buttons split IMMEDIATELY into an empty
+  // pane whose picker offers live content — no arm-then-pick two-step.
+  const splitEmpty = (targetPaneId: string, dir: 'row' | 'col') => {
+    const newPaneId = makePaneId();
+    setLayout(splitLayout(layout, targetPaneId, dir, 'after', newPaneId));
+    setTabStates((prev) => ({ ...prev, [newPaneId]: { tabs: [], active: null } }));
+    focusPane(newPaneId);
+  };
+
   const closePane = (paneId: string) => {
     const next = closeLayoutPane(layout, paneId);
     if (!next) {
@@ -240,6 +249,7 @@ export function TilingWorkspace({
         onFocus={focusPane}
         onTabsChange={tabsChange}
         onSplit={split}
+        onSplitEmpty={splitEmpty}
         onClosePane={closePane}
         onMoveTab={moveTab}
         onOpenSession={onOpenSession}

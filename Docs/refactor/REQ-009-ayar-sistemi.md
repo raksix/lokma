@@ -1,0 +1,7 @@
+# REQ-009 — Docs'a uygun detaylı ayar sistemi yap
+
+- **Status:** pending (kod yazılmadı — kullanıcı "yap" deyince başlanacak; REQ-008'deki activity bar'ın en altındaki dişli ikon buraya bağlanacak)
+- **Asked:** 2026-09-07 — "ayarlar falan en alta olcak, detaylı bir ayar sistemi yapman lazım, docs'a uygun ayar sistemi yapmak için de ayrı refactör aç".
+- **Interpretation:** `Docs/26-CONFIG-and-CREDENTIALS.md` + `Docs/32-SETUP-optional-stack-and-connections.md`'e uygun, tek ekranda toplanmış detaylı ayar sistemi: profil/tema (4 palet + light/dark), provider anahtarları (keySet, asla plaintext göstermez), modeller (enable/disable), session varsayılanları (model, cwd), izinler (defaultMode plan/auto + allow/deny), MCP sunucuları, locks/budget limitleri, doctor özet satırı. Her değişiklik anında `PATCH /api/config` ile persist + toast + validation hatası inline.
+- **Touched (plan):** mevcut Settings/Setup/Auth panelleri envanterlenir (neler var, neler eksik — önce `Docs/26` ve `Docs/32` claim-by-claim kontrol), eksikler tek `settings` yüzeyinde toplanır, activity bar dişlisi buraya açılır.
+- **Verify (plan):** Docs/26+32'deki her ayar iddiası canlıda var/yok tablosu, eksik yok; root+web `tsc` 0, web build green, config round-trip headless kanıtı (yaz→oku aynı), bundle match.

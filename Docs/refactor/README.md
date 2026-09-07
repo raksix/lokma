@@ -26,3 +26,5 @@
 - [REQ-005](REQ-005-session-surukle-pane.md) — Session listeden pane'e session ekleme çalışmıyor — pending
 - [REQ-006](REQ-006-side-rozet-kaldir.md) — Sidebar left/right rozetleri kaldır — pending
 - [REQ-007](REQ-007-menu-swap-ikonu.md) — Sol/sağ menü swap ikonu (en sol üst) — pending
+- [REQ-008](REQ-008-activity-bar.md) — En sağa VS Code tarzı activity bar — pending
+- [REQ-009](REQ-009-ayar-sistemi.md) — Docs'a uygun detaylı ayar sistemi — pending

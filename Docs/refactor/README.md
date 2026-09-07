@@ -37,3 +37,4 @@
 - [REQ-016](REQ-016-alt-hint-kaldir.md) — Alttaki gereksiz ibareler kaldırılacak — pending
 - [REQ-017](REQ-017-sekmede-duzenle.md) — Dosya sekmeleri IDE gibi düzenlenebilir — pending
 - [REQ-018](REQ-018-status-bar-metrik.md) — Status bar: gateway/proje/cpu/ram/token-s/sürüm — pending
+- [REQ-019](REQ-019-sidebar-resize.md) — Sol/sağ menüler resize edilebilir — pending

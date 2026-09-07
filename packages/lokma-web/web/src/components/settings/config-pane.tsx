@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { emitToast } from '@/components/shell';
 import type { NormalizedConfig } from './settings';
-import { buildAgentsPatch, isValidAgentDefaultModel, validateAgentsCaps } from './settings';
+import { buildAgentsPatch, isValidAgentDefaultModel, validateAgentsBudgets, validateAgentsCaps } from './settings';
 
 /**
  * ConfigPane — the effective (merged) harness config, read live from
@@ -27,6 +27,11 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
   const [savingCaps, setSavingCaps] = React.useState(false);
   const [agentModel, setAgentModel] = React.useState(config.agentDefaultModel);
   const [agentModelError, setAgentModelError] = React.useState('');
+  const [budgets, setBudgets] = React.useState({
+    tokens: config.agentBudgets.tokens === null ? '' : String(config.agentBudgets.tokens),
+    usd: config.agentBudgets.usd === null ? '' : String(config.agentBudgets.usd),
+  });
+  const [budgetsErrors, setBudgetsErrors] = React.useState<Record<string, string>>({});
 
   async function handleSaveModel(): Promise<void> {
     const next = model.trim();
@@ -54,13 +59,15 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
     setCapsErrors(errors);
     const modelError = isValidAgentDefaultModel(agentModel) ? '' : 'Non-empty model id (e.g. provider::model-id).';
     setAgentModelError(modelError);
-    if (Object.keys(errors).length > 0 || modelError) return;
+    const budgetErrors = validateAgentsBudgets(budgets);
+    setBudgetsErrors(budgetErrors);
+    if (Object.keys(errors).length > 0 || modelError || Object.keys(budgetErrors).length > 0) return;
     setSavingCaps(true);
     try {
       // Full agents object — saveGlobal shallow-merges, so every key rides
       // along and no sibling is reset to the schema default.
       await api.patchConfig(
-        buildAgentsPatch(Number(caps.maxAgents), Number(caps.maxConcurrent), Number(caps.maxQueue), agentModel.trim()),
+        buildAgentsPatch(Number(caps.maxAgents), Number(caps.maxConcurrent), Number(caps.maxQueue), agentModel.trim(), Number(budgets.tokens), Number(budgets.usd)),
       );
       emitToast('Agent caps saved');
       await onReload();
@@ -75,6 +82,11 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
     { key: 'maxAgents', label: 'Max agents', hint: 'Registry slots (1–100)' },
     { key: 'maxConcurrent', label: 'Max concurrent', hint: 'Running at once (1–20)' },
     { key: 'maxQueue', label: 'Max queue', hint: 'Waiting slots (1+)' },
+  ];
+
+  const budgetFields: Array<{ key: 'tokens' | 'usd'; label: string; hint: string }> = [
+    { key: 'tokens', label: 'Budget tokens', hint: 'Whole tokens, 1+' },
+    { key: 'usd', label: 'Budget USD', hint: 'USD cap, 0+' },
   ];
 
   return (
@@ -96,8 +108,8 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
           </div>
           <div className="flex gap-2 rounded border border-line/50 bg-muted/50 p-1.5">
             <span className="shrink-0 font-semibold">agents</span>
-            <span className="truncate text-zinc-500" title={`max ${config.maxAgents ?? '—'} · concurrent ${config.maxConcurrent ?? '—'} · queue ${config.maxQueue ?? '—'} · model ${config.agentDefaultModel || '—'}`}>
-              max {config.maxAgents ?? '—'} · concurrent {config.maxConcurrent ?? '—'} · queue {config.maxQueue ?? '—'} · model {config.agentDefaultModel || '—'}
+            <span className="truncate text-zinc-500" title={`max ${config.maxAgents ?? '—'} · concurrent ${config.maxConcurrent ?? '—'} · queue ${config.maxQueue ?? '—'} · model ${config.agentDefaultModel || '—'} · budget ${config.agentBudgets.tokens ?? '—'} tokens / $${config.agentBudgets.usd ?? '—'}`}>
+              max {config.maxAgents ?? '—'} · concurrent {config.maxConcurrent ?? '—'} · queue {config.maxQueue ?? '—'} · model {config.agentDefaultModel || '—'} · budget {config.agentBudgets.tokens ?? '—'} tokens / ${config.agentBudgets.usd ?? '—'}
             </span>
           </div>
           <div className="flex gap-2 rounded border border-line/50 bg-muted/50 p-1.5">
@@ -165,6 +177,28 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
               />
               {capsErrors[f.key] ? (
                 <div className="mt-0.5 text-[10px] text-red-600">{capsErrors[f.key]}</div>
+              ) : (
+                <div className="mt-0.5 text-[10px] text-zinc-500">{f.hint}</div>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+          {budgetFields.map((f) => (
+            <div key={f.key} className="min-w-0">
+              <label htmlFor={`settings-budgets-${f.key}`} className="text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
+                {f.label}
+              </label>
+              <Input
+                id={`settings-budgets-${f.key}`}
+                inputMode="decimal"
+                value={budgets[f.key]}
+                onChange={(e) => setBudgets((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                placeholder={f.hint}
+                className="mt-0.5 h-7 font-mono text-xs min-w-0"
+              />
+              {budgetsErrors[f.key] ? (
+                <div className="mt-0.5 text-[10px] text-red-600">{budgetsErrors[f.key]}</div>
               ) : (
                 <div className="mt-0.5 text-[10px] text-zinc-500">{f.hint}</div>
               )}

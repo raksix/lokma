@@ -181,6 +181,7 @@ export type NormalizedConfig = {
   maxConcurrent: number | null;
   maxQueue: number | null;
   agentDefaultModel: string;
+  agentBudgets: { tokens: number | null; usd: number | null };
   vaultHost: string | null;
   coordinatorMode: string;
   credentials: Record<string, { keySet: boolean; last4: string | null }>;
@@ -195,6 +196,7 @@ export function normalizeConfig(raw: unknown): NormalizedConfig {
   const cfg = asRecord(root.config);
   const perms = asRecord(cfg.permissions);
   const agents = asRecord(cfg.agents);
+  const budgets = asRecord(agents.budgets);
   const coord = asRecord(cfg.coordinator);
   const vault = asRecord(cfg.vault);
   const mcp = asRecord(cfg.mcp);
@@ -213,6 +215,10 @@ export function normalizeConfig(raw: unknown): NormalizedConfig {
     maxConcurrent: typeof agents.maxConcurrent === 'number' ? agents.maxConcurrent : null,
     maxQueue: typeof agents.maxQueue === 'number' ? agents.maxQueue : null,
     agentDefaultModel: typeof agents.defaultModel === 'string' ? agents.defaultModel : '',
+    agentBudgets: {
+      tokens: typeof budgets.tokens === 'number' && Number.isFinite(budgets.tokens) ? budgets.tokens : null,
+      usd: typeof budgets.usd === 'number' && Number.isFinite(budgets.usd) ? budgets.usd : null,
+    },
     vaultHost: typeof vault.host === 'string' ? vault.host : null,
     coordinatorMode: typeof coord.mode === 'string' ? coord.mode : '',
     credentials: asRecord(root.credentials) as NormalizedConfig['credentials'],
@@ -317,15 +323,50 @@ export function isValidAgentDefaultModel(v: unknown): boolean {
 }
 
 /**
- * Build a PATCH body for the full agents object. Always sends all four
- * keys together — `saveGlobal` shallow-merges, so a partial object would
- * reset the sibling (e.g. defaultModel back to the schema default).
+ * Build a PATCH body for the full agents object. Always sends every key
+ * together — `saveGlobal` shallow-merges, so a partial object would
+ * reset the sibling (e.g. defaultModel back to the schema default, or
+ * budgets back to 500k tokens / $10).
  */
 export function buildAgentsPatch(
   maxAgents: number,
   maxConcurrent: number,
   maxQueue: number,
   agentDefaultModel: string,
+  budgetsTokens: number,
+  budgetsUsd: number,
 ): Record<string, unknown> {
-  return { agents: { maxAgents, maxConcurrent, maxQueue, defaultModel: agentDefaultModel } };
+  return {
+    agents: {
+      maxAgents,
+      maxConcurrent,
+      maxQueue,
+      defaultModel: agentDefaultModel,
+      budgets: { tokens: budgetsTokens, usd: budgetsUsd },
+    },
+  };
+}
+
+/**
+ * Agent budget bounds (mirror the server `AgentsConfigSchema.budgets`:
+ * plain numbers, no schema min — the form guards against garbage/empty
+ * only: whole tokens >= 1, finite usd >= 0).
+ */
+export type AgentsBudgetsInput = {
+  tokens: unknown;
+  usd: unknown;
+};
+
+/** Validate the agent-budgets edit form; returns per-field errors (empty = valid). */
+export function validateAgentsBudgets(input: AgentsBudgetsInput): Record<string, string> {
+  const errors: Record<string, string> = {};
+  const tokens = typeof input.tokens === 'string' && input.tokens.trim() !== '' ? Number(input.tokens) : typeof input.tokens === 'number' ? input.tokens : NaN;
+  if (!Number.isInteger(tokens) || tokens < 1) {
+    errors.tokens = 'Whole tokens, 1 or more.';
+  }
+  const usd = typeof input.usd === 'string' && input.usd.trim() !== '' ? Number(input.usd) : typeof input.usd === 'number' ? input.usd : NaN;
+  if (!Number.isFinite(usd) || usd < 0) {
+    errors.usd = 'USD cap, 0 or more.';
+  }
+  return errors;
 }

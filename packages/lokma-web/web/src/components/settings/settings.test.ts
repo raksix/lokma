@@ -21,6 +21,7 @@ import {
   summarizeDoctor,
   themeCardFromView,
   validateAgentsCaps,
+  validateAgentsBudgets,
   validateMcpForm,
   THEME_CARDS,
 } from './settings';
@@ -113,7 +114,7 @@ const cfg = normalizeConfig({
     permissions: { allow: ['Bash: npm *'], deny: [], defaultMode: 'plan' },
     mcp: { servers: { fs: { transport: 'stdio', command: 'npx x' } } },
     hooks: {},
-    agents: { maxAgents: 20, maxConcurrent: 5, maxQueue: 20 },
+    agents: { maxAgents: 20, maxConcurrent: 5, maxQueue: 20, budgets: { tokens: 500000, usd: 10 } },
   },
   credentials: { anthropic: { keySet: true, last4: 'abcd' } },
 });
@@ -123,10 +124,12 @@ check('reads allow rules', cfg.permissions.allow.length === 1);
 check('reads defaultMode', cfg.permissions.defaultMode === 'plan');
 check('reads mcp servers', cfg.mcpServers.length === 1 && cfg.mcpServers[0].name === 'fs');
 check('reads caps', cfg.maxAgents === 20 && cfg.maxQueue === 20);
+check('reads agent budgets', cfg.agentBudgets.tokens === 500000 && cfg.agentBudgets.usd === 10);
 check('reads credentials', cfg.credentials.anthropic.keySet === true);
 const empty = normalizeConfig(null);
 check('null payload keeps defaults', empty.defaultModel === '' && empty.theme === null && empty.permissions.defaultMode === 'auto');
 check('null payload has no servers', empty.mcpServers.length === 0);
+check('null payload has null budgets', empty.agentBudgets.tokens === null && empty.agentBudgets.usd === null);
 
 // PATCH builders (full objects — saveGlobal shallow-merges)
 const permPatch = buildPermissionsPatch(['a'], ['b'], 'manual') as { permissions: { allow: string[]; deny: string[]; defaultMode: string } };
@@ -162,9 +165,10 @@ check('zero agents flagged', typeof validateAgentsCaps({ maxAgents: '0', maxConc
 check('concurrent over 20 flagged', typeof validateAgentsCaps({ maxAgents: '20', maxConcurrent: '21', maxQueue: '20' }).maxConcurrent === 'string');
 check('fractional queue flagged', typeof validateAgentsCaps({ maxAgents: '20', maxConcurrent: '5', maxQueue: '2.5' }).maxQueue === 'string');
 check('blank queue flagged', typeof validateAgentsCaps({ maxAgents: '20', maxConcurrent: '5', maxQueue: '' }).maxQueue === 'string');
-const agentsPatch = buildAgentsPatch(20, 5, 20, 'anthropic/claude-4-sonnet') as { agents: { maxAgents: number; maxConcurrent: number; maxQueue: number; defaultModel: string } };
+const agentsPatch = buildAgentsPatch(20, 5, 20, 'anthropic/claude-4-sonnet', 500000, 10) as { agents: { maxAgents: number; maxConcurrent: number; maxQueue: number; defaultModel: string; budgets: { tokens: number; usd: number } } };
 check('caps patch keeps all three caps', agentsPatch.agents.maxAgents === 20 && agentsPatch.agents.maxConcurrent === 5 && agentsPatch.agents.maxQueue === 20);
 check('caps patch carries defaultModel (no shallow-merge wipe)', agentsPatch.agents.defaultModel === 'anthropic/claude-4-sonnet');
+check('caps patch carries budgets (no shallow-merge wipe)', agentsPatch.agents.budgets.tokens === 500000 && agentsPatch.agents.budgets.usd === 10);
 
 // isValidAgentDefaultModel (REQ-009 session-defaults piece — agents.defaultModel editable)
 check('non-empty model id passes', isValidAgentDefaultModel('anthropic/claude-4-sonnet') === true);
@@ -172,6 +176,15 @@ check('empty string fails', isValidAgentDefaultModel('') === false);
 check('whitespace-only fails', isValidAgentDefaultModel('   ') === false);
 check('non-string fails', isValidAgentDefaultModel(null) === false);
 check('overlong model id fails', isValidAgentDefaultModel(`x:${'a'.repeat(200)}`) === false);
+
+// validateAgentsBudgets (REQ-009 budgets piece — agents.budgets.tokens/usd editable)
+check('valid budgets pass', Object.keys(validateAgentsBudgets({ tokens: '500000', usd: '10' })).length === 0);
+check('numeric budgets pass', Object.keys(validateAgentsBudgets({ tokens: 500000, usd: 10 })).length === 0);
+check('zero usd passes (free cap)', Object.keys(validateAgentsBudgets({ tokens: '1000', usd: '0' })).length === 0);
+check('fractional tokens flagged', typeof validateAgentsBudgets({ tokens: '2.5', usd: '10' }).tokens === 'string');
+check('blank tokens flagged', typeof validateAgentsBudgets({ tokens: '', usd: '10' }).tokens === 'string');
+check('negative usd flagged', typeof validateAgentsBudgets({ tokens: '500000', usd: '-1' }).usd === 'string');
+check('non-numeric usd flagged', typeof validateAgentsBudgets({ tokens: '500000', usd: 'abc' }).usd === 'string');
 
 console.log(`settings.test.ts: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

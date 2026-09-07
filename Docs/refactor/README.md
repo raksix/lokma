@@ -38,3 +38,4 @@
 - [REQ-017](REQ-017-sekmede-duzenle.md) — Dosya sekmeleri IDE gibi düzenlenebilir — pending
 - [REQ-018](REQ-018-status-bar-metrik.md) — Status bar: gateway/proje/cpu/ram/token-s/sürüm — pending
 - [REQ-019](REQ-019-sidebar-resize.md) — Sol/sağ menüler resize edilebilir — pending
+- [REQ-020](REQ-020-inspector-liste-kaldir.md) — Inspector 23'lü liste kalkar (rail'e taşındı) — pending

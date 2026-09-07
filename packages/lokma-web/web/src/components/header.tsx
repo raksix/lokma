@@ -1,30 +1,17 @@
 import * as React from 'react';
-import { ArrowLeftRight, Moon, PanelLeft, PanelRight, Search, Sun } from 'lucide-react';
+import { ArrowLeftRight, Moon, PanelLeft, PanelRight, Search, Settings, Sun } from 'lucide-react';
 import type { CostTotal, WsStatus } from '@/lib/ws';
 import { api } from '@/lib/api';
-import { useProviderStore } from '@/stores';
-import { applyTheme, applyThemeVars, emitToast, getTheme, subscribeTheme, type ShellTheme } from '@/components/shell';
+import { applyTheme, applyThemeVars, getTheme, subscribeTheme, type ShellTheme } from '@/components/shell';
 import { sidebarPanelTitle, type ExplorerSide } from '@/components/shell/responsive';
-import { enabledModels } from '@/components/providers/models';
 
 /**
  * Header — harness top bar ported from the concept shell (same cream/
  * terracotta tokens, serif wordmark, lucide icons only).
- * Real wiring: model dropdown reads the shared providerStore cache
- * (`GET /api/models`), the cost badge renders live WS `cost` frames, the
- * theme toggle persists `lokma-theme`, search opens the real SearchModal.
+ * REQ-012: no model picker here — model selection lives in the Composer
+ * popup and the Models tab. Compact single-row bar: brand, session pill,
+ * WS/cost readout, search, settings, theme and sidebar toggles.
  */
-
-const MODEL_KEY = 'lokma-model';
-
-function readModel(): string | null {
-  try {
-    if (typeof localStorage === 'undefined') return null;
-    return localStorage.getItem(MODEL_KEY);
-  } catch {
-    return null;
-  }
-}
 
 /** Compact `12.3k · $0.04` label from accumulated WS cost frames. */
 export function formatCostBadge(cost: CostTotal): string {
@@ -39,6 +26,7 @@ export function Header({
   cost,
   wsStatus,
   onSearch,
+  onOpenSettings,
   onToggleLeft,
   onToggleRight,
   explorerSide = 'right',
@@ -49,30 +37,25 @@ export function Header({
   cost: CostTotal;
   wsStatus: WsStatus;
   onSearch: () => void;
+  onOpenSettings: () => void;
   onToggleLeft: () => void;
   onToggleRight: () => void;
   explorerSide?: ExplorerSide;
   onSwapSides?: () => void;
 }) {
   const [theme, setTheme] = React.useState<ShellTheme>('light');
-  const [model, setModel] = React.useState<string | null>(null);
-  const models = useProviderStore((s) => s.models);
-  const refreshProviders = useProviderStore((s) => s.refresh);
 
-  // Sync persisted theme/model once; refresh the shared model cache.
-  // The stored mode applies instantly; then the persisted NAMED theme's
-  // full var set loads best-effort (Phase 3 themes polish) so a reload
-  // keeps the exact palette, not just the light/dark family. The header
-  // toggle also subscribes to effective-mode changes, so the async named
-  // theme load (or an Appearance-pane pick) can never leave its icon and
-  // aria-label stale.
+  // Sync persisted theme once. The stored mode applies instantly; then
+  // the persisted NAMED theme's full var set loads best-effort (Phase 3
+  // themes polish) so a reload keeps the exact palette, not just the
+  // light/dark family. The header toggle also subscribes to
+  // effective-mode changes, so the async named theme load (or an
+  // Appearance-pane pick) can never leave its icon and aria-label stale.
   React.useEffect(() => {
     const stored = getTheme();
     applyTheme(stored);
     setTheme(stored);
     const unsubscribe = subscribeTheme((mode) => setTheme(mode));
-    setModel(readModel());
-    void refreshProviders();
     void api
       .getConfig()
       .then((res) => {
@@ -87,7 +70,7 @@ export function Header({
     return () => {
       unsubscribe();
     };
-  }, [refreshProviders]);
+  }, []);
 
   const flipTheme = (): void => {
     const next = getTheme() === 'dark' ? 'light' : 'dark';
@@ -95,42 +78,20 @@ export function Header({
     setTheme(next);
   };
 
-  const pickModel = (id: string): void => {
-    setModel(id);
-    try {
-      localStorage.setItem(MODEL_KEY, id);
-    } catch {
-      // Selection still applies for this tab without persistence.
-    }
-    // Persist per-session server-side (W1 chat core); failures only toast.
-    api.patchSession(sessionId, { model: id }).catch(() => undefined);
-    emitToast(`Model ${id} selected`);
-  };
-
-  const effectiveModel = model ?? models[0]?.id ?? '';
-  // Single source (W2-6): the Models tab owns enable/disable — the header
-  // select offers enabled models, keeping the persisted choice visible even
-  // when it was disabled after the fact (so the select never blanks).
-  const visibleModels = React.useMemo(() => {
-    const enabled = enabledModels(models);
-    if (!effectiveModel || enabled.some((m) => m.id === effectiveModel)) return enabled;
-    const current = models.find((m) => m.id === effectiveModel);
-    return current ? [...enabled, current] : enabled;
-  }, [models, effectiveModel]);
   const live = wsStatus === 'open';
   // REQ-007 — toggle copy follows the sidebar swap, never hardcoded sides.
   const leftPanel = sidebarPanelTitle('left', explorerSide);
   const rightPanel = sidebarPanelTitle('right', explorerSide);
 
   return (
-    <header className="z-40 h-11 shrink-0 border-b border-[#E8E4DE] bg-[#FAF9F5]/90 backdrop-blur-xl">
-      <div className="flex h-full w-full items-center gap-1.5 px-2 sm:px-3">
+    <header className="z-40 h-9 shrink-0 border-b border-[#E8E4DE] bg-[#FAF9F5]/90 backdrop-blur-xl">
+      <div className="flex h-full w-full items-center gap-1 px-2">
         {onSwapSides ? (
           <button
             onClick={onSwapSides}
             title={`Swap sidebars (Explorer ${explorerSide === 'left' ? 'left' : 'right'})`}
             aria-label="Swap left and right sidebars"
-            className="grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-[#F2F0EB]"
+            className="grid h-6 w-6 place-items-center rounded-md text-zinc-500 hover:bg-[#F2F0EB]"
           >
             <ArrowLeftRight className="h-3.5 w-3.5" />
           </button>
@@ -139,23 +100,20 @@ export function Header({
           onClick={onToggleLeft}
           title={`Toggle ${leftPanel} ([)`}
           aria-label={`Toggle ${leftPanel}`}
-          className="grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-[#F2F0EB]"
+          className="grid h-6 w-6 place-items-center rounded-md text-zinc-500 hover:bg-[#F2F0EB]"
         >
           <PanelLeft className="h-3.5 w-3.5" />
         </button>
-        <div className="ml-1 flex items-center gap-2">
-          <span className="grid h-6 w-6 place-items-center rounded-md bg-[#262624] text-xs font-semibold text-white">
+        <div className="ml-1 flex items-center gap-1.5">
+          <span className="grid h-5 w-5 place-items-center rounded-md bg-[#262624] text-[10px] font-semibold text-white">
             L
           </span>
-          <span className="hidden font-serif text-[17px] sm:block">lokma</span>
-          <span className="hidden rounded border border-[#E8E4DE] bg-white px-1 py-0.5 text-[9px] uppercase tracking-widest text-zinc-500 md:inline-flex">
-            harness
-          </span>
+          <span className="hidden font-serif text-[15px] sm:block">lokma</span>
         </div>
         <div className="ml-2 hidden items-center gap-1 text-xs text-zinc-500 md:flex">
           <span className="mx-1 h-4 w-px bg-[#E8E4DE]" />
           <span className="font-mono" title={sessionId}>
-            {sessionId.slice(0, 18)}
+            {sessionId.slice(0, 12)}
           </span>
           <span
             className={`rounded-full border px-1.5 py-0.5 text-[10px] ${
@@ -176,28 +134,11 @@ export function Header({
           </span>
         </div>
         <div className="flex items-center gap-1">
-          <select
-            id="lokma-model-select"
-            value={effectiveModel}
-            onChange={(e) => pickModel(e.target.value)}
-            title="Model (Ctrl+M)"
-            className="hidden h-7 max-w-[180px] rounded-md border border-[#E8E4DE] bg-white px-1.5 text-xs text-zinc-700 outline-none focus:ring-1 focus:ring-[#C96442] md:block"
-          >
-            {visibleModels.length === 0 ? (
-              <option value="">No models</option>
-            ) : (
-              visibleModels.map((m) => (
-                <option key={`${m.provider}::${m.id}`} value={m.id}>
-                  {m.label || m.id}
-                </option>
-              ))
-            )}
-          </select>
           <button
             onClick={flipTheme}
             title="Toggle theme"
             aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-            className="grid h-7 w-7 place-items-center rounded-md border border-[#E8E4DE] bg-white text-zinc-600 hover:bg-[#F2F0EB]"
+            className="grid h-6 w-6 place-items-center rounded-md border border-[#E8E4DE] bg-white text-zinc-600 hover:bg-[#F2F0EB]"
           >
             {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
           </button>
@@ -205,15 +146,23 @@ export function Header({
             onClick={onSearch}
             title="Search (Ctrl+K)"
             aria-label="Search (Control K)"
-            className="grid h-7 w-7 place-items-center rounded-md border border-[#E8E4DE] bg-white text-zinc-600 hover:bg-[#F2F0EB]"
+            className="grid h-6 w-6 place-items-center rounded-md border border-[#E8E4DE] bg-white text-zinc-600 hover:bg-[#F2F0EB]"
           >
             <Search className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={onOpenSettings}
+            title="Settings"
+            aria-label="Open settings"
+            className="grid h-6 w-6 place-items-center rounded-md border border-[#E8E4DE] bg-white text-zinc-600 hover:bg-[#F2F0EB]"
+          >
+            <Settings className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={onToggleRight}
             title={`Toggle ${rightPanel} (])`}
             aria-label={`Toggle ${rightPanel}`}
-            className="grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-[#F2F0EB]"
+            className="grid h-6 w-6 place-items-center rounded-md text-zinc-500 hover:bg-[#F2F0EB]"
           >
             <PanelRight className="h-3.5 w-3.5" />
           </button>

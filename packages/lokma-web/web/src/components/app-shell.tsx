@@ -216,7 +216,9 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       }
       if (mod && (e.key === 'm' || e.key === 'M')) {
         e.preventDefault();
-        document.getElementById('lokma-model-select')?.focus();
+        // REQ-012 — the header model select is gone; Ctrl+M opens the
+        // Composer's own model popup (it toggles on click).
+        document.getElementById('lokma-composer-model')?.click();
         return;
       }
       if (mod && (e.key === 'p' || e.key === 'P')) {
@@ -305,6 +307,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         cost={ws.cost}
         wsStatus={ws.status}
         onSearch={() => setSearchOpen(true)}
+        onOpenSettings={() => handleInspectorRailSelect('settings')}
         onToggleLeft={() => toggleSidebar('left')}
         onToggleRight={() => toggleSidebar('right')}
         explorerSide={explorerSide}

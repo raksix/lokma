@@ -21,7 +21,7 @@ export type ShortcutDef = {
 
 export const SHORTCUTS: ShortcutDef[] = [
   { id: 'search', keys: ['Ctrl/⌘', 'K'], description: 'Search sessions, notes and commands' },
-  { id: 'model', keys: ['Ctrl/⌘', 'M'], description: 'Jump to the model picker' },
+  { id: 'model', keys: ['Ctrl/⌘', 'M'], description: 'Open the composer model picker' },
   { id: 'explorer', keys: ['Ctrl/⌘', 'P'], description: 'Toggle Files panel and focus files' },
   { id: 'left', keys: ['['], description: 'Toggle left sidebar (Inspector)' },
   { id: 'right', keys: [']'], description: 'Toggle right sidebar (Explorer)' },

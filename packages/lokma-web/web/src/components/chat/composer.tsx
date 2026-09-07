@@ -330,10 +330,11 @@ export function Composer({
           </div>
           <div className="relative">
             <Button
+              id="lokma-composer-model"
               variant="outline"
               size="sm"
               onClick={() => setModelOpen((v) => !v)}
-              title="Model select (Ctrl+M in header)"
+              title="Model select (Ctrl+M)"
               className="h-6 max-w-[150px] gap-1 rounded-full border-line bg-white pr-1 pl-1.5 text-xs"
             >
               <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[#262624] text-[9px] text-white">L</span>

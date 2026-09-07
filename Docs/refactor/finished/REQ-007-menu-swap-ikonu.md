@@ -1,6 +1,6 @@
 # REQ-007 — Sol/sağ menü yer değiştirebilir olacak, en sol üste swap iconu
 
-- **Status:** done (live 2026-09-07)
+- **Status:** done (commit `f71983a`, live 2026-09-07)
 - **Asked:** 2026-09-07 — "sol sağ menü yer değişbireşblir olcakonun için en sol üste bir icon ekle yer değişrimek için".
 - **Interpretation:** Explorer ↔ Inspector swap: header'ın en soluna bir swap ikonu (`ArrowLeftRight`, lucide-only) eklendi; tıklayınca sol/sağ paneller yer değiştirir. Tercih `lokma-explorer-side` localStorage anahtarında kalıcı, reload'da korunur. Toggle başlıkları (`Toggle Explorer ([)` / `Toggle Inspector (])`), mobil drawer etiketleri, `Ctrl+P` hedefi ve `?` kısayol listesindeki `[`/`]` açıklamaları swap'i takip eder; `[`/`]` her zaman fiziksel solu/sağı çalıştırır.
 - **Touched:** `components/shell/responsive.ts` (`ExplorerSide` + `read/write/swappedExplorerSide` + `sidebarPanelTitle`/`sidebarToggleTitle`), `components/shell/shortcuts.ts` (`resolveShortcuts`), `components/shell/shortcuts-dialog.tsx` (`explorerSide` prop), `components/shell/index.ts` (barrel), `components/header.tsx` (en solda swap butonu + swap-aware toggle copy), `components/app-shell.tsx` (`explorerSide` state + `swapSides` + swap-aware render/Ctrl+P/drawer-dismiss), `components/shell/responsive.test.ts` (18 yeni kontrol).

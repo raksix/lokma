@@ -61,6 +61,10 @@ import { useFocusTrap } from '@/components/shell/use-focus-trap';
  * REQ-007: Explorer and Inspector swap physical sides via the header swap
  * button (`explorerSide`, persisted to localStorage) — toggle titles,
  * drawer labels and `[`/`]` shortcut copy all follow the swap.
+ *
+ * REQ-011: the FileBrowser lives fixed on the LEFT (docked above the
+ * swap-dependent left content) — file work is always left, while sessions
+ * + the server card stay in the Explorer panel wherever the swap puts it.
  */
 export function AppShell({ sessionId }: { sessionId: string }) {
   const [activeId, setActiveId] = React.useState(sessionId);
@@ -191,11 +195,13 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       if (!id || id === activeId) return;
       setActiveId(id);
       selectSession(id);
-      // On mobile the Explorer is a drawer — dismiss it so the chat is visible.
-      if (isMobile) setSidebars((current) => ({ ...current, [explorerSide]: false }));
+      // On mobile both sidebars are drawers — dismiss them so the chat is
+      // visible (REQ-011: files live in the left drawer, sessions in the
+      // Explorer drawer, so dismissing one no longer covers both).
+      if (isMobile) setSidebars(() => ({ left: false, right: false }));
       void refreshSessions();
     },
-    [activeId, explorerSide, isMobile, refreshSessions, selectSession],
+    [activeId, isMobile, refreshSessions, selectSession],
   );
 
   // Global shortcuts — every combo is listed in the SHORTCUTS registry so
@@ -215,7 +221,8 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       }
       if (mod && (e.key === 'p' || e.key === 'P')) {
         e.preventDefault();
-        setSidebars((current) => nextSidebarVisibility(current, explorerSide, isMobile));
+        // REQ-011 — files live fixed on the left, so reveal the left panel.
+        setSidebars((current) => nextSidebarVisibility(current, 'left', isMobile));
         window.dispatchEvent(new Event(FOCUS_FILES_EVENT));
         return;
       }
@@ -238,7 +245,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [explorerSide, isMobile, toggleSidebar]);
+  }, [isMobile, toggleSidebar]);
 
   // Footer hint + panes open the dialog through this event (no prop drilling).
   React.useEffect(() => {
@@ -247,10 +254,12 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     return () => window.removeEventListener(SHOW_SHORTCUTS_EVENT, open);
   }, []);
 
+  // REQ-011 — FileBrowser moved out to the fixed left stack below; the
+  // Explorer panel keeps sessions + the server card wherever the swap
+  // puts it.
   const explorerContent = (
     <div className="space-y-4">
       <SessionsSidebar activeId={activeId} onSelect={switchSession} />
-      <FileBrowser key={activeId} sessionId={activeId} />
       <div className="rounded border border-dashed p-3 text-xs text-muted-foreground">
         <div className="font-medium text-foreground">Server</div>
         <div className="mt-1 flex items-center gap-2">
@@ -270,6 +279,17 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   const rightPanel = sidebarPanelTitle('right', explorerSide);
   const leftContent = explorerSide === 'left' ? explorerContent : inspectorContent;
   const rightContent = explorerSide === 'left' ? inspectorContent : explorerContent;
+
+  // REQ-011 — file work is always left: the FileBrowser docks fixed above
+  // the swap-dependent left content (the REQ-007 swap only swaps the
+  // Explorer vs Inspector body below it). Session scope is unchanged
+  // (`key` remounts per session, exactly as before).
+  const leftStack = (
+    <div className="space-y-4">
+      <FileBrowser key={activeId} sessionId={activeId} />
+      {leftContent}
+    </div>
+  );
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -301,14 +321,14 @@ export function AppShell({ sessionId }: { sessionId: string }) {
             <MobileDrawer side="left" label={`${leftPanel} panel`} onClose={closeDrawers}>
               <PaneErrorBoundary paneName={leftPanel}>
                 <Sidebar side="left" title={leftPanel} className="h-full w-full">
-                  {leftContent}
+                  {leftStack}
                 </Sidebar>
               </PaneErrorBoundary>
             </MobileDrawer>
           ) : (
             <PaneErrorBoundary paneName={leftPanel}>
               <Sidebar side="left" title={leftPanel}>
-                {leftContent}
+                {leftStack}
               </Sidebar>
             </PaneErrorBoundary>
           )

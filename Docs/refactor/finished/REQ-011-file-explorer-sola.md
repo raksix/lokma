@@ -1,0 +1,8 @@
+# REQ-011 — File explorer sola taşınacak
+
+- **Status:** done (live 2026-09-07)
+- **Asked:** 2026-09-07 — "ayrıca file exploreri de oraya taşı piç".
+- **Interpretation:** `FileBrowser` (dosya ağacı + arama + önizleme/editör) sağdaki Explorer panelinden alınıp SOL tarafa taşınır (REQ-010'daki ikon şeridinin yanındaki geniş panele ya da mevcut sol panele — net yerleşim uygulamaya bırakıldı ama sonuç: dosya işlemleri solda). Sağdaki Explorer panelinde sessions + server kartı kalır. `openFile` → sekme akışı (REQ-002) ve cwd/session kapsamı aynen korunur, sadece bulunduğu panel değişir.
+- **Decision:** FileBrowser yeni sol yuvasında SABİT kalır — REQ-007 swap'i sadece Explorer↔Inspector gövdesini değiştirir (sol panel = Files + swap gövdesi). Ctrl+P artık sol paneli açar (files hep solda), mobilde session seçimi iki drawer'ı da kapatır (önceden files Explorer drawer'ının içindeydi, tek kapatma yetiyordu).
+- **Touched:** `components/app-shell.tsx` (`explorerContent` içinden `FileBrowser` çıkarıldı — sessions + server kaldı; yeni sabit `leftStack` = FileBrowser + swap-bağımlı `leftContent`, iki sol render dalında da kullanıldı; Ctrl+P `nextSidebarVisibility(..., 'left', ...)`; mobil `switchSession` iki drawer'ı kapatır), `components/shell/shortcuts.ts` (Ctrl+P açıklaması → 'Toggle Files panel and focus files').
+- **Proof:** root tsc 0, responsive probe 41/41 (a11y 32/33 — 1 pre-existing stale `SHORTCUTS.map` kontrolü, temiz ağaçta da fail), web build green (index-CBS7wW7F.js), single-proc lokma-web restart, live / 200 authed + health 200 + served bundle == disk dist, headless DOM probe PASS (sol aside `#lokma-file-search` var / `New Session` yok; sağ aside `New Session` + server kartı var / file search yok).

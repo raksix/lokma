@@ -29,7 +29,7 @@
 - [REQ-008](finished/REQ-008-activity-bar.md) — En sağa VS Code tarzı activity bar — done
 - [REQ-009](finished/REQ-009-ayar-sistemi.md) — Docs'a uygun detaylı ayar sistemi — done
 - [REQ-010](finished/REQ-010-sol-ikon-rail.md) — En sola Inspector ikon şeridi — done
-- [REQ-011](REQ-011-file-explorer-sola.md) — File explorer sola taşınacak — pending
+- [REQ-011](finished/REQ-011-file-explorer-sola.md) — File explorer sola taşınacak — done
 - [REQ-012](REQ-012-ust-bar-compact.md) — Üst model seçimi kalkar, bar compact + ayarlar ikonu — pending
 - [REQ-013](REQ-013-browser-sadelestir.md) — Browser sade: sekme yok, URL-only, tam alan — pending
 - [REQ-014](REQ-014-windowed-arka-plan.md) — Windowed panellere solid arka plan — pending

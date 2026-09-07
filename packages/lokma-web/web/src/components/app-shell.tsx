@@ -11,6 +11,7 @@ import { TilingWorkspace } from '@/components/panes';
 import { LayoutGrid, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePaneStore } from '@/stores/pane';
+import { DEFAULT_LEFT_WIDTH, DEFAULT_RIGHT_WIDTH } from '@/stores/layout';
 import { HealthBadge } from '@/components/status/health-badge';
 import { useWs } from '@/hooks/use-ws';
 import { api, type MetricsRes } from '@/lib/api';
@@ -69,6 +70,11 @@ import { useFocusTrap } from '@/components/shell/use-focus-trap';
 export function AppShell({ sessionId }: { sessionId: string }) {
   const [activeId, setActiveId] = React.useState(sessionId);
   const tiling = usePaneStore((s) => s.tiling);
+  // REQ-019 — resizable sidebars: widths persist in the pane store
+  // (`lokma:layout:v1`), the Sidebar handle writes back live via setSideWidth.
+  const leftW = usePaneStore((s) => s.leftW);
+  const rightW = usePaneStore((s) => s.rightW);
+  const setSideWidth = usePaneStore((s) => s.setSideWidth);
   const isMobile = useIsMobile();
   const [sidebars, setSidebars] = React.useState<SidebarVisibility>(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -376,7 +382,13 @@ export function AppShell({ sessionId }: { sessionId: string }) {
             </MobileDrawer>
           ) : (
             <PaneErrorBoundary paneName={leftPanel}>
-              <Sidebar side="left" title={leftPanel}>
+              <Sidebar
+                side="left"
+                title={leftPanel}
+                width={leftW}
+                defaultWidth={DEFAULT_LEFT_WIDTH}
+                onResize={(w) => setSideWidth('left', w)}
+              >
                 {leftStack}
               </Sidebar>
             </PaneErrorBoundary>
@@ -405,7 +417,13 @@ export function AppShell({ sessionId }: { sessionId: string }) {
             </MobileDrawer>
           ) : (
             <PaneErrorBoundary paneName={rightPanel}>
-              <Sidebar side="right" title={rightPanel}>
+              <Sidebar
+                side="right"
+                title={rightPanel}
+                width={rightW}
+                defaultWidth={DEFAULT_RIGHT_WIDTH}
+                onResize={(w) => setSideWidth('right', w)}
+              >
                 {rightContent}
               </Sidebar>
             </PaneErrorBoundary>

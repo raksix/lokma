@@ -1,9 +1,13 @@
 import { Bot, CircleUserRound, Database, FlaskConical, GitBranch, Globe, MessagesSquare, Settings, Terminal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { InspectorTab } from '@/components/providers';
+import type { SidebarSide } from './responsive';
 
 /**
- * ActivityBar — VS Code-style icon rail docked at the far right edge.
+ * ActivityBar — VS Code-style icon rail docked on the Explorer panel's
+ * outer edge (REQ-008 + REQ-021: it travels with the Explorer across the
+ * REQ-007 swap, exactly like the InspectorRail travels with the
+ * Inspector — no rail is ever left stranded next to the other panel).
  * Top: sessions, then git; middle: tiling/inspector pane shortcuts;
  * bottom: settings + account. Purely presentational: the parent owns the
  * active key and maps each click to a sidebar (Explorer vs Inspector +
@@ -77,11 +81,13 @@ function ActivityButton({
   active,
   label,
   Icon,
+  indicatorClass,
   onClick,
 }: {
   active: boolean;
   label: string;
   Icon: typeof MessagesSquare;
+  indicatorClass: string;
   onClick: () => void;
 }) {
   return (
@@ -102,7 +108,7 @@ function ActivityButton({
         aria-hidden="true"
         className={cn(
           'absolute top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-terracotta transition-opacity',
-          'left-[-6px]',
+          indicatorClass,
           active ? 'opacity-100' : 'opacity-0',
         )}
       />
@@ -111,22 +117,36 @@ function ActivityButton({
   );
 }
 
-export function ActivityBar({ active, onSelect }: { active: ActivityKey; onSelect: (key: ActivityKey) => void }) {
+export function ActivityBar({
+  active,
+  onSelect,
+  side,
+}: {
+  active: ActivityKey;
+  onSelect: (key: ActivityKey) => void;
+  side: SidebarSide;
+}) {
+  // Full literal classes — Tailwind v4 never compiles dynamic `border-${x}`.
+  const borderClass = side === 'left' ? 'border-r border-line' : 'border-l border-line';
+  const indicatorClass = side === 'left' ? 'right-[-6px]' : 'left-[-6px]';
   return (
     <nav
       aria-label="Activity bar"
-      className="hidden w-12 shrink-0 flex-col items-center gap-0.5 overflow-y-auto border-l border-line bg-card py-2 md:flex"
+      className={cn(
+        'hidden w-12 shrink-0 flex-col items-center gap-0.5 overflow-y-auto bg-card py-2 md:flex',
+        borderClass,
+      )}
     >
       {TOP_ITEMS.map(({ key, label, Icon }) => (
-        <ActivityButton key={key} active={active === key} label={label} Icon={Icon} onClick={() => onSelect(key)} />
+        <ActivityButton key={key} active={active === key} label={label} Icon={Icon} indicatorClass={indicatorClass} onClick={() => onSelect(key)} />
       ))}
       <span aria-hidden="true" className="my-1.5 h-px w-6 shrink-0 bg-line" />
       {PANE_ITEMS.map(({ key, label, Icon }) => (
-        <ActivityButton key={key} active={active === key} label={label} Icon={Icon} onClick={() => onSelect(key)} />
+        <ActivityButton key={key} active={active === key} label={label} Icon={Icon} indicatorClass={indicatorClass} onClick={() => onSelect(key)} />
       ))}
       <span className="flex-1" />
       {BOTTOM_ITEMS.map(({ key, label, Icon }) => (
-        <ActivityButton key={key} active={active === key} label={label} Icon={Icon} onClick={() => onSelect(key)} />
+        <ActivityButton key={key} active={active === key} label={label} Icon={Icon} indicatorClass={indicatorClass} onClick={() => onSelect(key)} />
       ))}
     </nav>
   );

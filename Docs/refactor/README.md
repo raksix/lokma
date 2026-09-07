@@ -39,7 +39,7 @@
 - [REQ-018](finished/REQ-018-status-bar-metrik.md) — Status bar: gateway/proje/cpu/ram/token-s/sürüm — done
 - [REQ-019](finished/REQ-019-sidebar-resize.md) — Sol/sağ menüler resize edilebilir — done
 - [REQ-020](finished/REQ-020-inspector-liste-kaldir.md) — Inspector 23'lü liste kalkar (rail'e taşındı) — done
-- [REQ-021](REQ-021-swap-rail-takip.md) — Swap'te mini menüler panelle birlikte taşınır — pending
+- [REQ-021](finished/REQ-021-swap-rail-takip.md) — Swap'te mini menüler panelle birlikte taşınır — done
 - [REQ-022](REQ-022-ayarlar-modal.md) — Ayarlar modal olarak açılır — pending
 - [REQ-023](REQ-023-ikon-kucult.md) — Sol/sağ menü ikonları küçültülür — pending
 - [REQ-024](REQ-024-mobil-single.md) — Mobilde pane yok, single görünüm — pending

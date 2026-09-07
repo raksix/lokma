@@ -367,10 +367,16 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       />
       <OfflineBanner status={ws.status} onRetry={ws.reconnect} />
       <div className="flex flex-1 overflow-hidden">
-        {/* REQ-010 — thin Inspector icon rail on the Inspector's outer edge. */}
-        {inspectorSide === 'left' ? (
+        {/* REQ-021 — rails travel WITH their panels across the REQ-007 swap:
+            the left outer edge hosts the Explorer's ActivityBar when the
+            Explorer is left, otherwise the Inspector's InspectorRail (and
+            mirrored on the right) — no rail is ever stranded next to the
+            other panel. */}
+        {explorerSide === 'left' ? (
+          <ActivityBar active={activity} onSelect={handleActivitySelect} side="left" />
+        ) : (
           <InspectorRail active={inspectorTab ?? 'info'} onSelect={handleInspectorRailSelect} side="left" />
-        ) : null}
+        )}
         {sidebars.left ? (
           isMobile ? (
             <MobileDrawer side="left" label={`${leftPanel} panel`} onClose={closeDrawers}>
@@ -429,14 +435,15 @@ export function AppShell({ sessionId }: { sessionId: string }) {
             </PaneErrorBoundary>
           )
         ) : null}
-        {/* REQ-010 — rail docks between the Inspector panel and the REQ-008
-            activity bar (kept separate: activity keys own Explorer sessions,
-            the rail owns the 23 Inspector tabs). */}
-        {inspectorSide === 'right' ? (
+        {/* REQ-021 — right outer edge mirrors the left: the Inspector rail
+            when the Inspector is right, otherwise the Explorer's activity
+            bar (REQ-008 rail now travels with its panel instead of staying
+            pinned far right). */}
+        {explorerSide === 'left' ? (
           <InspectorRail active={inspectorTab ?? 'info'} onSelect={handleInspectorRailSelect} side="right" />
-        ) : null}
-        {/* REQ-008 — VS Code-style activity rail, pinned at the far right. */}
-        <ActivityBar active={activity} onSelect={handleActivitySelect} />
+        ) : (
+          <ActivityBar active={activity} onSelect={handleActivitySelect} side="right" />
+        )}
       </div>
       <FooterBar
         serverUp={serverUp}

@@ -305,6 +305,8 @@ export type SkillFileRes = { ok: boolean; path: string; content: string };
 export type SkillPatchRes = { ok: boolean; skill: SkillInfo; bytes: number };
 export type SkillUseRes = { ok: boolean; id: string };
 export type SkillPatchBody = { old_string: string; new_string: string };
+/** Installed skill row + its `~/.lokma/skills/<slug>/` dir name. */
+export type SkillInstallRes = { ok: boolean; skill: SkillInfo; slug: string };
 /** One named theme from `GET /api/themes` (canonical core registry + card preview). */
 export type ThemeView = {
   id: string;
@@ -1060,6 +1062,11 @@ export const api = {
     patch<SkillPatchRes>(`/api/skills/${encodeURIComponent(id)}`, body),
   /** Record a use event (web parity of the agent loop's use event). */
   recordSkillUse: (id: string) => post<SkillUseRes>(`/api/skills/${encodeURIComponent(id)}/use`, {}),
+  /** Live GitHub `lokma-skill` topic search (empty q browses the whole topic). */
+  searchSkillMarketplace: (q = '') =>
+    get<MarketplaceRes>(`/api/skills/marketplace${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  /** Strict https validation + git clone into ~/.lokma/skills (appears in registry). */
+  installSkill: (url: string) => post<SkillInstallRes>('/api/skills/install', { url }),
 
   // Themes — canonical named-theme registry (Phase 3 themes polish).
   listThemes: () => get<ThemesRes>('/api/themes'),

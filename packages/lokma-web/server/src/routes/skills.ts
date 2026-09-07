@@ -1,11 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import {
+  installSkillFromUrl,
+  MarketplaceError,
   patchSkill,
   readSkillFile,
   readSkillView,
   readUsage,
   recordUsage,
   scan,
+  searchSkillMarketplace,
   SkillError,
 } from 'lokma-core';
 
@@ -18,6 +21,11 @@ import {
  * `PATCH /api/skills/:id { old_string, new_string }` (curator patch,
  * records a patch), `POST /api/skills/:id/use` (records a use — the web
  * parity of the agent loop's use event until the loop lands).
+ * `GET /api/skills/marketplace?q=` (live GitHub `lokma-skill` topic —
+ * every hit is a real repo, `url` feeds `POST /install` directly),
+ * `POST /api/skills/install { url }` (strict https validation +
+ * `git clone --depth 1` into `~/.lokma/skills/<slug>/`, rescan — the
+ * skill appears in `<available_skills>` next turn).
  * Telemetry lives in `~/.lokma/skills/.usage.json`, same shape as Hermes.
  * All failures answer `{ code, message }` (never raw keys or stacks).
  */
@@ -38,6 +46,30 @@ export async function skillRoutes(app: FastifyInstance): Promise<void> {
       // Keep the empty map.
     }
     return { skills, count: skills.length, usage };
+  });
+
+  // Static before `:id` — the live remote marketplace (no local writes).
+  app.get('/api/skills/marketplace', async (req, reply) => {
+    const { q } = (req.query ?? {}) as { q?: unknown };
+    try {
+      return await searchSkillMarketplace(q ?? '');
+    } catch (e) {
+      if (e instanceof MarketplaceError) {
+        return reply.status(e.status).send({ code: e.code, message: e.message });
+      }
+      throw e;
+    }
+  });
+
+  // Static before `:id/use` shape — git-clone install into ~/.lokma/skills.
+  app.post('/api/skills/install', async (req, reply) => {
+    const body = (req.body ?? {}) as { url?: unknown };
+    try {
+      const { skill, slug } = await installSkillFromUrl(body.url);
+      return { ok: true, skill, slug };
+    } catch (e) {
+      return skillErr(reply, e);
+    }
   });
 
   app.get('/api/skills/:id', async (req, reply) => {

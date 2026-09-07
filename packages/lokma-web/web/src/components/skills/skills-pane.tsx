@@ -2,6 +2,7 @@ import * as React from 'react';
 import {
   BookOpen,
   ChevronRight,
+  Download,
   FileText,
   History,
   Pencil,
@@ -9,11 +10,13 @@ import {
   RefreshCw,
   Search,
   Sparkles,
+  Star,
   Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { api, type SkillUsage } from '@/lib/api';
+import { api, type MarketplaceItem, type SkillUsage } from '@/lib/api';
+import { formatStars, initials } from '../plugins/plugins';
 import {
   buildAvailableSkills,
   emptyPatchForm,
@@ -78,6 +81,14 @@ export function SkillsPane() {
   const [patchError, setPatchError] = React.useState<string | null>(null);
   const [patching, setPatching] = React.useState(false);
   const [recordingUse, setRecordingUse] = React.useState(false);
+  const [view, setView] = React.useState<'registry' | 'market'>('registry');
+  // Remote skill marketplace (live GitHub topic — no local state until Install).
+  const [mquery, setMquery] = React.useState('');
+  const [mitems, setMitems] = React.useState<MarketplaceItem[] | null>(null);
+  const [msource, setMsource] = React.useState('');
+  const [mloading, setMloading] = React.useState(false);
+  const [merror, setMerror] = React.useState<string | null>(null);
+  const [minstalling, setMinstalling] = React.useState<Record<string, boolean>>({});
   const reloadRef = React.useRef(0);
   const searchRef = React.useRef<HTMLInputElement>(null);
 
@@ -207,6 +218,42 @@ export function SkillsPane() {
     }
   }, [selected, recordingUse]);
 
+  const searchMarket = React.useCallback(async (query: string) => {
+    setMloading(true);
+    setMerror(null);
+    try {
+      const res = await api.searchSkillMarketplace(query.trim());
+      setMitems(res.items);
+      setMsource(res.source);
+    } catch (e) {
+      setMerror(e instanceof Error ? e.message : 'marketplace search failed');
+    } finally {
+      setMloading(false);
+    }
+  }, []);
+
+  const openMarket = React.useCallback(() => {
+    setView('market');
+    // Browse the whole topic on first open (empty q = no filter).
+    if (mitems === null && !mloading && merror === null) void searchMarket('');
+  }, [mitems, mloading, merror, searchMarket]);
+
+  const installFromMarket = async (item: MarketplaceItem) => {
+    setMinstalling((prev) => ({ ...prev, [item.repo]: true }));
+    try {
+      const res = await api.installSkill(item.url);
+      toast(`${res.skill.name} installed — in the registry as ${res.skill.id}`);
+      // Reload the registry so the new row appears without a manual refresh.
+      const list = await api.listSkills();
+      setSkills(normalizeSkills(list.skills));
+      if (list.usage) setUsage(list.usage);
+    } catch (e) {
+      toast(`Install failed — ${e instanceof Error ? e.message : 'install failed'}`);
+    } finally {
+      setMinstalling((prev) => ({ ...prev, [item.repo]: false }));
+    }
+  };
+
   const filtered = React.useMemo(() => filterSkills(skills, q), [skills, q]);
   const sel = selected ? (skills.find((s) => s.id === selected) ?? null) : null;
 
@@ -220,6 +267,23 @@ export function SkillsPane() {
         </span>
         <span className="ml-auto flex gap-1">
           <Button
+            variant={view === 'registry' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-5 text-[11px]"
+            onClick={() => setView('registry')}
+          >
+            Registry
+          </Button>
+          <Button
+            variant={view === 'market' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-5 text-[11px]"
+            onClick={() => void openMarket()}
+          >
+            Marketplace
+          </Button>
+          {view === 'registry' && (
+          <Button
             variant="ghost"
             size="sm"
             className="h-5 text-[11px] gap-1"
@@ -227,9 +291,118 @@ export function SkillsPane() {
           >
             <Search className="w-3 h-3" /> /skills
           </Button>
+          )}
         </span>
       </div>
 
+      {view === 'market' ? (
+      <div className="flex flex-col flex-1 min-h-0">
+        <div className="p-2 border-b border-line/50 space-y-2">
+          <div className="flex gap-2 items-center">
+            <div className="relative flex-1">
+              <label htmlFor="skill-marketplace-search" className="sr-only">
+                Search the skill marketplace
+              </label>
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-400" />
+              <Input
+                id="skill-marketplace-search"
+                placeholder="Search GitHub lokma-skill repos…"
+                value={mquery}
+                onChange={(e) => setMquery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void searchMarket(mquery);
+                }}
+                className="pl-7 h-7 text-xs"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={() => void searchMarket(mquery)}
+              disabled={mloading}
+            >
+              <Search className="w-3 h-3" />
+              {mloading ? 'Searching…' : 'Search'}
+            </Button>
+          </div>
+          <div className="text-[11px] text-zinc-400">
+            Live GitHub <span className="font-mono">lokma-skill</span> topic{msource ? ` — ${msource}` : ''} · Install clones
+            the repo into <span className="font-mono">~/.lokma/skills/</span> and rescans — no restart.
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto p-2 space-y-1.5">
+          {merror && (
+            <div className="p-3 rounded-lg border border-red-200 text-xs text-red-600">
+              {merror}{' '}
+              <button type="button" className="underline" onClick={() => void searchMarket(mquery)}>
+                Retry
+              </button>
+            </div>
+          )}
+          {mloading && mitems === null && !merror && (
+            <div className="p-6 text-center text-xs text-zinc-400">Searching the marketplace…</div>
+          )}
+          {(mitems ?? []).map((item) => {
+            const busy = minstalling[item.repo] ?? false;
+            return (
+              <div
+                key={item.repo}
+                className="flex gap-3 p-2.5 rounded-lg border border-line bg-white dark:bg-[#1E1E21] hover:border-terracotta/20 hover:shadow-sm transition"
+              >
+                <span className="w-8 h-8 rounded-lg bg-[#262624] dark:bg-white text-white dark:text-black grid place-items-center text-[10px] font-bold shrink-0">
+                  {initials(item.name)}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold flex items-center gap-1.5 flex-wrap">
+                    {item.name}
+                    <span className="text-[11px] font-normal text-zinc-400">· {item.author}</span>
+                    <span className="flex items-center gap-0.5 text-[11px] font-normal text-zinc-400">
+                      <Star className="w-3 h-3" /> {formatStars(item.stars)}
+                    </span>
+                  </div>
+                  <div className="text-xs text-zinc-500 leading-4 line-clamp-2" title={item.description || 'No description upstream.'}>
+                    {item.description || 'No description upstream.'}
+                  </div>
+                  <div className="mt-1 text-[11px] text-zinc-400 font-mono truncate">{item.repo}</div>
+                </div>
+                <div className="flex flex-col gap-1 shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 text-xs px-2 gap-1"
+                    onClick={() => void installFromMarket(item)}
+                    disabled={busy}
+                    title={`Install ${item.repo}`}
+                  >
+                    <Download className="w-3 h-3" />
+                    {busy ? 'Adding…' : 'Install'}
+                  </Button>
+                  <a
+                    className="text-[11px] text-zinc-400 underline text-center"
+                    href={item.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Repo
+                  </a>
+                </div>
+              </div>
+            );
+          })}
+          {!mloading && !merror && mitems !== null && mitems.length === 0 && (
+            <div className="p-6 text-center text-xs text-zinc-400">
+              No skills carry the lokma-skill topic yet — publish a repo with that topic to list it here.
+            </div>
+          )}
+        </div>
+        <div className="p-2 border-t border-line bg-muted/20 text-[11px] text-zinc-500">
+          Install = <span className="font-mono">git clone --depth 1</span> + SKILL.md check + rescan · community repos are
+          unvetted — inspect the repo before installing
+        </div>
+      </div>
+      ) : (
+      <>
       {/* Narrow containers stack list over detail (same pattern as archify/bots). */}
       <div className="flex flex-1 min-h-0 @max-[380px]:flex-col @max-[380px]:overflow-auto">
         <div className="w-[42%] min-w-[180px] border-r border-line flex flex-col @max-[380px]:w-full @max-[380px]:min-w-0 @max-[380px]:border-r-0 @max-[380px]:border-b @max-[380px]:max-h-72 @max-[380px]:shrink-0">
@@ -491,6 +664,8 @@ export function SkillsPane() {
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

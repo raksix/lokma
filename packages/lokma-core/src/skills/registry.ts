@@ -21,7 +21,7 @@ type Snapshot = {
 
 let cache: Snapshot | null = null;
 
-function parseFrontmatter(raw: string): { name: string; description: string; category: string } | null {
+export function parseFrontmatter(raw: string): { name: string; description: string; category: string } | null {
   const m = raw.match(/^---\s*\n([\s\S]*?)\n---/);
   if (!m) return null;
   const fm = m[1];
@@ -33,6 +33,18 @@ function parseFrontmatter(raw: string): { name: string; description: string; cat
   const description = get('description');
   if (!name || !description) return null;
   return { name, description, category: get('category') || 'general' };
+}
+
+/** Linked files = references/* + templates/* + scripts/* + assets/*. */
+async function linkedFiles(skillDir: string): Promise<string[]> {
+  const linked: string[] = [];
+  for (const sub of ['references', 'templates', 'scripts', 'assets']) {
+    try {
+      const files = await readdir(join(skillDir, sub));
+      for (const f of files) linked.push(`${sub}/${f}`);
+    } catch {}
+  }
+  return linked;
 }
 
 async function scanDir(dir: string): Promise<Skill[]> {
@@ -56,14 +68,7 @@ async function scanDir(dir: string): Promise<Skill[]> {
         const raw = await readFile(skPath, 'utf-8');
         const fm = parseFrontmatter(raw);
         if (!fm) continue;
-        // Linked files = references/* + templates/* + scripts/* + assets/*
-        const linked: string[] = [];
-        for (const sub of ['references', 'templates', 'scripts', 'assets']) {
-          try {
-            const files = await readdir(join(catPath, sk.name, sub));
-            for (const f of files) linked.push(`${sub}/${f}`);
-          } catch {}
-        }
+        const linked = await linkedFiles(join(catPath, sk.name));
         out.push({
           id: `${cat.name}/${fm.name}`,
           name: fm.name,
@@ -87,7 +92,7 @@ async function scanDir(dir: string): Promise<Skill[]> {
           description: fm.description,
           category: fm.category,
           path: flatSkill,
-          linked_files: [],
+          linked_files: await linkedFiles(join(full, cat.name)),
         });
       }
     } catch {}

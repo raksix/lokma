@@ -40,3 +40,4 @@
 - [REQ-019](REQ-019-sidebar-resize.md) — Sol/sağ menüler resize edilebilir — pending
 - [REQ-020](REQ-020-inspector-liste-kaldir.md) — Inspector 23'lü liste kalkar (rail'e taşındı) — pending
 - [REQ-021](REQ-021-swap-rail-takip.md) — Swap'te mini menüler panelle birlikte taşınır — pending
+- [REQ-022](REQ-022-ayarlar-modal.md) — Ayarlar modal olarak açılır — pending

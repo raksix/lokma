@@ -1,7 +1,8 @@
 # REQ-010 — En sola Inspector menüleri için ince ikon sidebarı
 
-- **Status:** pending (kod yazılmadı — kullanıcı "yap" deyince başlanacak)
+- **Status:** done (live 2026-09-07)
 - **Asked:** 2026-09-07 — "en sola da küçük bir sidebar, soldaki sidebarın menü itemları için... inspector nerdeyse oraya olacak... bu ss'deki şeyler sadece icon olarak güzel dursun diye olacak" (+ ekran görüntüsü: 23 Inspector menüsü).
 - **Interpretation:** En sola (~48px) sabit ince ikon şeridi: 23 Inspector menüsü (Info, Providers, Models, Usage, Settings, Terminal, Git, Browser, Agents, Orchestration, Vault, Skills, Archify, Design, Testing, Bots, Auth, Setup, Plugins, Observability, Cron, Extras, Memory) SADECE ikon olarak dizilir (mevcut `TAB_ICONS` kullanılır, tooltip'te ad yazar). Tıklayınca ilgili Inspector içeriği yanındaki geniş panelde açılır. REQ-007 swap'i takip eder: Inspector sola geçerse bu şerit en solda, sağa geçerse en sağda olur (REQ-008 activity bar ile çakışırsa ikisi birleşir — karar kullanıcıda).
-- **Touched (plan):** yeni `components/inspector-rail.tsx` (ince şerit, ikon-only butonlar + tooltip + aktif vurgusu), `app-shell.tsx` layout (şerit + geniş Inspector paneli yan yana), REQ-007 swap state'i ile konum takibi.
-- **Verify (plan):** root+web `tsc` 0, web build green, single-proc restart, headless ile 23 ikonun doğru içeriği açtığı + swap takibi + dark/light kanıtlanır, bundle match.
+- **Decision (REQ-008 conflict):** kept SEPARATE — the rail docks between the Inspector panel and the activity bar (activity keys own Explorer sessions; the rail owns the 23 Inspector tabs). No merge.
+- **Touched:** yeni `components/shell/inspector-rail.tsx` (INSPECTOR_RAIL_ITEMS 23 + `inspectorRailSide` pure + InspectorRail), `components/shell/index.ts` (barrel), `components/shell/inspector-rail.test.ts` (7 checks), `components/app-shell.tsx` (hoisted `inspectorSide`, `handleInspectorRailSelect`, rail rendered on Inspector outer edge both sides).
+- **Proof:** rail probe 7/7, activity-bar 14/14, shell 10/10, root+web `tsc` 0, web build green (`index-CyZifOSp.js`), single-proc restart, live bundle match, headless: 23 icon buttons w-48px, Vault click opens Inspector content, swap moves rail far-left↔right, 0 console errors.

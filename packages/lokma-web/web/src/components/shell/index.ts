@@ -9,6 +9,11 @@ export {
   activityInspectorTab,
   type ActivityKey,
 } from './activity-bar';
+export {
+  INSPECTOR_RAIL_ITEMS,
+  InspectorRail,
+  inspectorRailSide,
+} from './inspector-rail';
 export { OfflineBanner } from './offline-banner';
 export { PaneErrorBoundary } from './pane-error-boundary';
 export {

@@ -18,6 +18,7 @@ import { useSessionStore } from '@/stores';
 import {
   FooterBar,
   ActivityBar,
+  InspectorRail,
   OfflineBanner,
   PaneErrorBoundary,
   SearchModal,
@@ -29,6 +30,7 @@ import {
   closeAllSidebars,
   emitToast,
   initialSidebarVisibility,
+  inspectorRailSide,
   isEditableTarget,
   mobileQuery,
   nextSidebarVisibility,
@@ -75,6 +77,9 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   const [serverUp, setServerUp] = React.useState<boolean | null>(null);
   // REQ-007 — which physical side hosts the Explorer (persisted, survives reload).
   const [explorerSide, setExplorerSide] = React.useState<ExplorerSide>(() => readExplorerSide());
+  // REQ-010 — the Inspector always lives opposite the Explorer; the thin
+  // icon rail docks on its outer edge and follows the REQ-007 swap.
+  const inspectorSide: SidebarSide = inspectorRailSide(explorerSide);
   // REQ-008 — activity rail selection + the Inspector tab it requested
   // (null = sessions, which live in the Explorer panel).
   const [activity, setActivity] = React.useState<ActivityKey>('sessions');
@@ -104,14 +109,27 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         );
         return;
       }
-      const inspectorSide: SidebarSide = explorerSide === 'left' ? 'right' : 'left';
       setSidebars((current) =>
         isMobile
           ? { left: inspectorSide === 'left', right: inspectorSide === 'right' }
           : { ...current, [inspectorSide]: true },
       );
     },
-    [explorerSide, isMobile],
+    [explorerSide, inspectorSide, isMobile],
+  );
+
+  // REQ-010 — rail click asks the Inspector for the tab (prop-driven, same
+  // as REQ-008) and reveals the wide Inspector panel next to the rail.
+  const handleInspectorRailSelect = React.useCallback(
+    (tab: InspectorTab) => {
+      setInspectorTab(tab);
+      setSidebars((current) =>
+        isMobile
+          ? { left: inspectorSide === 'left', right: inspectorSide === 'right' }
+          : { ...current, [inspectorSide]: true },
+      );
+    },
+    [inspectorSide, isMobile],
   );
 
   const ws = useWs(activeId);
@@ -274,6 +292,10 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       />
       <OfflineBanner status={ws.status} onRetry={ws.reconnect} />
       <div className="flex flex-1 overflow-hidden">
+        {/* REQ-010 — thin Inspector icon rail on the Inspector's outer edge. */}
+        {inspectorSide === 'left' ? (
+          <InspectorRail active={inspectorTab ?? 'info'} onSelect={handleInspectorRailSelect} side="left" />
+        ) : null}
         {sidebars.left ? (
           isMobile ? (
             <MobileDrawer side="left" label={`${leftPanel} panel`} onClose={closeDrawers}>
@@ -322,6 +344,12 @@ export function AppShell({ sessionId }: { sessionId: string }) {
               </Sidebar>
             </PaneErrorBoundary>
           )
+        ) : null}
+        {/* REQ-010 — rail docks between the Inspector panel and the REQ-008
+            activity bar (kept separate: activity keys own Explorer sessions,
+            the rail owns the 23 Inspector tabs). */}
+        {inspectorSide === 'right' ? (
+          <InspectorRail active={inspectorTab ?? 'info'} onSelect={handleInspectorRailSelect} side="right" />
         ) : null}
         {/* REQ-008 — VS Code-style activity rail, pinned at the far right. */}
         <ActivityBar active={activity} onSelect={handleActivitySelect} />

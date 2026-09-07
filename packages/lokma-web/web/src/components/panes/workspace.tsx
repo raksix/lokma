@@ -77,7 +77,7 @@ export function TilingWorkspace({
       }
     });
     return { states: next, changed };
-  }, [paneIds, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [paneIds, sessionId, tabStates]);
 
   React.useEffect(() => {
     if (ensured.changed) setTabStates(ensured.states);

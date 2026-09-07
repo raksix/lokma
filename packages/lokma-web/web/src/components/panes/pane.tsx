@@ -633,7 +633,7 @@ function PaneTabBar({
   return (
     <div className="flex h-7 shrink-0 items-center gap-0.5 border-b bg-[#FDFCFB] px-1 dark:bg-muted/40">
       <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground" />
-      <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
+      <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto" role="tablist" aria-label="Pane tabs">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
           return (
@@ -641,10 +641,27 @@ function PaneTabBar({
               key={tab.id}
               data-pane-tab={tab.id}
               draggable
+              role="tab"
+              aria-selected={isActive}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelect(tab.id);
+                }
+              }}
               onDragStart={(e) => {
                 e.dataTransfer.setData(PANE_TAB_MIME, encodeTabMove(paneId, tab));
                 e.dataTransfer.effectAllowed = 'move';
               }}
+              // REQ-015: a draggable tab swallows clicks — the browser turns
+              // any press with a few px of movement into a dragstart, so the
+              // click event never fires and the tab never activates. Select
+              // on mousedown (always delivered before a drag can start, and
+              // the standard IDE behavior that dragging a tab activates it);
+              // the click handler stays as a fallback. Both call the
+              // idempotent onSelect, so double delivery is harmless.
+              onMouseDown={() => onSelect(tab.id)}
               onClick={() => onSelect(tab.id)}
               title={`${tab.title} — drag to another pane to move it`}
               className={`flex max-w-36 shrink-0 cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-[11px] ${

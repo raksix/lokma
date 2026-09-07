@@ -1,0 +1,7 @@
+# REQ-012 — Üstteki model seçimini kaldır, üst kısmı compact yap + ayarlar ikonu
+
+- **Status:** done (commit `6eca233`, live 2026-09-07)
+- **Asked:** 2026-09-07 — "ekranın en üst solundan model seçimi şeyini kaldır, orasını da en üst kısmını daha compact hale getir. ayrıca oraya ayarlar iconu da ekle ya".
+- **Interpretation:** (1) Header model select (`lokma-model-select`) removed — model picking stays in the Composer popup (`lokma-composer-model`, `onPickModel`) + Models tab; header no longer reads providerStore. (2) Header compacted: `h-11` → `h-9`, buttons `h-7 w-7` → `h-6 w-6`, brand shrunk (L badge `h-5 w-5`, wordmark 15px, `harness` badge dropped), session id slice 18 → 12 chars. (3) Settings gear (lucide `Settings`) added after search → `onOpenSettings` prop wired in AppShell to `handleInspectorRailSelect('settings')` (reveals Inspector on the Settings tab); Ctrl+M now clicks the Composer model button instead of focusing the removed select; SHORTCUTS copy updated.
+- **Touched:** `packages/lokma-web/web/src/components/header.tsx` (select/state removed, `h-9` compact, settings gear + `onOpenSettings`), `components/app-shell.tsx` (Ctrl+M → composer click, `onOpenSettings` wiring), `components/chat/composer.tsx` (`id="lokma-composer-model"`, title), `components/shell/shortcuts.ts` (model copy).
+- **Proof:** root `tsc --noEmit` 0, web build green (`index-L1tk--2_.js`), single-proc restart, served bundle == disk dist index.html ref, live chunk carries `lokma-composer-model` + `Open settings`, `lokma-model-select` gone.

@@ -55,3 +55,4 @@
 - [REQ-034](REQ-034-file-explorer-sadece-inspector.md) — File explorer sadece Inspector'da görünür — pending
 - [REQ-035](REQ-035-drop-modal-uste.md) — Dropped session modali üste çıkar — pending
 - [REQ-036](REQ-036-crosshair-imlec.md) — Butonlarda crosshair imleç — pending
+- [REQ-037](REQ-037-browser-full-height.md) — Browser içeriği full height — pending

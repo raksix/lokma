@@ -1,7 +1,8 @@
 # REQ-020 — Inspector'daki 23'lü menü listesini kaldır (rail'e taşındı)
 
-- **Status:** pending (kod yazılmadı — kullanıcı "yap" deyince başlanacak)
+- **Status:** done (2026-09-07, live verified — see Proof below)
 - **Asked:** 2026-09-07 — "inceptor kısmında bunlara gerek yok kaldıralım" (+ ekran görüntüsü: 23 Inspector menüsü) → netleştirme: "bunların hepsi zaten en soldaki sabit menüye taşındı, ondan gerek yok".
 - **Interpretation:** REQ-010 ile 23 menü sabit sol ikon şeridine taşındığı için (canlıda doğrulandı), Inspector paneli içindeki 23 satırlık liste (Info…Memory) kaldırılır — panel sadece seçili içeriği gösterir, navigasyon rail'den olur. Liste bileşeni silinir, `InspectorPanel` doğrudan aktif sekmeyi render eder.
 - **Touched (plan):** Inspector nav listesi bileşeni (`inspector-host.tsx` veya liste kısmı — uygulamada netleşir).
 - **Verify (plan):** root+web `tsc` 0, web build green, single-proc restart, headless ile rail ikonlarının tüm içerikleri açtığı + listede artık menü satırı olmadığı kanıtlanır, bundle match.
+- **Proof:** Removed the 23-button `flex flex-wrap gap-1` nav list from `InspectorPanel` — the panel now renders only the selected tab content (rail-driven via `requestedTab`; Extras `onOpenTab` still switches internally). Touched: `web/src/components/providers/inspector-panel.tsx` (nav block + unused `Button`/lucide imports deleted, REQ-020 doc note) + `web/src/components/shell/inspector-rail.tsx` (stale comment: rail icons no longer mirror panel buttons). Gates: web `tsc --noEmit` 0, web build green `index-CVeBrupp.js`, single-proc lokma-web restart online, served bundle == disk dist (BUNDLE-MATCH), headless probe PASS: rail 23 icons, Bots + Memory rail clicks render content, zero `flex-wrap gap-1` nav rows left in inspector (the only 2 matches page-wide are the chat composer attach hint).

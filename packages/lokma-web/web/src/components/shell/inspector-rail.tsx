@@ -6,7 +6,7 @@ import type { ExplorerSide, SidebarSide } from './responsive';
 /**
  * InspectorRail — REQ-010 thin icon strip (~48px) docked on the Inspector's
  * outer edge. One icon-only button per Inspector tab (same lucide icons and
- * labels as the InspectorPanel tab buttons, tooltip via `title`), so the
+ * labels as before, tooltip via `title`), so the
  * 23 menus stay reachable without the wide panel open. Purely
  * presentational: the parent owns the active tab and reveals the Inspector
  * panel on select. Follows the REQ-007 swap via the `side` prop.

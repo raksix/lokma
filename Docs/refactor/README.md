@@ -31,7 +31,7 @@
 - [REQ-010](finished/REQ-010-sol-ikon-rail.md) — En sola Inspector ikon şeridi — done
 - [REQ-011](finished/REQ-011-file-explorer-sola.md) — File explorer sola taşınacak — done
 - [REQ-012](finished/REQ-012-ust-bar-compact.md) — Üst model seçimi kalkar, bar compact + ayarlar ikonu — done
-- [REQ-013](REQ-013-browser-sadelestir.md) — Browser sade: sekme yok, URL-only, tam alan — pending
+- [REQ-013](finished/REQ-013-browser-sadelestir.md) — Browser sade: sekme yok, URL-only, tam alan — done
 - [REQ-014](REQ-014-windowed-arka-plan.md) — Windowed panellere solid arka plan — pending
 - [REQ-015](REQ-015-pane-tab-tiklama.md) — Pane tabları seçilemiyor — pending
 - [REQ-016](REQ-016-alt-hint-kaldir.md) — Alttaki gereksiz ibareler kaldırılacak — pending

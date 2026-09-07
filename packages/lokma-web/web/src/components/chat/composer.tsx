@@ -298,7 +298,7 @@ export function Composer({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <div className="inline-flex rounded-full border border-[#262624] bg-[#262624] p-0.5">
+          <div className="inline-flex rounded-full border border-line bg-muted p-0.5 dark:border-[#262624] dark:bg-[#262624]">
             <Button
               variant="ghost"
               size="sm"
@@ -308,7 +308,7 @@ export function Composer({
               aria-pressed={mode === 'steer'}
               className={cn(
                 'h-6 w-6 rounded-full p-0',
-                mode === 'steer' ? 'bg-white text-ink hover:bg-white' : 'text-white/70 hover:bg-white/10 hover:text-white',
+                mode === 'steer' ? 'bg-white text-ink shadow-sm hover:bg-white' : 'text-zinc-500 hover:bg-white hover:text-ink dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white',
               )}
             >
               <LifeBuoy className="h-3.5 w-3.5" />
@@ -322,7 +322,7 @@ export function Composer({
               aria-pressed={mode === 'queue'}
               className={cn(
                 'h-6 w-6 rounded-full p-0',
-                mode === 'queue' ? 'bg-white text-ink hover:bg-white' : 'text-white/70 hover:bg-white/10 hover:text-white',
+                mode === 'queue' ? 'bg-white text-ink shadow-sm hover:bg-white' : 'text-zinc-500 hover:bg-white hover:text-ink dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white',
               )}
             >
               <ListTree className="h-3.5 w-3.5" />

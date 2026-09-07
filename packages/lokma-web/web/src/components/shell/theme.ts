@@ -42,6 +42,9 @@ export function subscribeTheme(fn: (mode: ShellTheme) => void): () => void {
   };
 }
 
+/** Keys last inlined by `applyThemeVars` (module-owned, never persisted). */
+let lastVarKeys: string[] = [];
+
 /** Read the persisted theme without crashing outside the browser. */
 export function getTheme(): ShellTheme {
   try {
@@ -57,6 +60,17 @@ export function applyTheme(theme: ShellTheme): void {
   try {
     if (typeof document !== 'undefined') {
       document.documentElement.classList.toggle('dark', theme === 'dark');
+      if (theme === 'light') {
+        // REQ-004: a dark server theme (omp/midnight) stamps its vars —
+        // including a near-black `--border` — inline on <html>. Leaving
+        // them in place paints every light-theme border black, so the
+        // header toggle back to light removes the stamped set and the
+        // stylesheet `:root` light values take over again.
+        const root = document.documentElement as unknown as {
+          style?: { removeProperty: (k: string) => void };
+        };
+        for (const key of lastVarKeys) root.style?.removeProperty(`--${key}`);
+      }
     }
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(THEME_KEY, theme);
@@ -93,6 +107,7 @@ export function applyThemeVars(cssVars: Record<string, string>, mode: ShellTheme
         root.style?.setProperty(`--${key}`, value);
       }
       root.classList.toggle('dark', mode === 'dark');
+      lastVarKeys = Object.keys(cssVars);
     }
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(THEME_KEY, mode);
@@ -116,6 +131,7 @@ export function clearThemeVars(cssVars: Record<string, string>): void {
       for (const key of Object.keys(cssVars)) {
         root.style?.removeProperty(`--${key}`);
       }
+      lastVarKeys = lastVarKeys.filter((k) => !(k in cssVars));
     }
   } catch {
     // Non-browser runtimes (probes, SSR) skip silently.

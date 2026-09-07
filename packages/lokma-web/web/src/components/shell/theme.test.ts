@@ -88,6 +88,18 @@ check('second theme overwrites the var', inline.get('--background') === '40 33% 
 clearThemeVars({ background: '40 33% 98%', primary: '199 89% 48%' });
 check('clear removes every inlined var', inline.size === 0);
 
+// REQ-004: leaving dark via the header toggle clears server-stamped vars
+// (a stale dark --border used to paint every light-theme border black).
+reset();
+applyThemeVars({ background: '240 10% 4%', border: '240 4% 16%' }, 'dark');
+check('dark vars stamped inline', inline.get('--border') === '240 4% 16%');
+applyTheme('light');
+check('light toggle clears stamped server vars', inline.size === 0);
+check('light toggle clears the html class', !classes.has('dark'));
+applyThemeVars({ background: '240 10% 4%' }, 'dark');
+applyTheme('dark');
+check('dark toggle keeps stamped server vars', inline.get('--background') === '240 10% 4%' && classes.has('dark'));
+
 // subscribeTheme sees every effective-mode change (header-toggle contract:
 // the async named-theme load and Appearance picks must sync the toggle).
 reset();

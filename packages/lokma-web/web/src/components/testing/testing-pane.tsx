@@ -228,7 +228,7 @@ export function TestingPane() {
                 onClick={() => setActiveStage(s.n)}
                 className={`flex-1 min-w-[92px] flex flex-col items-center gap-1 p-2 rounded-lg border transition ${
                   selected
-                    ? 'bg-[#262624] text-white border-[#262624] dark:bg-white dark:text-black'
+                    ? 'bg-terracotta text-white border-terracotta dark:bg-white dark:text-black dark:border-white'
                     : 'bg-white dark:bg-[#1E1E21] border-line hover:border-terracotta/30'
                 }`}
               >
@@ -236,7 +236,7 @@ export function TestingPane() {
                 <span className="text-[11px] font-semibold">
                   {s.n}. {s.title}
                 </span>
-                <span className={`text-[10px] leading-tight text-center ${selected ? 'text-white/60' : 'text-zinc-500'}`}>
+                <span className={`text-[10px] leading-tight text-center ${selected ? 'text-white/80 dark:text-black/60' : 'text-zinc-500'}`}>
                   {s.desc}
                 </span>
               </button>

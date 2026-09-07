@@ -52,3 +52,4 @@
 - [REQ-031](finished/REQ-031-opencode-go-0-models.md) — Test 35 bulurken satır 0 models gösteriyor — done
 - [REQ-032](finished/REQ-032-refresh-tum-modeller.md) — Refresh tüm provider /v1/models'leri çeker — done
 - [REQ-033](finished/REQ-033-tiling-bozuk.md) — Pane tiling sistemi çalışmıyor (concept'te çalışıyordu) — done
+- [REQ-034](REQ-034-file-explorer-sadece-inspector.md) — File explorer sadece Inspector'da görünür — pending

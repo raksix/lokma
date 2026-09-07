@@ -20,6 +20,13 @@ export type SessionMeta = {
   updatedAt: string;
   /** Human label for the session list (set via rename; falls back to first user line). */
   title?: string;
+  /**
+   * Bot binding for Grok-style bot chats (REQ-027, Docs/35 §8): when set,
+   * prompts in this session run with the bot's model + systemPrompt +
+   * knowledge injected. A per-prompt `model` override still wins for that
+   * turn; clearing the binding (empty string) returns to plain chat.
+   */
+  botId?: string;
 };
 
 export type Session = {
@@ -38,6 +45,12 @@ export type SessionSummary = {
   /** True when the title was set via rename (vs derived from transcript). */
   renamed: boolean;
   model: string | null;
+  /**
+   * Bot binding id for Grok-style bot chats (REQ-027) — null when the
+   * session is plain chat. The client resolves the display name from the
+   * bot registry (no core→bots import, no cycle).
+   */
+  botId: string | null;
   messageCount: number;
   createdAt: string; // ISO
   updatedAt: string; // ISO

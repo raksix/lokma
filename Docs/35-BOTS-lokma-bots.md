@@ -176,7 +176,20 @@ lokma bot fork https://lokma.sh/b/code-reviewer-v2 --as mine
 
 ---
 
-## 8. Bot vs Skill vs MCP vs Agent (How They Compose)
+## 8. Bot-Bound Sessions (Grok-Style Separate Chats, REQ-027)
+
+A plain chat session can be **bound to a bot** (`SessionMeta.botId`, `SessionSummary.botId`, null = plain chat). A bound session chats AS the bot — its own personality, knowledge, and model, independent of other chats. Resolution is live per turn:
+- **Model**: per-prompt override wins, then the bound bot's model, then session meta, then default.
+- **Personality + knowledge**: the bot's `systemPrompt` (SOUL) + knowledge files prepend ahead of the tool system prompt (`agent-loop.ts` `systemPreamble`). Knowledge is jailed to the bot dir (no `/` or `..` escapes, 512KB/file read cap, 20 files max) and context-capped (8KB/file, 24KB total, cut with a `…[truncated]` marker instead of a silent mid-sentence end).
+- Bot edits apply without rebinding; a deleted bot degrades to plain chat, never a failed turn. Fork carries the binding; empty-string `botId` clears it.
+
+API: `POST /api/sessions { botId }` validates against the registry (404 `bot_not_found`) and adopts the bot's model; `PATCH /api/sessions/:id { botId }` switches mid-chat (sends the bot's model alongside so the session follows); detail + summaries carry `botId`.
+UI: the Bots pane **Chat** button (`MessageCircle`, terracotta outline) opens a fresh bot-bound session; the Chat header bot picker (search + Plain-chat row + per-bot model labels) switches/clears in place.
+Code map: `lokma-core` `bots/chat-context.ts` (`resolveBotChatContext`, `readBotKnowledge`, pure `buildBotSystemPreamble`/`capKnowledgeText`/`joinKnowledgeSections` + probe `chat-context.test.ts` 7/7) and `bots/store.ts` (`runBotAsAgent` stamps `botId`); server `routes/sessions.ts` (POST/PATCH/GET `botId`) + `routes/ws.ts` (per-turn injection) via `agent-loop.ts` `systemPreamble`; web `components/bots/bot-chat.ts` pure helpers (+ probe `bot-chat.test.ts` 4/4) + `BotsPane` Chat + Chat header picker + `lib/api.ts` + `stores/session.ts` (`setSessionBot`).
+
+---
+
+## 9. Bot vs Skill vs MCP vs Agent (How They Compose)
 
 | Layer | What It Provides | Bot Uses It How |
 |-------|------------------|-----------------|
@@ -189,7 +202,7 @@ A single task can use multiple bots: `Coordinator` (from `30-*`) can spawn `code
 
 ---
 
-## 9. Roadmap Slot
+## 10. Roadmap Slot
 
 | Phase | What |
 |-------|------|
@@ -201,7 +214,7 @@ A single task can use multiple bots: `Coordinator` (from `30-*`) can spawn `code
 
 ---
 
-## 10. References
+## 11. References
 
 - Grok Bots: https://docs.x.ai/grok-bot/overview · https://x.ai/blog (Aug 11 & 26 2026) · https://grok.com
 - Bot store: https://bot.store · https://github.com/awesome-grok-bot-plugins (219 plugins)

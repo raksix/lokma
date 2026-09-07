@@ -514,6 +514,6 @@ export async function runBotAsAgent(
     content: `Bot ${bot.id} run started: ${cleanTask.slice(0, 200)}`,
     timestamp: new Date().toISOString(),
   });
-  await store.writeMeta(sessionId, { model: bot.model });
+  await store.writeMeta(sessionId, { model: bot.model, botId: bot.id });
   return { agent, sessionId };
 }

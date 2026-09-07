@@ -91,6 +91,10 @@ export class SessionStore {
     };
     const title = patch.title ?? prev?.title;
     if (typeof title === 'string' && title) next.title = title;
+    // Bot binding: a patch value wins (empty string clears the binding back
+    // to plain chat), otherwise the previous binding survives the merge.
+    const botId = patch.botId !== undefined ? patch.botId : prev?.botId;
+    if (typeof botId === 'string' && botId) next.botId = botId;
     await writeFile(metaPath(this.cwd, sessionId), JSON.stringify(next, null, 2), 'utf-8');
     return next;
   }
@@ -106,7 +110,7 @@ export class SessionStore {
     const lines = messages.map((m) => JSON.stringify(m)).join('\n');
     await writeFile(sessionPath(this.cwd, newId), lines ? lines + '\n' : '', 'utf-8');
     const meta = await this.readMeta(sessionId);
-    await this.writeMeta(newId, { model: meta?.model ?? '', title: meta?.title });
+    await this.writeMeta(newId, { model: meta?.model ?? '', title: meta?.title, botId: meta?.botId ?? '' });
     return { id: newId, copied: messages.length };
   }
 
@@ -228,6 +232,7 @@ export class SessionStore {
       title: meta?.title ?? SessionStore.titleFor(messages, 'Untitled session'),
       renamed: typeof meta?.title === 'string' && meta.title.length > 0,
       model: meta?.model && meta.model.length > 0 ? meta.model : null,
+      botId: meta?.botId && meta.botId.length > 0 ? meta.botId : null,
       messageCount: messages.length,
       createdAt,
       updatedAt,

@@ -1,5 +1,6 @@
 export { BotsPane } from './bots-pane';
 export { BotDialog } from './bot-dialog';
+export { botClearPatch, botSwitchPatch, filterPickerBots, sessionBotName } from './bot-chat';
 export {
   BOT_TABS,
   agentCountFor,

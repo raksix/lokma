@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Bot as BotIcon, CheckCircle2, Copy, GitFork, Play, RefreshCw, Search, Share2, Sparkles, Trash2 } from 'lucide-react';
+import { Bot as BotIcon, CheckCircle2, Copy, GitFork, MessageCircle, Play, RefreshCw, Search, Share2, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ApiError, api, type AgentInfo, type Bot, type BotVisibility } from '@/lib/api';
@@ -39,7 +39,8 @@ const LIFECYCLE = ['Create', 'Playground', 'Publish', 'Fork', 'Run → Agent'] a
  * detail with Run/Fork/Publish/bot.json + lifecycle strip + bot.json
  * preview + playground note), but every pixel is live: rows come from
  * `GET /api/bots` (bundled lokma-ceo + `~/.lokma/bots/`), Run spawns a
- * REAL agent + session (`POST /api/bots/:id/run`), Fork clones the real
+ * REAL agent + session (`POST /api/bots/:id/run`), Chat opens a separate
+ * bot-bound session (`POST /api/sessions { botId }`, REQ-027), Fork clones the real
  * `bot.json` (`POST /:id/fork`), Publish flips real visibility
  * (`POST /:id/publish`), Delete removes the real dir
  * (`DELETE /api/bots/:id`, two-click arm, bundled stays read-only),
@@ -77,6 +78,8 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
   // Two-click delete arm (cron-pane pattern) + in-flight flag.
   const [confirmDelete, setConfirmDelete] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
+  // Separate bot chat (REQ-027): a fresh session bound to this bot.
+  const [chatting, setChatting] = React.useState(false);
 
   const load = React.useCallback(async (keepSelection?: string) => {
     setLoading(true);
@@ -117,6 +120,7 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
     setForkError(null);
     setForkAs('');
     setConfirmDelete(null);
+    setChatting(false);
   }, [selectedId]);
 
   async function createBot(form: CreateBotForm): Promise<void> {
@@ -182,6 +186,25 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
       setForkError(errMessage(e));
     } finally {
       setForking(false);
+    }
+  }
+
+  /**
+   * Separate bot chat (REQ-027, Docs/35 §8): opens a fresh session bound
+   * to this bot (botId + bot model), so the chat runs AS the bot — its own
+   * SOUL, knowledge, and model, independent of other chats.
+   */
+  async function chatSelected(): Promise<void> {
+    if (!selected || chatting) return;
+    setChatting(true);
+    try {
+      const res = await api.createSession({ botId: selected.id, model: selected.model });
+      toast(`Chat opened as ${selected.name}`);
+      if (onOpenSession) onOpenSession(res.id);
+    } catch (e) {
+      toast(`Chat failed: ${errMessage(e)}`);
+    } finally {
+      setChatting(false);
     }
   }
 
@@ -411,6 +434,17 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
                   <Button size="sm" className="h-7 text-xs gap-1" disabled={running} onClick={() => void runSelected()}>
                     <Play className="w-3 h-3" /> {running ? 'Starting…' : 'Run'}
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs gap-1 border-terracotta/40 text-terracotta hover:bg-terracotta/10"
+                    disabled={chatting}
+                    onClick={() => void chatSelected()}
+                    title={`Open a separate chat running as ${selected.name} (own SOUL, knowledge, model)`}
+                    aria-label={`Chat as ${selected.name}`}
+                  >
+                    <MessageCircle className="w-3 h-3" /> {chatting ? 'Opening…' : 'Chat'}
+                  </Button>
                   <Button variant="outline" size="sm" className="h-7 text-xs gap-1" disabled={forking} onClick={() => void forkSelected()}>
                     <GitFork className="w-3 h-3" /> {forking ? 'Forking…' : 'Fork'}
                   </Button>
@@ -552,7 +586,8 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
                 </div>
 
                 <div className="rounded-md bg-[#FDF0E6] dark:bg-[#2A1E15] border border-[#F2D5C2] p-2 text-[11px] text-zinc-600 dark:text-zinc-300">
-                  Playground: run the bot with a task above — a real session opens for chat, tagged bot:{selected.id}.
+                  Chat opens a separate session bound to this bot (own SOUL + knowledge + model). Run spawns an
+                  agent with a task instead — a real session opens for chat, tagged bot:{selected.id}.
                   Try before you publish.
                 </div>
               </div>

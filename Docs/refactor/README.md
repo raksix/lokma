@@ -45,9 +45,10 @@
 - [REQ-024](finished/REQ-024-mobil-single.md) — Mobilde pane yok, single görünüm — done
 - [REQ-025](finished/REQ-025-agent-hub-tasarim.md) — Agent Hub tasarımı iyileşir — done
 - [REQ-026](finished/REQ-026-hersey-pane-olur.md) — Her şey pane olarak kullanılabilir — done
-- [REQ-027](REQ-027-bot-sistemi.md) — Bot sistemi refaktörü (Grok + Hermes referanslı) — pending
+- [REQ-027](finished/REQ-027-bot-sistemi.md) — Bot sistemi refaktörü (Grok + Hermes referanslı) — done
 - [REQ-028](REQ-028-plugin-market.md) — Skill/plugin market + örnek plugin — pending
 - [REQ-029](REQ-029-drag-split-calismiyor.md) — Session drop'ta split yapmıyor — pending
 - [REQ-030](REQ-030-provider-modelleri-gorunsun.md) — Eklenen provider'ın modelleri listede görünsün — pending
 - [REQ-031](REQ-031-opencode-go-0-models.md) — Test 35 bulurken satır 0 models gösteriyor — pending
 - [REQ-032](REQ-032-refresh-tum-modeller.md) — Refresh tüm provider /v1/models'leri çeker — pending
+- [REQ-033](REQ-033-tiling-bozuk.md) — Pane tiling sistemi çalışmıyor (concept'te çalışıyordu) — in-progress

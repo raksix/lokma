@@ -200,16 +200,18 @@ export type SessionSummary = {
   renamed?: boolean;
   /** Per-session model from the meta sidecar (null when never set). */
   model?: string | null;
+  /** Bot binding id (REQ-027) — null when the session is plain chat. */
+  botId?: string | null;
   messageCount?: number;
   /** ISO timestamps for Today/Yesterday/Earlier grouping. */
   createdAt?: string;
   updatedAt?: string;
 };
 export type SessionsRes = { sessions: SessionSummary[]; count: number };
-export type SessionDetail = { id: string; cwd: string; model: string | null; messages: unknown[]; count: number };
+export type SessionDetail = { id: string; cwd: string; model: string | null; botId: string | null; messages: unknown[]; count: number };
 export type CreateSessionRes = { ok: boolean; id: string; cwd: string };
 export type ForkSessionRes = { ok: boolean; id: string; from: string; copied?: number };
-export type PatchSessionRes = { ok: boolean; id: string; model: string; title?: string | null };
+export type PatchSessionRes = { ok: boolean; id: string; model: string; title?: string | null; botId?: string | null };
 export type RenameSessionRes = { ok: boolean; id: string; model: string; title: string | null };
 export type DeleteSessionRes = { ok: boolean; id: string };
 export type MergeSessionRes = { ok: boolean; id: string; from: string; appended: number };
@@ -989,9 +991,9 @@ export const api = {
     get<SessionsRes>(cwd ? `/api/sessions?cwd=${encodeURIComponent(cwd)}` : '/api/sessions'),
   sessions: () => get<SessionsRes>('/api/sessions'),
   getSession: (id: string) => get<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
-  createSession: (body?: { cwd?: string; model?: string }) => post<CreateSessionRes>('/api/sessions', body ?? {}),
+  createSession: (body?: { cwd?: string; model?: string; botId?: string }) => post<CreateSessionRes>('/api/sessions', body ?? {}),
   forkSession: (id: string) => post<ForkSessionRes>(`/api/sessions/${encodeURIComponent(id)}/fork`),
-  patchSession: (id: string, body: { model: string }) =>
+  patchSession: (id: string, body: { model?: string; botId?: string | null }) =>
     patch<PatchSessionRes>(`/api/sessions/${encodeURIComponent(id)}`, body),
   renameSession: (id: string, title: string) =>
     patch<RenameSessionRes>(`/api/sessions/${encodeURIComponent(id)}`, { title }),

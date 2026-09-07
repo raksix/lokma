@@ -59,6 +59,11 @@ export type AgentLoopOpts = {
   waitAnswer: (req: { requestId: string; question: string; choices?: string[] }) => Promise<string>;
   /** Parent abort (WS `abort` / socket close) — rejects waits, kills turns. */
   signal: AbortSignal;
+  /**
+   * Bot SOUL + knowledge preamble (REQ-027, Docs/35 §8) — prepended ahead
+   * of the tool system prompt so a bot-bound session chats AS the bot.
+   */
+  systemPreamble?: string;
   maxTurns?: number;
   turnTimeoutMs?: number;
 };
@@ -121,7 +126,9 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
 
   const registry = new ToolRegistry();
   for (const tool of buildBuiltinTools(opts.cwd)) registry.register(tool);
-  const system = buildToolSystemPrompt(registry.list().map((t) => ({ name: t.name, description: t.description })));
+  const toolSystem = buildToolSystemPrompt(registry.list().map((t) => ({ name: t.name, description: t.description })));
+  const preamble = opts.systemPreamble?.trim() ? `${opts.systemPreamble.trim()}\n\n` : '';
+  const system = `${preamble}${toolSystem}`;
 
   const messages: ProviderMessage[] = [
     { role: 'system', content: system },

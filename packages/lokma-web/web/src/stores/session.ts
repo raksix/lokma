@@ -26,7 +26,9 @@ export type SessionStore = {
   /** Drop one cached transcript so the next view refetches it. */
   invalidateSession: (id: string) => void;
   /** Create a session on the server, refresh the list, and select it. */
-  createSession: (opts?: { cwd?: string; model?: string }) => Promise<string | null>;
+  createSession: (opts?: { cwd?: string; model?: string; botId?: string }) => Promise<string | null>;
+  /** Bind/switch/clear the session's bot (Grok-style switch, REQ-027). */
+  setSessionBot: (id: string, botId: string | null) => Promise<boolean>;
   /** Fork a session on the server, refresh, and return the new id. */
   forkSession: (id: string) => Promise<string | null>;
   /** Rename a session (title sidecar) and refresh the list. */
@@ -124,7 +126,7 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
     });
   },
 
-  createSession: async (opts?: { cwd?: string; model?: string }) => {
+  createSession: async (opts?: { cwd?: string; model?: string; botId?: string }) => {
     try {
       const res = await api.createSession(opts ?? {});
       await get().refreshSessions(opts?.cwd);
@@ -133,6 +135,18 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
     } catch (e) {
       set({ lastError: e instanceof Error ? e.message : 'session create failed' });
       return null;
+    }
+  },
+
+  setSessionBot: async (id: string, botId: string | null) => {
+    try {
+      // Empty string clears server-side; null would fail the string guard.
+      await api.patchSession(id, { botId: botId ?? '' });
+      await get().refreshSessions();
+      return true;
+    } catch (e) {
+      set({ lastError: e instanceof Error ? e.message : 'bot bind failed' });
+      return false;
     }
   },
 

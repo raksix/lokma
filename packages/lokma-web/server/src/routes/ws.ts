@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { SessionStore, TerminalError, UsageLedger, estimateCost, estimateTokens, loadConfig, onAgentEvent, recordApprovalDecision, resolveInRoot, saveGlobal, terminalManager } from 'lokma-core';
+import { SessionStore, TerminalError, UsageLedger, estimateCost, estimateTokens, loadConfig, onAgentEvent, recordApprovalDecision, resolveBotChatContext, resolveInRoot, saveGlobal, terminalManager } from 'lokma-core';
 import { decodeClientMessage, encodeServerMessage } from 'lokma-shared';
 import { LoopAborted, buildLoopHistory, runAgentLoop, type ApprovalDecision } from '../agent-loop.js';
 import { resolveProviderUpstream } from './providers.js';
@@ -9,7 +9,11 @@ import { resolveProviderUpstream } from './providers.js';
 /**
  * WS /ws/:sessionId — runs the agent tool loop (`../agent-loop.js`) over
  * `lokma-ai stream()`, forwarding typed server frames.
- * Model resolution per prompt: message `model` > session meta > default.
+ * Model resolution per prompt: message `model` > bound bot's model >
+ * session meta > default. A bot-bound session (`meta.botId`, REQ-027,
+ * Docs/35 §8) additionally injects the bot's SOUL + knowledge ahead of the
+ * tool system prompt — resolved live per turn, so bot edits apply without
+ * rebinding. A deleted bot degrades to plain chat, never a failed turn.
  * `@file` mentions arrive as `contextPaths`; the server reads them (scoped to
  * the session cwd, size-capped) and prepends them to the model context.
  * Transcript history is NOT replayed here — the client loads it via
@@ -124,9 +128,12 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
         if (!prompt) return;
         await store.append(sessionId, { role: 'user', content: prompt, timestamp: new Date().toISOString() });
 
-        // Effective model: per-prompt override wins, then the session meta.
+        // Effective model: per-prompt override wins, then the bound bot's
+        // model, then the session meta. The bot context (SOUL + knowledge)
+        // resolves live per turn; a deleted bot degrades to plain chat.
         const meta = await store.readMeta(sessionId);
-        const model = msg.model?.trim() || meta?.model || DEFAULT_MODEL;
+        const botCtx = meta?.botId ? await resolveBotChatContext(meta.botId, cwd).catch(() => null) : null;
+        const model = msg.model?.trim() || botCtx?.model || meta?.model || DEFAULT_MODEL;
         if (msg.model?.trim() && msg.model.trim() !== meta?.model) {
           await store.writeMeta(sessionId, { model: model });
         }
@@ -163,6 +170,7 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
             upstream,
             history,
             prompt: effectivePrompt,
+            systemPreamble: botCtx?.systemPreamble || undefined,
             permissions: config?.permissions,
             store,
             send: (frame) => socket.send(encodeServerMessage(frame)),

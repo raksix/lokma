@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { SessionStore, compactSession, compactionStatus, loadConfig, searchSessionsDetailed } from 'lokma-core';
+import { SessionStore, compactSession, compactionStatus, getBot, loadConfig, searchSessionsDetailed } from 'lokma-core';
 
 /**
  * Sessions — JSONL same files as CLI (SessionStore).
@@ -11,8 +11,14 @@ import { SessionStore, compactSession, compactionStatus, loadConfig, searchSessi
  * shrink (hygiene + extractive summary with `<id>.archive.jsonl`
  * soft-archive) — below every threshold POST is an honest no-op
  * (`{ ok: true, compacted: false }`), never an error.
- * `GET /api/sessions` returns enriched summaries (title/model/counts/dates)
+ * `GET /api/sessions` returns enriched summaries (title/model/botId/counts/dates)
  * for the Sessions sidebar — same shape as `SessionSummary` in lokma-core.
+ * Bot binding (REQ-027, Docs/35 §8): POST accepts `{ botId }` (validated
+ * against the registry, 404 `bot_not_found` when unknown) and PATCH accepts
+ * `{ botId }` to switch bots mid-chat (empty string clears back to plain
+ * chat). A bound session adopts the bot's model at bind time; per-turn
+ * injection (model + SOUL + knowledge) resolves live in the WS prompt path,
+ * so bot edits apply without rebinding.
  * `GET /api/sessions/search` runs full-text search over one project's
  * transcripts (FTS5 BM25, substring degrade — the `engine` field says which;
  * Phase 2 memory-deep wave 3b, Docs/28 session_search).
@@ -63,21 +69,37 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     if (messages.length === 0 && meta == null) {
       return reply.status(404).send({ code: 'session_not_found', message: `No transcript for ${id}` });
     }
-    return { id, cwd, model: meta?.model ?? null, messages, count: messages.length };
+    return { id, cwd, model: meta?.model ?? null, botId: meta?.botId ?? null, messages, count: messages.length };
   });
 
-  app.post('/api/sessions', async (req) => {
-    const body = req.body as { cwd?: string; model?: string } | undefined;
+  app.post('/api/sessions', async (req, reply) => {
+    const body = req.body as { cwd?: string; model?: string; botId?: string } | undefined;
     // Explicit cwd wins; otherwise the configured session default
     // (`sessions.defaultCwd`, REQ-009); empty = server working dir.
     const configured = (await loadConfig(process.cwd())).sessions.defaultCwd.trim();
     const cwd = body?.cwd ?? (configured || process.cwd());
+    // Bot binding is validated up front — a bad id 404s instead of minting
+    // a session bound to nothing.
+    let botId: string | undefined;
+    let botModel: string | undefined;
+    if (typeof body?.botId === 'string' && body.botId) {
+      const bot = await getBot(body.botId, cwd);
+      if (!bot) {
+        return reply.status(404).send({ code: 'bot_not_found', message: `No bot '${body.botId}'` });
+      }
+      botId = bot.id;
+      botModel = bot.model;
+    }
     const id = newSessionId();
     // Create empty session file by appending a system marker (not a user message)
     const store = new SessionStore(cwd);
     await store.append(id, { role: 'assistant', content: `Session ${id} created`, timestamp: new Date().toISOString() });
-    if (typeof body?.model === 'string' && body.model) {
-      await store.writeMeta(id, { model: body.model });
+    const metaPatch: { model?: string; botId?: string } = {};
+    if (typeof body?.model === 'string' && body.model) metaPatch.model = body.model;
+    else if (botModel) metaPatch.model = botModel;
+    if (botId) metaPatch.botId = botId;
+    if (Object.keys(metaPatch).length > 0) {
+      await store.writeMeta(id, metaPatch);
     }
     return { ok: true, id, cwd };
   });
@@ -106,13 +128,32 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     } catch {
       return reply.status(400).send({ code: 'bad_session_id', message: 'Invalid session id' });
     }
-    const body = (req.body ?? {}) as { model?: unknown; title?: unknown };
-    const patch: { model?: string; title?: string } = {};
+    const body = (req.body ?? {}) as { model?: unknown; title?: unknown; botId?: unknown };
+    const patch: { model?: string; title?: string; botId?: string } = {};
     if (body.model !== undefined) {
       if (typeof body.model !== 'string' || !body.model.trim()) {
         return reply.status(400).send({ code: 'bad_model', message: 'PATCH needs { model: "<provider>/<id>" }' });
       }
       patch.model = body.model.trim();
+    }
+    if (body.botId !== undefined) {
+      // Grok-style bot switching: a bot id rebinds (validated), an empty
+      // string clears back to plain chat. The client also sends the bot's
+      // model alongside so the session model follows the switch.
+      if (typeof body.botId !== 'string') {
+        return reply.status(400).send({ code: 'bad_bot', message: 'PATCH needs { botId: "<id>" }' });
+      }
+      const clean = body.botId.trim();
+      if (clean) {
+        const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
+        const bot = await getBot(clean, cwd);
+        if (!bot) {
+          return reply.status(404).send({ code: 'bot_not_found', message: `No bot '${clean}'` });
+        }
+        patch.botId = bot.id;
+      } else {
+        patch.botId = '';
+      }
     }
     if (body.title !== undefined) {
       if (typeof body.title !== 'string' || !body.title.trim() || body.title.trim().length > 120) {
@@ -121,12 +162,12 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
       patch.title = body.title.trim();
     }
     if (Object.keys(patch).length === 0) {
-      return reply.status(400).send({ code: 'bad_patch', message: 'PATCH needs { model } and/or { title }' });
+      return reply.status(400).send({ code: 'bad_patch', message: 'PATCH needs { model } and/or { title } and/or { botId }' });
     }
     const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
     const store = new SessionStore(cwd);
     const meta = await store.writeMeta(id, patch);
-    return { ok: true, id, model: meta.model, title: meta.title ?? null };
+    return { ok: true, id, model: meta.model, title: meta.title ?? null, botId: meta.botId ?? null };
   });
 
   app.delete('/api/sessions/:id', async (req, reply) => {

@@ -1,11 +1,12 @@
 import * as React from 'react';
-import { GitFork, Plus } from 'lucide-react';
+import { Bot as BotIcon, GitFork, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Composer, type ComposerSend } from './composer';
 import { SingleChatView, type PendingMessage, type TranscriptMessage } from './single-chat-view';
 import { useWs, type UseWs } from '@/hooks/use-ws';
-import { api } from '@/lib/api';
+import { api, type Bot } from '@/lib/api';
+import { botClearPatch, botSwitchPatch, filterPickerBots, sessionBotName } from '@/components/bots/bot-chat';
 import { useKnownSession, useProviderStore, useSessionStore } from '@/stores';
 import { emitToast } from '@/components/shell';
 import { FILE_DRAG_MIME, INSERT_MENTION_EVENT } from '@/components/files';
@@ -47,6 +48,12 @@ export function Chat({
 }) {
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const [model, setModel] = React.useState<string>('');
+  // Bot binding (REQ-027): Grok-style "switch bot in chat" — the session
+  // chats AS the bound bot (own SOUL/knowledge/model, server-injected).
+  const [botId, setBotId] = React.useState<string | null>(null);
+  const [bots, setBots] = React.useState<Bot[]>([]);
+  const [botOpen, setBotOpen] = React.useState(false);
+  const [botQuery, setBotQuery] = React.useState('');
   const [pending, setPending] = React.useState<PendingMessage[]>([]);
   const [streamVisible, setStreamVisible] = React.useState(true);
   const [paletteSignal, setPaletteSignal] = React.useState(0);
@@ -74,20 +81,34 @@ export function Chat({
     doneSeen.current = false;
     setPending([]);
     setStreamVisible(true);
+    setBotOpen(false);
+    setBotQuery('');
     void refreshProviders();
+    api
+      .listBots()
+      .then((res) => setBots(res.bots))
+      .catch(() => setBots([]));
     if (known === 'loading') {
       setModel(readStoredModel());
+      setBotId(null);
       return;
     }
     void loadTranscript(sessionId);
     if (!known) {
       setModel(readStoredModel());
+      setBotId(null);
       return;
     }
     api
       .getSession(sessionId)
-      .then((detail) => setModel(detail.model || readStoredModel()))
-      .catch(() => setModel(readStoredModel()));
+      .then((detail) => {
+        setModel(detail.model || readStoredModel());
+        setBotId(detail.botId ?? known.botId ?? null);
+      })
+      .catch(() => {
+        setModel(readStoredModel());
+        setBotId(known.botId ?? null);
+      });
   }, [sessionId, loadTranscript, refreshProviders, known]);
 
   const transcript: TranscriptMessage[] = React.useMemo(() => {
@@ -145,6 +166,39 @@ export function Chat({
     },
     [sessionId],
   );
+
+  // Grok-style bot switching (REQ-027): binding also adopts the bot's
+  // model so the session chats AS the bot; clearing returns to plain chat.
+  const pickBot = React.useCallback(
+    (bot: Bot) => {
+      const patch = botSwitchPatch(bot);
+      setBotId(patch.botId);
+      setModel(patch.model);
+      setBotOpen(false);
+      try {
+        localStorage.setItem(MODEL_KEY, patch.model);
+      } catch {
+        // Selection still applies for this tab without persistence.
+      }
+      api.patchSession(sessionId, patch).catch((e: Error) => {
+        emitToast(`Bot not saved server-side: ${e.message}`);
+      });
+      emitToast(`Chatting as ${bot.name}`);
+    },
+    [sessionId],
+  );
+
+  const clearBot = React.useCallback(() => {
+    setBotId(null);
+    setBotOpen(false);
+    api.patchSession(sessionId, botClearPatch()).catch((e: Error) => {
+      emitToast(`Bot not cleared server-side: ${e.message}`);
+    });
+    emitToast('Plain chat — no bot');
+  }, [sessionId]);
+
+  const botName = sessionBotName(botId, bots);
+  const pickerBots = filterPickerBots(bots, botQuery);
 
   const send = React.useCallback(
     (s: ComposerSend) => {
@@ -396,6 +450,62 @@ export function Chat({
     >
       <div className="flex h-9 items-center gap-2 border-b px-3 text-xs text-muted-foreground">
         <span className="font-mono">{sessionId}</span>
+        {/* Bot picker (REQ-027): Grok-style switch-bot-in-chat. */}
+        <span className="relative">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 gap-1 px-2 text-[11px]"
+            title={botName ? `Chatting as ${botName} — click to switch` : 'Plain chat — click to chat as a bot'}
+            aria-label={botName ? `Active bot ${botName}, switch bot` : 'Pick a bot for this chat'}
+            aria-expanded={botOpen}
+            onClick={() => setBotOpen((o) => !o)}
+          >
+            <BotIcon className="h-3 w-3 text-terracotta" />
+            <span className="max-w-28 truncate">{botName ?? 'No bot'}</span>
+          </Button>
+          {botOpen && (
+            <span className="absolute left-0 top-7 z-50 block w-64 overflow-hidden rounded-lg border border-line bg-white shadow-lg dark:bg-[#1E1E21]">
+              <span className="block p-1.5">
+                <input
+                  aria-label="Search bots"
+                  placeholder="Search bots"
+                  value={botQuery}
+                  onChange={(e) => setBotQuery(e.target.value)}
+                  className="h-7 w-full rounded-md border border-line bg-white px-2 text-xs focus:border-terracotta/30 focus:outline-none dark:bg-[#0F0F11]"
+                />
+              </span>
+              <span className="block max-h-56 overflow-auto pb-1">
+                <button
+                  onClick={clearBot}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] hover:bg-muted"
+                >
+                  <X className="h-3 w-3 text-zinc-400" />
+                  Plain chat (no bot)
+                  {!botName && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-terracotta" />}
+                </button>
+                {pickerBots.map((b) => (
+                  <button
+                    key={b.id}
+                    onClick={() => pickBot(b)}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] hover:bg-muted"
+                    title={`${b.description} · ${b.model}`}
+                  >
+                    <BotIcon className="h-3 w-3 shrink-0 text-terracotta" />
+                    <span className="min-w-0 flex-1 truncate font-medium text-foreground">{b.name}</span>
+                    <span className="shrink-0 truncate text-zinc-400">{b.model}</span>
+                    {botId === b.id && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-terracotta" />}
+                  </button>
+                ))}
+                {pickerBots.length === 0 && (
+                  <span className="block px-3 py-4 text-center text-[11px] text-zinc-500">
+                    No bots — create one in the Bots pane
+                  </span>
+                )}
+              </span>
+            </span>
+          )}
+        </span>
         <span className="ml-auto flex items-center gap-1">
           <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" title="New session" aria-label="New session" onClick={() => runSlash('new', '')}>
             <Plus className="h-3 w-3" />

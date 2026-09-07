@@ -28,3 +28,5 @@
 - [REQ-007](REQ-007-menu-swap-ikonu.md) — Sol/sağ menü swap ikonu (en sol üst) — pending
 - [REQ-008](REQ-008-activity-bar.md) — En sağa VS Code tarzı activity bar — pending
 - [REQ-009](REQ-009-ayar-sistemi.md) — Docs'a uygun detaylı ayar sistemi — pending
+- [REQ-010](REQ-010-sol-ikon-rail.md) — En sola Inspector ikon şeridi — pending
+- [REQ-011](REQ-011-file-explorer-sola.md) — File explorer sola taşınacak — pending

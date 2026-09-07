@@ -34,6 +34,12 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    // Stale-tab crash fix: each deploy re-hashes chunk filenames and the
+    // default wipe deletes the old ones while long-lived tabs still import
+    // them (SPA fallback serves index.html -> dynamic import fails ->
+    // "Inspector crashed"). Keeping superseded chunks costs ~MBs per deploy
+    // and lets pre-deploy tabs keep working.
+    emptyOutDir: false,
     // Phase 3 perf wave 2b: keep React in one shared chunk so the 22 lazy
     // Inspector panes (see `components/panes/lazy-panes.tsx`) share it
     // instead of each duplicating the runtime.

@@ -98,7 +98,7 @@ function ActivityButton({
       aria-label={label}
       aria-pressed={active}
       className={cn(
-        'relative grid h-9 w-9 place-items-center rounded-md transition',
+        'relative grid h-8 w-8 place-items-center rounded-md transition',
         active
           ? 'bg-terracotta/10 text-terracotta'
           : 'text-zinc-500 hover:bg-muted hover:text-ink dark:hover:text-white',
@@ -112,7 +112,7 @@ function ActivityButton({
           active ? 'opacity-100' : 'opacity-0',
         )}
       />
-      <Icon className="h-[18px] w-[18px]" />
+      <Icon className="h-4 w-4" />
     </button>
   );
 }
@@ -133,7 +133,7 @@ export function ActivityBar({
     <nav
       aria-label="Activity bar"
       className={cn(
-        'hidden w-12 shrink-0 flex-col items-center gap-0.5 overflow-y-auto bg-card py-2 md:flex',
+        'hidden w-11 shrink-0 flex-col items-center gap-0.5 overflow-y-auto bg-card py-2 md:flex',
         borderClass,
       )}
     >

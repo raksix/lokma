@@ -4,7 +4,7 @@ import type { InspectorTab } from '@/components/providers';
 import type { ExplorerSide, SidebarSide } from './responsive';
 
 /**
- * InspectorRail — REQ-010 thin icon strip (~48px) docked on the Inspector's
+ * InspectorRail — REQ-010 thin icon strip (~44px, REQ-023) docked on the Inspector's
  * outer edge. One icon-only button per Inspector tab (same lucide icons and
  * labels as before, tooltip via `title`), so the
  * 23 menus stay reachable without the wide panel open. Purely
@@ -72,7 +72,7 @@ function InspectorRailButton({
       aria-label={label}
       aria-pressed={active}
       className={cn(
-        'relative grid h-9 w-9 shrink-0 place-items-center rounded-md transition',
+        'relative grid h-8 w-8 shrink-0 place-items-center rounded-md transition',
         active
           ? 'bg-terracotta/10 text-terracotta'
           : 'text-zinc-500 hover:bg-muted hover:text-ink dark:hover:text-white',
@@ -86,7 +86,7 @@ function InspectorRailButton({
           active ? 'opacity-100' : 'opacity-0',
         )}
       />
-      <Icon className="h-[18px] w-[18px]" />
+      <Icon className="h-4 w-4" />
     </button>
   );
 }
@@ -106,7 +106,7 @@ export function InspectorRail({
   return (
     <nav
       aria-label="Inspector rail"
-      className={cn('hidden w-12 shrink-0 flex-col items-center gap-0.5 overflow-y-auto bg-card py-2 md:flex', borderClass)}
+      className={cn('hidden w-11 shrink-0 flex-col items-center gap-0.5 overflow-y-auto bg-card py-2 md:flex', borderClass)}
     >
       {INSPECTOR_RAIL_ITEMS.map(({ tab, label, Icon }) => (
         <InspectorRailButton

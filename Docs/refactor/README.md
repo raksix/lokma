@@ -42,3 +42,4 @@
 - [REQ-021](REQ-021-swap-rail-takip.md) — Swap'te mini menüler panelle birlikte taşınır — pending
 - [REQ-022](REQ-022-ayarlar-modal.md) — Ayarlar modal olarak açılır — pending
 - [REQ-023](REQ-023-ikon-kucult.md) — Sol/sağ menü ikonları küçültülür — pending
+- [REQ-024](REQ-024-mobil-single.md) — Mobilde pane yok, single görünüm — pending

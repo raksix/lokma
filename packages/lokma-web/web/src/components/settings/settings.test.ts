@@ -3,6 +3,7 @@
  * Run: `bun src/components/settings/settings.test.ts` (no DOM, no server).
  */
 import {
+  buildAgentsPatch,
   buildHooksPatch,
   buildMcpPatch,
   buildPermissionsPatch,
@@ -18,6 +19,7 @@ import {
   serverThemeToMode,
   summarizeDoctor,
   themeCardFromView,
+  validateAgentsCaps,
   validateMcpForm,
   THEME_CARDS,
 } from './settings';
@@ -152,6 +154,16 @@ check('mixed counts 1/3', mixed.passed === 1 && mixed.total === 3);
 check('mixed names the failing probes', mixed.failing.join(',') === 'browser,vault');
 const none = summarizeDoctor([]);
 check('empty list is 0/0 with no failing', none.passed === 0 && none.total === 0 && none.failing.length === 0);
+
+// validateAgentsCaps + buildAgentsPatch (REQ-009 caps card — mirror AgentsConfigSchema)
+check('valid caps pass', Object.keys(validateAgentsCaps({ maxAgents: '20', maxConcurrent: 5, maxQueue: '20' })).length === 0);
+check('zero agents flagged', typeof validateAgentsCaps({ maxAgents: '0', maxConcurrent: '5', maxQueue: '20' }).maxAgents === 'string');
+check('concurrent over 20 flagged', typeof validateAgentsCaps({ maxAgents: '20', maxConcurrent: '21', maxQueue: '20' }).maxConcurrent === 'string');
+check('fractional queue flagged', typeof validateAgentsCaps({ maxAgents: '20', maxConcurrent: '5', maxQueue: '2.5' }).maxQueue === 'string');
+check('blank queue flagged', typeof validateAgentsCaps({ maxAgents: '20', maxConcurrent: '5', maxQueue: '' }).maxQueue === 'string');
+const agentsPatch = buildAgentsPatch(20, 5, 20, 'anthropic/claude-4-sonnet') as { agents: { maxAgents: number; maxConcurrent: number; maxQueue: number; defaultModel: string } };
+check('caps patch keeps all three caps', agentsPatch.agents.maxAgents === 20 && agentsPatch.agents.maxConcurrent === 5 && agentsPatch.agents.maxQueue === 20);
+check('caps patch carries defaultModel (no shallow-merge wipe)', agentsPatch.agents.defaultModel === 'anthropic/claude-4-sonnet');
 
 console.log(`settings.test.ts: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

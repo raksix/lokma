@@ -276,3 +276,48 @@ export function buildMcpPatch(servers: McpEntry[]): Record<string, unknown> {
   }
   return { mcp: { servers: map } };
 }
+
+/**
+ * Agent caps bounds (mirror the server `AgentsConfigSchema`:
+ * maxAgents 1-100, maxConcurrent 1-20, maxQueue >= 1).
+ */
+export const AGENTS_CAPS_BOUNDS = {
+  maxAgents: { min: 1, max: 100 },
+  maxConcurrent: { min: 1, max: 20 },
+  maxQueue: { min: 1, max: 9999 },
+} as const;
+
+export type AgentsCapsInput = {
+  maxAgents: unknown;
+  maxConcurrent: unknown;
+  maxQueue: unknown;
+};
+
+/** Validate the agent-caps edit form; returns per-field errors (empty = valid). */
+export function validateAgentsCaps(input: AgentsCapsInput): Record<string, string> {
+  const errors: Record<string, string> = {};
+  const fields: Array<keyof AgentsCapsInput> = ['maxAgents', 'maxConcurrent', 'maxQueue'];
+  for (const field of fields) {
+    const raw = input[field];
+    const n = typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : typeof raw === 'number' ? raw : NaN;
+    const bounds = AGENTS_CAPS_BOUNDS[field];
+    if (!Number.isInteger(n) || n < bounds.min || n > bounds.max) {
+      errors[field] = `Whole number ${bounds.min}–${bounds.max}.`;
+    }
+  }
+  return errors;
+}
+
+/**
+ * Build a PATCH body for the full agents object. Always sends all four
+ * keys together — `saveGlobal` shallow-merges, so a partial object would
+ * reset the sibling (e.g. defaultModel back to the schema default).
+ */
+export function buildAgentsPatch(
+  maxAgents: number,
+  maxConcurrent: number,
+  maxQueue: number,
+  agentDefaultModel: string,
+): Record<string, unknown> {
+  return { agents: { maxAgents, maxConcurrent, maxQueue, defaultModel: agentDefaultModel } };
+}

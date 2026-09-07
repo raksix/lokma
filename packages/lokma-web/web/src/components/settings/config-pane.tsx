@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { emitToast } from '@/components/shell';
 import type { NormalizedConfig } from './settings';
+import { buildAgentsPatch, validateAgentsCaps } from './settings';
 
 /**
  * ConfigPane — the effective (merged) harness config, read live from
@@ -17,6 +18,13 @@ import type { NormalizedConfig } from './settings';
 export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onReload: () => Promise<void> }) {
   const [model, setModel] = React.useState(config.defaultModel);
   const [saving, setSaving] = React.useState(false);
+  const [caps, setCaps] = React.useState({
+    maxAgents: config.maxAgents === null ? '' : String(config.maxAgents),
+    maxConcurrent: config.maxConcurrent === null ? '' : String(config.maxConcurrent),
+    maxQueue: config.maxQueue === null ? '' : String(config.maxQueue),
+  });
+  const [capsErrors, setCapsErrors] = React.useState<Record<string, string>>({});
+  const [savingCaps, setSavingCaps] = React.useState(false);
 
   async function handleSaveModel(): Promise<void> {
     const next = model.trim();
@@ -38,6 +46,32 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
 
   const credEntries = Object.entries(config.credentials);
   const keysSet = credEntries.filter(([, c]) => c.keySet).length;
+
+  async function handleSaveCaps(): Promise<void> {
+    const errors = validateAgentsCaps(caps);
+    setCapsErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+    setSavingCaps(true);
+    try {
+      // Full agents object — saveGlobal shallow-merges, so the current
+      // agentDefaultModel rides along and is never reset to the default.
+      await api.patchConfig(
+        buildAgentsPatch(Number(caps.maxAgents), Number(caps.maxConcurrent), Number(caps.maxQueue), config.agentDefaultModel),
+      );
+      emitToast('Agent caps saved');
+      await onReload();
+    } catch (e) {
+      emitToast(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setSavingCaps(false);
+    }
+  }
+
+  const capsFields: Array<{ key: 'maxAgents' | 'maxConcurrent' | 'maxQueue'; label: string; hint: string }> = [
+    { key: 'maxAgents', label: 'Max agents', hint: 'Registry slots (1–100)' },
+    { key: 'maxConcurrent', label: 'Max concurrent', hint: 'Running at once (1–20)' },
+    { key: 'maxQueue', label: 'Max queue', hint: 'Waiting slots (1+)' },
+  ];
 
   return (
     <div className="space-y-2 p-2 text-xs">
@@ -90,6 +124,36 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
           </Button>
         </div>
         <div className="mt-1 text-[11px] text-zinc-500">Persists to global config via PATCH /api/config.</div>
+      </div>
+
+      <div className="rounded-lg border border-line bg-white p-2.5 dark:bg-[#1E1E21]">
+        <div className="font-semibold">Agent caps</div>
+        <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+          {capsFields.map((f) => (
+            <div key={f.key} className="min-w-0">
+              <label htmlFor={`settings-caps-${f.key}`} className="text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
+                {f.label}
+              </label>
+              <Input
+                id={`settings-caps-${f.key}`}
+                inputMode="numeric"
+                value={caps[f.key]}
+                onChange={(e) => setCaps((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                placeholder={f.hint}
+                className="mt-0.5 h-7 font-mono text-xs min-w-0"
+              />
+              {capsErrors[f.key] ? (
+                <div className="mt-0.5 text-[10px] text-red-600">{capsErrors[f.key]}</div>
+              ) : (
+                <div className="mt-0.5 text-[10px] text-zinc-500">{f.hint}</div>
+              )}
+            </div>
+          ))}
+        </div>
+        <Button size="sm" className="mt-1.5 h-7 text-xs" disabled={savingCaps} onClick={handleSaveCaps}>
+          {savingCaps ? 'Saving…' : 'Save caps'}
+        </Button>
+        <div className="mt-1 text-[11px] text-zinc-500">Persists the full agents object via PATCH /api/config.</div>
       </div>
 
       <div className="rounded-lg border border-[#F2D5C2] bg-[#FDF0E6] p-2.5 dark:bg-[#2A1E15]">

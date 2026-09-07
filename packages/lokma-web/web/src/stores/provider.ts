@@ -37,7 +37,9 @@ export type ProviderStore = {
   /** Drop the cache so the next read refetches (e.g. after provider CRUD). */
   invalidate: () => void;
   reset: () => void;
-  /** Live connection test — stores the result under testResults[id]. */
+  /** Live connection test — stores the result under testResults[id]. On a
+   * passing probe the shared providers/models cache is force-refreshed so
+   * the row's model count and the Models tab update at once (REQ-031). */
   testProvider: (id: string) => Promise<ProviderTestRes>;
   /** Create a custom provider, then force-refresh the shared cache. */
   createProvider: (body: CreateProviderBody) => Promise<ProviderInfo>;
@@ -95,6 +97,11 @@ export const useProviderStore = create<ProviderStore>()((set, get) => ({
     try {
       const result = await api.testProvider(id);
       set((s) => ({ testingId: null, testResults: { ...s.testResults, [id]: result } }));
+      // REQ-031: a passing probe means the merged catalog now carries this
+      // provider's live models — force-refresh so the row's "N models" count
+      // and the Models tab reflect the test result immediately instead of
+      // sitting on the TTL-cached zero. Failures change nothing server-side.
+      if (result.ok) await get().refresh(true);
       return result;
     } catch (e) {
       const fallback: ProviderTestRes = {

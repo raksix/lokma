@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ApiError, api, type FileEntry, type FileSearchHit } from '@/lib/api';
 import { useKnownSession } from '@/stores';
+import { usePaneStore } from '@/stores/pane';
 import { emitToast } from '@/components/shell';
 import {
   FILE_DRAG_MIME,
@@ -185,6 +186,12 @@ export function FileBrowser({ sessionId }: { sessionId: string }) {
   const openFile = React.useCallback(
     async (path: string) => {
       if (!cwd) return;
+      // REQ-002: every Explorer open also lands as a tab in the
+      // last-focused tiling pane (open-or-focus, no duplicates). Tiling
+      // turns on when off so the tab has a pane to land in.
+      const panes = usePaneStore.getState();
+      if (!panes.tiling) panes.setTiling(true);
+      panes.requestFileTab(path, sessionId);
       const seq = (requestSeq.current += 1);
       setSelected(path);
       setView(null);

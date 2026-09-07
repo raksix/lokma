@@ -129,6 +129,18 @@ export function makeFileTab(filePath: string, sessionId: string): PaneTab {
   return { id: makeTabId('tab-file'), title: base, kind: 'file', filePath, sessionId };
 }
 
+/**
+ * Open-or-focus a file tab in a pane state (REQ-002): the same path owned by
+ * the same session focuses its existing tab instead of duplicating it;
+ * anything else appends a fresh live file tab and activates it.
+ */
+export function upsertFileTab(state: PaneTabState, filePath: string, sessionId: string): PaneTabState {
+  const existing = state.tabs.find((t) => t.kind === 'file' && t.filePath === filePath && t.sessionId === sessionId);
+  if (existing) return { tabs: state.tabs, active: existing.id };
+  const tab = makeFileTab(filePath, sessionId);
+  return { tabs: [...state.tabs, tab], active: tab.id };
+}
+
 /** Runtime guard for persisted / drag-carried tabs (corrupt rows are dropped, never rendered). */
 export function isPaneTab(value: unknown): value is PaneTab {
   if (typeof value !== 'object' || value === null) return false;

@@ -31,6 +31,7 @@ import {
   serializeTabStates,
   splitForZone,
   splitLayout,
+  upsertFileTab,
 } from "./panes";
 import type { LayoutNode } from "@/stores/layout";
 
@@ -62,6 +63,16 @@ check("inspector tab label", g.title === "Terminal" && g.inspectorId === "termin
 const f = makeFileTab("src/index.ts", "sess_abc123");
 check("file tab carries path+session", f.filePath === "src/index.ts" && f.sessionId === "sess_abc123");
 check("file tab title is basename", f.title === "index.ts");
+
+/* 1b — upsertFileTab (REQ-002): open-or-focus, never duplicates. */
+const u1 = upsertFileTab({ tabs: [], active: null }, "src/a.ts", "sess_1");
+check("upsert appends first file tab", u1.tabs.length === 1 && u1.active === u1.tabs[0].id);
+const u2 = upsertFileTab(u1, "src/a.ts", "sess_1");
+check("upsert same path+session focuses", u2.tabs.length === 1 && u2.active === u1.active);
+const u3 = upsertFileTab(u2, "src/b.ts", "sess_1");
+check("upsert new path appends+activates", u3.tabs.length === 2 && u3.active !== u2.active);
+const u4 = upsertFileTab(u3, "src/a.ts", "sess_2");
+check("upsert same path other session appends", u4.tabs.length === 3);
 
 check("tab id prefix", makeTabId("tab-x").startsWith("tab-x-"));
 check("pane id prefix unique", makePaneId().startsWith("p-") && makePaneId() !== makePaneId());

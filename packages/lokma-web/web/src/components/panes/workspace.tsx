@@ -24,6 +24,7 @@ import {
   type InspectorTabId,
   type PaneTab,
   type PaneTabState,
+  upsertFileTab,
 } from './panes';
 
 // TilingWorkspace: the W7 pane system inside the harness center column.
@@ -48,6 +49,8 @@ export function TilingWorkspace({
   const focusedPaneId = usePaneStore((s) => s.focusedPaneId);
   const focusPane = usePaneStore((s) => s.focusPane);
   const resetStoreLayout = usePaneStore((s) => s.resetLayout);
+  const pendingFileTab = usePaneStore((s) => s.pendingFileTab);
+  const consumeFileTab = usePaneStore((s) => s.consumeFileTab);
 
   const [tabStates, setTabStates] = React.useState<Record<string, PaneTabState>>(loadTabStates);
   const [winPos, setWinPos] = React.useState<Record<string, WindowPos>>({});
@@ -94,6 +97,23 @@ export function TilingWorkspace({
   }, [states, paneIds]);
 
   const tabCount = paneIds.reduce((n, pid) => n + (states[pid]?.tabs.length ?? 0), 0);
+
+  // REQ-002: Explorer file clicks land here as a tab in the last-focused
+  // pane (same path+session focuses instead of duplicating). One-shot: the
+  // request is consumed even when no pane exists (nothing to open into).
+  React.useEffect(() => {
+    if (!pendingFileTab) return;
+    const target = paneIds.includes(focusedPaneId) ? focusedPaneId : paneIds[0];
+    if (target) {
+      const { path, sessionId: ownerId } = pendingFileTab;
+      setTabStates((prev) => ({
+        ...prev,
+        [target]: upsertFileTab(prev[target] ?? { tabs: [], active: null }, path, ownerId),
+      }));
+      focusPane(target);
+    }
+    consumeFileTab();
+  }, [pendingFileTab, paneIds, focusedPaneId, focusPane, consumeFileTab]);
 
   const tabsChange = (paneId: string, tabs: PaneTab[], active: string | null) => {
     setTabStates((prev) => ({ ...prev, [paneId]: { tabs, active } }));

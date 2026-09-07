@@ -20,6 +20,12 @@ import {
 
 export type { LayoutNode, OpenTab };
 
+/** One-shot file-open request from the Explorer (consumed by TilingWorkspace, never persisted). */
+export type PendingFileTab = {
+  path: string;
+  sessionId: string;
+};
+
 type PaneState = {
   layout: LayoutNode;
   leftW: number;
@@ -29,6 +35,7 @@ type PaneState = {
   openTabs: OpenTab[];
   focusedPaneId: string;
   activeSessionId: string | null;
+  pendingFileTab: PendingFileTab | null;
   setLayout: (layout: LayoutNode) => void;
   setSideWidth: (side: 'left' | 'right', width: number) => void;
   setTiling: (on: boolean) => void;
@@ -37,6 +44,8 @@ type PaneState = {
   closeTab: (id: string) => void;
   focusPane: (id: string) => void;
   setActiveSession: (id: string | null) => void;
+  requestFileTab: (path: string, sessionId: string) => void;
+  consumeFileTab: () => void;
   resetLayout: () => void;
 };
 
@@ -49,6 +58,7 @@ const initial = {
   openTabs: [] as OpenTab[],
   focusedPaneId: 'a',
   activeSessionId: null as string | null,
+  pendingFileTab: null as PendingFileTab | null,
 };
 
 export const usePaneStore = create<PaneState>()(
@@ -82,6 +92,9 @@ export const usePaneStore = create<PaneState>()(
 
       focusPane: (id: string) => set({ focusedPaneId: id }),
       setActiveSession: (id: string | null) => set({ activeSessionId: id }),
+
+      requestFileTab: (path: string, sessionId: string) => set({ pendingFileTab: { path, sessionId } }),
+      consumeFileTab: () => set({ pendingFileTab: null }),
 
       resetLayout: () => set({ ...initial, layout: defaultLayout(), openTabs: [] }),
     }),

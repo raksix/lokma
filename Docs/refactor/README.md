@@ -46,3 +46,4 @@
 - [REQ-025](REQ-025-agent-hub-tasarim.md) — Agent Hub tasarımı iyileşir — pending
 - [REQ-026](REQ-026-hersey-pane-olur.md) — Her şey pane olarak kullanılabilir — pending
 - [REQ-027](REQ-027-bot-sistemi.md) — Bot sistemi refaktörü (Grok + Hermes referanslı) — pending
+- [REQ-028](REQ-028-plugin-market.md) — Skill/plugin market + örnek plugin — pending

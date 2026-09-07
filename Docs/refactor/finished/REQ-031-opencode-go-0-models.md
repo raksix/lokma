@@ -1,6 +1,6 @@
 # REQ-031 — opencode-go testi 35 model buluyor ama satırda 0 models görünüyor
 
-- **Status:** done 2026-09-07 (implemented + live, commit hash in annotate follow-up)
+- **Status:** done 2026-09-07, commit 7e85ea8 (implemented + live)
 - **Asked:** 2026-09-07 — "opencode go'da test ok — 35 models · 155ms diyor ama OpenCode Go satırında 0 models, key set, custom, base https://opencode.ai/zen/go/v1. 0 models diyor, güncellemiyor".
 - **Root cause (live-verified):** server merge already correct — live `GET /api/models` returns 42 models / 35 `opencode-go/*` (REQ-030). The row stayed stale because `testProvider` only stored the toast result and never invalidated the 5-min TTL client cache, so the row's `countModelsByProvider` kept reading the pre-test zero.
 - **Fix:** `testProvider` now force-refreshes the shared providers/models cache (`refresh(true)`, same call create/patch/delete/reorder already use) on a passing probe; failures refresh nothing. No server change, no new helper (DRY).

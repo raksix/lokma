@@ -44,3 +44,4 @@
 - [REQ-023](REQ-023-ikon-kucult.md) — Sol/sağ menü ikonları küçültülür — pending
 - [REQ-024](REQ-024-mobil-single.md) — Mobilde pane yok, single görünüm — pending
 - [REQ-025](REQ-025-agent-hub-tasarim.md) — Agent Hub tasarımı iyileşir — pending
+- [REQ-026](REQ-026-hersey-pane-olur.md) — Her şey pane olarak kullanılabilir — pending

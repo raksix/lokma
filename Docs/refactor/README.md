@@ -47,7 +47,7 @@
 - [REQ-026](finished/REQ-026-hersey-pane-olur.md) — Her şey pane olarak kullanılabilir — done
 - [REQ-027](finished/REQ-027-bot-sistemi.md) — Bot sistemi refaktörü (Grok + Hermes referanslı) — done
 - [REQ-028](finished/REQ-028-plugin-market.md) — Skill/plugin market + örnek plugin — done
-- [REQ-029](REQ-029-drag-split-calismiyor.md) — Session drop'ta split yapmıyor — pending
+- [REQ-029](finished/REQ-029-drag-split-calismiyor.md) — Session drop'ta split yapmıyor — done
 - [REQ-030](REQ-030-provider-modelleri-gorunsun.md) — Eklenen provider'ın modelleri listede görünsün — pending
 - [REQ-031](REQ-031-opencode-go-0-models.md) — Test 35 bulurken satır 0 models gösteriyor — pending
 - [REQ-032](REQ-032-refresh-tum-modeller.md) — Refresh tüm provider /v1/models'leri çeker — pending

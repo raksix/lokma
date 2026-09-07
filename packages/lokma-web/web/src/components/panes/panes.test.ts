@@ -12,6 +12,7 @@ import {
   closeLayoutPane,
   collectPaneIds,
   countPanes,
+  dropEffectFor,
   dropZoneFor,
   encodeInspectorDrag,
   encodeTabMove,
@@ -228,6 +229,18 @@ check("rail drop makes a live tool tab", (() => {
   const tab = makeInspectorTab(got);
   return tab.kind === "inspector" && tab.inspectorId === "bots";
 })());
+
+/* 10 — REQ-029: dropEffect must stay compatible with the source's
+ * effectAllowed (Chrome silently rejects mismatched drops: no drop event).
+ * Session/file rows drag with 'copy', rails and tab strips with 'move'. */
+check("dropEffect copy source stays copy", dropEffectFor("copy") === "copy");
+check("dropEffect copyLink source stays copy", dropEffectFor("copyLink") === "copy");
+check("dropEffect move source stays move", dropEffectFor("move") === "move");
+check("dropEffect copyMove source allows move", dropEffectFor("copyMove") === "move");
+check("dropEffect linkMove source allows move", dropEffectFor("linkMove") === "move");
+check("dropEffect link source stays link", dropEffectFor("link") === "link");
+check("dropEffect all allows move", dropEffectFor("all") === "move");
+check("dropEffect uninitialized allows move", dropEffectFor("uninitialized") === "move");
 
 console.log(`panes: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

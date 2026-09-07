@@ -268,6 +268,29 @@ export function splitForZone(zone: DropZone): { dir: 'row' | 'col'; pos: 'before
   return null;
 }
 
+/**
+ * Compatible dropEffect for a drag source's effectAllowed (REQ-029).
+ * Chrome enforces the pair: a drop whose dropEffect is incompatible with
+ * the source's effectAllowed is silently rejected (no drop event fires).
+ * Session/file rows drag with 'copy', rails and tab strips with 'move' —
+ * answering every dragover with a hardcoded 'move' killed all session and
+ * file drops. Answer with an effect the source allows instead.
+ */
+export function dropEffectFor(effectAllowed: string): 'copy' | 'move' | 'link' {
+  if (effectAllowed === 'link') return 'link';
+  if (
+    effectAllowed === 'move' ||
+    effectAllowed === 'copyMove' ||
+    effectAllowed === 'linkMove' ||
+    effectAllowed === 'all' ||
+    effectAllowed === 'uninitialized' ||
+    effectAllowed === ''
+  ) {
+    return 'move';
+  }
+  return 'copy';
+}
+
 // ─── Layout-tree ops (pure mirrors of the concept App split/close/resize) ────
 
 let splitSeq = 0;

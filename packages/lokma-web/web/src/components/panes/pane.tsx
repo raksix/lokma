@@ -31,6 +31,7 @@ import {
   INSPECTOR_TABS,
   PANE_TAB_MIME,
   SESSION_DRAG_MIME,
+  dropEffectFor,
   dropZoneFor,
   encodeTabMove,
   isValidRelPath,
@@ -581,10 +582,10 @@ export function WorkspacePane({
     setPickerOpen(false);
   };
 
-  const handleDrop = async (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent, forcedZone?: DropZone) => {
     e.preventDefault();
     e.stopPropagation();
-    const target = computeZone(e);
+    const target = forcedZone ?? computeZone(e);
     setZone(null);
     if (pending) return;
 
@@ -672,7 +673,10 @@ export function WorkspacePane({
     if (!hasPanePayload(e.dataTransfer)) return;
     e.preventDefault();
     e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
+    // REQ-029: answer with an effect the source allows — Chrome silently
+    // rejects drops whose dropEffect is incompatible with effectAllowed
+    // (session/file rows drag with 'copy', rails/tabs with 'move').
+    e.dataTransfer.dropEffect = dropEffectFor(e.dataTransfer.effectAllowed);
     setZone(computeZone(e));
   };
 
@@ -743,6 +747,7 @@ export function WorkspacePane({
         }}
         onSplitEmpty={(dir) => onSplitEmpty(id, dir)}
         onClosePane={() => onClosePane(id)}
+        onTabBarDrop={(e) => void handleDrop(e, 'center')}
       />
       <div
         ref={bodyRef}
@@ -829,6 +834,7 @@ function PaneTabBar({
   onAdd,
   onSplitEmpty,
   onClosePane,
+  onTabBarDrop,
 }: {
   tabs: PaneTab[];
   activeTabId: string | null;
@@ -839,9 +845,28 @@ function PaneTabBar({
   onAdd: () => void;
   onSplitEmpty: (dir: 'row' | 'col') => void;
   onClosePane: () => void;
+  onTabBarDrop: (e: React.DragEvent) => void;
 }) {
+  // REQ-029: the tab strip is a drop target too (concept handleTabBarDrop).
+  // Drops here land as CENTER (open tab / chooser, never split) so aiming
+  // at the top of a pane no longer loses the drop.
+  const [barOver, setBarOver] = React.useState(false);
   return (
-    <div className="flex h-7 shrink-0 items-center gap-0.5 border-b bg-[#FDFCFB] px-1 dark:bg-muted/40">
+    <div
+      onDragOver={(e) => {
+        if (!hasPanePayload(e.dataTransfer)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = dropEffectFor(e.dataTransfer.effectAllowed);
+        setBarOver(true);
+      }}
+      onDragLeave={() => setBarOver(false)}
+      onDrop={(e) => {
+        setBarOver(false);
+        onTabBarDrop(e);
+      }}
+      className={`flex h-7 shrink-0 items-center gap-0.5 border-b px-1 ${barOver ? 'border-[#C96442]/50 bg-[#C96442]/10' : 'bg-[#FDFCFB] dark:bg-muted/40'}`}
+    >
       <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground" />
       <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto" role="tablist" aria-label="Pane tabs">
         {tabs.map((tab) => {

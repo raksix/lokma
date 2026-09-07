@@ -30,6 +30,12 @@ import {
  * repo) — live AI-driven screenshots land with the agent tool loop (W4+).
  * Sites sending `X-Frame-Options: DENY` refuse the iframe; the external-link
  * button next to the address bar is the real fallback (opens the live URL).
+ *
+ * REQ-037 full-height contract: this root is `flex-1` inside a flex column,
+ * so every host must hand it a real height — the tiling InspectorHost wraps
+ * it in a `h-full` flex shell, the scrolling sidebar/mobile InspectorPanel
+ * wraps it in a viewport-relative (`h-[60vh]`) flex shell. Without that the
+ * flex-1 chain collapses and the page area renders cut off.
  */
 export function BrowserPane({ sessionId }: { sessionId: string }) {
   const [tabs, setTabs] = React.useState<BrowserTab[]>([]);
@@ -160,7 +166,7 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
   const forwardDisabled = !selected || !canGoForward(selected) || busy;
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-1 border-b border-line bg-[#FDFCFB] px-2 py-1.5 dark:bg-[#161618]">
         <Button variant="ghost" size="sm" className="h-5 w-5 p-0" title="Back" disabled={backDisabled} onClick={() => void step('back')} aria-label="Back">
           <ChevronLeft className="h-3 w-3" />
@@ -218,7 +224,7 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
         <div className="shrink-0 border-b border-red-200 bg-red-50 px-2.5 py-1 text-[11px] text-red-700">{lastError}</div>
       ) : null}
 
-      <div className="relative flex-1 overflow-hidden bg-zinc-100 dark:bg-[#0F0F11]">
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-zinc-100 dark:bg-[#0F0F11]">
         {loading ? (
           <div className="grid h-full place-items-center text-xs text-zinc-400">Loading…</div>
         ) : !selected ? (

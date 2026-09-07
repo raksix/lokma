@@ -178,7 +178,12 @@ export function InspectorPanel({
         <LazyGitPane key={sessionId ?? 'no-session'} sessionId={sessionId} />
       ) : tab === 'browser' ? (
         sessionId ? (
-          <LazyBrowserPane key={sessionId} sessionId={sessionId} />
+          // REQ-037 — the sidebar/mobile Inspector is a scrolling column with
+          // no bounded height, so BrowserPane's flex-1 collapses and the page
+          // renders cut off. This shell gives it a viewport-relative height.
+          <div className="flex h-[60vh] min-h-[320px] flex-col overflow-hidden">
+            <LazyBrowserPane key={sessionId} sessionId={sessionId} />
+          </div>
         ) : (
           <div className="rounded border border-dashed p-3 text-xs text-muted-foreground">
             Open a session to use the browser.

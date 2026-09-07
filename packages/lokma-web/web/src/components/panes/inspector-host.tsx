@@ -98,7 +98,15 @@ function LazyTab({
     if (!sessionId || (tab === 'terminal' && !ws)) return <NeedsSessionPane pane={tab} onOpenSession={onOpenSession} />;
     if (tab === 'terminal') return <LazyTerminalPane key={sessionId} sessionId={sessionId} ws={ws as UseWs} />;
     if (tab === 'git') return <LazyGitPane key={sessionId} sessionId={sessionId} />;
-    return <LazyBrowserPane key={sessionId} sessionId={sessionId} />;
+    // REQ-037 — the shared tab wrapper above is a scrolling block (`h-full
+    // overflow-auto`), so BrowserPane's flex-1 is inert there and the page
+    // area collapses. This flex shell hands the pane the tab body's full
+    // height; other inspector tabs keep the scrolling wrapper untouched.
+    return (
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <LazyBrowserPane key={sessionId} sessionId={sessionId} />
+      </div>
+    );
   }
   return null;
 }

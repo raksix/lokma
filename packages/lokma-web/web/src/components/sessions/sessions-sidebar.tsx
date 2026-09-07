@@ -337,7 +337,7 @@ export function SessionsSidebar({
         <Button
           variant="default"
           size="sm"
-          className="w-full h-7 text-xs gap-1.5 justify-center"
+          className="w-full h-7 text-xs gap-1.5 justify-center bg-terracotta text-white hover:bg-terracotta-hover"
           onClick={handleCreate}
           disabled={creating}
         >

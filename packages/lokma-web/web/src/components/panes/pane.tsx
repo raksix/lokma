@@ -410,6 +410,10 @@ export function PaneTabPicker({
 // SessionDropChooser: a dropped session never becomes a fake tab. The user
 // picks open / side-by-side split / real fork / real merge into the pane's
 // current session tab.
+// REQ-035: top-anchored, never centered — in short panes a centered dialog
+// gets squeezed under the content or clipped at the bottom. The overlay
+// scrolls, the card caps its own height with an inner scroll, and the
+// z-index clears the zone highlight plus chat composer layers.
 export function SessionDropChooser({
   sessionId,
   title,
@@ -433,9 +437,18 @@ export function SessionDropChooser({
   onMerge: () => void;
   onCancel: () => void;
 }) {
+  // REQ-035: Escape dismisses the chooser (same as Cancel, blocked while busy).
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !busy) onCancel();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [busy, onCancel]);
+
   return (
-    <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80 p-3">
-      <div className="w-full max-w-xs rounded-lg border bg-card p-3 shadow-xl">
+    <div role="dialog" aria-modal="true" aria-label="Dropped session" className="absolute inset-0 z-50 flex items-start justify-center overflow-y-auto bg-background/80 p-2 pt-4">
+      <div className="my-1 max-h-[calc(100%-0.5rem)] w-full max-w-xs overflow-y-auto rounded-lg border bg-card p-2.5 shadow-xl">
         <div className="mb-1 text-xs font-medium">Dropped session</div>
         <div className="mb-2 truncate font-mono text-[11px] text-muted-foreground" title={sessionId}>
           {title}

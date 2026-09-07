@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils';
 import { ApiError, api, type FileEntry, type FileSearchHit } from '@/lib/api';
 import { useKnownSession } from '@/stores';
 import { usePaneStore } from '@/stores/pane';
-import { emitToast } from '@/components/shell';
+import { emitToast, isMobileViewport } from '@/components/shell';
 import {
   FILE_DRAG_MIME,
   FOCUS_FILES_EVENT,
@@ -189,9 +189,14 @@ export function FileBrowser({ sessionId }: { sessionId: string }) {
       // REQ-002: every Explorer open also lands as a tab in the
       // last-focused tiling pane (open-or-focus, no duplicates). Tiling
       // turns on when off so the tab has a pane to land in.
-      const panes = usePaneStore.getState();
-      if (!panes.tiling) panes.setTiling(true);
-      panes.requestFileTab(path, sessionId);
+      // REQ-024: mobile single-view has no pane system — the inline
+      // preview/editor below is the whole file surface, so tiling stays
+      // off and no pane tab is requested.
+      if (!isMobileViewport()) {
+        const panes = usePaneStore.getState();
+        if (!panes.tiling) panes.setTiling(true);
+        panes.requestFileTab(path, sessionId);
+      }
       const seq = (requestSeq.current += 1);
       setSelected(path);
       setView(null);

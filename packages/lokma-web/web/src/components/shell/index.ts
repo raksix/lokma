@@ -19,11 +19,15 @@ export { PaneErrorBoundary } from './pane-error-boundary';
 export {
   EXPLORER_SIDE_KEY,
   MOBILE_BREAKPOINT,
+  MOBILE_TABS,
   anyDrawerOpen,
   closeAllSidebars,
   initialSidebarVisibility,
+  isMobileViewport,
   isMobileWidth,
+  isPaneSystemAllowed,
   mobileQuery,
+  mobileTabLabel,
   nextSidebarVisibility,
   readExplorerSide,
   sidebarPanelTitle,
@@ -31,10 +35,12 @@ export {
   swappedExplorerSide,
   writeExplorerSide,
   type ExplorerSide,
+  type MobileTab,
   type SidebarSide,
   type SidebarVisibility,
 } from './responsive';
 export { useIsMobile } from './use-is-mobile';
+export { MobileSingleView } from './mobile-single-view';
 export { SearchModal, filterNoteHits, filterSessionHits, type NoteHit } from './search-modal';
 export { ToastHost, TOAST_EVENT, emitToast } from './toast';
 export {

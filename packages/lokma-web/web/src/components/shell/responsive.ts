@@ -117,3 +117,53 @@ export function sidebarToggleTitle(side: SidebarSide, explorerSide: ExplorerSide
   const key = side === 'left' ? '[' : ']';
   return `Toggle ${sidebarPanelTitle(side, explorerSide)} (${key})`;
 }
+
+/**
+ * REQ-024 mobile single-view — the phone experience is a separate simple
+ * mode: every feature stays reachable but the tiling/windowed pane system
+ * never opens. One surface at a time, switched by a bottom tab bar
+ * (see `MobileSingleView`); the desktop drawers evolve into these tabs.
+ */
+
+/** Single-view surfaces reachable on a mobile viewport (no pane system). */
+export type MobileTab = 'chat' | 'sessions' | 'files' | 'tools';
+
+/** Bottom-tab order for the mobile single view (stable, probe-tested). */
+export const MOBILE_TABS: MobileTab[] = ['chat', 'sessions', 'files', 'tools'];
+
+/** Short bottom-tab label for a mobile surface. */
+export function mobileTabLabel(tab: MobileTab): string {
+  switch (tab) {
+    case 'chat':
+      return 'Chat';
+    case 'sessions':
+      return 'Sessions';
+    case 'files':
+      return 'Files';
+    case 'tools':
+      return 'Tools';
+  }
+}
+
+/**
+ * Pane-system entry is desktop-only: tiling splits, floating windows and
+ * session/file drag-drop never open on a mobile viewport. Callers gate
+ * `setTiling(true)` / `requestFileTab` / `requestSessionTab` on this.
+ */
+export function isPaneSystemAllowed(isMobile: boolean): boolean {
+  return !isMobile;
+}
+
+/**
+ * Live viewport probe for event handlers that cannot use the
+ * `useIsMobile` hook (`usePaneStore.getState()` call sites in the file
+ * browser and the session list). DOM-guarded — false without a browser.
+ */
+export function isMobileViewport(breakpoint: number = MOBILE_BREAKPOINT): boolean {
+  try {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+    return window.matchMedia(mobileQuery(breakpoint)).matches;
+  } catch {
+    return false;
+  }
+}

@@ -31,6 +31,7 @@ export function Header({
   onToggleRight,
   explorerSide = 'right',
   onSwapSides,
+  hideSideToggles = false,
 }: {
   sessionId: string;
   serverUp: boolean | null;
@@ -42,6 +43,12 @@ export function Header({
   onToggleRight: () => void;
   explorerSide?: ExplorerSide;
   onSwapSides?: () => void;
+  /**
+   * REQ-024 — mobile single-view hides the drawer chrome (swap + panel
+   * toggles): there are no sidebars to toggle, only bottom-tab surfaces.
+   * Search / settings / theme stay — they open modals, not sidebars.
+   */
+  hideSideToggles?: boolean;
 }) {
   const [theme, setTheme] = React.useState<ShellTheme>('light');
 
@@ -86,7 +93,7 @@ export function Header({
   return (
     <header className="z-40 h-9 shrink-0 border-b border-[#E8E4DE] bg-[#FAF9F5]/90 backdrop-blur-xl">
       <div className="flex h-full w-full items-center gap-1 px-2">
-        {onSwapSides ? (
+        {onSwapSides && !hideSideToggles ? (
           <button
             onClick={onSwapSides}
             title={`Swap sidebars (Explorer ${explorerSide === 'left' ? 'left' : 'right'})`}
@@ -96,14 +103,16 @@ export function Header({
             <ArrowLeftRight className="h-3.5 w-3.5" />
           </button>
         ) : null}
-        <button
-          onClick={onToggleLeft}
-          title={`Toggle ${leftPanel} ([)`}
-          aria-label={`Toggle ${leftPanel}`}
-          className="grid h-6 w-6 place-items-center rounded-md text-zinc-500 hover:bg-[#F2F0EB]"
-        >
-          <PanelLeft className="h-3.5 w-3.5" />
-        </button>
+        {hideSideToggles ? null : (
+          <button
+            onClick={onToggleLeft}
+            title={`Toggle ${leftPanel} ([)`}
+            aria-label={`Toggle ${leftPanel}`}
+            className="grid h-6 w-6 place-items-center rounded-md text-zinc-500 hover:bg-[#F2F0EB]"
+          >
+            <PanelLeft className="h-3.5 w-3.5" />
+          </button>
+        )}
         <div className="ml-1 flex items-center gap-1.5">
           <span className="grid h-5 w-5 place-items-center rounded-md bg-[#262624] text-[10px] font-semibold text-white">
             L
@@ -158,14 +167,16 @@ export function Header({
           >
             <Settings className="h-3.5 w-3.5" />
           </button>
-          <button
-            onClick={onToggleRight}
-            title={`Toggle ${rightPanel} (])`}
-            aria-label={`Toggle ${rightPanel}`}
-            className="grid h-6 w-6 place-items-center rounded-md text-zinc-500 hover:bg-[#F2F0EB]"
-          >
-            <PanelRight className="h-3.5 w-3.5" />
-          </button>
+          {hideSideToggles ? null : (
+            <button
+              onClick={onToggleRight}
+              title={`Toggle ${rightPanel} (])`}
+              aria-label={`Toggle ${rightPanel}`}
+              className="grid h-6 w-6 place-items-center rounded-md text-zinc-500 hover:bg-[#F2F0EB]"
+            >
+              <PanelRight className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
     </header>

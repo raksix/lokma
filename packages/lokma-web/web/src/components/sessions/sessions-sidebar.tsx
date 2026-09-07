@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { SessionSummary } from '@/lib/api';
 import { usePaneStore, useSessionStore } from '@/stores';
-import { emitToast } from '@/components/shell';
+import { emitToast, isMobileViewport, useIsMobile } from '@/components/shell';
 import {
   displayTitle,
   filterSessions,
@@ -68,6 +68,9 @@ function SessionRow({
 }) {
   const [draft, setDraft] = React.useState(displayTitle(session));
   const [mergeInto, setMergeInto] = React.useState(mergeTargets[0]?.id ?? '');
+  // REQ-024 — mobile single-view has no pane system: rows are not
+  // draggable and the "open as pane" affordance below stays hidden.
+  const isMobile = useIsMobile();
   React.useEffect(() => {
     setDraft(displayTitle(session));
     setMergeInto(mergeTargets[0]?.id ?? '');
@@ -78,8 +81,9 @@ function SessionRow({
 
   return (
     <div
-      draggable
+      draggable={!isMobile}
       onDragStart={(e) => {
+        if (isMobileViewport()) return;
         e.dataTransfer.setData('application/x-lokma-session', session.id);
         e.dataTransfer.setData('text/plain', title);
         e.dataTransfer.effectAllowed = 'copy';
@@ -124,15 +128,17 @@ function SessionRow({
           </div>
         </div>
         <div className="flex items-center shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            title="Open as pane tab"
-            onClick={onOpenAsPane}
-           aria-label="Open as pane tab">
-            <Columns2 className="w-3 h-3" />
-          </Button>
+          {isMobile ? null : (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              title="Open as pane tab"
+              onClick={onOpenAsPane}
+             aria-label="Open as pane tab">
+              <Columns2 className="w-3 h-3" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -352,7 +358,10 @@ export function SessionsSidebar({
 
   // REQ-005: explicit affordance that needs no drag — opens/focuses the
   // session as a tab in the last-focused pane (tiling auto-enabled).
+  // REQ-024: mobile single-view has no pane system — the row button is
+  // hidden below the breakpoint, and this handler no-ops as a backstop.
   const handleOpenAsPane = React.useCallback((s: SessionSummary) => {
+    if (isMobileViewport()) return;
     const pane = usePaneStore.getState();
     if (!pane.tiling) {
       pane.setTiling(true);

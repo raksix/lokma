@@ -20,6 +20,7 @@ import {
   FooterBar,
   ActivityBar,
   InspectorRail,
+  MobileSingleView,
   OfflineBanner,
   PaneErrorBoundary,
   SearchModal,
@@ -80,6 +81,11 @@ const LazySettingsModal = React.lazy(() =>
 export function AppShell({ sessionId }: { sessionId: string }) {
   const [activeId, setActiveId] = React.useState(sessionId);
   const tiling = usePaneStore((s) => s.tiling);
+  // REQ-024 — mobile is single-view only: the effect below forces these
+  // flags off, so a persisted desktop `tiling:true` can never strand a
+  // phone viewport inside the pane system.
+  const setTiling = usePaneStore((s) => s.setTiling);
+  const setWindowed = usePaneStore((s) => s.setWindowed);
   // REQ-019 — resizable sidebars: widths persist in the pane store
   // (`lokma:layout:v1`), the Sidebar handle writes back live via setSideWidth.
   const leftW = usePaneStore((s) => s.leftW);
@@ -190,6 +196,18 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       );
     }
   }, [isMobile]);
+
+  // REQ-024 — mobile single-view: tiling splits, floating windows and
+  // drag-drop targets never open below the breakpoint. Forcing the flags
+  // off also heals a persisted desktop `tiling:true` on mobile boot; the
+  // entry points (file open, session drag, "open as pane") additionally
+  // guard `setTiling(true)` with `isMobileViewport()`.
+  React.useEffect(() => {
+    if (isMobile) {
+      setTiling(false);
+      setWindowed(false);
+    }
+  }, [isMobile, setTiling, setWindowed]);
 
   // Session list + server liveness (30s poll feeds FooterBar + Header pill).
   // REQ-018 — the same tick also times the health round-trip (gateway
@@ -374,6 +392,77 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       {leftContent}
     </div>
   );
+
+  // REQ-024 — mobile single-view branch: below the breakpoint the harness
+  // renders a separate simple mode (one surface + bottom tab bar) instead
+  // of the desktop frame. No activity/inspector rails, no sidebar drawers,
+  // no tiling toggle or workspace — every feature lives in the tabbed
+  // single surface, settings/search stay header modals as on desktop.
+  if (isMobile) {
+    const noop = (): void => undefined;
+    return (
+      <div className="flex h-screen flex-col bg-background text-foreground">
+        <a
+          href="#lokma-chat"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-1 focus:left-1 focus:z-[70] focus:rounded-md focus:bg-[#262624] focus:px-3 focus:py-1.5 focus:text-xs focus:text-white"
+        >
+          Skip to chat
+        </a>
+        <Header
+          sessionId={activeId}
+          serverUp={serverUp}
+          cost={ws.cost}
+          wsStatus={ws.status}
+          onSearch={() => setSearchOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onToggleLeft={noop}
+          onToggleRight={noop}
+          explorerSide={explorerSide}
+          hideSideToggles
+        />
+        <OfflineBanner status={ws.status} onRetry={ws.reconnect} />
+        <div id="lokma-chat" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <PaneErrorBoundary paneName="Mobile">
+            <MobileSingleView
+              activeId={activeId}
+              ws={ws}
+              onSelectSession={switchSession}
+              requestedTab={inspectorTab}
+            />
+          </PaneErrorBoundary>
+        </div>
+        <FooterBar
+          serverUp={serverUp}
+          latencyMs={latencyMs}
+          projectName={projectName}
+          cpuPercent={metrics?.cpuPercent ?? null}
+          memUsedBytes={metrics?.memory.usedBytes ?? null}
+          memTotalBytes={metrics?.memory.totalBytes ?? null}
+          tokensPerSec={tokensPerSec}
+          version={metrics?.version ?? null}
+        />
+        <SearchModal
+          open={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          onSelectSession={(id) => {
+            switchSession(id);
+            emitToast(`Switched to ${id.slice(0, 24)}`);
+          }}
+        />
+        <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} explorerSide={explorerSide} />
+        {settingsOpen ? (
+          <React.Suspense fallback={null}>
+            <LazySettingsModal
+              open={settingsOpen}
+              onClose={() => setSettingsOpen(false)}
+              explorerSide={explorerSide}
+            />
+          </React.Suspense>
+        ) : null}
+        <ToastHost />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -569,10 +658,13 @@ function MobileDrawer({
 // TilingToggle — enters the W7 tiling workspace (split/windowed panes over
 // live sessions and Inspector tools). Hidden once tiling (the TilingBar's
 // Single button exits); layout and tabs restore from the persisted stores.
+// REQ-024 — desktop-only: the mobile single-view never offers the pane
+// system, so the toggle stays hidden below the breakpoint.
 function TilingToggle() {
   const tiling = usePaneStore((s) => s.tiling);
   const setTiling = usePaneStore((s) => s.setTiling);
-  if (tiling) return null;
+  const isMobile = useIsMobile();
+  if (tiling || isMobile) return null;
   return (
     <div className="mb-2 flex shrink-0 justify-end">
       <Button

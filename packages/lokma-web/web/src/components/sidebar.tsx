@@ -22,7 +22,6 @@ export function Sidebar({
     <aside className={`flex ${className ?? 'w-[280px]'} shrink-0 flex-col ${side === 'left' ? 'border-r' : 'border-l'} border-line bg-card`}>
       <div className="flex h-10 items-center border-b px-3">
         <span className="text-sm font-medium">{title}</span>
-        <Badge variant="outline" className="ml-auto text-[10px]">{side}</Badge>
       </div>
       {/* @container: Inspector panes use container queries (@min-*) instead of
           viewport sm: so subtitles/grids adapt to this 280px column even on

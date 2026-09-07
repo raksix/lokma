@@ -24,7 +24,7 @@
 - [REQ-003](REQ-003-new-session-renk.md) — New Session butonuna renk ekle — done
 - [REQ-004](REQ-004-acik-tema-siyah-border.md) — Açık temadaki siyah borderlar yumuşatılacak — done
 - [REQ-005](finished/REQ-005-session-surukle-pane.md) — Session listeden pane'e session ekleme çalışmıyor — done
-- [REQ-006](REQ-006-side-rozet-kaldir.md) — Sidebar left/right rozetleri kaldır — pending
+- [REQ-006](finished/REQ-006-side-rozet-kaldir.md) — Sidebar left/right rozetleri kaldır — done
 - [REQ-007](REQ-007-menu-swap-ikonu.md) — Sol/sağ menü swap ikonu (en sol üst) — pending
 - [REQ-008](REQ-008-activity-bar.md) — En sağa VS Code tarzı activity bar — pending
 - [REQ-009](REQ-009-ayar-sistemi.md) — Docs'a uygun detaylı ayar sistemi — pending

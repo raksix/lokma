@@ -44,7 +44,7 @@
 - [REQ-023](finished/REQ-023-ikon-kucult.md) — Sol/sağ menü ikonları küçültülür — done
 - [REQ-024](finished/REQ-024-mobil-single.md) — Mobilde pane yok, single görünüm — done
 - [REQ-025](finished/REQ-025-agent-hub-tasarim.md) — Agent Hub tasarımı iyileşir — done
-- [REQ-026](REQ-026-hersey-pane-olur.md) — Her şey pane olarak kullanılabilir — pending
+- [REQ-026](finished/REQ-026-hersey-pane-olur.md) — Her şey pane olarak kullanılabilir — done
 - [REQ-027](REQ-027-bot-sistemi.md) — Bot sistemi refaktörü (Grok + Hermes referanslı) — pending
 - [REQ-028](REQ-028-plugin-market.md) — Skill/plugin market + örnek plugin — pending
 - [REQ-029](REQ-029-drag-split-calismiyor.md) — Session drop'ta split yapmıyor — pending

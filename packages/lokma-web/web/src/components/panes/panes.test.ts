@@ -3,6 +3,7 @@
  * Run: `bun src/components/panes/panes.test.ts` from packages/lokma-web/web.
  */
 import {
+  INSPECTOR_DRAG_MIME,
   INSPECTOR_TABS,
   PANE_TAB_MIME,
   SESSION_DRAG_MIME,
@@ -12,10 +13,12 @@ import {
   collectPaneIds,
   countPanes,
   dropZoneFor,
+  encodeInspectorDrag,
   encodeTabMove,
   inspectorLabel,
   isInspectorTabId,
   isPaneTab,
+  isRailDropId,
   isValidRelPath,
   isValidSessionId,
   makeFileTab,
@@ -24,6 +27,7 @@ import {
   makeSessionTab,
   makeTabId,
   parseFileDrop,
+  parseInspectorDrop,
   parseSessionDrop,
   parseTabMove,
   parseTabStates,
@@ -206,6 +210,24 @@ check("snapshot fixes bad active", round.a?.active === round.a?.tabs[0].id);
 check("snapshot drops corrupt pane", !("b" in round));
 check("snapshot rejects garbage", Object.keys(parseTabStates("{bad")).length === 0);
 check("snapshot rejects null", Object.keys(parseTabStates(null)).length === 0);
+
+/* 9 — REQ-026 rail-icon drag: every app surface drops as a pane tab. */
+check("rail mime distinct", String(INSPECTOR_DRAG_MIME) !== String(SESSION_DRAG_MIME) && String(INSPECTOR_DRAG_MIME) !== String(PANE_TAB_MIME));
+check("rail id accepts every inspector tab", INSPECTOR_TABS.every((t) => isRailDropId(t.id)));
+check("rail id accepts sessions surface", isRailDropId("sessions"));
+check("rail id rejects unknown", !isRailDropId("nope") && !isRailDropId("") && !isRailDropId(null));
+check("parse rail mime", parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: "terminal" })) === "terminal");
+check("parse rail trims", parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: "  git " })) === "git");
+check("parse rail sessions surface", parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: encodeInspectorDrag("sessions") })) === "sessions");
+check("parse rail rejects unknown id", parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: "nope" })) === null);
+check("parse rail ignores empty", parseInspectorDrop(stubData({})) === null);
+check("parse rail ignores label-only text", parseInspectorDrop(stubData({ "text/plain": "Terminal" })) === null);
+check("rail drop makes a live tool tab", (() => {
+  const got = parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: "bots" }));
+  if (!got || got === "sessions") return false;
+  const tab = makeInspectorTab(got);
+  return tab.kind === "inspector" && tab.inspectorId === "bots";
+})());
 
 console.log(`panes: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

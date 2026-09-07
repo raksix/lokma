@@ -5,6 +5,7 @@
  * table).
  */
 import { INSPECTOR_RAIL_ITEMS, inspectorRailSide } from './inspector-rail';
+import { encodeInspectorDrag, isRailDropId, parseInspectorDrop } from '@/components/panes/panes';
 
 let passed = 0;
 let failed = 0;
@@ -35,6 +36,11 @@ check(
   'every item has a label and an icon',
   INSPECTOR_RAIL_ITEMS.every((item) => item.label.length > 0 && typeof item.Icon !== 'undefined'),
 );
+check(
+  'REQ-026 every rail tab drags as a valid rail drop id',
+  INSPECTOR_RAIL_ITEMS.every((item) => isRailDropId(item.tab)),
+);
+check('REQ-026 rail drag payload round-trips', INSPECTOR_RAIL_ITEMS.every((item) => parseInspectorDrop({ getData: (t: string) => (t === 'application/x-lokma-inspector' ? encodeInspectorDrag(item.tab) : '') }) === item.tab));
 
 console.log(`inspector-rail.test.ts: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

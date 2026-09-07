@@ -4,6 +4,7 @@
  * workspace, its frames, and the pure helpers with their probe.
  */
 export {
+  INSPECTOR_DRAG_MIME,
   INSPECTOR_TABS,
   PANE_TAB_MIME,
   SESSION_DRAG_MIME,
@@ -14,10 +15,12 @@ export {
   collectPaneIds,
   countPanes,
   dropZoneFor,
+  encodeInspectorDrag,
   encodeTabMove,
   inspectorLabel,
   isInspectorTabId,
   isPaneTab,
+  isRailDropId,
   isValidRelPath,
   isValidSessionId,
   makeFileTab,
@@ -26,6 +29,7 @@ export {
   makeSessionTab,
   makeTabId,
   parseFileDrop,
+  parseInspectorDrop,
   parseSessionDrop,
   parseTabMove,
   parseTabStates,
@@ -38,6 +42,7 @@ export {
   type PaneTab,
   type PaneTabKind,
   type PaneTabState,
+  type RailDropId,
 } from './panes';
 export { WorkspacePane, PaneFilePreview, PaneTabPicker, SessionDropChooser, formatBytes, type PaneCtx } from './pane';
 export { SplitTree } from './split-tree';

@@ -1,5 +1,6 @@
 import { Activity, BarChart3, Beaker, Bot, Brain, Clock3, Cpu, Folder, GitBranch, Globe, HardDrive, Info, Layers, Package, Paintbrush, Plug2, Puzzle, Settings, Shield, Star, Terminal, Users, Workflow } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { INSPECTOR_DRAG_MIME, encodeInspectorDrag } from '@/components/panes/panes';
 import type { InspectorTab } from '@/components/providers';
 import type { ExplorerSide, SidebarSide } from './responsive';
 
@@ -54,12 +55,14 @@ export function inspectorRailSide(explorerSide: ExplorerSide): SidebarSide {
 function InspectorRailButton({
   active,
   label,
+  tab,
   Icon,
   indicatorClass,
   onClick,
 }: {
   active: boolean;
   label: string;
+  tab: InspectorTab;
   Icon: typeof Info;
   indicatorClass: string;
   onClick: () => void;
@@ -68,9 +71,15 @@ function InspectorRailButton({
     <button
       type="button"
       onClick={onClick}
-      title={label}
+      title={`${label} — drag to a pane to open it`}
       aria-label={label}
       aria-pressed={active}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData(INSPECTOR_DRAG_MIME, encodeInspectorDrag(tab));
+        e.dataTransfer.setData('text/plain', label);
+        e.dataTransfer.effectAllowed = 'move';
+      }}
       className={cn(
         'relative grid h-8 w-8 shrink-0 place-items-center rounded-md transition',
         active
@@ -113,6 +122,7 @@ export function InspectorRail({
           key={tab}
           active={active === tab}
           label={label}
+          tab={tab}
           Icon={Icon}
           indicatorClass={indicatorClass}
           onClick={() => onSelect(tab)}

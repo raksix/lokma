@@ -27,6 +27,7 @@ import { emitToast, PaneErrorBoundary } from '@/components/shell';
 import { ChatWithSocket } from '@/components/chat';
 import { FILE_DRAG_MIME, emitInsertMention } from '@/components/files';
 import {
+  INSPECTOR_DRAG_MIME,
   INSPECTOR_TABS,
   PANE_TAB_MIME,
   SESSION_DRAG_MIME,
@@ -37,6 +38,7 @@ import {
   makeInspectorTab,
   makeSessionTab,
   parseFileDrop,
+  parseInspectorDrop,
   parseSessionDrop,
   parseTabMove,
   splitForZone,
@@ -401,7 +403,7 @@ export function PaneTabPicker({
           ))}
         </div>
       </div>
-      <div className="text-[10px] text-muted-foreground">Tip: drag a session or file row here to open, split, fork, or merge it.</div>
+      <div className="text-[10px] text-muted-foreground">Tip: drag a session, file row, or rail icon here to open, split, fork, or merge it.</div>
     </div>
   );
 }
@@ -615,6 +617,32 @@ export function WorkspacePane({
       return;
     }
 
+    // REQ-026: rail icons (InspectorRail + ActivityBar) drop as live tool
+    // tabs through the same flow. Runs BEFORE parseFileDrop: the rail also
+    // sets text/plain to its label, and labels like "Terminal" would
+    // otherwise parse as workspace-relative file paths.
+    const railId = parseInspectorDrop(e.dataTransfer);
+    if (railId) {
+      if (railId === 'sessions') {
+        // The sessions list lives in the Explorer sidebar, not the
+        // Inspector: reveal this pane's live picker (real sessions +
+        // tools) as its pane entry instead of a tool tab.
+        setPickerOpen(true);
+        setSplitArm(null);
+        return;
+      }
+      const tab = makeInspectorTab(railId);
+      if (target) {
+        const edge = splitForZone(target);
+        if (edge) {
+          openSplit(tab, edge.dir, edge.pos);
+          return;
+        }
+      }
+      addTab(tab);
+      return;
+    }
+
     const filePath = parseFileDrop(e.dataTransfer, FILE_DRAG_MIME);
     if (filePath && ctx.sessionId) {
       const tab = makeFileTab(filePath, ctx.sessionId);
@@ -633,7 +661,7 @@ export function WorkspacePane({
       return;
     }
 
-    emitToast('Drop a session, file, or pane tab here');
+    emitToast('Drop a session, file, rail icon, or pane tab here');
   };
 
   const computeZone = (e: React.DragEvent): DropZone | null => {
@@ -788,7 +816,7 @@ export function WorkspacePane({
 
 function hasPanePayload(dt: React.DragEvent['dataTransfer']): boolean {
   const types = Array.from(dt.types ?? []);
-  return types.includes(PANE_TAB_MIME) || types.includes(SESSION_DRAG_MIME) || types.includes(FILE_DRAG_MIME) || types.includes('text/plain');
+  return types.includes(PANE_TAB_MIME) || types.includes(SESSION_DRAG_MIME) || types.includes(INSPECTOR_DRAG_MIME) || types.includes(FILE_DRAG_MIME) || types.includes('text/plain');
 }
 
 function ZoneHighlight({ zone }: { zone: DropZone }) {

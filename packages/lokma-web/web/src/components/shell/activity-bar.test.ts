@@ -3,7 +3,8 @@
  * Run: `bun src/components/shell/activity-bar.test.ts` (no DOM, no server —
  * only the pure `activityInspectorTab` mapper + the static item table).
  */
-import { ACTIVITY_ITEMS, activityInspectorTab, type ActivityKey } from './activity-bar';
+import { ACTIVITY_ITEMS, activityDragId, activityInspectorTab, type ActivityKey } from './activity-bar';
+import { isRailDropId } from '@/components/panes/panes';
 
 let passed = 0;
 let failed = 0;
@@ -44,6 +45,14 @@ check(
   'every item has a label',
   ACTIVITY_ITEMS.every((item) => item.label.length > 0),
 );
+check(
+  'REQ-026 every key drags as a valid rail drop id',
+  (['sessions', 'git', 'terminal', 'browser', 'vault', 'testing', 'bots', 'settings', 'account'] as ActivityKey[]).every(
+    (key) => isRailDropId(activityDragId(key)),
+  ),
+);
+check('REQ-026 sessions drags as the sessions surface', activityDragId('sessions') === 'sessions');
+check('REQ-026 mapped keys drag as their inspector tab', activityDragId('git') === 'git' && activityDragId('account') === 'auth');
 
 console.log(`activity-bar.test.ts: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

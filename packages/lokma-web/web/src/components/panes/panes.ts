@@ -13,6 +13,13 @@ import type { LayoutNode } from '@/stores/layout';
 /** Drag MIME type for session rows (same wire as the sessions sidebar). */
 export const SESSION_DRAG_MIME = 'application/x-lokma-session';
 
+/**
+ * Drag MIME type for rail icons (REQ-026: InspectorRail + ActivityBar) —
+ * every app surface becomes a pane tab through the same drop flow as
+ * sessions and files.
+ */
+export const INSPECTOR_DRAG_MIME = 'application/x-lokma-inspector';
+
 /** Tab-bar drag payload MIME (a whole real tab moving between panes). */
 export const PANE_TAB_MIME = 'application/x-lokma-tab';
 
@@ -183,6 +190,34 @@ export function parseSessionDrop(dt: DataGetter): string | null {
   if (viaMime && isValidSessionId(viaMime)) return viaMime;
   // Sidebar rows also set text/plain to the display title — never a valid id,
   // so a text-only drop is not openable (caller toasts instead of faking a tab).
+  return null;
+}
+
+/**
+ * What a rail-icon drag carries (REQ-026): any Inspector tab id, plus the
+ * literal 'sessions' for the sessions list — which lives in the Explorer
+ * sidebar, not the Inspector, so its drop opens the pane tab picker
+ * (the live sessions + tools chooser) instead of a tool tab.
+ */
+export type RailDropId = InspectorTabId | 'sessions';
+
+export function isRailDropId(value: unknown): value is RailDropId {
+  return value === 'sessions' || isInspectorTabId(value);
+}
+
+/** Encode a rail-icon drag payload (plain id string — validated on drop). */
+export function encodeInspectorDrag(id: RailDropId): string {
+  return id;
+}
+
+/**
+ * Real rail surface carried by a rail-icon drag (MIME only, never the
+ * text/plain label — labels like "Terminal" would otherwise parse as file
+ * paths downstream, so the caller must run this BEFORE parseFileDrop).
+ */
+export function parseInspectorDrop(dt: DataGetter): RailDropId | null {
+  const raw = dt.getData(INSPECTOR_DRAG_MIME).trim();
+  if (raw && isRailDropId(raw)) return raw;
   return null;
 }
 

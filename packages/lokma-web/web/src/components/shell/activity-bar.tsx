@@ -1,5 +1,6 @@
 import { Bot, CircleUserRound, Database, FlaskConical, GitBranch, Globe, MessagesSquare, Settings, Terminal } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { INSPECTOR_DRAG_MIME, encodeInspectorDrag, type RailDropId } from '@/components/panes/panes';
 import type { InspectorTab } from '@/components/providers';
 import type { SidebarSide } from './responsive';
 
@@ -77,15 +78,26 @@ export function activityInspectorTab(key: ActivityKey): InspectorTab | null {
   }
 }
 
+/**
+ * What an activity-icon drag carries (REQ-026): the mapped Inspector tab —
+ * or 'sessions' for the Explorer sessions list, whose drop opens the pane
+ * tab picker (the live sessions + tools chooser). Pure so probes cover it.
+ */
+export function activityDragId(key: ActivityKey): RailDropId {
+  return activityInspectorTab(key) ?? 'sessions';
+}
+
 function ActivityButton({
   active,
   label,
+  dragId,
   Icon,
   indicatorClass,
   onClick,
 }: {
   active: boolean;
   label: string;
+  dragId: RailDropId;
   Icon: typeof MessagesSquare;
   indicatorClass: string;
   onClick: () => void;
@@ -94,9 +106,15 @@ function ActivityButton({
     <button
       type="button"
       onClick={onClick}
-      title={label}
+      title={`${label} — drag to a pane to open it`}
       aria-label={label}
       aria-pressed={active}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData(INSPECTOR_DRAG_MIME, encodeInspectorDrag(dragId));
+        e.dataTransfer.setData('text/plain', label);
+        e.dataTransfer.effectAllowed = 'move';
+      }}
       className={cn(
         'relative grid h-8 w-8 place-items-center rounded-md transition',
         active
@@ -138,15 +156,15 @@ export function ActivityBar({
       )}
     >
       {TOP_ITEMS.map(({ key, label, Icon }) => (
-        <ActivityButton key={key} active={active === key} label={label} Icon={Icon} indicatorClass={indicatorClass} onClick={() => onSelect(key)} />
+        <ActivityButton key={key} active={active === key} label={label} dragId={activityDragId(key)} Icon={Icon} indicatorClass={indicatorClass} onClick={() => onSelect(key)} />
       ))}
       <span aria-hidden="true" className="my-1.5 h-px w-6 shrink-0 bg-line" />
       {PANE_ITEMS.map(({ key, label, Icon }) => (
-        <ActivityButton key={key} active={active === key} label={label} Icon={Icon} indicatorClass={indicatorClass} onClick={() => onSelect(key)} />
+        <ActivityButton key={key} active={active === key} label={label} dragId={activityDragId(key)} Icon={Icon} indicatorClass={indicatorClass} onClick={() => onSelect(key)} />
       ))}
       <span className="flex-1" />
       {BOTTOM_ITEMS.map(({ key, label, Icon }) => (
-        <ActivityButton key={key} active={active === key} label={label} Icon={Icon} indicatorClass={indicatorClass} onClick={() => onSelect(key)} />
+        <ActivityButton key={key} active={active === key} label={label} dragId={activityDragId(key)} Icon={Icon} indicatorClass={indicatorClass} onClick={() => onSelect(key)} />
       ))}
     </nav>
   );

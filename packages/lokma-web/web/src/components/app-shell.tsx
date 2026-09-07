@@ -346,9 +346,6 @@ export function AppShell({ sessionId }: { sessionId: string }) {
               <Chat key={activeId} sessionId={activeId} ws={ws} onOpenSession={switchSession} />
             )}
           </PaneErrorBoundary>
-          <div className="mt-2 hidden text-center text-[11px] text-muted-foreground sm:block">
-            Sessions persist to <code className="rounded bg-muted px-1">~/.lokma/projects/&lt;hash&gt;/sessions/*.jsonl</code> (CLI + Web share)
-          </div>
         </main>
 
         {sidebars.right ? (

@@ -34,7 +34,7 @@
 - [REQ-013](finished/REQ-013-browser-sadelestir.md) — Browser sade: sekme yok, URL-only, tam alan — done
 - [REQ-014](finished/REQ-014-windowed-arka-plan.md) — Windowed panellere solid arka plan — done
 - [REQ-015](finished/REQ-015-pane-tab-tiklama.md) — Pane tabları seçilemiyor — done
-- [REQ-016](REQ-016-alt-hint-kaldir.md) — Alttaki gereksiz ibareler kaldırılacak — pending
+- [REQ-016](finished/REQ-016-alt-hint-kaldir.md) — Alttaki gereksiz ibareler kaldırılacak — done
 - [REQ-017](REQ-017-sekmede-duzenle.md) — Dosya sekmeleri IDE gibi düzenlenebilir — pending
 - [REQ-018](REQ-018-status-bar-metrik.md) — Status bar: gateway/proje/cpu/ram/token-s/sürüm — pending
 - [REQ-019](REQ-019-sidebar-resize.md) — Sol/sağ menüler resize edilebilir — pending

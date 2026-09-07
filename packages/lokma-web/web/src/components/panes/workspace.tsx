@@ -300,9 +300,6 @@ export function TilingWorkspace({
           <SplitTree node={layout} renderPane={renderPane} onResize={(nodeId, sizes) => setLayout(resizeLayoutNode(layout, nodeId, sizes))} />
         )}
       </div>
-      <div className="shrink-0 text-center text-[11px] text-muted-foreground">
-        Session tabs run their own chat. Tool panes share this workspace session. Drag sessions or files here to open, split, fork, or merge.
-      </div>
     </div>
   );
 }

@@ -32,3 +32,4 @@
 - [REQ-011](REQ-011-file-explorer-sola.md) — File explorer sola taşınacak — pending
 - [REQ-012](REQ-012-ust-bar-compact.md) — Üst model seçimi kalkar, bar compact + ayarlar ikonu — pending
 - [REQ-013](REQ-013-browser-sadelestir.md) — Browser sade: sekme yok, URL-only, tam alan — pending
+- [REQ-014](REQ-014-windowed-arka-plan.md) — Windowed panellere solid arka plan — pending

@@ -1,5 +1,6 @@
 import * as React from 'react';
 import {
+  AlertTriangle,
   AtSign,
   Columns2,
   Copy,
@@ -9,15 +10,17 @@ import {
   GripVertical,
   Loader2,
   MessageSquare,
+  Pencil,
   Plus,
   Rows2,
+  Save,
   Search,
   Wrench,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { api } from '@/lib/api';
+import { ApiError, api } from '@/lib/api';
 import type { UseWs } from '@/hooks/use-ws';
 import { useKnownSession, useSessionStore } from '@/stores/session';
 import { emitToast, PaneErrorBoundary } from '@/components/shell';
@@ -44,15 +47,47 @@ import {
 import { InspectorHost } from './inspector-host';
 import { TAB_ICONS } from './tiling-bar';
 
-// PaneFilePreview: read-only preview of a workspace file tab. Loads the
+// PaneFilePreview (REQ-017): IDE-style editable file tab. Loads the
 // owning session's cwd (GET /api/sessions/:id) then the real bytes
-// (GET /api/files/read). Editing stays in the Explorer FileBrowser —
-// this tab never fakes a save button.
-export function PaneFilePreview({ sessionId, path }: { sessionId: string; path: string }) {
+// (GET /api/files/read). Edits save through POST /api/files/write with
+// the `expectedSha` lost-update guard (409 `stale_file` → conflict UI,
+// never a silent overwrite) — the same honest pattern as the Explorer
+// FileBrowser. Dirty state reports up via onDirtyChange so the tab strip
+// can show an unsaved dot. Known limit: the draft lives while the tab is
+// active (inactive tabs unmount); closing a dirty tab asks first.
+export function PaneFilePreview({
+  sessionId,
+  path,
+  tabId,
+  onDirtyChange,
+}: {
+  sessionId: string;
+  path: string;
+  tabId?: string;
+  onDirtyChange?: (tabId: string, dirty: boolean) => void;
+}) {
   const [status, setStatus] = React.useState<'loading' | 'error' | 'ok'>('loading');
   const [error, setError] = React.useState('');
   const [content, setContent] = React.useState('');
   const [meta, setMeta] = React.useState<{ sha: string; size: number; truncated: boolean } | null>(null);
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [conflict, setConflict] = React.useState<{
+    content: string;
+    sha: string;
+    size: number;
+    truncated: boolean;
+  } | null>(null);
+
+  const dirty = editing && status === 'ok' && draft !== content;
+  const dirtyKey = tabId ?? `${sessionId}:${path}`;
+  React.useEffect(() => {
+    onDirtyChange?.(dirtyKey, dirty);
+    return () => {
+      onDirtyChange?.(dirtyKey, false);
+    };
+  }, [dirtyKey, dirty, onDirtyChange]);
 
   // cwd comes from the cached server list — never a detail GET (fresh
   // sessions used to 404 here once per mounted file tab).
@@ -60,6 +95,9 @@ export function PaneFilePreview({ sessionId, path }: { sessionId: string; path: 
   const load = React.useCallback(async () => {
     setStatus('loading');
     setError('');
+    setEditing(false);
+    setDraft('');
+    setConflict(null);
     if (known === 'loading') return;
     if (!known) {
       setError('Session has no workspace yet');
@@ -80,6 +118,40 @@ export function PaneFilePreview({ sessionId, path }: { sessionId: string; path: 
   React.useEffect(() => {
     void load();
   }, [load]);
+
+  const saveFile = React.useCallback(
+    async (overwriteSha?: string) => {
+      if (!known || known === 'loading' || !meta || saving) return;
+      const cwd = known.cwd ?? '';
+      if (!cwd) return;
+      setSaving(true);
+      try {
+        const res = await api.writeWorkspaceFile(cwd, path, draft, overwriteSha ?? meta.sha);
+        setContent(draft);
+        setMeta({ sha: res.sha, size: res.size, truncated: false });
+        setEditing(false);
+        setConflict(null);
+        emitToast(res.created ? `Created ${path}` : `Saved ${path}`);
+      } catch (e) {
+        if (e instanceof ApiError && e.code === 'stale_file') {
+          // Lost-update guard fired: fetch the server version and let the
+          // user choose (reload discards mine, overwrite keeps mine).
+          try {
+            const server = await api.readWorkspaceFile(cwd, path);
+            setConflict({ content: server.content, sha: server.sha, size: server.size, truncated: server.truncated });
+            emitToast('File changed on disk — resolve the conflict below');
+          } catch {
+            emitToast(`Save blocked: ${e.message}`);
+          }
+        } else {
+          emitToast(`Save failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      } finally {
+        setSaving(false);
+      }
+    },
+    [known, meta, saving, draft, path],
+  );
 
   const copyPath = async () => {
     try {
@@ -115,21 +187,118 @@ export function PaneFilePreview({ sessionId, path }: { sessionId: string; path: 
   return (
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-2 py-1 text-[11px] text-muted-foreground">
+        {dirty ? (
+          <span title="Unsaved changes" className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#C96442]" />
+        ) : null}
         <span className="min-w-0 flex-1 truncate font-mono">{path}</span>
         {meta ? <span>{formatBytes(meta.size)}</span> : null}
         {meta?.truncated ? <span className="rounded bg-muted px-1">truncated at 256 KB</span> : null}
-        <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[11px]" title="Copy the file path" onClick={() => void copyPath()}>
-          <Copy className="h-3 w-3" />
-          Copy
-        </Button>
-        <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[11px]" title="Insert @mention into the chat composer" onClick={() => emitInsertMention(path)}>
-          <AtSign className="h-3 w-3" />
-          Mention
-        </Button>
+        {editing ? (
+          <>
+            <Button
+              variant="default"
+              size="sm"
+              className="h-6 px-1.5 text-[11px]"
+              title="Save (Ctrl+S)"
+              disabled={saving || !dirty}
+              onClick={() => void saveFile()}
+            >
+              {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+              Save
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-1.5 text-[11px]"
+              title="Discard edits"
+              onClick={() => {
+                setEditing(false);
+                setDraft('');
+                setConflict(null);
+              }}
+            >
+              <X className="h-3 w-3" />
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-1.5 text-[11px]"
+              title={meta?.truncated ? 'Reload the file to edit large previews' : 'Edit this file'}
+              disabled={meta?.truncated}
+              onClick={() => {
+                setDraft(content);
+                setEditing(true);
+              }}
+            >
+              <Pencil className="h-3 w-3" />
+              Edit
+            </Button>
+            <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[11px]" title="Copy the file path" onClick={() => void copyPath()}>
+              <Copy className="h-3 w-3" />
+              Copy
+            </Button>
+            <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[11px]" title="Insert @mention into the chat composer" onClick={() => emitInsertMention(path)}>
+              <AtSign className="h-3 w-3" />
+              Mention
+            </Button>
+          </>
+        )}
       </div>
-      <pre className="min-h-0 flex-1 overflow-auto p-2 font-mono text-[11px] leading-relaxed">{content}</pre>
+      {conflict ? (
+        <div className="mx-2 mt-2 shrink-0 rounded border border-amber-300 bg-amber-50 p-1.5 text-[11px] text-amber-800">
+          <div className="flex items-center gap-1 font-medium">
+            <AlertTriangle className="h-3 w-3" /> Changed on disk since you opened it
+          </div>
+          <div className="mt-1 flex gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 flex-1 text-[11px]"
+              onClick={() => {
+                setContent(conflict.content);
+                setMeta({ sha: conflict.sha, size: conflict.size, truncated: conflict.truncated });
+                setDraft(conflict.content);
+                setConflict(null);
+                emitToast('Reloaded the server version');
+              }}
+            >
+              Use server version
+            </Button>
+            <Button variant="default" size="sm" className="h-6 flex-1 text-[11px]" disabled={saving} onClick={() => void saveFile(conflict.sha)}>
+              Overwrite with mine
+            </Button>
+          </div>
+        </div>
+      ) : null}
+      {editing ? (
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+              e.preventDefault();
+              void saveFile();
+            }
+          }}
+          spellCheck={false}
+          aria-label={`Edit ${path}`}
+          className="min-h-0 flex-1 resize-none overflow-auto bg-transparent p-2 font-mono text-[11px] leading-relaxed focus:outline-none"
+        />
+      ) : (
+        <pre className="min-h-0 flex-1 overflow-auto p-2 font-mono text-[11px] leading-relaxed">{content}</pre>
+      )}
       <div className="shrink-0 border-t px-2 py-1 text-[10px] text-muted-foreground">
-        Read-only preview{meta ? ` · sha ${meta.sha.slice(0, 12)}` : ''} · edit in the Explorer file browser
+        {dirty ? (
+          'Edited — unsaved changes (Ctrl+S saves)'
+        ) : (
+          <>
+            {meta ? `sha ${meta.sha.slice(0, 12)}` : 'saved'} · Ctrl+S saves while editing
+          </>
+        )}
       </div>
     </div>
   );
@@ -349,6 +518,18 @@ export function WorkspacePane({
   const [pending, setPending] = React.useState<PendingSession | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [maximized, setMaximized] = React.useState(false);
+  // REQ-017: file tabs with unsaved edits report here (PaneFilePreview →
+  // PaneTabContent → markDirty); the strip shows a dot and closing asks.
+  const [dirtyTabs, setDirtyTabs] = React.useState<ReadonlySet<string>>(() => new Set());
+  const markDirty = React.useCallback((tabId: string, dirty: boolean) => {
+    setDirtyTabs((prev) => {
+      if (dirty === prev.has(tabId)) return prev;
+      const next = new Set(prev);
+      if (dirty) next.add(tabId);
+      else next.delete(tabId);
+      return next;
+    });
+  }, []);
 
   const sessions = useSessionStore((s) => s.sessions);
   const forkSession = useSessionStore((s) => s.forkSession);
@@ -365,6 +546,17 @@ export function WorkspacePane({
   };
 
   const closeTab = (tabId: string) => {
+    // REQ-017: never silently drop unsaved file edits.
+    if (dirtyTabs.has(tabId) && typeof window !== 'undefined') {
+      const tab = tabs.find((t) => t.id === tabId);
+      if (!window.confirm(`Close ${tab?.title ?? 'this tab'} with unsaved changes? They will be lost.`)) return;
+    }
+    setDirtyTabs((prev) => {
+      if (!prev.has(tabId)) return prev;
+      const next = new Set(prev);
+      next.delete(tabId);
+      return next;
+    });
     const next = tabs.filter((t) => t.id !== tabId);
     const nextActive = activeTabId === tabId ? (next[next.length - 1]?.id ?? null) : activeTabId;
     onTabsChange(id, next, nextActive);
@@ -523,6 +715,7 @@ export function WorkspacePane({
         tabs={tabs}
         activeTabId={activeTabId}
         paneId={id}
+        dirtyTabIds={dirtyTabs}
         onSelect={(tabId) => onTabsChange(id, tabs, tabId)}
         onClose={closeTab}
         onAdd={() => {
@@ -558,6 +751,7 @@ export function WorkspacePane({
             <PaneTabContent
               tab={active}
               ctx={ctx}
+              onDirtyChange={markDirty}
               onOpenInspectorTab={(inspectorId) => addTab(makeInspectorTab(inspectorId))}
               onOpenSession={onOpenSession}
             />
@@ -615,6 +809,7 @@ function PaneTabBar({
   tabs,
   activeTabId,
   paneId,
+  dirtyTabIds,
   onSelect,
   onClose,
   onAdd,
@@ -624,6 +819,7 @@ function PaneTabBar({
   tabs: PaneTab[];
   activeTabId: string | null;
   paneId: string;
+  dirtyTabIds: ReadonlySet<string>;
   onSelect: (tabId: string) => void;
   onClose: (tabId: string) => void;
   onAdd: () => void;
@@ -669,6 +865,9 @@ function PaneTabBar({
               }`}
             >
               <TabIcon tab={tab} />
+              {dirtyTabIds.has(tab.id) ? (
+                <span title="Unsaved changes" className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#C96442]" />
+              ) : null}
               <span className="truncate">{tab.title}</span>
               <button
                 type="button"
@@ -710,15 +909,17 @@ function TabIcon({ tab }: { tab: PaneTab }) {
 
 // PaneTabContent: one live surface per tab. Session tabs own a real Chat
 // (socket + Composer included); inspector tabs render the same real panes
-// as the sidebar; file tabs render a real read preview.
+// as the sidebar; file tabs render an editable file editor (REQ-017).
 function PaneTabContent({
   tab,
   ctx,
+  onDirtyChange,
   onOpenInspectorTab,
   onOpenSession,
 }: {
   tab: PaneTab;
   ctx: PaneCtx;
+  onDirtyChange: (tabId: string, dirty: boolean) => void;
   onOpenInspectorTab: (id: InspectorTabId) => void;
   onOpenSession?: (id: string) => void;
 }) {
@@ -735,7 +936,7 @@ function PaneTabContent({
     );
   }
   if (tab.kind === 'file' && tab.filePath && tab.sessionId && isValidRelPath(tab.filePath)) {
-    return <PaneFilePreview sessionId={tab.sessionId} path={tab.filePath} />;
+    return <PaneFilePreview sessionId={tab.sessionId} path={tab.filePath} tabId={tab.id} onDirtyChange={onDirtyChange} />;
   }
   return (
     <div className="flex h-full items-center justify-center p-6 text-center text-xs text-muted-foreground">

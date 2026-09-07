@@ -56,3 +56,4 @@
 - [REQ-035](finished/REQ-035-drop-modal-uste.md) — Dropped session modali üste çıkar — done
 - [REQ-036](finished/REQ-036-crosshair-imlec.md) — Butonlarda crosshair imleç — done
 - [REQ-037](finished/REQ-037-browser-full-height.md) — Browser içeriği full height — done
+- [REQ-038](REQ-038-sending-takiliyor.md) — Gönderince sending'de takılma — done

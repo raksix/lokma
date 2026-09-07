@@ -32,6 +32,7 @@ import {
   splitForZone,
   splitLayout,
   upsertFileTab,
+  upsertSessionTab,
 } from "./panes";
 import type { LayoutNode } from "@/stores/layout";
 
@@ -73,6 +74,17 @@ const u3 = upsertFileTab(u2, "src/b.ts", "sess_1");
 check("upsert new path appends+activates", u3.tabs.length === 2 && u3.active !== u2.active);
 const u4 = upsertFileTab(u3, "src/a.ts", "sess_2");
 check("upsert same path other session appends", u4.tabs.length === 3);
+
+/* 1c — upsertSessionTab (REQ-005): open-or-focus, never duplicates. */
+const v1 = upsertSessionTab({ tabs: [], active: null }, "sess_1", "One");
+check("upsert session appends first tab", v1.tabs.length === 1 && v1.active === v1.tabs[0].id);
+check("upsert session tab carries id+title", v1.tabs[0].kind === "session" && v1.tabs[0].sessionId === "sess_1" && v1.tabs[0].title === "One");
+const v2 = upsertSessionTab(v1, "sess_1", "One");
+check("upsert same session focuses", v2.tabs.length === 1 && v2.active === v1.active);
+const v3 = upsertSessionTab(v2, "sess_2", "Two");
+check("upsert new session appends+activates", v3.tabs.length === 2 && v3.active !== v2.active);
+const v4 = upsertSessionTab({ tabs: [makeFileTab("src/a.ts", "sess_1")], active: null }, "sess_1", "One");
+check("upsert session ignores file tabs", v4.tabs.length === 2);
 
 check("tab id prefix", makeTabId("tab-x").startsWith("tab-x-"));
 check("pane id prefix unique", makePaneId().startsWith("p-") && makePaneId() !== makePaneId());

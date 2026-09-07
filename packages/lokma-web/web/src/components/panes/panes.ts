@@ -141,6 +141,18 @@ export function upsertFileTab(state: PaneTabState, filePath: string, sessionId: 
   return { tabs: [...state.tabs, tab], active: tab.id };
 }
 
+/**
+ * Open-or-focus a session tab in a pane state (REQ-005): the same session
+ * focuses its existing tab instead of duplicating it; anything else appends
+ * a fresh live session tab and activates it.
+ */
+export function upsertSessionTab(state: PaneTabState, sessionId: string, title?: string): PaneTabState {
+  const existing = state.tabs.find((t) => t.kind === 'session' && t.sessionId === sessionId);
+  if (existing) return { tabs: state.tabs, active: existing.id };
+  const tab = makeSessionTab(sessionId, title);
+  return { tabs: [...state.tabs, tab], active: tab.id };
+}
+
 /** Runtime guard for persisted / drag-carried tabs (corrupt rows are dropped, never rendered). */
 export function isPaneTab(value: unknown): value is PaneTab {
   if (typeof value !== 'object' || value === null) return false;

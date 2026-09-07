@@ -25,6 +25,7 @@ import {
   type PaneTab,
   type PaneTabState,
   upsertFileTab,
+  upsertSessionTab,
 } from './panes';
 
 // TilingWorkspace: the W7 pane system inside the harness center column.
@@ -51,6 +52,8 @@ export function TilingWorkspace({
   const resetStoreLayout = usePaneStore((s) => s.resetLayout);
   const pendingFileTab = usePaneStore((s) => s.pendingFileTab);
   const consumeFileTab = usePaneStore((s) => s.consumeFileTab);
+  const pendingSessionTab = usePaneStore((s) => s.pendingSessionTab);
+  const consumeSessionTab = usePaneStore((s) => s.consumeSessionTab);
 
   const [tabStates, setTabStates] = React.useState<Record<string, PaneTabState>>(loadTabStates);
   const [winPos, setWinPos] = React.useState<Record<string, WindowPos>>({});
@@ -114,6 +117,23 @@ export function TilingWorkspace({
     }
     consumeFileTab();
   }, [pendingFileTab, paneIds, focusedPaneId, focusPane, consumeFileTab]);
+
+  // REQ-005: session-list "Open as pane tab" requests land here as a tab in
+  // the last-focused pane (same session focuses instead of duplicating).
+  // One-shot: the request is consumed even when no pane exists.
+  React.useEffect(() => {
+    if (!pendingSessionTab) return;
+    const target = paneIds.includes(focusedPaneId) ? focusedPaneId : paneIds[0];
+    if (target) {
+      const { sessionId: ownerId, title } = pendingSessionTab;
+      setTabStates((prev) => ({
+        ...prev,
+        [target]: upsertSessionTab(prev[target] ?? { tabs: [], active: null }, ownerId, title),
+      }));
+      focusPane(target);
+    }
+    consumeSessionTab();
+  }, [pendingSessionTab, paneIds, focusedPaneId, focusPane, consumeSessionTab]);
 
   const tabsChange = (paneId: string, tabs: PaneTab[], active: string | null) => {
     setTabStates((prev) => ({ ...prev, [paneId]: { tabs, active } }));

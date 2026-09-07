@@ -2,6 +2,7 @@ import * as React from 'react';
 import {
   Check,
   Clock,
+  Columns2,
   GitFork,
   GitMerge,
   LayoutGrid,
@@ -15,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { SessionSummary } from '@/lib/api';
-import { useSessionStore } from '@/stores';
+import { usePaneStore, useSessionStore } from '@/stores';
 import { emitToast } from '@/components/shell';
 import {
   displayTitle,
@@ -48,6 +49,7 @@ function SessionRow({
   action,
   onAction,
   onResume,
+  onOpenAsPane,
   onSubmitRename,
   onCancelAction,
   mergeTargets,
@@ -58,6 +60,7 @@ function SessionRow({
   action: RowAction;
   onAction: (a: Exclude<RowAction, null>) => void;
   onResume: () => void;
+  onOpenAsPane: () => void;
   onSubmitRename: (title: string) => void;
   onCancelAction: () => void;
   mergeTargets: SessionSummary[];
@@ -80,6 +83,13 @@ function SessionRow({
         e.dataTransfer.setData('application/x-lokma-session', session.id);
         e.dataTransfer.setData('text/plain', title);
         e.dataTransfer.effectAllowed = 'copy';
+        // REQ-005: the drop target only exists in tiling mode — enable it so
+        // the drag always has somewhere to land.
+        const pane = usePaneStore.getState();
+        if (!pane.tiling) {
+          pane.setTiling(true);
+          emitToast('Tiling workspace enabled — drop the session into a pane');
+        }
       }}
       title={`Drag into a tiling pane (open, split, fork, merge) — ${session.id}`}
       className={cn(
@@ -114,6 +124,15 @@ function SessionRow({
           </div>
         </div>
         <div className="flex items-center shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            title="Open as pane tab"
+            onClick={onOpenAsPane}
+           aria-label="Open as pane tab">
+            <Columns2 className="w-3 h-3" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -331,6 +350,17 @@ export function SessionsSidebar({
     [forkSession, onSelect],
   );
 
+  // REQ-005: explicit affordance that needs no drag — opens/focuses the
+  // session as a tab in the last-focused pane (tiling auto-enabled).
+  const handleOpenAsPane = React.useCallback((s: SessionSummary) => {
+    const pane = usePaneStore.getState();
+    if (!pane.tiling) {
+      pane.setTiling(true);
+      emitToast('Tiling workspace enabled — session opened as a pane tab');
+    }
+    pane.requestSessionTab(s.id, displayTitle(s));
+  }, []);
+
   return (
     <div className="flex flex-col overflow-hidden">
       <div className="px-2 py-2 border-b border-line/50 space-y-2">
@@ -404,6 +434,7 @@ export function SessionsSidebar({
                   action={openAction?.id === s.id ? openAction.action : null}
                   onAction={(a) => setOpenAction({ id: s.id, action: a })}
                   onResume={() => onSelect(s.id)}
+                  onOpenAsPane={() => handleOpenAsPane(s)}
                   onSubmitRename={(title) => {
                     const trimmed = title.trim();
                     if (!trimmed || trimmed === displayTitle(s)) {

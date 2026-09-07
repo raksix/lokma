@@ -26,6 +26,12 @@ export type PendingFileTab = {
   sessionId: string;
 };
 
+/** One-shot session-open request from the session list (REQ-005, consumed by TilingWorkspace, never persisted). */
+export type PendingSessionTab = {
+  sessionId: string;
+  title: string;
+};
+
 type PaneState = {
   layout: LayoutNode;
   leftW: number;
@@ -36,6 +42,7 @@ type PaneState = {
   focusedPaneId: string;
   activeSessionId: string | null;
   pendingFileTab: PendingFileTab | null;
+  pendingSessionTab: PendingSessionTab | null;
   setLayout: (layout: LayoutNode) => void;
   setSideWidth: (side: 'left' | 'right', width: number) => void;
   setTiling: (on: boolean) => void;
@@ -46,6 +53,8 @@ type PaneState = {
   setActiveSession: (id: string | null) => void;
   requestFileTab: (path: string, sessionId: string) => void;
   consumeFileTab: () => void;
+  requestSessionTab: (sessionId: string, title: string) => void;
+  consumeSessionTab: () => void;
   resetLayout: () => void;
 };
 
@@ -59,6 +68,7 @@ const initial = {
   focusedPaneId: 'a',
   activeSessionId: null as string | null,
   pendingFileTab: null as PendingFileTab | null,
+  pendingSessionTab: null as PendingSessionTab | null,
 };
 
 export const usePaneStore = create<PaneState>()(
@@ -95,6 +105,9 @@ export const usePaneStore = create<PaneState>()(
 
       requestFileTab: (path: string, sessionId: string) => set({ pendingFileTab: { path, sessionId } }),
       consumeFileTab: () => set({ pendingFileTab: null }),
+
+      requestSessionTab: (sessionId: string, title: string) => set({ pendingSessionTab: { sessionId, title } }),
+      consumeSessionTab: () => set({ pendingSessionTab: null }),
 
       resetLayout: () => set({ ...initial, layout: defaultLayout(), openTabs: [] }),
     }),

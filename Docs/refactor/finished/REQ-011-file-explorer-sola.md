@@ -1,6 +1,6 @@
 # REQ-011 — File explorer sola taşınacak
 
-- **Status:** done (live 2026-09-07)
+- **Status:** done (commit `3778c10`, live 2026-09-07)
 - **Asked:** 2026-09-07 — "ayrıca file exploreri de oraya taşı piç".
 - **Interpretation:** `FileBrowser` (dosya ağacı + arama + önizleme/editör) sağdaki Explorer panelinden alınıp SOL tarafa taşınır (REQ-010'daki ikon şeridinin yanındaki geniş panele ya da mevcut sol panele — net yerleşim uygulamaya bırakıldı ama sonuç: dosya işlemleri solda). Sağdaki Explorer panelinde sessions + server kartı kalır. `openFile` → sekme akışı (REQ-002) ve cwd/session kapsamı aynen korunur, sadece bulunduğu panel değişir.
 - **Decision:** FileBrowser yeni sol yuvasında SABİT kalır — REQ-007 swap'i sadece Explorer↔Inspector gövdesini değiştirir (sol panel = Files + swap gövdesi). Ctrl+P artık sol paneli açar (files hep solda), mobilde session seçimi iki drawer'ı da kapatır (önceden files Explorer drawer'ının içindeydi, tek kapatma yetiyordu).

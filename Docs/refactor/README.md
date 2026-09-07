@@ -51,4 +51,4 @@
 - [REQ-030](REQ-030-provider-modelleri-gorunsun.md) — Eklenen provider'ın modelleri listede görünsün — pending
 - [REQ-031](REQ-031-opencode-go-0-models.md) — Test 35 bulurken satır 0 models gösteriyor — pending
 - [REQ-032](REQ-032-refresh-tum-modeller.md) — Refresh tüm provider /v1/models'leri çeker — pending
-- [REQ-033](REQ-033-tiling-bozuk.md) — Pane tiling sistemi çalışmıyor (concept'te çalışıyordu) — in-progress
+- [REQ-033](REQ-033-tiling-bozuk.md) — Pane tiling sistemi çalışmıyor (concept'te çalışıyordu) — done

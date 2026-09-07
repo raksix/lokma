@@ -82,19 +82,53 @@ import {
  * entries + live usage meter over `GET/POST/PATCH/DELETE /api/memory`).
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
+ *
+ * REQ-008 — `requestedTab` lets the activity rail open a tab from outside:
+ * when the prop changes to a non-null tab the panel switches to it (also
+ * fires on mount, so a rail click that first reveals the sidebar still
+ * lands on the right tab).
  */
+export type InspectorTab =
+  | 'info'
+  | 'providers'
+  | 'models'
+  | 'usage'
+  | 'settings'
+  | 'terminal'
+  | 'git'
+  | 'browser'
+  | 'agents'
+  | 'orchestration'
+  | 'vault'
+  | 'skills'
+  | 'archify'
+  | 'design'
+  | 'testing'
+  | 'bots'
+  | 'auth'
+  | 'setup'
+  | 'plugins'
+  | 'observability'
+  | 'cron'
+  | 'extras'
+  | 'memory';
+
 export function InspectorPanel({
   onOpenSession,
   sessionId,
   ws,
+  requestedTab,
 }: {
   onOpenSession?: (id: string) => void;
   sessionId?: string;
   ws?: UseWs;
+  requestedTab?: InspectorTab | null;
 }) {
-  const [tab, setTab] = React.useState<'info' | 'providers' | 'models' | 'usage' | 'settings' | 'terminal' | 'git' | 'browser' | 'agents' | 'orchestration' | 'vault' | 'skills' | 'archify' | 'design' | 'testing' | 'bots' | 'auth' | 'setup' | 'plugins' | 'observability' | 'cron' | 'extras' | 'memory'>(
-    'info',
-  );
+  const [tab, setTab] = React.useState<InspectorTab>('info');
+
+  React.useEffect(() => {
+    if (requestedTab) setTab(requestedTab);
+  }, [requestedTab]);
 
   return (
     <div className="space-y-3">

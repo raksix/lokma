@@ -3,6 +3,12 @@
  * (header helpers, toast bus, search, footer, error boundary, banner).
  */
 export { FooterBar } from './footer-bar';
+export {
+  ACTIVITY_ITEMS,
+  ActivityBar,
+  activityInspectorTab,
+  type ActivityKey,
+} from './activity-bar';
 export { OfflineBanner } from './offline-banner';
 export { PaneErrorBoundary } from './pane-error-boundary';
 export {

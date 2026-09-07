@@ -3,6 +3,7 @@ import * as React from 'react';
 import { Header } from '@/components/header';
 import { Sidebar } from '@/components/sidebar';
 import { InspectorPanel } from '@/components/providers';
+import type { InspectorTab } from '@/components/providers';
 import { SessionsSidebar } from '@/components/sessions';
 import { FileBrowser, FOCUS_FILES_EVENT } from '@/components/files';
 import { Chat } from '@/components/chat';
@@ -16,12 +17,14 @@ import { api } from '@/lib/api';
 import { useSessionStore } from '@/stores';
 import {
   FooterBar,
+  ActivityBar,
   OfflineBanner,
   PaneErrorBoundary,
   SearchModal,
   ShortcutsDialog,
   SHOW_SHORTCUTS_EVENT,
   ToastHost,
+  activityInspectorTab,
   anyDrawerOpen,
   closeAllSidebars,
   emitToast,
@@ -34,6 +37,7 @@ import {
   swappedExplorerSide,
   useIsMobile,
   writeExplorerSide,
+  type ActivityKey,
   type ExplorerSide,
   type SidebarSide,
   type SidebarVisibility,
@@ -71,6 +75,10 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   const [serverUp, setServerUp] = React.useState<boolean | null>(null);
   // REQ-007 — which physical side hosts the Explorer (persisted, survives reload).
   const [explorerSide, setExplorerSide] = React.useState<ExplorerSide>(() => readExplorerSide());
+  // REQ-008 — activity rail selection + the Inspector tab it requested
+  // (null = sessions, which live in the Explorer panel).
+  const [activity, setActivity] = React.useState<ActivityKey>('sessions');
+  const [inspectorTab, setInspectorTab] = React.useState<InspectorTab | null>(null);
 
   const swapSides = React.useCallback(() => {
     setExplorerSide((current) => {
@@ -79,6 +87,32 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       return next;
     });
   }, []);
+
+  // REQ-008 — rail click reveals the panel that owns the key, then asks
+  // the Inspector to switch tabs (prop-driven so a first click that mounts
+  // the sidebar still lands on the right tab).
+  const handleActivitySelect = React.useCallback(
+    (key: ActivityKey) => {
+      setActivity(key);
+      const tab = activityInspectorTab(key);
+      setInspectorTab(tab);
+      if (tab === null) {
+        setSidebars((current) =>
+          isMobile
+            ? { left: explorerSide === 'left', right: explorerSide === 'right' }
+            : { ...current, [explorerSide]: true },
+        );
+        return;
+      }
+      const inspectorSide: SidebarSide = explorerSide === 'left' ? 'right' : 'left';
+      setSidebars((current) =>
+        isMobile
+          ? { left: inspectorSide === 'left', right: inspectorSide === 'right' }
+          : { ...current, [inspectorSide]: true },
+      );
+    },
+    [explorerSide, isMobile],
+  );
 
   const ws = useWs(activeId);
   const refreshSessions = useSessionStore((s) => s.refreshSessions);
@@ -210,7 +244,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   );
 
   const inspectorContent = (
-    <InspectorPanel onOpenSession={switchSession} sessionId={activeId} ws={ws} />
+    <InspectorPanel onOpenSession={switchSession} sessionId={activeId} ws={ws} requestedTab={inspectorTab} />
   );
 
   // REQ-007 — panel content follows the swap; titles/labels never hardcode sides.
@@ -289,6 +323,8 @@ export function AppShell({ sessionId }: { sessionId: string }) {
             </PaneErrorBoundary>
           )
         ) : null}
+        {/* REQ-008 — VS Code-style activity rail, pinned at the far right. */}
+        <ActivityBar active={activity} onSelect={handleActivitySelect} />
       </div>
       <FooterBar serverUp={serverUp} />
       <SearchModal

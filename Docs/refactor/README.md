@@ -53,3 +53,4 @@
 - [REQ-032](finished/REQ-032-refresh-tum-modeller.md) — Refresh tüm provider /v1/models'leri çeker — done
 - [REQ-033](finished/REQ-033-tiling-bozuk.md) — Pane tiling sistemi çalışmıyor (concept'te çalışıyordu) — done
 - [REQ-034](REQ-034-file-explorer-sadece-inspector.md) — File explorer sadece Inspector'da görünür — pending
+- [REQ-035](REQ-035-drop-modal-uste.md) — Dropped session modali üste çıkar — pending

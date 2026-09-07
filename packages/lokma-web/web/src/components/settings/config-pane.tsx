@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { emitToast } from '@/components/shell';
 import type { NormalizedConfig } from './settings';
-import { buildAgentsPatch, isValidAgentDefaultModel, validateAgentsBudgets, validateAgentsCaps } from './settings';
+import { buildAgentsPatch, buildSessionsPatch, isValidAgentDefaultModel, isValidSessionDefaultCwd, validateAgentsBudgets, validateAgentsCaps } from './settings';
 
 /**
  * ConfigPane — the effective (merged) harness config, read live from
@@ -32,6 +32,9 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
     usd: config.agentBudgets.usd === null ? '' : String(config.agentBudgets.usd),
   });
   const [budgetsErrors, setBudgetsErrors] = React.useState<Record<string, string>>({});
+  const [sessionCwd, setSessionCwd] = React.useState(config.sessionDefaultCwd);
+  const [sessionCwdError, setSessionCwdError] = React.useState('');
+  const [savingSessionCwd, setSavingSessionCwd] = React.useState(false);
 
   async function handleSaveModel(): Promise<void> {
     const next = model.trim();
@@ -78,6 +81,23 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
     }
   }
 
+  async function handleSaveSessionCwd(): Promise<void> {
+    const err = isValidSessionDefaultCwd(sessionCwd) ? '' : 'Absolute path (/…, ~…, X:\\…) or empty for the server default.';
+    setSessionCwdError(err);
+    if (err) return;
+    setSavingSessionCwd(true);
+    try {
+      // Own top-level key — never wipes agents/permissions/mcp siblings.
+      await api.patchConfig(buildSessionsPatch(sessionCwd.trim()));
+      emitToast('Session default saved');
+      await onReload();
+    } catch (e) {
+      emitToast(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setSavingSessionCwd(false);
+    }
+  }
+
   const capsFields: Array<{ key: 'maxAgents' | 'maxConcurrent' | 'maxQueue'; label: string; hint: string }> = [
     { key: 'maxAgents', label: 'Max agents', hint: 'Registry slots (1–100)' },
     { key: 'maxConcurrent', label: 'Max concurrent', hint: 'Running at once (1–20)' },
@@ -115,6 +135,12 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
           <div className="flex gap-2 rounded border border-line/50 bg-muted/50 p-1.5">
             <span className="shrink-0 font-semibold">coordinator</span>
             <span className="truncate text-zinc-500" title={config.coordinatorMode ?? undefined}>{config.coordinatorMode || '—'}</span>
+          </div>
+          <div className="flex gap-2 rounded border border-line/50 bg-muted/50 p-1.5">
+            <span className="shrink-0 font-semibold">sessions</span>
+            <span className="truncate text-zinc-500" title={config.sessionDefaultCwd || undefined}>
+              defaultCwd {config.sessionDefaultCwd || '(server default)'}
+            </span>
           </div>
           <div className="flex gap-2 rounded border border-line/50 bg-muted/50 p-1.5">
             <span className="shrink-0 font-semibold">vault</span>
@@ -209,6 +235,29 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
           {savingCaps ? 'Saving…' : 'Save caps'}
         </Button>
         <div className="mt-1 text-[11px] text-zinc-500">Persists the full agents object via PATCH /api/config.</div>
+      </div>
+
+      <div className="rounded-lg border border-line bg-white p-2.5 dark:bg-[#1E1E21]">
+        <label htmlFor="settings-session-cwd" className="font-semibold">
+          Session defaults
+        </label>
+        <div className="mt-1.5 flex gap-1">
+          <Input
+            id="settings-session-cwd"
+            value={sessionCwd}
+            onChange={(e) => setSessionCwd(e.target.value)}
+            placeholder="/mnt/apopic/my-project (empty = server default)"
+            className="h-7 font-mono text-xs min-w-0"
+          />
+          <Button size="sm" className="h-7 shrink-0 text-xs" disabled={savingSessionCwd} onClick={handleSaveSessionCwd}>
+            {savingSessionCwd ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
+        {sessionCwdError ? (
+          <div className="mt-0.5 text-[10px] text-red-600">{sessionCwdError}</div>
+        ) : (
+          <div className="mt-1 text-[11px] text-zinc-500">New sessions land here unless a cwd is given. Persists via PATCH /api/config.</div>
+        )}
       </div>
 
       <div className="rounded-lg border border-[#F2D5C2] bg-[#FDF0E6] p-2.5 dark:bg-[#2A1E15]">

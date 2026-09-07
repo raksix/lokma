@@ -7,6 +7,7 @@ import {
   buildHooksPatch,
   buildMcpPatch,
   buildPermissionsPatch,
+  buildSessionsPatch,
   flattenHooks,
   isMcpTransport,
   isPermissionMode,
@@ -14,6 +15,7 @@ import {
   isValidAgentDefaultModel,
   isValidMcpName,
   isValidRule,
+  isValidSessionDefaultCwd,
   normalizeConfig,
   normalizeMcpEntry,
   normalizeMcpServers,
@@ -185,6 +187,19 @@ check('fractional tokens flagged', typeof validateAgentsBudgets({ tokens: '2.5',
 check('blank tokens flagged', typeof validateAgentsBudgets({ tokens: '', usd: '10' }).tokens === 'string');
 check('negative usd flagged', typeof validateAgentsBudgets({ tokens: '500000', usd: '-1' }).usd === 'string');
 check('non-numeric usd flagged', typeof validateAgentsBudgets({ tokens: '500000', usd: 'abc' }).usd === 'string');
+
+// isValidSessionDefaultCwd + buildSessionsPatch (REQ-009 session-cwd piece — sessions.defaultCwd editable)
+check('empty cwd means server default', isValidSessionDefaultCwd('') === true);
+check('posix absolute passes', isValidSessionDefaultCwd('/mnt/apopic/lokma') === true);
+check('home-relative passes', isValidSessionDefaultCwd('~/work') === true);
+check('relative path fails', isValidSessionDefaultCwd('rel/path') === false);
+check('bare name fails', isValidSessionDefaultCwd('lokma') === false);
+check('non-string fails', isValidSessionDefaultCwd(null) === false);
+check('overlong cwd fails', isValidSessionDefaultCwd(`/${'a'.repeat(500)}`) === false);
+const sessionsPatch = buildSessionsPatch('/mnt/apopic/lokma') as { sessions: { defaultCwd: string } };
+check('sessions patch carries defaultCwd', sessionsPatch.sessions.defaultCwd === '/mnt/apopic/lokma');
+check('sessions payload reads back', normalizeConfig({ config: { sessions: { defaultCwd: '/tmp/x' } } }).sessionDefaultCwd === '/tmp/x');
+check('missing sessions reads empty', normalizeConfig(null).sessionDefaultCwd === '');
 
 console.log(`settings.test.ts: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

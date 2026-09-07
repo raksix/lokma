@@ -55,6 +55,17 @@ export const AgentsConfigSchema = z.object({
 
 export type AgentsConfig = z.infer<typeof AgentsConfigSchema>;
 
+/**
+ * Session defaults — where new sessions land when the caller passes no
+ * explicit cwd (`POST /api/sessions`, REQ-009 session-defaults piece).
+ * Empty string = server default (its own working dir).
+ */
+export const SessionsConfigSchema = z.object({
+  defaultCwd: z.string().max(500).default(''),
+});
+
+export type SessionsConfig = z.infer<typeof SessionsConfigSchema>;
+
 export const GlobalConfigSchema = z.object({
   version: z.number().int().default(1),
   defaultModel: z.string().default('anthropic::claude-sonnet-4-5'),
@@ -81,6 +92,7 @@ export const GlobalConfigSchema = z.object({
     memory: { agent_char_limit: 8000 },
     budgets: { tokens: 500_000, usd: 10 },
   }),
+  sessions: SessionsConfigSchema.default({ defaultCwd: '' }),
   locks: z
     .object({ heartbeatMs: z.number().default(30_000), leaseMs: z.number().default(60_000), dir: z.string().default('.agentlocks/locks') })
     .default({ heartbeatMs: 30_000, leaseMs: 60_000, dir: '.agentlocks/locks' }),

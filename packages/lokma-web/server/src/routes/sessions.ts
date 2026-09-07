@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { SessionStore, compactSession, compactionStatus, searchSessionsDetailed } from 'lokma-core';
+import { SessionStore, compactSession, compactionStatus, loadConfig, searchSessionsDetailed } from 'lokma-core';
 
 /**
  * Sessions — JSONL same files as CLI (SessionStore).
@@ -68,7 +68,10 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
 
   app.post('/api/sessions', async (req) => {
     const body = req.body as { cwd?: string; model?: string } | undefined;
-    const cwd = body?.cwd ?? process.cwd();
+    // Explicit cwd wins; otherwise the configured session default
+    // (`sessions.defaultCwd`, REQ-009); empty = server working dir.
+    const configured = (await loadConfig(process.cwd())).sessions.defaultCwd.trim();
+    const cwd = body?.cwd ?? (configured || process.cwd());
     const id = newSessionId();
     // Create empty session file by appending a system marker (not a user message)
     const store = new SessionStore(cwd);

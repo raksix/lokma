@@ -182,6 +182,7 @@ export type NormalizedConfig = {
   maxQueue: number | null;
   agentDefaultModel: string;
   agentBudgets: { tokens: number | null; usd: number | null };
+  sessionDefaultCwd: string;
   vaultHost: string | null;
   coordinatorMode: string;
   credentials: Record<string, { keySet: boolean; last4: string | null }>;
@@ -200,6 +201,7 @@ export function normalizeConfig(raw: unknown): NormalizedConfig {
   const coord = asRecord(cfg.coordinator);
   const vault = asRecord(cfg.vault);
   const mcp = asRecord(cfg.mcp);
+  const sessions = asRecord(cfg.sessions);
   return {
     defaultModel: typeof cfg.defaultModel === 'string' ? cfg.defaultModel : '',
     defaultProvider: typeof cfg.defaultProvider === 'string' ? cfg.defaultProvider : '',
@@ -219,6 +221,7 @@ export function normalizeConfig(raw: unknown): NormalizedConfig {
       tokens: typeof budgets.tokens === 'number' && Number.isFinite(budgets.tokens) ? budgets.tokens : null,
       usd: typeof budgets.usd === 'number' && Number.isFinite(budgets.usd) ? budgets.usd : null,
     },
+    sessionDefaultCwd: typeof sessions.defaultCwd === 'string' ? sessions.defaultCwd : '',
     vaultHost: typeof vault.host === 'string' ? vault.host : null,
     coordinatorMode: typeof coord.mode === 'string' ? coord.mode : '',
     credentials: asRecord(root.credentials) as NormalizedConfig['credentials'],
@@ -369,4 +372,27 @@ export function validateAgentsBudgets(input: AgentsBudgetsInput): Record<string,
     errors.usd = 'USD cap, 0 or more.';
   }
   return errors;
+}
+
+/**
+ * A session default cwd is either empty (= server default, its own working
+ * dir) or an absolute-looking path — POSIX `/…`, home `~…`, or Windows
+ * `X:\…` — max 500 chars (mirror `SessionsConfigSchema.defaultCwd`).
+ * Relative paths are rejected: the server resolves them against its own
+ * cwd, which silently scatters sessions across directories.
+ */
+export function isValidSessionDefaultCwd(v: unknown): boolean {
+  if (typeof v !== 'string') return false;
+  const t = v.trim();
+  if (t === '') return true;
+  if (t.length > 500) return false;
+  return t.startsWith('/') || t.startsWith('~') || /^[A-Za-z]:[\\/]/.test(t);
+}
+
+/**
+ * Build a PATCH body for the sessions object. Top-level key, so it rides
+ * `saveGlobal`'s shallow merge without touching agents/permissions/mcp.
+ */
+export function buildSessionsPatch(defaultCwd: string): Record<string, unknown> {
+  return { sessions: { defaultCwd } };
 }

@@ -11,6 +11,7 @@ import {
   isAiCreated,
   normalizeAgent,
   queuePosition,
+  stateBadge,
   stateTone,
   validateAgentForm,
 } from './agents';
@@ -55,6 +56,14 @@ check('queued is blue', stateTone('queued').includes('blue'));
 check('paused is amber', stateTone('paused').includes('amber'));
 check('failed is red', stateTone('failed').includes('red'));
 check('unknown state is zinc', stateTone('bogus').includes('zinc'));
+
+// stateBadge (pairs with stateTone dot; REQ-025)
+check('badge running is emerald', stateBadge('running').includes('emerald'));
+check('badge queued is blue', stateBadge('queued').includes('blue'));
+check('badge paused is amber', stateBadge('paused').includes('amber'));
+check('badge failed is red', stateBadge('failed').includes('red'));
+check('badge completed is teal', stateBadge('completed').includes('teal'));
+check('badge unknown falls back to zinc', stateBadge('bogus').includes('zinc'));
 
 // isAiCreated / initials
 check('ai prefix detected', isAiCreated('ai:builder-1') === true);

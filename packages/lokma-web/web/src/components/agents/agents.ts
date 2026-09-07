@@ -100,6 +100,25 @@ export function stateTone(state: string): string {
   }
 }
 
+/** Pill classes for the lifecycle status badge (pairs with the `stateTone` dot). */
+export function stateBadge(state: string): string {
+  switch (state) {
+    case 'running':
+      return 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-300';
+    case 'queued':
+      return 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-500/10 dark:border-blue-500/30 dark:text-blue-300';
+    case 'paused':
+      return 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300';
+    case 'failed':
+      return 'bg-red-50 border-red-200 text-red-700 dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-300';
+    case 'completed':
+      return 'bg-teal-50 border-teal-200 text-teal-700 dark:bg-teal-500/10 dark:border-teal-500/30 dark:text-teal-300';
+    case 'killed':
+      return 'bg-zinc-100 border-zinc-300 text-zinc-600 dark:bg-zinc-500/10 dark:border-zinc-500/30 dark:text-zinc-300';
+    default:
+      return 'bg-zinc-100 border-line text-zinc-600 dark:bg-zinc-500/10 dark:border-zinc-500/30 dark:text-zinc-300';
+  }
+}
 /** True when the agent was spawned by another agent (`ai:<parentId>`). */
 export function isAiCreated(createdBy: string): boolean {
   return createdBy.startsWith('ai:');

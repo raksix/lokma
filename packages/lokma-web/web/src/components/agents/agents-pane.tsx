@@ -25,6 +25,7 @@ import {
   isAiCreated,
   normalizeAgent,
   queuePosition,
+  stateBadge,
   stateTone,
   type HubAgent,
 } from './agents';
@@ -125,10 +126,10 @@ function AgentRow({
   return (
     <button
       onClick={onSelect}
-      className={`w-full text-left p-2.5 rounded-lg border flex gap-2.5 transition ${
+      className={`w-full text-left p-2.5 rounded-lg border flex gap-2.5 transition hover:shadow-sm ${
         selected
           ? 'bg-[#FDF0E6] border-[#F2D5C2] dark:bg-[#2A1E15] dark:border-[#3A2A1A]'
-          : 'bg-white dark:bg-[#1E1E21] border-line hover:border-terracotta/20'
+          : 'bg-white dark:bg-[#1E1E21] border-line hover:border-terracotta/30'
       }`}
     >
       <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${stateTone(agent.state)}`} />
@@ -147,7 +148,7 @@ function AgentRow({
           <span className="px-1 py-0 rounded bg-white dark:bg-[#1E1E21] border border-line text-[10px]">
             {agent.model}
           </span>
-          <span className="px-1 py-0 rounded-full border border-line bg-zinc-100 text-zinc-600 text-[10px]">
+          <span className={`px-1.5 py-0 rounded-full border text-[10px] font-medium ${stateBadge(agent.state)}`}>
             {agent.state}
           </span>
         </div>
@@ -323,6 +324,9 @@ export function AgentsPane() {
                     <div className="text-xs font-semibold flex items-center gap-1.5">
                       {selected.name} <span className="text-[11px] font-normal text-zinc-400">· {selected.id} · {selected.persona}</span>
                       <span className={`w-2 h-2 rounded-full ${stateTone(selected.state)}`} />
+                      <span className={`px-1.5 py-0 rounded-full border text-[10px] font-medium ${stateBadge(selected.state)}`}>
+                        {selected.state}
+                      </span>
                     </div>
                     <div className="text-[11px] text-zinc-500">
                       {selected.cwd ? `cwd: ${selected.cwd} · ` : ''}createdBy: {selected.createdBy} · model{' '}

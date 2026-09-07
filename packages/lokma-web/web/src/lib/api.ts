@@ -191,6 +191,25 @@ export type ModelsMutationRes = {
   count: number;
   enabledCount: number;
 };
+/** One provider row in the `POST /api/models/refresh` response (REQ-032). */
+export type ModelsRefreshProvider = {
+  id: string;
+  ok: boolean;
+  modelCount: number;
+  latencyMs: number;
+  error?: string;
+  /** True when the provider was never probed (no stored key). */
+  skipped?: boolean;
+};
+/** Live fan-out refresh — merged catalog plus per-provider probe outcomes. */
+export type ModelsRefreshRes = {
+  ok: boolean;
+  models: ModelInfo[];
+  count: number;
+  enabledCount: number;
+  providers: ModelsRefreshProvider[];
+  refreshedAt: string;
+};
 export type SessionSummary = {
   id: string;
   cwd?: string;
@@ -987,6 +1006,8 @@ export const api = {
   /** Bulk enable/disable — one PATCH for Allow All / Disable All. */
   setModelsBulk: (models: Record<string, boolean>) =>
     patch<ModelsMutationRes>('/api/models', { models }),
+  /** Live refresh — fans out to every enabled provider's /v1/models at once (REQ-032). */
+  refreshModels: () => post<ModelsRefreshRes>('/api/models/refresh', {}),
 
   // Sessions — fork/patch/rewind are live server endpoints (W1 chat core).
   listSessions: (cwd?: string) =>

@@ -18,6 +18,79 @@ const MERGE_PROBE_TIMEOUT_MS = 6_000;
 const MERGE_PROBE_MAX_IDS = 500;
 
 /**
+ * One provider's live `/v1/models` outcome inside a catalog refresh.
+ * `skipped` = never probed (no stored key) — kept out of error badges so
+ * keyless built-ins do not paint red on every refresh.
+ */
+export type LiveProbeOutcome =
+  | { viewId: string; status: 'skipped'; reason: string }
+  | { viewId: string; status: 'ok'; ids: string[]; count: number; latencyMs: number }
+  | { viewId: string; status: 'error'; error: string; latencyMs: number };
+
+/** One provider row in the `POST /api/models/refresh` response. */
+export type RefreshProviderRow = {
+  id: string;
+  ok: boolean;
+  modelCount: number;
+  latencyMs: number;
+  error?: string;
+  skipped?: boolean;
+};
+
+/**
+ * Fan out to every enabled provider's live `/v1/models` at once — the
+ * single probe path behind both `GET /api/models` (REQ-030 merge) and
+ * `POST /api/models/refresh` (REQ-032). Bounded (6s each), parallel,
+ * failures come back as data and never block the others.
+ */
+async function probeAllEnabled(): Promise<LiveProbeOutcome[]> {
+  const views = await listProviderViews();
+  return Promise.all(
+    views
+      .filter((v) => v.enabled)
+      .map(async (view): Promise<LiveProbeOutcome> => {
+        const apiKey = await resolveApiKey(view.id);
+        if (!apiKey && providerNeedsKey(view.id)) {
+          return { viewId: view.id, status: 'skipped', reason: 'No API key stored' };
+        }
+        const probed = await probeProvider(view, apiKey, {
+          timeoutMs: MERGE_PROBE_TIMEOUT_MS,
+          maxIds: MERGE_PROBE_MAX_IDS,
+        });
+        if (!probed.ok || !probed.models) {
+          return { viewId: view.id, status: 'error', error: probed.error ?? 'probe failed', latencyMs: probed.latencyMs };
+        }
+        return {
+          viewId: view.id,
+          status: 'ok',
+          ids: probed.models,
+          count: probed.modelCount ?? probed.models.length,
+          latencyMs: probed.latencyMs,
+        };
+      }),
+  );
+}
+
+/** Fold live ids into the static base (same-id live hit wins). Pure. */
+function mergeLiveIds(base: CatalogModel[], outcomes: LiveProbeOutcome[]): CatalogModel[] {
+  const byId = new Map(base.map((m) => [m.id, m]));
+  for (const outcome of outcomes) {
+    if (outcome.status !== 'ok') continue;
+    for (const raw of outcome.ids) {
+      const full = raw.includes('/') ? raw : `${outcome.viewId}/${raw}`;
+      const short = full.slice(full.lastIndexOf('/') + 1);
+      byId.set(full, {
+        id: full,
+        label: short || full,
+        provider: providerOfId(full, outcome.viewId),
+        enabled: true,
+      });
+    }
+  }
+  return [...byId.values()];
+}
+
+/**
  * Merged catalog: static adapter models (`getCatalog`, 5m cached) enriched
  * with live `/v1/models` results from every enabled provider that can be
  * reached (stored key, or keyless local like Ollama). Static entries are the
@@ -27,35 +100,7 @@ const MERGE_PROBE_MAX_IDS = 500;
  */
 export async function getMergedCatalog(): Promise<CatalogModel[]> {
   const base = await getCatalog();
-  const views = await listProviderViews();
-  const probes = views
-    .filter((v) => v.enabled)
-    .map(async (view) => {
-      const apiKey = await resolveApiKey(view.id);
-      if (!apiKey && providerNeedsKey(view.id)) return null;
-      const probed = await probeProvider(view, apiKey, {
-        timeoutMs: MERGE_PROBE_TIMEOUT_MS,
-        maxIds: MERGE_PROBE_MAX_IDS,
-      });
-      if (!probed.ok || !probed.models) return null;
-      return { viewId: view.id, ids: probed.models };
-    });
-  const settled = await Promise.all(probes);
-  const byId = new Map(base.map((m) => [m.id, m]));
-  for (const hit of settled) {
-    if (!hit) continue;
-    for (const raw of hit.ids) {
-      const full = raw.includes('/') ? raw : `${hit.viewId}/${raw}`;
-      const short = full.slice(full.lastIndexOf('/') + 1);
-      byId.set(full, {
-        id: full,
-        label: short || full,
-        provider: providerOfId(full, hit.viewId),
-        enabled: true,
-      });
-    }
-  }
-  return [...byId.values()];
+  return mergeLiveIds(base, await probeAllEnabled());
 }
 
 export async function modelRoutes(app: FastifyInstance): Promise<void> {
@@ -67,6 +112,29 @@ export async function modelRoutes(app: FastifyInstance): Promise<void> {
       count: models.length,
       enabledCount: models.filter((m) => m.enabled).length,
       cached: true,
+    };
+  });
+
+  app.post('/api/models/refresh', async () => {
+    invalidateCatalog();
+    const base = await getCatalog();
+    const outcomes = await probeAllEnabled();
+    const cfg = await loadConfig(process.cwd());
+    const models = applyModelFlags(mergeLiveIds(base, outcomes), cfg.models ?? {});
+    const providers: RefreshProviderRow[] = outcomes.map((o): RefreshProviderRow => {
+      if (o.status === 'ok') return { id: o.viewId, ok: true, modelCount: o.count, latencyMs: o.latencyMs };
+      if (o.status === 'skipped') {
+        return { id: o.viewId, ok: false, modelCount: 0, latencyMs: 0, error: o.reason, skipped: true };
+      }
+      return { id: o.viewId, ok: false, modelCount: 0, latencyMs: o.latencyMs, error: o.error };
+    });
+    return {
+      ok: true,
+      models,
+      count: models.length,
+      enabledCount: models.filter((m) => m.enabled).length,
+      providers,
+      refreshedAt: new Date().toISOString(),
     };
   });
 

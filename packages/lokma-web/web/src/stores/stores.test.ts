@@ -152,6 +152,20 @@ globalThis.fetch = (async (url: unknown) => {
   const path = String(url);
   if (path === '/api/providers') return json(200, { providers: [{ id: 'p1', enabled: true, keySet: true, last4: 'ab12' }] });
   if (path === '/api/models') return json(200, { models: [{ id: 'p1::m1', label: 'M1', provider: 'p1' }], count: 1, cached: false });
+  if (path === '/api/models/refresh') {
+    return json(200, {
+      ok: true,
+      models: [{ id: 'p1::m1', label: 'M1', provider: 'p1', enabled: true }],
+      count: 1,
+      enabledCount: 1,
+      providers: [
+        { id: 'p1', ok: true, modelCount: 1, latencyMs: 12 },
+        { id: 'p2', ok: false, modelCount: 0, latencyMs: 30, error: 'HTTP 500 from example.com' },
+        { id: 'p3', ok: false, modelCount: 0, latencyMs: 0, error: 'No API key stored', skipped: true },
+      ],
+      refreshedAt: '2026-09-07T00:00:00.000Z',
+    });
+  }
   return json(404, { code: 'not_found', message: 'no such route in probe' });
 }) as unknown as typeof fetch;
 
@@ -167,6 +181,17 @@ assert(providerCalls > providerCallsAfterFirst, 'force bypasses the TTL');
 useProviderStore.getState().invalidate();
 await useProviderStore.getState().refresh();
 assert(providerCalls > providerCallsAfterFirst, 'invalidate forces refetch');
+
+// ─── Live fan-out refresh (REQ-032) ─────────────────────────────────────────
+
+useProviderStore.getState().reset();
+const live = await useProviderStore.getState().refreshModelsLive();
+assert(live.count === 1, 'live refresh returns the merged catalog');
+assert(live.providers.length === 3, 'live refresh reports every provider outcome');
+assert(useProviderStore.getState().models.length === 1, 'live refresh stores models');
+assert(useProviderStore.getState().testResults['p1']?.ok === true, 'live refresh records passing probes');
+assert(useProviderStore.getState().testResults['p2']?.ok === false, 'live refresh badges failed providers');
+assert(!('p3' in useProviderStore.getState().testResults), 'live refresh keeps skipped providers out of badges');
 
 // ─── Agent store ────────────────────────────────────────────────────────────
 

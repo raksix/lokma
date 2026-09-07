@@ -12,6 +12,9 @@ import { buildBulkMap, countEnabled, filterModels } from './models';
  * SettingsPane Models tab). Every row comes from `GET /api/models`
  * (merged `provider::id` catalog, 5m server cache); toggles persist via
  * `PATCH /api/models` (single or bulk) to `~/.lokma/config.json`.
+ * Refresh fans out live to every enabled provider's `/v1/models` via
+ * `POST /api/models/refresh` (REQ-032) — failures badge their provider
+ * row without blocking the others.
  * The concept's mock-only columns (Ctx, badge) are NOT ported — the
  * server catalog carries no context sizes, and fake data is forbidden.
  * The concept's toast-only "Fallback chain" button is NOT ported either
@@ -22,6 +25,7 @@ export function ModelsPane() {
   const models = useProviderStore((s) => s.models);
   const loading = useProviderStore((s) => s.loading);
   const refresh = useProviderStore((s) => s.refresh);
+  const refreshModelsLive = useProviderStore((s) => s.refreshModelsLive);
   const setModelEnabled = useProviderStore((s) => s.setModelEnabled);
   const setModelsBulk = useProviderStore((s) => s.setModelsBulk);
   const [query, setQuery] = React.useState('');
@@ -55,8 +59,28 @@ export function ModelsPane() {
     }
   }
 
+  /**
+   * Live fan-out refresh (REQ-032) — every enabled provider's `/v1/models`
+   * is probed at once; failures badge their provider row without blocking
+   * the others, keyless providers are reported as skipped.
+   */
   async function handleRefresh(): Promise<void> {
-    await refresh(true);
+    setBusy(true);
+    try {
+      const res = await refreshModelsLive();
+      const failed = res.providers.filter((p) => !p.ok && !p.skipped);
+      const skipped = res.providers.filter((p) => p.skipped);
+      const live = res.providers.length - failed.length - skipped.length;
+      emitToast(
+        failed.length === 0
+          ? `Refreshed ${res.count} models · ${live} provider${live === 1 ? '' : 's'} live${skipped.length > 0 ? ` · ${skipped.length} skipped (no key)` : ''}`
+          : `Refreshed ${res.count} models · ${failed.length} failed: ${failed.map((p) => p.id).join(', ')}`,
+      );
+    } catch (e) {
+      emitToast(e instanceof Error ? e.message : 'Refresh failed');
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -135,9 +159,9 @@ export function ModelsPane() {
         </div>
       </div>
       <div className="flex gap-1">
-        <Button size="sm" className="h-7 flex-1 gap-1 text-xs" disabled={loading} onClick={() => void handleRefresh()}>
+        <Button size="sm" className="h-7 flex-1 gap-1 text-xs" disabled={loading || busy} onClick={() => void handleRefresh()}>
           <RefreshCw className="h-3 w-3" />
-          Refresh
+          {busy ? 'Refreshing…' : 'Refresh'}
         </Button>
       </div>
       <div className="text-[11px] text-zinc-500">

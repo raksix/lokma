@@ -9,6 +9,7 @@ import {
   api,
   type CreateProviderBody,
   type ModelInfo,
+  type ModelsRefreshRes,
   type PatchProviderBody,
   type ProviderInfo,
   type ProviderTestRes,
@@ -34,6 +35,11 @@ export type ProviderStore = {
   testingId: string | null;
   /** Refresh unless the cache is fresh (pass `force` to bypass the TTL). */
   refresh: (force?: boolean) => Promise<void>;
+  /** Live fan-out refresh — `POST /api/models/refresh` hits every enabled
+   * provider's `/v1/models` at once (REQ-032). The merged catalog is stored
+   * directly; probed outcomes land in testResults so failed providers gain
+   * their error badge without blocking the others (skipped = no key stays out). */
+  refreshModelsLive: () => Promise<ModelsRefreshRes>;
   /** Drop the cache so the next read refetches (e.g. after provider CRUD). */
   invalidate: () => void;
   reset: () => void;
@@ -86,6 +92,27 @@ export const useProviderStore = create<ProviderStore>()((set, get) => ({
 
   invalidate: () => {
     set({ fetchedAt: null });
+  },
+
+  refreshModelsLive: async () => {
+    set({ loading: true, lastError: null });
+    try {
+      const res = await api.refreshModels();
+      set((s) => {
+        const testResults = { ...s.testResults };
+        for (const p of res.providers) {
+          if (p.skipped) continue;
+          testResults[p.id] = p.ok
+            ? { ok: true, provider: p.id, modelCount: p.modelCount, latencyMs: p.latencyMs }
+            : { ok: false, provider: p.id, error: p.error ?? 'refresh failed', latencyMs: p.latencyMs };
+        }
+        return { models: res.models, fetchedAt: Date.now(), loading: false, testResults };
+      });
+      return res;
+    } catch (e) {
+      set({ loading: false, lastError: e instanceof Error ? e.message : 'model refresh failed' });
+      throw e;
+    }
   },
 
   reset: () => {

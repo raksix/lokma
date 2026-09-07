@@ -11,6 +11,7 @@ import {
   isMcpTransport,
   isPermissionMode,
   isServerTheme,
+  isValidAgentDefaultModel,
   isValidMcpName,
   isValidRule,
   normalizeConfig,
@@ -164,6 +165,13 @@ check('blank queue flagged', typeof validateAgentsCaps({ maxAgents: '20', maxCon
 const agentsPatch = buildAgentsPatch(20, 5, 20, 'anthropic/claude-4-sonnet') as { agents: { maxAgents: number; maxConcurrent: number; maxQueue: number; defaultModel: string } };
 check('caps patch keeps all three caps', agentsPatch.agents.maxAgents === 20 && agentsPatch.agents.maxConcurrent === 5 && agentsPatch.agents.maxQueue === 20);
 check('caps patch carries defaultModel (no shallow-merge wipe)', agentsPatch.agents.defaultModel === 'anthropic/claude-4-sonnet');
+
+// isValidAgentDefaultModel (REQ-009 session-defaults piece — agents.defaultModel editable)
+check('non-empty model id passes', isValidAgentDefaultModel('anthropic/claude-4-sonnet') === true);
+check('empty string fails', isValidAgentDefaultModel('') === false);
+check('whitespace-only fails', isValidAgentDefaultModel('   ') === false);
+check('non-string fails', isValidAgentDefaultModel(null) === false);
+check('overlong model id fails', isValidAgentDefaultModel(`x:${'a'.repeat(200)}`) === false);
 
 console.log(`settings.test.ts: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

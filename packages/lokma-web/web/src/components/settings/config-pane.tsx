@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { emitToast } from '@/components/shell';
 import type { NormalizedConfig } from './settings';
-import { buildAgentsPatch, validateAgentsCaps } from './settings';
+import { buildAgentsPatch, isValidAgentDefaultModel, validateAgentsCaps } from './settings';
 
 /**
  * ConfigPane — the effective (merged) harness config, read live from
@@ -25,6 +25,8 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
   });
   const [capsErrors, setCapsErrors] = React.useState<Record<string, string>>({});
   const [savingCaps, setSavingCaps] = React.useState(false);
+  const [agentModel, setAgentModel] = React.useState(config.agentDefaultModel);
+  const [agentModelError, setAgentModelError] = React.useState('');
 
   async function handleSaveModel(): Promise<void> {
     const next = model.trim();
@@ -50,13 +52,15 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
   async function handleSaveCaps(): Promise<void> {
     const errors = validateAgentsCaps(caps);
     setCapsErrors(errors);
-    if (Object.keys(errors).length > 0) return;
+    const modelError = isValidAgentDefaultModel(agentModel) ? '' : 'Non-empty model id (e.g. provider::model-id).';
+    setAgentModelError(modelError);
+    if (Object.keys(errors).length > 0 || modelError) return;
     setSavingCaps(true);
     try {
-      // Full agents object — saveGlobal shallow-merges, so the current
-      // agentDefaultModel rides along and is never reset to the default.
+      // Full agents object — saveGlobal shallow-merges, so every key rides
+      // along and no sibling is reset to the schema default.
       await api.patchConfig(
-        buildAgentsPatch(Number(caps.maxAgents), Number(caps.maxConcurrent), Number(caps.maxQueue), config.agentDefaultModel),
+        buildAgentsPatch(Number(caps.maxAgents), Number(caps.maxConcurrent), Number(caps.maxQueue), agentModel.trim()),
       );
       emitToast('Agent caps saved');
       await onReload();
@@ -92,8 +96,8 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
           </div>
           <div className="flex gap-2 rounded border border-line/50 bg-muted/50 p-1.5">
             <span className="shrink-0 font-semibold">agents</span>
-            <span className="truncate text-zinc-500" title={`max ${config.maxAgents ?? '—'} · concurrent ${config.maxConcurrent ?? '—'} · queue ${config.maxQueue ?? '—'}`}>
-              max {config.maxAgents ?? '—'} · concurrent {config.maxConcurrent ?? '—'} · queue {config.maxQueue ?? '—'}
+            <span className="truncate text-zinc-500" title={`max ${config.maxAgents ?? '—'} · concurrent ${config.maxConcurrent ?? '—'} · queue ${config.maxQueue ?? '—'} · model ${config.agentDefaultModel || '—'}`}>
+              max {config.maxAgents ?? '—'} · concurrent {config.maxConcurrent ?? '—'} · queue {config.maxQueue ?? '—'} · model {config.agentDefaultModel || '—'}
             </span>
           </div>
           <div className="flex gap-2 rounded border border-line/50 bg-muted/50 p-1.5">
@@ -128,6 +132,23 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
 
       <div className="rounded-lg border border-line bg-white p-2.5 dark:bg-[#1E1E21]">
         <div className="font-semibold">Agent caps</div>
+        <div>
+          <label htmlFor="settings-agent-model" className="text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
+            Agent default model
+          </label>
+          <Input
+            id="settings-agent-model"
+            value={agentModel}
+            onChange={(e) => setAgentModel(e.target.value)}
+            placeholder="provider::model-id"
+            className="mt-0.5 h-7 font-mono text-xs min-w-0"
+          />
+          {agentModelError ? (
+            <div className="mt-0.5 text-[10px] text-red-600">{agentModelError}</div>
+          ) : (
+            <div className="mt-0.5 text-[10px] text-zinc-500">Model spawned agents use unless overridden.</div>
+          )}
+        </div>
         <div className="mt-1.5 grid grid-cols-3 gap-1.5">
           {capsFields.map((f) => (
             <div key={f.key} className="min-w-0">

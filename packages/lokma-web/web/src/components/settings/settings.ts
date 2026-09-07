@@ -309,6 +309,14 @@ export function validateAgentsCaps(input: AgentsCapsInput): Record<string, strin
 }
 
 /**
+ * An agent default model is a non-empty model id (same `provider::model`
+ * shape the Default-model field accepts, max 200 chars).
+ */
+export function isValidAgentDefaultModel(v: unknown): boolean {
+  return typeof v === 'string' && v.trim().length > 0 && v.trim().length <= 200;
+}
+
+/**
  * Build a PATCH body for the full agents object. Always sends all four
  * keys together — `saveGlobal` shallow-merges, so a partial object would
  * reset the sibling (e.g. defaultModel back to the schema default).

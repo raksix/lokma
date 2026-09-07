@@ -74,9 +74,10 @@ const LazySettingsModal = React.lazy(() =>
  * button (`explorerSide`, persisted to localStorage) — toggle titles,
  * drawer labels and `[`/`]` shortcut copy all follow the swap.
  *
- * REQ-011: the FileBrowser lives fixed on the LEFT (docked above the
- * swap-dependent left content) — file work is always left, while sessions
- * + the server card stay in the Explorer panel wherever the swap puts it.
+ * REQ-034: the FileBrowser lives INSIDE the Inspector content (docked
+ * above the InspectorPanel) — file work travels with the Inspector across
+ * the swap, while sessions + the server card stay in the Explorer panel
+ * wherever the swap puts it.
  */
 export function AppShell({ sessionId }: { sessionId: string }) {
   const [activeId, setActiveId] = React.useState(sessionId);
@@ -356,9 +357,8 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     return () => window.removeEventListener(SHOW_SHORTCUTS_EVENT, open);
   }, []);
 
-  // REQ-011 — FileBrowser moved out to the fixed left stack below; the
-  // Explorer panel keeps sessions + the server card wherever the swap
-  // puts it.
+  // REQ-034 — the Explorer panel keeps sessions + the server card wherever
+  // the swap puts it; file work moved into the Inspector content below.
   const explorerContent = (
     <div className="space-y-4">
       <SessionsSidebar activeId={activeId} onSelect={switchSession} />
@@ -372,8 +372,17 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     </div>
   );
 
+  // REQ-034 — the FileBrowser docks above the InspectorPanel so file work
+  // travels WITH the Inspector across the REQ-007 swap (it used to sit
+  // fixed on the left and stayed behind when the Inspector moved right).
+  // Session scope is unchanged (`key` remounts per session, exactly as
+  // before). Exactly one FileBrowser exists in the DOM: inspectorContent
+  // renders on one physical side only.
   const inspectorContent = (
-    <InspectorPanel onOpenSession={switchSession} sessionId={activeId} ws={ws} requestedTab={inspectorTab} />
+    <div className="space-y-4">
+      <FileBrowser key={activeId} sessionId={activeId} />
+      <InspectorPanel onOpenSession={switchSession} sessionId={activeId} ws={ws} requestedTab={inspectorTab} />
+    </div>
   );
 
   // REQ-007 — panel content follows the swap; titles/labels never hardcode sides.
@@ -381,17 +390,6 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   const rightPanel = sidebarPanelTitle('right', explorerSide);
   const leftContent = explorerSide === 'left' ? explorerContent : inspectorContent;
   const rightContent = explorerSide === 'left' ? inspectorContent : explorerContent;
-
-  // REQ-011 — file work is always left: the FileBrowser docks fixed above
-  // the swap-dependent left content (the REQ-007 swap only swaps the
-  // Explorer vs Inspector body below it). Session scope is unchanged
-  // (`key` remounts per session, exactly as before).
-  const leftStack = (
-    <div className="space-y-4">
-      <FileBrowser key={activeId} sessionId={activeId} />
-      {leftContent}
-    </div>
-  );
 
   // REQ-024 — mobile single-view branch: below the breakpoint the harness
   // renders a separate simple mode (one surface + bottom tab bar) instead
@@ -501,7 +499,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
             <MobileDrawer side="left" label={`${leftPanel} panel`} onClose={closeDrawers}>
               <PaneErrorBoundary paneName={leftPanel}>
                 <Sidebar side="left" title={leftPanel} className="h-full w-full">
-                  {leftStack}
+                  {leftContent}
                 </Sidebar>
               </PaneErrorBoundary>
             </MobileDrawer>
@@ -514,7 +512,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
                 defaultWidth={DEFAULT_LEFT_WIDTH}
                 onResize={(w) => setSideWidth('left', w)}
               >
-                {leftStack}
+                {leftContent}
               </Sidebar>
             </PaneErrorBoundary>
           )

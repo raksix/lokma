@@ -1,7 +1,9 @@
 # REQ-034 — File explorer SADECE Inspector sidebar'ında görünecek
 
-- **Status:** pending (kod yazılmadı — kullanıcı "yap" deyince başlanacak)
+- **Status:** done (live 2026-09-07 — implemente edildi, headless kanıtlı)
 - **Asked:** 2026-09-07 — "bu amına kodumun explorer, file explorer ki her seferinde sadece şeyde gözükecek, Inspector sidebarında" (+ ekran görüntüsü: sol file explorer).
 - **Interpretation:** `FileBrowser` TEK yerde render edilir: Inspector sidebar'ının parçası olarak (swap'te Inspector nereye giderse onunla gider). Mevcut durum: REQ-011 ile solda SABİT (`leftStack`, swap'ten bağımsız) + mobil single-view'da ayrı instance — yani Inspector sağa geçince file explorer yanlış gövdede kalıyor. Fix: FileBrowser `inspectorContent`'in içine taşınır (swap mantığına dahil olur), mobildeki instance Inspector sekmesi mantığına bağlanır.
 - **Touched (plan):** `components/app-shell.tsx` (`leftStack` sabitliği kaldırılır, FileBrowser inspectorContent'e taşınır), `components/shell/mobile-single-view.tsx` (mobil files sekmesi Inspector kapsamına alınır).
 - **Verify (plan):** root+web `tsc` 0, web build green, single-proc restart, headless ile DOM'da tek FileBrowser olduğu + swap'te Inspector'la birlikte hareket ettiği kanıtlanır, bundle match.
+- **Fix:** `app-shell.tsx` — `leftStack` (sabit sol FileBrowser + swap-bağımlı içerik) kaldırıldı, FileBrowser `inspectorContent`'in içine taşındı (`FileBrowser` + `InspectorPanel`, `space-y-4` içinde); sol sidebar ve drawer artık `leftContent` render eder (swap'e dahil). Kurtarma notu: önceki tur tanımsız `leftStack` referansı bırakmıştı (2 kullanım), bu tur `leftContent` ile onarıldı. Mobil: `mobile-single-view.tsx` değişmedi — `files` sekmesi zaten mobil tek-yüzeyin (Inspector-kapsamlı) parçası, masaüstü sol stack'ten bağımsız ikinci instance yok.
+- **Proof:** web `tsc --noEmit` 0 hata, `vite build` green (`index-DFjXZHpD.js`), `pm2 start ecosystem.config.cjs --only lokma-web` + served==disk BUNDLE-MATCH, headless probe REQ034-PASS (`count:1, sideBefore:left, countAfter:1, sideAfter:right, moved:true`).

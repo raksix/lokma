@@ -31,12 +31,18 @@ export function WindowedCanvas({
           No floating windows. Open a pane from the tiling bar, then switch back to float it here.
         </div>
       ) : null}
+      {/* REQ-014: window frames use a solid card surface. `bg-background`
+          has no rule in the Tailwind v4 bundle (@theme defines no
+          --color-background, so the class compiles to nothing and the
+          window renders as a transparent ghost). `bg-white` is solid in
+          light and maps to #1E1E21 via the `.dark .bg-white` override
+          in index.css. Tiling split panes are untouched (already opaque). */}
       {panes.map((pane, i) => {
         const p = pos[pane.id] ?? { x: 24 + i * 28, y: 24 + i * 28, w: 560, h: 420 };
         return (
           <div
             key={pane.id}
-            className="absolute flex flex-col overflow-hidden rounded-lg border bg-background shadow-xl"
+            className="absolute flex flex-col overflow-hidden rounded-lg border bg-white shadow-xl"
             style={{ left: p.x, top: p.y, width: p.w, height: p.h }}
           >
             <div

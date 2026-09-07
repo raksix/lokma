@@ -1,7 +1,8 @@
 # REQ-014 — Windowed/sürüklenen panellerde arka plan yok (hayalet pane)
 
-- **Status:** pending (kod yazılmadı — kullanıcı "yap" deyince başlanacak)
+- **Status:** done (2026-09-07, live verified — see Proof below)
 - **Asked:** 2026-09-07 — "şu pane modunda windowed değilse ya da öylese... panelleri istediğim gibi sürükle bırak modunda yaptığımda onların arka planı yok, onu düzeltelim" (+ ekran görüntüsü: windowed modda sürüklenen "Empty pane" hayalet gibi şeffaf, arkadaki markdown görünüyor).
 - **Interpretation:** Windowed (floating) panellerde solid arka plan yok — sürükleme sırasında ve üst üste binince arkadaki içerik görünüyor. Fix: windowed pencere kabına (`WindowedCanvas` pencere çerçevesi) solid yüzey rengi (`bg-card`) + gölge verilir; tiling split paneller zaten opak, onlara dokunulmaz. Sürükleme anındaki ghost/placeholder da opak olur.
 - **Touched (plan):** `components/panes/windowed-canvas.tsx` (pencere kabına `bg-card` + `shadow-xl`, başlık çubuğu opak).
 - **Verify (plan):** root+web `tsc` 0, web build green, single-proc restart, headless windowed modda üst üste iki pane açılıp alttakinin görünmediği SS ile kanıtlanır, bundle match.
+- **Proof:** root cause was a missing Tailwind v4 rule, not a missing class: the frame used `bg-background` but `@theme` defines no `--color-background`, so the class compiles to nothing (verified: zero `.bg-background` rules across all built CSS) and the window rendered as a transparent ghost. Frame now uses `bg-white` (solid `#fff` light; existing `.dark .bg-white` override maps it to `#1E1E21` dark) + existing `shadow-xl`; header `bg-muted/60` already resolves (`--color-muted` defined) and sits on the now-solid parent. Tiling split panes untouched. Gates: root `tsc --noEmit` 0, web build green (`index-b4Crc_V-.js` carries `rounded-lg border bg-white shadow-xl`, old `bg-background` string gone), single-proc `lokma-web` restart online, served `/` 200 authed + served index-*.js == disk dist.

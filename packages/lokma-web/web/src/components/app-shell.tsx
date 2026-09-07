@@ -29,7 +29,12 @@ import {
   isEditableTarget,
   mobileQuery,
   nextSidebarVisibility,
+  readExplorerSide,
+  sidebarPanelTitle,
+  swappedExplorerSide,
   useIsMobile,
+  writeExplorerSide,
+  type ExplorerSide,
   type SidebarSide,
   type SidebarVisibility,
 } from '@/components/shell';
@@ -46,6 +51,10 @@ import { useFocusTrap } from '@/components/shell/use-focus-trap';
  * become exclusive slide-over drawers over a full-width chat — mobile
  * boots with both closed, opening one closes the other, and picking a
  * session dismisses the Explorer drawer.
+ *
+ * REQ-007: Explorer and Inspector swap physical sides via the header swap
+ * button (`explorerSide`, persisted to localStorage) — toggle titles,
+ * drawer labels and `[`/`]` shortcut copy all follow the swap.
  */
 export function AppShell({ sessionId }: { sessionId: string }) {
   const [activeId, setActiveId] = React.useState(sessionId);
@@ -60,6 +69,16 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
   const [serverUp, setServerUp] = React.useState<boolean | null>(null);
+  // REQ-007 — which physical side hosts the Explorer (persisted, survives reload).
+  const [explorerSide, setExplorerSide] = React.useState<ExplorerSide>(() => readExplorerSide());
+
+  const swapSides = React.useCallback(() => {
+    setExplorerSide((current) => {
+      const next = swappedExplorerSide(current);
+      writeExplorerSide(next);
+      return next;
+    });
+  }, []);
 
   const ws = useWs(activeId);
   const refreshSessions = useSessionStore((s) => s.refreshSessions);
@@ -121,10 +140,10 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       setActiveId(id);
       selectSession(id);
       // On mobile the Explorer is a drawer — dismiss it so the chat is visible.
-      if (isMobile) setSidebars((current) => ({ ...current, right: false }));
+      if (isMobile) setSidebars((current) => ({ ...current, [explorerSide]: false }));
       void refreshSessions();
     },
-    [activeId, isMobile, refreshSessions, selectSession],
+    [activeId, explorerSide, isMobile, refreshSessions, selectSession],
   );
 
   // Global shortcuts — every combo is listed in the SHORTCUTS registry so
@@ -144,7 +163,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       }
       if (mod && (e.key === 'p' || e.key === 'P')) {
         e.preventDefault();
-        setSidebars((current) => nextSidebarVisibility(current, 'right', isMobile));
+        setSidebars((current) => nextSidebarVisibility(current, explorerSide, isMobile));
         window.dispatchEvent(new Event(FOCUS_FILES_EVENT));
         return;
       }
@@ -167,7 +186,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isMobile, toggleSidebar]);
+  }, [explorerSide, isMobile, toggleSidebar]);
 
   // Footer hint + panes open the dialog through this event (no prop drilling).
   React.useEffect(() => {
@@ -194,6 +213,12 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     <InspectorPanel onOpenSession={switchSession} sessionId={activeId} ws={ws} />
   );
 
+  // REQ-007 — panel content follows the swap; titles/labels never hardcode sides.
+  const leftPanel = sidebarPanelTitle('left', explorerSide);
+  const rightPanel = sidebarPanelTitle('right', explorerSide);
+  const leftContent = explorerSide === 'left' ? explorerContent : inspectorContent;
+  const rightContent = explorerSide === 'left' ? inspectorContent : explorerContent;
+
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <a
@@ -210,22 +235,24 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         onSearch={() => setSearchOpen(true)}
         onToggleLeft={() => toggleSidebar('left')}
         onToggleRight={() => toggleSidebar('right')}
+        explorerSide={explorerSide}
+        onSwapSides={swapSides}
       />
       <OfflineBanner status={ws.status} onRetry={ws.reconnect} />
       <div className="flex flex-1 overflow-hidden">
         {sidebars.left ? (
           isMobile ? (
-            <MobileDrawer side="left" label="Inspector panel" onClose={closeDrawers}>
-              <PaneErrorBoundary paneName="Inspector">
-                <Sidebar side="left" title="Inspector" className="h-full w-full">
-                  {inspectorContent}
+            <MobileDrawer side="left" label={`${leftPanel} panel`} onClose={closeDrawers}>
+              <PaneErrorBoundary paneName={leftPanel}>
+                <Sidebar side="left" title={leftPanel} className="h-full w-full">
+                  {leftContent}
                 </Sidebar>
               </PaneErrorBoundary>
             </MobileDrawer>
           ) : (
-            <PaneErrorBoundary paneName="Inspector">
-              <Sidebar side="left" title="Inspector">
-                {inspectorContent}
+            <PaneErrorBoundary paneName={leftPanel}>
+              <Sidebar side="left" title={leftPanel}>
+                {leftContent}
               </Sidebar>
             </PaneErrorBoundary>
           )
@@ -247,17 +274,17 @@ export function AppShell({ sessionId }: { sessionId: string }) {
 
         {sidebars.right ? (
           isMobile ? (
-            <MobileDrawer side="right" label="Explorer panel" onClose={closeDrawers}>
-              <PaneErrorBoundary paneName="Explorer">
-                <Sidebar side="right" title="Explorer" className="h-full w-full">
-                  {explorerContent}
+            <MobileDrawer side="right" label={`${rightPanel} panel`} onClose={closeDrawers}>
+              <PaneErrorBoundary paneName={rightPanel}>
+                <Sidebar side="right" title={rightPanel} className="h-full w-full">
+                  {rightContent}
                 </Sidebar>
               </PaneErrorBoundary>
             </MobileDrawer>
           ) : (
-            <PaneErrorBoundary paneName="Explorer">
-              <Sidebar side="right" title="Explorer">
-                {explorerContent}
+            <PaneErrorBoundary paneName={rightPanel}>
+              <Sidebar side="right" title={rightPanel}>
+                {rightContent}
               </Sidebar>
             </PaneErrorBoundary>
           )
@@ -272,7 +299,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           emitToast(`Switched to ${id.slice(0, 24)}`);
         }}
       />
-      <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} explorerSide={explorerSide} />
       <ToastHost />
     </div>
   );

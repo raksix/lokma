@@ -1,9 +1,10 @@
 import * as React from 'react';
-import { Moon, PanelLeft, PanelRight, Search, Sun } from 'lucide-react';
+import { ArrowLeftRight, Moon, PanelLeft, PanelRight, Search, Sun } from 'lucide-react';
 import type { CostTotal, WsStatus } from '@/lib/ws';
 import { api } from '@/lib/api';
 import { useProviderStore } from '@/stores';
 import { applyTheme, applyThemeVars, emitToast, getTheme, subscribeTheme, type ShellTheme } from '@/components/shell';
+import { sidebarPanelTitle, type ExplorerSide } from '@/components/shell/responsive';
 import { enabledModels } from '@/components/providers/models';
 
 /**
@@ -40,6 +41,8 @@ export function Header({
   onSearch,
   onToggleLeft,
   onToggleRight,
+  explorerSide = 'right',
+  onSwapSides,
 }: {
   sessionId: string;
   serverUp: boolean | null;
@@ -48,6 +51,8 @@ export function Header({
   onSearch: () => void;
   onToggleLeft: () => void;
   onToggleRight: () => void;
+  explorerSide?: ExplorerSide;
+  onSwapSides?: () => void;
 }) {
   const [theme, setTheme] = React.useState<ShellTheme>('light');
   const [model, setModel] = React.useState<string | null>(null);
@@ -113,14 +118,27 @@ export function Header({
     return current ? [...enabled, current] : enabled;
   }, [models, effectiveModel]);
   const live = wsStatus === 'open';
+  // REQ-007 — toggle copy follows the sidebar swap, never hardcoded sides.
+  const leftPanel = sidebarPanelTitle('left', explorerSide);
+  const rightPanel = sidebarPanelTitle('right', explorerSide);
 
   return (
     <header className="z-40 h-11 shrink-0 border-b border-[#E8E4DE] bg-[#FAF9F5]/90 backdrop-blur-xl">
       <div className="flex h-full w-full items-center gap-1.5 px-2 sm:px-3">
+        {onSwapSides ? (
+          <button
+            onClick={onSwapSides}
+            title={`Swap sidebars (Explorer ${explorerSide === 'left' ? 'left' : 'right'})`}
+            aria-label="Swap left and right sidebars"
+            className="grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-[#F2F0EB]"
+          >
+            <ArrowLeftRight className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
         <button
           onClick={onToggleLeft}
-          title="Toggle Inspector ([)"
-          aria-label="Toggle Inspector"
+          title={`Toggle ${leftPanel} ([)`}
+          aria-label={`Toggle ${leftPanel}`}
           className="grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-[#F2F0EB]"
         >
           <PanelLeft className="h-3.5 w-3.5" />
@@ -193,8 +211,8 @@ export function Header({
           </button>
           <button
             onClick={onToggleRight}
-            title="Toggle Explorer (])"
-            aria-label="Toggle Explorer"
+            title={`Toggle ${rightPanel} (])`}
+            aria-label={`Toggle ${rightPanel}`}
             className="grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-[#F2F0EB]"
           >
             <PanelRight className="h-3.5 w-3.5" />

@@ -3,6 +3,7 @@
  * Run: `bun src/components/shell/responsive.test.ts` (no DOM, no server).
  */
 import {
+  EXPLORER_SIDE_KEY,
   MOBILE_BREAKPOINT,
   anyDrawerOpen,
   closeAllSidebars,
@@ -10,7 +11,13 @@ import {
   isMobileWidth,
   mobileQuery,
   nextSidebarVisibility,
+  readExplorerSide,
+  sidebarPanelTitle,
+  sidebarToggleTitle,
+  swappedExplorerSide,
+  writeExplorerSide,
 } from './responsive';
+import { SHORTCUTS, resolveShortcuts } from './shortcuts';
 
 let passed = 0;
 let failed = 0;
@@ -102,6 +109,40 @@ check(
 check('drawer open on mobile', anyDrawerOpen({ left: true, right: false }, true) === true);
 check('no drawer on mobile', anyDrawerOpen({ left: false, right: false }, true) === false);
 check('desktop panels are not drawers', anyDrawerOpen({ left: true, right: true }, false) === false);
+
+// REQ-007 sidebar swap — default side, flip, titles, persistence key
+check('swap key is namespaced', EXPLORER_SIDE_KEY === 'lokma-explorer-side');
+check('no DOM store reads default right', readExplorerSide() === 'right');
+check('no DOM store write is a safe no-op', (() => { writeExplorerSide('left'); return true; })());
+check('flip right goes left', swappedExplorerSide('right') === 'left');
+check('flip left goes right', swappedExplorerSide('left') === 'right');
+check('double flip restores', swappedExplorerSide(swappedExplorerSide('left')) === 'left');
+check('default right side hosts Explorer', sidebarPanelTitle('right', 'right') === 'Explorer');
+check('default left side hosts Inspector', sidebarPanelTitle('left', 'right') === 'Inspector');
+check('swapped left side hosts Explorer', sidebarPanelTitle('left', 'left') === 'Explorer');
+check('swapped right side hosts Inspector', sidebarPanelTitle('right', 'left') === 'Inspector');
+check('default left toggle copy', sidebarToggleTitle('left', 'right') === 'Toggle Inspector ([)');
+check('default right toggle copy', sidebarToggleTitle('right', 'right') === 'Toggle Explorer (])');
+check('swapped left toggle copy', sidebarToggleTitle('left', 'left') === 'Toggle Explorer ([)');
+check('swapped right toggle copy', sidebarToggleTitle('right', 'left') === 'Toggle Inspector (])');
+
+// REQ-007 shortcut descriptions follow the swap
+check(
+  'default registry matches unswapped',
+  JSON.stringify(resolveShortcuts('right')) === JSON.stringify(SHORTCUTS),
+);
+check(
+  'swapped left row names Explorer',
+  resolveShortcuts('left').find((s) => s.id === 'left')?.description === 'Toggle left sidebar (Explorer)',
+);
+check(
+  'swapped right row names Inspector',
+  resolveShortcuts('left').find((s) => s.id === 'right')?.description === 'Toggle right sidebar (Inspector)',
+);
+check(
+  'swap keeps shortcut count',
+  resolveShortcuts('left').length === SHORTCUTS.length,
+);
 
 console.log(`responsive.test.ts: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

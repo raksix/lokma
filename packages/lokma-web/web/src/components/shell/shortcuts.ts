@@ -4,7 +4,11 @@
  * The AppShell keydown handler AND the ShortcutsDialog both read this list,
  * so the dialog can never drift from what the keys actually do. To add a
  * shortcut: append one entry here, handle `def.id` in AppShell, done.
+ *
+ * REQ-007: the `[`/`]` descriptions follow the sidebar swap — use
+ * `resolveShortcuts(explorerSide)` wherever the swap state is known.
  */
+import { sidebarPanelTitle, type ExplorerSide } from './responsive';
 
 export type ShortcutDef = {
   /** Stable id the AppShell handler switches on. */
@@ -27,6 +31,19 @@ export const SHORTCUTS: ShortcutDef[] = [
 
 /** Event that opens the shortcuts dialog from anywhere (footer hint, panes). */
 export const SHOW_SHORTCUTS_EVENT = 'lokma:show-shortcuts';
+
+/**
+ * REQ-007 — SHORTCUTS with the `[`/`]` descriptions following the sidebar
+ * swap. The default registry above already matches `explorerSide: 'right'`.
+ */
+export function resolveShortcuts(explorerSide: ExplorerSide): ShortcutDef[] {
+  return SHORTCUTS.map((s) => {
+    if (s.id === 'left' || s.id === 'right') {
+      return { ...s, description: `Toggle ${s.id} sidebar (${sidebarPanelTitle(s.id, explorerSide)})` };
+    }
+    return s;
+  });
+}
 
 export function requestShortcutsDialog(): void {
   window.dispatchEvent(new Event(SHOW_SHORTCUTS_EVENT));

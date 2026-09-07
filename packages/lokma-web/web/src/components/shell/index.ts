@@ -6,6 +6,7 @@ export { FooterBar } from './footer-bar';
 export { OfflineBanner } from './offline-banner';
 export { PaneErrorBoundary } from './pane-error-boundary';
 export {
+  EXPLORER_SIDE_KEY,
   MOBILE_BREAKPOINT,
   anyDrawerOpen,
   closeAllSidebars,
@@ -13,6 +14,12 @@ export {
   isMobileWidth,
   mobileQuery,
   nextSidebarVisibility,
+  readExplorerSide,
+  sidebarPanelTitle,
+  sidebarToggleTitle,
+  swappedExplorerSide,
+  writeExplorerSide,
+  type ExplorerSide,
   type SidebarSide,
   type SidebarVisibility,
 } from './responsive';
@@ -24,6 +31,7 @@ export {
   SHOW_SHORTCUTS_EVENT,
   isEditableTarget,
   requestShortcutsDialog,
+  resolveShortcuts,
   type ShortcutDef,
 } from './shortcuts';
 export { ShortcutsDialog } from './shortcuts-dialog';

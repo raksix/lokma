@@ -6,6 +6,10 @@
  * and become exclusive slide-over drawers instead (see `useIsMobile` and
  * `AppShell`). All width thresholds live here so the hook, the shell, and
  * the tests share one source of truth.
+ *
+ * REQ-007: the two side panels are swappable via the header swap button —
+ * `ExplorerSide` below is the single source of truth for which physical
+ * side hosts the Explorer.
  */
 
 /** Viewport widths strictly below this value count as mobile (Tailwind `md`). */
@@ -65,4 +69,51 @@ export function closeAllSidebars(current: SidebarVisibility): SidebarVisibility 
 /** True when at least one drawer is open on a mobile viewport. */
 export function anyDrawerOpen(visibility: SidebarVisibility, isMobile: boolean): boolean {
   return isMobile && (visibility.left || visibility.right);
+}
+
+/**
+ * REQ-007 sidebar swap — which physical side hosts the Explorer panel.
+ * The header's swap button flips this; every toggle title, drawer label
+ * and `[`/`]` shortcut description follows it (never hardcode
+ * "left = Inspector" / "right = Explorer" in UI copy).
+ */
+export type ExplorerSide = 'left' | 'right';
+
+/** localStorage key persisting the REQ-007 swap across reloads. */
+export const EXPLORER_SIDE_KEY = 'lokma-explorer-side';
+
+/** Read the persisted Explorer side (guarded — defaults to `right`). */
+export function readExplorerSide(): ExplorerSide {
+  try {
+    if (typeof localStorage === 'undefined') return 'right';
+    return localStorage.getItem(EXPLORER_SIDE_KEY) === 'left' ? 'left' : 'right';
+  } catch {
+    return 'right';
+  }
+}
+
+/** Persist the Explorer side (guarded — a failed write keeps the tab state). */
+export function writeExplorerSide(side: ExplorerSide): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(EXPLORER_SIDE_KEY, side);
+  } catch {
+    // Persistence is best-effort; the in-memory state still applies.
+  }
+}
+
+/** Flip the Explorer to the opposite physical side. */
+export function swappedExplorerSide(side: ExplorerSide): ExplorerSide {
+  return side === 'left' ? 'right' : 'left';
+}
+
+/** Panel hosted on a physical side given the swap state. */
+export function sidebarPanelTitle(side: SidebarSide, explorerSide: ExplorerSide): 'Explorer' | 'Inspector' {
+  return side === explorerSide ? 'Explorer' : 'Inspector';
+}
+
+/** Header toggle-button label for a physical side, e.g. `Toggle Explorer ([)`. */
+export function sidebarToggleTitle(side: SidebarSide, explorerSide: ExplorerSide): string {
+  const key = side === 'left' ? '[' : ']';
+  return `Toggle ${sidebarPanelTitle(side, explorerSide)} (${key})`;
 }

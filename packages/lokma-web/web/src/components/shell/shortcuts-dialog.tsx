@@ -1,19 +1,30 @@
 import * as React from 'react';
 import { Keyboard, X } from 'lucide-react';
-import { SHORTCUTS } from './shortcuts';
+import { resolveShortcuts } from './shortcuts';
+import type { ExplorerSide } from './responsive';
 import { useFocusTrap } from './use-focus-trap';
 
 /**
  * ShortcutsDialog — lists every global harness shortcut from the single
  * SHORTCUTS registry (never hand-duplicated). Opens on `?`, closes on
  * Escape, backdrop click, or the close button. Focus is trapped inside
- * while open (shared `useFocusTrap`).
+ * while open (shared `useFocusTrap`). REQ-007: the `[`/`]` rows follow the
+ * sidebar swap via `explorerSide`.
  */
-export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function ShortcutsDialog({
+  open,
+  onClose,
+  explorerSide = 'right',
+}: {
+  open: boolean;
+  onClose: () => void;
+  explorerSide?: ExplorerSide;
+}) {
   const panelRef = React.useRef<HTMLDivElement>(null);
   useFocusTrap(open, panelRef, { onEscape: onClose });
 
   if (!open) return null;
+  const shortcuts = resolveShortcuts(explorerSide);
   return (
     <div
       className="fixed inset-0 z-[60] grid place-items-center bg-black/40 p-4"
@@ -41,7 +52,7 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () 
           </button>
         </div>
         <ul className="max-h-[60vh] space-y-1 overflow-auto p-3">
-          {SHORTCUTS.map((s) => (
+          {shortcuts.map((s) => (
             <li key={s.id} className="flex items-center gap-3 rounded-md px-1 py-1 text-[13px]">
               <span className="flex min-w-[92px] shrink-0 items-center gap-1">
                 {s.keys.map((k) => (

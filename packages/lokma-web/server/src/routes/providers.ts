@@ -145,14 +145,21 @@ export async function resolveProviderUpstream(
   throw err;
 }
 
-/** Live connection check against the provider's real models endpoint. */
-async function probeProvider(
+/**
+ * Live connection check against the provider's real models endpoint.
+ * `opts.timeoutMs` bounds one probe (default 10s); `opts.maxIds` caps the
+ * returned id list (default 20 — the test toast only shows a sample, while
+ * the catalog merge passes a high cap so no model is dropped).
+ */
+export async function probeProvider(
   view: ProviderView,
   apiKey: string | null,
+  opts?: { timeoutMs?: number; maxIds?: number },
 ): Promise<{ ok: boolean; modelCount?: number; models?: string[]; latencyMs: number; error?: string }> {
   const started = Date.now();
+  const timeoutMs = opts?.timeoutMs ?? PROBE_TIMEOUT_MS;
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT_MS);
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const base = view.baseUrl.replace(/\/$/, '');
     let url: string;
@@ -184,12 +191,12 @@ async function probeProvider(
       : Array.isArray(body.models)
         ? body.models.map((m) => m.name).filter((x): x is string => typeof x === 'string')
         : [];
-    return { ok: true, modelCount: ids.length, models: ids.slice(0, 20), latencyMs };
+    return { ok: true, modelCount: ids.length, models: ids.slice(0, opts?.maxIds ?? 20), latencyMs };
   } catch (e) {
     const latencyMs = Date.now() - started;
     const reason =
       e instanceof Error && e.name === 'AbortError'
-        ? `timed out after ${PROBE_TIMEOUT_MS / 1000}s`
+        ? `timed out after ${timeoutMs / 1000}s`
         : e instanceof Error
           ? e.message
           : 'probe failed';
@@ -197,6 +204,11 @@ async function probeProvider(
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** True when the provider id needs a stored key for live calls (REQ-030 merge). */
+export function providerNeedsKey(id: string): boolean {
+  return BUILTINS[id]?.needsKey ?? true;
 }
 
 export async function providerRoutes(app: FastifyInstance): Promise<void> {

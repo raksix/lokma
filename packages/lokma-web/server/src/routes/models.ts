@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
-import { applyModelFlags, getCatalog, invalidateCatalog } from 'lokma-ai';
+import { applyModelFlags, getCatalog, invalidateCatalog, providerOfId, type CatalogModel } from 'lokma-ai';
 import { loadConfig, saveGlobal } from 'lokma-core';
+import { listProviderViews, probeProvider, providerNeedsKey, resolveApiKey } from './providers.js';
 
 /**
  * Models route — merged catalog from all providers, 5m cache.
@@ -12,10 +13,55 @@ import { loadConfig, saveGlobal } from 'lokma-core';
 
 const MAX_BULK_KEYS = 500;
 
+/** Live-probe budget for the catalog merge — bounded, parallel, failures skipped. */
+const MERGE_PROBE_TIMEOUT_MS = 6_000;
+const MERGE_PROBE_MAX_IDS = 500;
+
+/**
+ * Merged catalog: static adapter models (`getCatalog`, 5m cached) enriched
+ * with live `/v1/models` results from every enabled provider that can be
+ * reached (stored key, or keyless local like Ollama). Static entries are the
+ * fallback — a failed probe never removes them; a live hit overwrites the
+ * same id. Bare upstream ids gain a `provider/` prefix so picker badges stay
+ * honest (REQ-030).
+ */
+export async function getMergedCatalog(): Promise<CatalogModel[]> {
+  const base = await getCatalog();
+  const views = await listProviderViews();
+  const probes = views
+    .filter((v) => v.enabled)
+    .map(async (view) => {
+      const apiKey = await resolveApiKey(view.id);
+      if (!apiKey && providerNeedsKey(view.id)) return null;
+      const probed = await probeProvider(view, apiKey, {
+        timeoutMs: MERGE_PROBE_TIMEOUT_MS,
+        maxIds: MERGE_PROBE_MAX_IDS,
+      });
+      if (!probed.ok || !probed.models) return null;
+      return { viewId: view.id, ids: probed.models };
+    });
+  const settled = await Promise.all(probes);
+  const byId = new Map(base.map((m) => [m.id, m]));
+  for (const hit of settled) {
+    if (!hit) continue;
+    for (const raw of hit.ids) {
+      const full = raw.includes('/') ? raw : `${hit.viewId}/${raw}`;
+      const short = full.slice(full.lastIndexOf('/') + 1);
+      byId.set(full, {
+        id: full,
+        label: short || full,
+        provider: providerOfId(full, hit.viewId),
+        enabled: true,
+      });
+    }
+  }
+  return [...byId.values()];
+}
+
 export async function modelRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/models', async () => {
     const cfg = await loadConfig(process.cwd());
-    const models = applyModelFlags(await getCatalog(), cfg.models ?? {});
+    const models = applyModelFlags(await getMergedCatalog(), cfg.models ?? {});
     return {
       models,
       count: models.length,
@@ -66,7 +112,8 @@ export async function modelRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ ok: false, code: 'empty_patch', message: 'Nothing to update' });
     }
 
-    const known = new Set((await getCatalog()).map((m) => m.id));
+    const base = await getMergedCatalog();
+    const known = new Set(base.map((m) => m.id));
     const unknown = entries.map(([id]) => id).filter((id) => !known.has(id));
     if (unknown.length > 0) {
       return reply.code(400).send({
@@ -82,7 +129,7 @@ export async function modelRoutes(app: FastifyInstance): Promise<void> {
     await saveGlobal({ models: flags });
     invalidateCatalog();
 
-    const models = applyModelFlags(await getCatalog(), flags);
+    const models = applyModelFlags(base, flags);
     return {
       ok: true,
       updated: entries.length,

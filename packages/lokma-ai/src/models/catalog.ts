@@ -31,6 +31,19 @@ export function applyModelFlags(models: CatalogModel[], flags: ModelFlags): Cata
   });
 }
 
+/**
+ * True provider for a catalog id. Static fallbacks are registered under one
+ * adapter but may carry another provider's id (`deepseek/deepseek-chat` rode
+ * the OpenAI adapter), so the id prefix wins — the adapter is only a fallback
+ * for bare ids. Keeps provider badges honest (REQ-030).
+ */
+export function providerOfId(id: string, fallback: string): string {
+  const slash = id.indexOf('/');
+  if (slash <= 0) return fallback;
+  const prefix = id.slice(0, slash);
+  return /^[a-z0-9][a-z0-9-]*$/.test(prefix) ? prefix : fallback;
+}
+
 export async function getCatalog(): Promise<CatalogModel[]> {
   if (cache && Date.now() - cache.at < TTL_MS) return cache.models;
 
@@ -38,7 +51,7 @@ export async function getCatalog(): Promise<CatalogModel[]> {
   for (const adapter of providerRegistry.list()) {
     const list = await adapter.listModels().catch(() => []);
     for (const m of list) {
-      models.push({ id: m.id, label: m.label, provider: adapter.id, enabled: true });
+      models.push({ id: m.id, label: m.label, provider: providerOfId(m.id, adapter.id), enabled: true });
     }
   }
   cache = { at: Date.now(), models };

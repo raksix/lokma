@@ -84,6 +84,16 @@ export const AuthSettingsSchema = z.object({
    * open instances keep working until a superadmin flips it.
    */
   requireLogin: z.boolean().default(false),
+  /**
+   * REQ-066: first-run onboarding completed. The web App shows the
+   * full-screen onboarding wizard while the instance is unbootstrapped
+   * AND this is false; the wizard sets it true (auth path via
+   * `PATCH /api/auth/settings`, open path via
+   * `POST /api/auth/onboarding`). Default false — existing instances
+   * keep their behavior; live open boxes never see the wizard because
+   * they are already bootstrapped.
+   */
+  onboardingDone: z.boolean().default(false),
 });
 
 export type AuthSettings = z.infer<typeof AuthSettingsSchema>;

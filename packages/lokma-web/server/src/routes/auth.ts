@@ -152,6 +152,34 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
+  /**
+   * First-run onboarding record (REQ-066) — unbootstrapped instances
+   * only. The wizard calls this when the owner picks the open
+   * (no-login) path so the choice persists server-side in
+   * `settings.json` (`onboardingDone: true`) and the wizard never
+   * returns. The auth path never calls this: `registerFirstAdmin`
+   * bootstraps the instance (which hides the wizard by itself) and
+   * the fresh superadmin flips `requireLogin` via the authed PATCH
+   * below. Bootstrapped → 403 (same code as register-after-bootstrap).
+   * No privilege risk: a fresh instance is already single-user-open,
+   * this endpoint only writes the two onboarding keys.
+   */
+  app.post('/api/auth/onboarding', async (req, reply) => {
+    try {
+      if (await isBootstrapped()) {
+        return reply.status(403).send({ code: 'auth_already_bootstrapped', message: 'Instance already has users — onboarding is done' });
+      }
+      const body = (req.body ?? {}) as { requireLogin?: unknown };
+      const settings = await saveAuthSettings({
+        requireLogin: body.requireLogin === true,
+        onboardingDone: true,
+      });
+      return { ok: true, settings, bootstrapped: false };
+    } catch (e) {
+      return authErr(reply, e);
+    }
+  });
+
   app.get('/api/auth/me', async (req, reply) => {
     const user = await requireUser(req, reply);
     if (!user) return reply;

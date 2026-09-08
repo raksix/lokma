@@ -1,5 +1,7 @@
 export { AuthPane } from './auth-pane';
 export { LoginGate } from './login-gate';
+export { OnboardingWizard } from './onboarding-wizard';
+export { defaultAuthChoice, nextStep, prevStep, stepIndex, type AuthChoice, type OnboardingStep } from './onboarding';
 export {
   TOKEN_KEY,
   canDo,

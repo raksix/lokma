@@ -832,6 +832,8 @@ export type AuthSettings = {
   sessionRetentionDays: number | null;
   /** REQ-062 Parça A — full-screen login + WS token gate when true. */
   requireLogin: boolean;
+  /** REQ-066 — first-run wizard done (server-persisted, unbootstrapped only). */
+  onboardingDone: boolean;
 };
 export type AuthSessionRes = { ok: boolean; user: AuthUser; token: string };
 export type AuthMeRes = { ok: boolean; user: AuthUser };
@@ -1410,6 +1412,14 @@ export const api = {
   getAuthSettings: () => get<AuthSettingsRes>('/api/auth/settings'),
   patchAuthSettings: (body: Partial<AuthSettings>) =>
     patch<AuthSettingsRes>('/api/auth/settings', body),
+  /**
+   * REQ-066 — record the first-run choice on a FRESH instance only
+   * (403 once bootstrapped). The open-path wizard calls this with
+   * `{ requireLogin: false }`; the auth path never does (register +
+   * authed PATCH instead).
+   */
+  completeOnboarding: (body: { requireLogin: boolean }) =>
+    post<{ ok: boolean; settings: AuthSettings; bootstrapped: boolean }>('/api/auth/onboarding', body),
   /** Admin user table (403 for member/viewer). */
   listUsers: () => get<UsersRes>('/api/users'),
   inviteUser: (body: { email: string; role?: AuthRole; projectIds?: string[] }) =>

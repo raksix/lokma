@@ -248,6 +248,7 @@ All `fetch` include `credentials: "include"` so the httpOnly cookie is sent; CLI
 
 ```
 POST   /api/auth/register           → first admin seed (no auth), thereafter 401
+POST   /api/auth/onboarding         → fresh only: { requireLogin } → persists onboardingDone (REQ-066 §14)
 POST   /api/auth/login              → { email, password } → sets lokma_token cookie + { user }
 POST   /api/auth/logout             → clears cookie
 GET    /api/auth/me                 → { user } (requires auth)
@@ -320,6 +321,16 @@ One switch, three surfaces, all keyed on `loginGateActive()` = bootstrapped AND 
 - **Heartbeat:** `heartbeatTodo` (holder only, quiet false otherwise) + `heartbeatSession(sessionId)` (cross-project sweep, called once per agent turn, best-effort so it never breaks a turn).
 - **Agent tools** (`buildTodoTools({ sessionId, userId })`, registered in the server agent loop): `list_todos` (read), `claim_todo` + `complete_todo` (WRITE_TOOLS → ask by default; failures return `{ ok: false, code }` results, never throw into the turn).
 - **UI:** Todo pane (Inspector rail + tiling tabs) — project picker, Open / Claimed by me / In progress / Done groups, claim button (409 names the holder session), "Do with AI" (mints a session, claims the todo to it, stages the work prompt via `INITIAL_PREFIX` so chat auto-sends on open), done/release/delete.
+
+---
+
+## 14. First-run onboarding — `onboardingDone` (REQ-066)
+
+Fresh instances (unbootstrapped, `settings.onboardingDone === false`) boot into a full-screen `OnboardingWizard` (`web/src/components/auth/onboarding-wizard.tsx`, unskippable like `LoginGate`, not a pane): welcome → "do you want login?" → owner account (auth path) or open-instance confirm (open path). Step machine (`onboarding.ts`: `nextStep`/`prevStep`/`stepIndex`) is unit-probed 15/15; forms reuse `validateRegisterForm`.
+
+- **Auth path:** `POST /api/auth/register` bootstraps (first account = superadmin), the wizard stores the token, then the fresh superadmin flips `{ requireLogin: true, onboardingDone: true }` via the authed `PATCH /api/auth/settings` and lands straight in the shell. Retry-safe: a failed policy PATCH retries the PATCH only (`accountCreated` flag — re-register would 403 as already-bootstrapped).
+- **Open path:** `POST /api/auth/onboarding { requireLogin }` persists `{ requireLogin: false, onboardingDone: true }` server-side and answers `{ ok, settings, bootstrapped: false }`. Unbootstrapped-only (bootstrapped → 403 `auth_already_bootstrapped`, same code as late register); idempotent while fresh. No privilege risk — a fresh instance is already single-user-open (§10), this only writes the two onboarding keys.
+- **Gate (`App.tsx`):** unbootstrapped + not done → `onboarding` phase; unbootstrapped + done (owner picked open) → shell (legacy behavior); bootstrapped instances never see the wizard. Later flips (open → login, new accounts) stay in the Auth pane (`requireLogin` toggle + `inviteUser`, REQ-062).
 
 ---
 

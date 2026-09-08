@@ -1,17 +1,20 @@
 import * as React from 'react';
 import { AppShell } from '@/components/app-shell';
 import { LoginGate } from '@/components/auth/login-gate';
+import { OnboardingWizard } from '@/components/auth/onboarding-wizard';
 import { api } from '@/lib/api';
 import './index.css';
 
 /**
- * App boot gate (REQ-062 Parça A, REQ-063): when the instance is
- * bootstrapped AND `requireLogin` is on, the shell stays hidden behind a
- * full-screen login until `/api/auth/me` 200s. Gate-off (or fresh)
- * instances boot straight into the shell — legacy behavior, untouched.
+ * App boot gate (REQ-062 Parça A, REQ-063 + REQ-066 onboarding): fresh
+ * instances (unbootstrapped, onboarding not done) boot into the
+ * full-screen onboarding wizard; bootstrapped AND `requireLogin` on
+ * hides the shell behind login until `/api/auth/me` 200s. Gate-off (or
+ * fresh-but-onboarded-open) instances boot straight into the shell —
+ * legacy behavior, untouched.
  */
 
-type GateState = { phase: 'loading' } | { phase: 'open' } | { phase: 'gated'; mode: 'login' | 'register' };
+type GateState = { phase: 'loading' } | { phase: 'open' } | { phase: 'onboarding' } | { phase: 'gated'; mode: 'login' | 'register' };
 
 function useSessionId(): string {
   const [id, setId] = React.useState('sess_phase0_demo');
@@ -37,9 +40,10 @@ function useGate(): { gate: GateState; refresh: () => void } {
       try {
         const settingsRes = await api.getAuthSettings();
         if (!settingsRes.bootstrapped) {
-          // Fresh instance: the owner registers from the Auth pane (or the
-          // gate below once requireLogin flips on) — shell stays open.
-          setGate({ phase: 'open' });
+          // Fresh instance (REQ-066): first launch shows the onboarding
+          // wizard; a fresh-but-onboarded-open instance (owner picked
+          // "no login") boots straight into the shell.
+          setGate(settingsRes.settings.onboardingDone ? { phase: 'open' } : { phase: 'onboarding' });
           return;
         }
         if (!settingsRes.settings.requireLogin) {
@@ -73,6 +77,9 @@ export default function App() {
   }
   if (gate.phase === 'gated') {
     return <LoginGate mode={gate.mode} onDone={refresh} />;
+  }
+  if (gate.phase === 'onboarding') {
+    return <OnboardingWizard onDone={refresh} />;
   }
   return <AppShell sessionId={sessionId} />;
 }

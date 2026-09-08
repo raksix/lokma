@@ -91,6 +91,10 @@ export class SessionStore {
     };
     const title = patch.title ?? prev?.title;
     if (typeof title === 'string' && title) next.title = title;
+    // Owner: a patch value wins (stamped at create/fork by the server),
+    // otherwise the previous owner survives the merge. Empty clears.
+    const ownerId = patch.ownerId !== undefined ? patch.ownerId : prev?.ownerId;
+    if (typeof ownerId === 'string' && ownerId) next.ownerId = ownerId;
     // Bot binding: a patch value wins (empty string clears the binding back
     // to plain chat), otherwise the previous binding survives the merge.
     const botId = patch.botId !== undefined ? patch.botId : prev?.botId;
@@ -236,6 +240,7 @@ export class SessionStore {
       messageCount: messages.length,
       createdAt,
       updatedAt,
+      ownerId: typeof meta?.ownerId === 'string' && meta.ownerId ? meta.ownerId : null,
     };
   }
 

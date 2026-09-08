@@ -94,12 +94,13 @@ check("upsert session ignores file tabs", v4.tabs.length === 2);
 check("tab id prefix", makeTabId("tab-x").startsWith("tab-x-"));
 check("pane id prefix unique", makePaneId().startsWith("p-") && makePaneId() !== makePaneId());
 
-/* 2 — registry mirrors the left Inspector (24 tabs, REQ-043 Files page); tiling bar keeps the 20 open actions. */
-check("registry has 24 entries", INSPECTOR_TABS.length === 24);
+/* 2 — registry mirrors the left Inspector (25 tabs incl. REQ-062 Todos); tiling bar keeps the 20 open actions. */
+check("registry has 25 entries", INSPECTOR_TABS.length === 25);
 check("registry has files first", INSPECTOR_TABS[0].id === "files");
 check("registry has browser", INSPECTOR_TABS.some((t) => t.id === "browser"));
 check("registry has orchestration+agents pair", INSPECTOR_TABS.some((t) => t.id === "orchestration") && INSPECTOR_TABS.some((t) => t.id === "agents"));
 check("registry has memory", INSPECTOR_TABS.some((t) => t.id === "memory"));
+check("registry has todos", INSPECTOR_TABS.some((t) => t.id === "todos"));
 check("tiling bar has 20 entries", TILING_BAR_TABS.length === 20);
 check("tiling bar all in registry", TILING_BAR_TABS.every(isInspectorTabId));
 check("inspectorLabel known", inspectorLabel("git") === "Git");

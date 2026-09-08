@@ -1,6 +1,6 @@
 # REQ-065 — Uygulama-içi todo + AI oto-assign (claim kilidi)
 
-- **Status:** pending (kod yazılmadı — kullanıcı "yap" deyince başlanacak)
+- **Status:** done (2026-09-08 — implemented as REQ-062 Parça C in the same atomic run; this split file tracked the same work, no separate code)
 - **Asked:** 2026-09-08 — "birden fazla çalışanın aynı yerde çalışması için uygulamanın kendi içinde todo sistemi; todo'yu AI yapmaya başlayınca oto-assign etsin, başka bir ajan gelip o görevi yapmasın" (REQ-062'nin C parçası, bağımsız istek).
 - **Mevcut durum:** todo sistemi YOK. Ama kilit primitifi HAZIR: `lokma-core/agents/locks.ts` (`.agentlocks/locks/<sha1>.json` + `acquire(owner, leaseMs)` + `heartbeat` + süresi dolmuşu devralma, Docs/30 §10.1). Bu iş sıfırdan icat edilmez, lock deseninin üstüne kurulur.
 - **İstenen mimari:**

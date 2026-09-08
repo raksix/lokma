@@ -21,16 +21,17 @@ This doc is the **single source** for auth. Implementation must be 1:1 with it.
 
 ---
 
-## 2. Roles (global)
+## 2. Roles (global) — REQ-062/REQ-064
 
 | Role | Who | What they can do (global) |
 |------|-----|---------------------------|
-| **admin** | First user (`lokma init --admin` or `LOKMA_ADMIN_EMAIL`) + anyone promoted by an admin | **Everything:** manage users (CRUD + invite + reset), manage global providers/models/themes, manage all projects (create/delete/transfer), manage all sessions (view/kill), manage agents & vault, change `~/.lokma/config.json` + `permissions` + `maxAgents`, view `Usage` for all users, promote/demote, set `project_creation` policy |
-| **member** | Invited by admin (default) | Create sessions **only in projects they are a member of** (or all if policy = `open`), create worktrees/checkpoints in those projects, use agents within caps, read own usage, manage own `SOUL.md`/`MEMORY.md`, cannot manage users or global config, cannot create projects unless `project_creation = members` or they are explicitly given `project:create` |
+| **superadmin** | First registered user (auto) + anyone promoted by a superadmin; oldest admin auto-promotes while none exists (no migration script) | **Instance owner:** everything an admin does PLUS user/role management on any row, `PATCH /api/auth/settings` (incl. `requireLogin`), promoting others to superadmin, transferring ownership |
+| **admin** | Promoted by a superadmin | Projects (create/delete/transfer), invites (calisan/viewer), every session in a project (view/kill), providers/models/themes, usage for all — everything EXCEPT `auth:manage` and touching superadmin rows (`403 superadmin_required`) |
+| **calisan** | Invited by admin (default; legacy `member` rows normalize to `calisan` on read/write) | Assigned projects only: create sessions, edit files, run agents in those projects; sees ONLY own sessions (+ unattributed legacy ones) — чужой sessions are invisible, even in lists; cannot create projects (unless policy = `open`), cannot invite, cannot see settings |
 | **viewer** | Invited as read-only (optional) | Read-only in assigned projects: list sessions, view chat/code/files/browser (read-only), view logs/orchestration, cannot send prompts, edit files, run tools, or create sessions. Useful for auditors, stakeholders. |
 
-- Exactly **one** `admin` at first boot; thereafter at least one admin must remain (deleting the last admin is blocked).
-- Roles are stored in `user.role` (see §8) and enforced in every `preHandler`.
+- At least one `admin`/`superadmin` must remain (deleting/demoting the last elevated user is blocked: `409 last admin cannot be removed`).
+- Roles are stored in `user.role` (see §8) and enforced in every route guard. `member` is accepted wherever a role is read (legacy alias) but never written back — writes persist `calisan`.
 
 ---
 
@@ -40,36 +41,39 @@ Permissions are **capabilities**, not just roles. Roles map to a default permiss
 
 ### 3.1 Global permissions (instance-wide)
 
-| Permission ID | Description | Default: admin | member | viewer |
-|---------------|-------------|----------------|--------|--------|
-| `user:list` | List users | ✓ | — | — |
-| `user:create` | Invite user | ✓ | — | — |
-| `user:edit` | Edit user (role, name, perms, reset pw, disable) | ✓ | — (own profile only) | — |
-| `user:delete` | Remove user | ✓ | — | — |
-| `project:create` | Create a new project (see §4.2 policy) | ✓ | see §4.2 | — |
-| `project:list:all` | List all projects (not just assigned) | ✓ | — | — |
-| `project:delete` | Delete any project | ✓ | — | — |
-| `provider:manage` | `POST/PATCH/DELETE /api/providers` + test | ✓ | — | — |
-| `model:manage` | `PATCH /api/models` + catalog refresh | ✓ | — | — |
-| `theme:manage` | Change global theme | ✓ | — | — |
-| `config:manage` | `PATCH /api/config` (global) | ✓ | — | — |
-| `agent:manage:all` | View/kill any agent, manage caps | ✓ | — (own agents only) | — |
-| `vault:manage` | Vault sync, graph admin | ✓ | — | — |
-| `usage:view:all` | See usage for all users | ✓ | — (own) | — (own) |
+| Permission ID | Description | Default: superadmin | admin | calisan | viewer |
+|---------------|-------------|---------------------|-------|---------|--------|
+| `user:list` | List users | ✓ | ✓ | — | — |
+| `user:create` | Invite user | ✓ | ✓ | — | — |
+| `user:edit` | Edit user (role, name, perms, reset pw, disable) | ✓ | ✓ (never superadmin rows) | — (own profile only) | — |
+| `user:delete` | Remove user | ✓ | ✓ (never superadmin rows) | — | — |
+| `auth:manage` | `PATCH /api/auth/settings` (incl. `requireLogin`) | ✓ | — | — | — |
+| `session:view-own` | List/read own + unattributed sessions | ✓ | ✓ | ✓ | — |
+| `project:create` | Create a new project (see §4.2 policy) | ✓ | ✓ | see §4.2 | — |
+| `project:list:all` | List all projects (not just assigned) | ✓ | ✓ | — | — |
+| `project:delete` | Delete any project | ✓ | ✓ | — | — |
+| `provider:manage` | `POST/PATCH/DELETE /api/providers` + test | ✓ | ✓ | — | — |
+| `model:manage` | `PATCH /api/models` + catalog refresh | ✓ | ✓ | — | — |
+| `theme:manage` | Change global theme | ✓ | ✓ | — | — |
+| `config:manage` | `PATCH /api/config` (global) | ✓ | ✓ | — | — |
+| `agent:manage:all` | View/kill any agent, manage caps | ✓ | ✓ | — (own agents only) | — |
+| `vault:manage` | Vault sync, graph admin | ✓ | ✓ | — | — |
+| `usage:view:all` | See usage for all users | ✓ | ✓ | — (own) | — (own) |
 
 ### 3.2 Project-scoped permissions (per `projectId`)
 
-Every `project_members` row has a `role` + `permissions[]` override for that project. If empty, defaults by global role apply (admin = all, member = `session:*` + `file:*` + `terminal:*` + `browser:*`, viewer = `read` only).
+Every `project_members` row has a `role` + `permissions[]` override for that project. If empty, defaults by global role apply (superadmin/admin = all, calisan = `session:*` + `file:*` + `terminal:*` + `browser:*`, viewer = `read` only).
 
-| Permission ID | Description | member default | viewer default |
-|---------------|-------------|----------------|----------------|
+| Permission ID | Description | calisan default | viewer default |
+|---------------|-------------|-----------------|----------------|
 | `project:view` | See project in list, open it | ✓ | ✓ |
 | `project:edit` | Edit project name/path/settings | ✓ (owner) / — | — |
 | `session:create` | `POST /api/sessions` in this project | ✓ | — |
-| `session:list` | `GET /api/sessions?projectId=` | ✓ | ✓ |
-| `session:read` | `GET /api/sessions/:id` + WS replay | ✓ | ✓ |
-| `session:write` | Send prompts, edit etc. (means `session:create` already covers new) | ✓ | — |
-| `session:fork` | Fork a session in this project | ✓ | — |
+| `session:list` | `GET /api/sessions?projectId=` | ✓ (own + unattributed only — §5) | ✓ |
+| `session:read` | `GET /api/sessions/:id` + WS replay | ✓ (own + unattributed only — §5) | ✓ |
+| `session:write` | Send prompts, edit etc. (means `session:create` already covers new) | ✓ (own only) | — |
+| `session:fork` | Fork a session in this project | ✓ (own only) | — |
+| `session:view-own` | Ownership scope flag for the §5 filter | ✓ | — |
 | `session:delete` | Delete sessions in this project | ✓ (own) | — |
 | `file:read` | `GET /api/files*` | ✓ | ✓ |
 | `file:write` | Write/Edit via tools | ✓ | — |
@@ -100,8 +104,8 @@ Every `project_members` row has a `role` + `permissions[]` override for that pro
 
 | Policy | Who can `POST /api/projects` |
 |--------|------------------------------|
-| `admin-only` | Only `admin` → others get `403 project:create requires admin` |
-| `members` (default) | `admin` + `member` (viewer never) |
+| `admin-only` | Only `admin`/`superadmin` → others get `403 project:create requires admin` |
+| `members` (default) | `admin`/`superadmin` only (`calisan` never creates — REQ-064) |
 | `open` | Any authenticated user |
 
 - This is the toggle the user asked for: **“proje oluşturma (yoksa sadece atanan projelerde session açabilir vs)”** — set to `admin-only` if you want only admins to create projects; everyone else can only open sessions in projects they are assigned to.
@@ -127,12 +131,14 @@ DELETE /api/projects/:id/members/:userId → same guard
 
 ---
 
-## 5. Sessions — Inheritance
+## 5. Sessions — Inheritance + Ownership (REQ-062/REQ-064)
 
 - **Sessions belong to exactly one `projectId`.** On `POST /api/sessions { projectId, initialPrompt, model }`, the server checks `session:create` for that `projectId`. If `projectId` is null (legacy), it requires `project:list:all` or falls back to user's default project.
+- **Ownership stamp:** every created/forked session records `meta.ownerId` (the caller token's user id; absent for anonymous/legacy sessions). See `SessionMeta.ownerId` + `SessionSummary.ownerId`.
+- **Calisan isolation (`canViewSession`):** superadmin/admin see every session. Everyone else sees ONLY sessions they own PLUS unattributed (`ownerId` null) legacy sessions. `GET /api/sessions` filters the list; `GET /:id`, fork, PATCH, DELETE, merge, rewind return `403 not your session` for чужой rows; `/search` drops чужой hits. A calisan never sees чужой session — not even its title.
 - **Listing:** `GET /api/sessions` without `projectId` returns only sessions from projects the user can `session:list` in (filtered by membership for non-admins). Admin with `project:list:all` sees all, but the UI still groups by project.
-- **Resuming:** `GET /api/sessions/:id` checks `session:read` for its `projectId`; `POST /api/sessions/:id/resume` (WS replay) checks `session:write` if the user will send prompts.
-- **Sharing:** share a **project**, not a session — adding a user to the project instantly grants `session:read` (viewer) or `session:create/write` (member) for all sessions in it. No per-session ACL to avoid the “which link did I share?” bug.
+- **Resuming:** `GET /api/sessions/:id` checks `session:read` for its `projectId` (+ ownership); `POST /api/sessions/:id/resume` (WS replay) checks `session:write` if the user will send prompts.
+- **Sharing:** share a **project**, not a session — adding a user to the project instantly grants `session:read` (viewer) or `session:create/write` (calisan) for all sessions in it. No per-session ACL to avoid the “which link did I share?” bug.
 
 ---
 
@@ -290,6 +296,30 @@ All `401` → `{"error":"unauthenticated"}`, `403` → `{"error":"forbidden: mis
 
 - **Single-user → multi-user:** on first `POST /api/users/invite`, migrate `~/.lokma/auth.json` (if exists) + `~/.lokma/config.json` `users[0]` to DB, create `projects` from existing `~/.lokma/projects/*` dirs, add the inviter as `owner` of each.
 - **Env override:** `LOKMA_AUTH_DISABLED=1` keeps the current single-user mode (no `preHandler` checks) for local dev — not for `lokma.fermag.com.tr`.
+- **REQ-062 roles (no script, in-memory):** `readUsers()` normalizes legacy `member` → `calisan` on every read (writes persist the canonical value, so the file converges), and promotes the oldest active `admin` to `superadmin` while no superadmin row exists. Pre-062 instances boot with identical behavior and gain the new matrix without touching `users.json`.
+- **REQ-062 sessions:** `meta.ownerId` is absent on all pre-062 sessions → they read as unattributed → visible to every project member (§5). Isolation only narrows sessions created after the upgrade.
+
+---
+
+## 12. Login gate — `requireLogin` (REQ-062 Parça A, REQ-063)
+
+One switch, three surfaces, all keyed on `loginGateActive()` = bootstrapped AND `settings.requireLogin` (default `false` — existing open instances keep working until a superadmin flips it in the Auth pane or `settings.json`):
+
+- **Web App (`App.tsx`):** boot probes `GET /api/auth/settings` (public: settings + `bootstrapped`) then `GET /api/auth/me` (quiet, no `/login` bounce). Gate active + 401 → full-screen `LoginGate` (login form; register variant only pre-bootstrap). No shell, no tabs, no session until 200. Gate off → straight to `AppShell` (legacy behavior).
+- **REST:** every `/api/sessions/*` + `/api/projects/:id/todos/*` route resolves the caller first — 401 tokenless while the gate is on, legacy-open while off. (User/project/admin routes always required a token once bootstrapped — unchanged.)
+- **WS (`/ws/:sessionId`):** handshake probe closes tokenless sockets with `4401 login required` (+ an `error/login_required` frame first so the client toasts instead of hanging). Token rides `?token=` (browsers cannot set WS headers) or the httpOnly `lokma_token` cookie. Gate checks fail open — a gate-probe crash never breaks the socket; the prompt path re-resolves the user per turn anyway.
+
+---
+
+## 13. Todos + agent claims (REQ-062 Parça C, REQ-065)
+
+`~/.lokma/todos/<projectId>.json`, shapes in `lokma-shared/schemas/todo.ts`, store in `lokma-core/todos/store.ts`:
+
+- `{ id, projectId, title, status: open|claimed|done, claimedBy: { sessionId, userId, claimedAt } | null, leaseUntil: epoch-ms | null }`. Default lease 5 min (`TODO_CLAIM_LEASE_MS`), heartbeat cadence ~60 s (`TODO_HEARTBEAT_MS`, approximated by once-per-agent-turn).
+- **Claim** (`claimTodo` / `POST .../claim`) is one atomic file write (`writeAtomic` tmp+rename): `open → claimed` + holder + lease together. Live чужой lease → `409 todo_claimed` + holder (never a silent double-take). Same-session re-claim is idempotent (extends). Expired leases sweep to `open` on next touch — dead loops orphan nothing.
+- **Heartbeat:** `heartbeatTodo` (holder only, quiet false otherwise) + `heartbeatSession(sessionId)` (cross-project sweep, called once per agent turn, best-effort so it never breaks a turn).
+- **Agent tools** (`buildTodoTools({ sessionId, userId })`, registered in the server agent loop): `list_todos` (read), `claim_todo` + `complete_todo` (WRITE_TOOLS → ask by default; failures return `{ ok: false, code }` results, never throw into the turn).
+- **UI:** Todo pane (Inspector rail + tiling tabs) — project picker, Open / Claimed by me / In progress / Done groups, claim button (409 names the holder session), "Do with AI" (mints a session, claims the todo to it, stages the work prompt via `INITIAL_PREFIX` so chat auto-sends on open), done/release/delete.
 
 ---
 

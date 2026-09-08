@@ -1,6 +1,6 @@
 # REQ-062 — Auth zorunluluğu + superadmin/admin/çalışan rolleri + todo claim mimarisi
 
-- **Status:** pending (kod yazılmadı — kullanıcı "yap" deyince başlanacak)
+- **Status:** done (2026-09-08 — Parça A+B+C implemented in one atomic run: `requireLogin` gate (App LoginGate + REST 401 + WS 4401), `superadmin/admin/calisan/viewer` roles + `canViewSession` isolation + `ownerId` stamps, per-project todos + atomic claims + heartbeat + agent tools + Todo pane; core 49/49 + web 73/73 unit, isolated-server E2E 26/26, live bundle match)
 - **Asked:** 2026-09-08 — "config'den auth açıksa hesapla login olmadan web harness'e ulaşılamasın. rol tanımları olacak, onun için detaylı araştırma yap: superadmin, admin, çalışan — çalışan sadece adminlerin izin verdiği projelerde kendi özel session'larını açacak; ayrıca birden fazla çalışanın aynı yerde çalışması için uygulamanın kendi içinde todo sistemi ve todo'yu AI yapmaya başlayınca oto-assign etmesi, başka bir ajanın o görevi kapmaması lazım — bunlara dikkat eden bir mimari kur".
 - **Research (yapıldı):**
   - Roller BUGÜN: global `admin|member|viewer` + proje üyeliği `member|viewer` (`lokma-shared/schemas/auth.ts`, `lokma-core/auth/store.ts` `can()`). `superadmin` YOK, `çalışan` kavramı YOK (en yakın: member).

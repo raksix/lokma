@@ -27,6 +27,7 @@ import { cronRoutes } from './routes/cron.js';
 import { memoryRoutes } from './routes/memory.js';
 import { themeRoutes } from './routes/themes.js';
 import { cloudRoutes } from './routes/cloud.js';
+import { todoRoutes } from './routes/todos.js';
 
 /**
  * Create Fastify app — registers all plugins + routes.
@@ -64,6 +65,7 @@ export async function createApp(): Promise<ReturnType<typeof Fastify>> {
   await memoryRoutes(app);
   await themeRoutes(app);
   await cloudRoutes(app);
+  await todoRoutes(app);
   await wsRoutes(app);
 
   return app;

@@ -23,6 +23,7 @@ import {
   LazySkillsPane,
   LazyTerminalPane,
   LazyTestingPane,
+  LazyTodosPane,
   LazyUsagePane,
   LazyVaultPane,
   PaneFallback,
@@ -116,7 +117,8 @@ export type InspectorTab =
   | 'observability'
   | 'cron'
   | 'extras'
-  | 'memory';
+  | 'memory'
+  | 'todos';
 
 export function InspectorPanel({
   onOpenSession,
@@ -152,6 +154,8 @@ export function InspectorPanel({
         )
       ) : tab === 'memory' ? (
         <LazyMemoryPane />
+      ) : tab === 'todos' ? (
+        <LazyTodosPane sessionId={sessionId} onOpenSession={onOpenSession} />
       ) : tab === 'extras' ? (
         <LazyExtrasPane onOpenTab={(t) => setTab(t)} />
       ) : tab === 'cron' ? (

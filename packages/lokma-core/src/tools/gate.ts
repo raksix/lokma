@@ -15,7 +15,12 @@ export type GateDecision = 'allow' | 'ask' | 'deny';
 export const READ_TOOLS: ReadonlySet<string> = new Set(['read_file', 'list_files', 'search_files']);
 
 /** Tools that mutate disk or spawn processes — need approval by default. */
-export const WRITE_TOOLS: ReadonlySet<string> = new Set(['write_file', 'run_command']);
+export const WRITE_TOOLS: ReadonlySet<string> = new Set([
+  'write_file',
+  'run_command',
+  'claim_todo',
+  'complete_todo',
+]);
 
 /** Exact or prefix match: `write` covers `write_file`, `read` covers reads. */
 function listed(entries: readonly string[], tool: string): boolean {

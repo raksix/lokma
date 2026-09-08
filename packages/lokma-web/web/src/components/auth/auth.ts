@@ -28,9 +28,16 @@ export function clearToken(): void {
 
 /** Row tone for the role cards + member badges (concept colors 1:1). */
 export function roleTone(role: AuthRole): string {
+  if (role === 'superadmin') return 'bg-[#C96442] text-white border-[#C96442]';
   if (role === 'admin') return 'bg-[#262624] text-white border-[#262624]';
-  if (role === 'member') return 'bg-white dark:bg-[#1E1E21] border-line';
+  if (role === 'calisan' || role === 'member') return 'bg-white dark:bg-[#1E1E21] border-line';
   return 'bg-zinc-100 border-line text-zinc-600';
+}
+
+/** Human label — legacy `member` renders as its canonical `calisan`. */
+export function roleLabel(role: AuthRole): string {
+  if (role === 'member') return 'calisan';
+  return role;
 }
 
 /** Status pill tone for the admin user table. */
@@ -58,25 +65,32 @@ export function memberCountLabel(n: number): string {
  * ONLY to gate buttons. The server re-checks every write; a stale
  * mirror can hide a button, never grant access.
  * `settings` mirrors the creation policy for `createProject` only.
+ * REQ-064: superadmin = everything; admin = everything except
+ * manageSettings (instance auth policy is superadmin-only server-side);
+ * calisan creates projects only under the `open` policy; inviteUsers =
+ * admin+ (admins invite calisan/viewer, superadmin owns roles).
  */
 export function canDo(
   viewer: AuthUser | null,
-  action: 'manageUsers' | 'manageSettings' | 'createProject' | 'deleteProject',
+  action: 'manageUsers' | 'manageSettings' | 'inviteUsers' | 'createProject' | 'deleteProject',
   settings?: { projectCreation: 'admin-only' | 'members' | 'open' } | null,
 ): boolean {
   if (!viewer || viewer.status !== 'active') return false;
+  if (viewer.role === 'superadmin') return true;
+  if (action === 'manageSettings') return false;
   if (viewer.role === 'admin') return true;
   if (action === 'createProject') {
-    if (viewer.role !== 'member') return false;
-    return (settings?.projectCreation ?? 'members') !== 'admin-only';
+    // Viewers never create (read-only guests); calisan only under `open`.
+    if (viewer.role === 'viewer') return false;
+    return (settings?.projectCreation ?? 'members') === 'open';
   }
   return false;
 }
 
-/** Project edit gating — admin or the project owner (mirrors the server). */
+/** Project edit gating — admin/superadmin or the project owner (mirrors the server). */
 export function canEditProject(viewer: AuthUser | null, project: AuthProject): boolean {
   if (!viewer || viewer.status !== 'active') return false;
-  if (viewer.role === 'admin') return true;
+  if (viewer.role === 'admin' || viewer.role === 'superadmin') return true;
   return project.ownerId === viewer.id;
 }
 
@@ -128,11 +142,11 @@ export function validateRegisterForm(form: RegisterForm): string | null {
 }
 
 export type InviteForm = { email: string; role: AuthRole; projectIds: string[] };
-export const emptyInviteForm: InviteForm = { email: '', role: 'member', projectIds: [] };
+export const emptyInviteForm: InviteForm = { email: '', role: 'calisan', projectIds: [] };
 
 export function validateInviteForm(form: InviteForm): string | null {
   if (!EMAIL_PATTERN.test(form.email.trim())) return 'Enter a valid email address';
-  if (form.role === 'admin') return 'Invites are member|viewer — promote after they join';
+  if (form.role === 'admin' || form.role === 'superadmin') return 'Invites are calisan|viewer — promote after they join';
   return null;
 }
 

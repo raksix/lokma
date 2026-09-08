@@ -21,6 +21,13 @@ export type SessionMeta = {
   /** Human label for the session list (set via rename; falls back to first user line). */
   title?: string;
   /**
+   * Owner user id (REQ-062 Parça B, REQ-064): stamped by POST /api/sessions
+   * from the caller token. `calisan` users list/read only their own
+   * sessions; admin/superadmin see all. Absent (legacy/anonymous) means
+   * unattributed — visible to every project member, never hidden.
+   */
+  ownerId?: string;
+  /**
    * Bot binding for Grok-style bot chats (REQ-027, Docs/35 §8): when set,
    * prompts in this session run with the bot's model + systemPrompt +
    * knowledge injected. A per-prompt `model` override still wins for that
@@ -54,4 +61,9 @@ export type SessionSummary = {
   messageCount: number;
   createdAt: string; // ISO
   updatedAt: string; // ISO
+  /**
+   * Owner user id (REQ-062 Parça B) — null for legacy/anonymous sessions.
+   * The server filters this list for `calisan` callers (own-only).
+   */
+  ownerId: string | null;
 };

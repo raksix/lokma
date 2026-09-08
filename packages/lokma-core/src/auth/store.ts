@@ -23,6 +23,12 @@ export type { User } from 'lokma-shared';
 /**
  * Auth store — users, projects, memberships, invites + RBAC `can()`
  * (Docs/36-AUTH-and-PERMISSIONS).
+ * Roles (REQ-062 Parça B, REQ-064): `superadmin` (instance owner: users,
+ * roles, auth policy) > `admin` (projects, invites, everything in-project)
+ * > `calisan` (member projects only, own sessions only) > `viewer`
+ * (read-only guest). `member` is a legacy alias of `calisan`: `readUsers()`
+ * normalizes it in memory (plus oldest-admin → superadmin when no
+ * superadmin exists yet), so pre-062 rows work with zero migration.
  * File-backed under `~/.lokma/auth/` (users.json 0600 — it holds
  * password hashes; projects/members/settings are world-readable JSON).
  * Passwords are scrypt hashes, sessions are stateless HMAC tokens
@@ -100,9 +106,18 @@ function assertPassword(password: unknown): asserts password is string {
 }
 
 function assertRole(role: unknown): asserts role is Role {
-  if (role !== 'admin' && role !== 'member' && role !== 'viewer') {
-    throw new AuthError('bad_role', "role must be admin|member|viewer", 400);
+  if (role !== 'superadmin' && role !== 'admin' && role !== 'calisan' && role !== 'member' && role !== 'viewer') {
+    throw new AuthError('bad_role', 'role must be superadmin|admin|calisan|viewer', 400);
   }
+}
+
+/**
+ * Legacy alias map (REQ-064 migration, in-memory): pre-062 `member` rows
+ * behave as `calisan`. Applied on read AND on write (writes persist the
+ * canonical value so the file converges without a migration script).
+ */
+function canonicalRole(role: Role): Role {
+  return role === 'member' ? 'calisan' : role;
 }
 
 function assertId(id: unknown, what: string): asserts id is string {
@@ -141,10 +156,18 @@ async function readUsers(): Promise<StoredUser[]> {
     try {
       const base = UserSchema.parse(row);
       const hash = (row as Record<string, unknown>).passwordHash;
-      out.push({ ...base, passwordHash: typeof hash === 'string' ? hash : null });
+      out.push({ ...base, role: canonicalRole(base.role), passwordHash: typeof hash === 'string' ? hash : null });
     } catch {
       // Skip corrupt rows — the registry stays readable.
     }
+  }
+  // REQ-064 migration: the oldest active admin becomes superadmin while no
+  // superadmin row exists (in-memory; the next user write persists it).
+  if (!out.some((u) => u.role === 'superadmin')) {
+    const oldest = out
+      .filter((u) => u.role === 'admin' && u.status === 'active')
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))[0];
+    if (oldest) oldest.role = 'superadmin';
   }
   return out;
 }
@@ -277,8 +300,8 @@ export async function getUserByEmail(email: string): Promise<StoredUser | null> 
 }
 
 /**
- * First-user seed — becomes admin, no auth (Docs/36 §6.2). Fails closed
- * once ANY user exists (thereafter invite/login only).
+ * First-user seed — becomes superadmin, no auth (Docs/36 §6.2). Fails
+ * closed once ANY user exists (thereafter invite/login only).
  */
 export async function registerFirstAdmin(input: { email: string; name: string; password: string }): Promise<{ user: User; token: string }> {
   assertEmail(input.email);
@@ -292,7 +315,7 @@ export async function registerFirstAdmin(input: { email: string; name: string; p
     id: randomId('u'),
     email: input.email.trim().toLowerCase(),
     name: input.name.trim(),
-    role: 'admin',
+    role: 'superadmin',
     status: 'active',
     permissions: [],
     createdAt: nowIso(),
@@ -333,18 +356,22 @@ export async function userFromToken(token: string | null | undefined): Promise<U
   return publicUser(row);
 }
 
-async function countAdmins(users: StoredUser[]): Promise<number> {
-  return users.filter((u) => u.role === 'admin' && u.status === 'active').length;
+async function countElevated(users: StoredUser[]): Promise<number> {
+  return users.filter((u) => (u.role === 'admin' || u.role === 'superadmin') && u.status === 'active').length;
 }
 
-/** Admin user edit — last-admin demote/disable is blocked (409, Docs/36 §9). */
+/**
+ * Admin user edit (Docs/36 §9). Last-elevated demote/disable is blocked
+ * (409). Touching a superadmin row (edit OR promote-to) needs a
+ * superadmin actor (403 `superadmin_required`) — admins manage calisan
+ * and viewer rows, never the instance owner.
+ */
 export async function patchUser(
   id: string,
   actor: User,
   patch: { name?: unknown; role?: unknown; status?: unknown; permissions?: unknown },
 ): Promise<User> {
   assertId(id, 'user');
-  void actor;
   const users = await readUsers();
   const row = users.find((u) => u.id === id);
   if (!row) throw new AuthError('user_not_found', 'User not found', 404);
@@ -358,7 +385,7 @@ export async function patchUser(
   }
   if (patch.role !== undefined) {
     assertRole(patch.role);
-    next.role = patch.role as Role;
+    next.role = canonicalRole(patch.role as Role);
   }
   if (patch.status !== undefined) {
     const s = patch.status;
@@ -374,20 +401,31 @@ export async function patchUser(
     next.permissions = [...(patch.permissions as string[])];
   }
   const preview = users.map((u) => (u.id === id ? next : u));
-  if ((await countAdmins(preview)) === 0) {
+  // Superadmin rows (or promoting TO superadmin) need a superadmin actor.
+  if ((row.role === 'superadmin' || next.role === 'superadmin') && actor.role !== 'superadmin') {
+    throw new AuthError('superadmin_required', 'Only a superadmin can edit a superadmin account', 403);
+  }
+  if ((await countElevated(preview)) === 0) {
     throw new AuthError('last_admin', 'Cannot remove the last active admin', 409);
   }
   await writeUsers(preview);
   return publicUser(next);
 }
 
-/** Admin user delete — last-admin is blocked; memberships are cleaned up. */
-export async function deleteUser(id: string): Promise<void> {
+/**
+ * User delete — last-elevated is blocked; deleting a superadmin needs a
+ * superadmin actor. Memberships + invites are cleaned up.
+ */
+export async function deleteUser(id: string, actor?: User): Promise<void> {
   assertId(id, 'user');
   const users = await readUsers();
-  if (!users.some((u) => u.id === id)) throw new AuthError('user_not_found', 'User not found', 404);
+  const row = users.find((u) => u.id === id);
+  if (!row) throw new AuthError('user_not_found', 'User not found', 404);
+  if (row.role === 'superadmin' && actor && actor.role !== 'superadmin') {
+    throw new AuthError('superadmin_required', 'Only a superadmin can delete a superadmin account', 403);
+  }
   const preview = users.filter((u) => u.id !== id);
-  if ((await countAdmins(preview)) === 0) {
+  if ((await countElevated(preview)) === 0) {
     throw new AuthError('last_admin', 'Cannot remove the last active admin', 409);
   }
   await writeUsers(preview);
@@ -494,7 +532,7 @@ export async function createProject(
   const members = await readMembers();
   await writeMembers([
     ...members,
-    { projectId: row.id, userId: owner.id, role: 'member', permissions: [], addedAt: nowIso(), addedBy: owner.id },
+    { projectId: row.id, userId: owner.id, role: 'calisan', permissions: [], addedAt: nowIso(), addedBy: owner.id },
   ]);
   return row;
 }
@@ -547,13 +585,13 @@ export async function memberOf(projectId: string, userId: string): Promise<Proje
 export async function addMember(
   projectId: string,
   actor: User,
-  input: { userId: string; role?: 'member' | 'viewer' },
+  input: { userId: string; role?: 'calisan' | 'member' | 'viewer' },
 ): Promise<ProjectMember> {
   const project = await getProject(projectId);
   if (!project) throw new AuthError('project_not_found', 'Project not found', 404);
   assertId(input.userId, 'user');
-  const role = input.role ?? 'member';
-  if (role !== 'member' && role !== 'viewer') throw new AuthError('bad_role', 'role must be member|viewer', 400);
+  const role = canonicalRole((input.role ?? 'calisan') as Role) as 'calisan' | 'viewer';
+  if (role !== 'calisan' && role !== 'viewer') throw new AuthError('bad_role', 'role must be calisan|viewer', 400);
   const target = await getUserById(input.userId);
   if (!target) throw new AuthError('user_not_found', 'User not found', 404);
   const members = await readMembers();
@@ -589,9 +627,11 @@ export async function inviteUser(
   input: { email: string; role?: Role; projectIds?: string[] },
 ): Promise<{ user: User; inviteLink: string }> {
   assertEmail(input.email);
-  const role = input.role ?? 'member';
+  const role = canonicalRole(input.role ?? 'calisan');
   assertRole(role);
-  if (role === 'admin') throw new AuthError('bad_role', 'Invites are member|viewer — admins are promoted, not invited', 400);
+  if (role === 'admin' || role === 'superadmin') {
+    throw new AuthError('bad_role', 'Invites are calisan|viewer — admins are promoted, not invited', 400);
+  }
   const projectIds = Array.isArray(input.projectIds) ? input.projectIds : [];
   for (const pid of projectIds) {
     if (!(await getProject(pid))) throw new AuthError('project_not_found', `Project not found: ${pid}`, 404);
@@ -658,7 +698,7 @@ export async function acceptInvite(input: { token: string; name: string; passwor
 
 // ─── RBAC `can()` (Docs/36 §3 + §7.1) ──────────────────────────────────────
 
-/** Global admin-only capabilities (plus per-user `permissions[]` grants). */
+/** Elevated-only capabilities (plus per-user `permissions[]` grants). */
 const ADMIN_ONLY = new Set([
   'user:list',
   'user:create',
@@ -673,10 +713,15 @@ const ADMIN_ONLY = new Set([
   'agent:manage:all',
   'vault:manage',
   'usage:view:all',
-  'auth:manage',
 ]);
 
-/** What a project `member` gets by default (Docs/36 §3.2). */
+/**
+ * Superadmin-only capabilities (REQ-064): instance ownership. Admins pass
+ * every other gate but never these — checked explicitly in `can()`.
+ */
+const SUPERADMIN_ONLY = new Set(['auth:manage', 'session:view-all']);
+
+/** What a project `calisan` gets by default (Docs/36 §3.2). */
 const MEMBER_DEFAULTS = new Set([
   'project:view',
   'session:create',
@@ -684,6 +729,7 @@ const MEMBER_DEFAULTS = new Set([
   'session:read',
   'session:write',
   'session:fork',
+  'session:view-own',
   'file:read',
   'file:write',
   'terminal:use',
@@ -697,19 +743,29 @@ const MEMBER_DEFAULTS = new Set([
 const VIEWER_DEFAULTS = new Set(['project:view', 'session:list', 'session:read', 'file:read']);
 
 /**
- * RBAC check — admin always passes; per-user `permissions[]` grant;
- * project-scoped perms resolve via membership (or public visibility
- * for `project:view`); `project:create` follows the creation policy.
+ * RBAC check — superadmin always passes; admin passes everything except
+ * `SUPERADMIN_ONLY` (auth policy + see-all-sessions); per-user
+ * `permissions[]` grant; project-scoped perms resolve via membership (or
+ * public visibility for `project:view`); `project:create` follows the
+ * creation policy (REQ-064: calisan never creates under `members` —
+ * only admins do; `open` lets any authenticated user create).
  */
 export async function can(user: User, perm: string, projectId?: string): Promise<boolean> {
-  if (user.role === 'admin') return true;
+  if (user.role === 'superadmin') return true;
+  if (user.role === 'admin') {
+    if (SUPERADMIN_ONLY.has(perm)) return false;
+    return true;
+  }
   if (user.permissions.includes(perm)) return true;
+  if (SUPERADMIN_ONLY.has(perm)) return false;
 
   if (perm === 'project:create') {
     const settings = await getAuthSettings();
     if (settings.projectCreation === 'admin-only') return false;
-    if (settings.projectCreation === 'members') return user.role === 'member';
-    return true; // open — any authenticated user
+    if (settings.projectCreation === 'open') return true;
+    // `members` policy: calisan (the only non-elevated project role that
+    // creates sessions) still cannot open projects — admins do.
+    return false;
   }
 
   if (!projectId) return false;
@@ -724,15 +780,39 @@ export async function can(user: User, perm: string, projectId?: string): Promise
     return false;
   }
   if (membership.permissions.includes(perm)) return true;
-  const defaults = membership.role === 'member' ? MEMBER_DEFAULTS : VIEWER_DEFAULTS;
+  const defaults = membership.role === 'viewer' ? VIEWER_DEFAULTS : MEMBER_DEFAULTS;
   return defaults.has(perm);
 }
 
-/** Projects visible to a user (membership + public; admins see all). */
+/** Projects visible to a user (membership + public; elevated see all). */
 export async function visibleProjects(user: User): Promise<Project[]> {
   const projects = await readProjects();
-  if (user.role === 'admin') return projects;
+  if (user.role === 'admin' || user.role === 'superadmin') return projects;
   const members = await readMembers();
   const mine = new Set(members.filter((m) => m.userId === user.id).map((m) => m.projectId));
   return projects.filter((p) => mine.has(p.id) || p.visibility === 'public');
+}
+
+/**
+ * Session ownership gate (REQ-062 Parça B, REQ-064): elevated roles see
+ * every session; everyone else sees only their own PLUS unattributed
+ * (legacy/anonymous, `ownerId` null) sessions — a calisan never sees a
+ * чужой session, not even in the list.
+ */
+export function canViewSession(user: User, ownerId: string | null | undefined): boolean {
+  if (user.role === 'admin' || user.role === 'superadmin') return true;
+  if (ownerId == null || ownerId === '') return true;
+  return ownerId === user.id;
+}
+
+/**
+ * Login gate switch (REQ-062 Parça A, REQ-063): true once the instance is
+ * bootstrapped AND the superadmin flipped `requireLogin`. Session/todo
+ * routes + the WS handshake + the web App all key on this one helper, so
+ * gate-off instances behave EXACTLY like pre-062 builds (single-user-open,
+ * no 401s, no login wall).
+ */
+export async function loginGateActive(): Promise<boolean> {
+  if (!(await isBootstrapped())) return false;
+  return (await getAuthSettings()).requireLogin;
 }

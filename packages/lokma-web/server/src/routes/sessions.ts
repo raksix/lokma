@@ -1,5 +1,17 @@
-import type { FastifyInstance } from 'fastify';
-import { SessionStore, compactSession, compactionStatus, getBot, loadConfig, searchSessionsDetailed } from 'lokma-core';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import {
+  SessionStore,
+  canViewSession,
+  compactSession,
+  compactionStatus,
+  getBot,
+  loadConfig,
+  loginGateActive,
+  searchSessionsDetailed,
+  userFromToken,
+  type User,
+} from 'lokma-core';
+import { requestToken } from './auth.js';
 
 /**
  * Sessions — JSONL same files as CLI (SessionStore).
@@ -39,18 +51,50 @@ function assertSessionId(id: unknown): asserts id is string {
 }
 
 export async function sessionRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/api/sessions', async (req) => {
+  /**
+   * Caller resolution (REQ-062, REQ-064): the login gate (`loginGateActive`
+   * = bootstrapped + `requireLogin`) switches every session route from
+   * legacy-open to token-required. Gate-off instances behave EXACTLY like
+   * pre-062 builds (null user, no gates). Returns the user (null only in
+   * open mode) or sends the error and returns undefined.
+   */
+  async function sessionUser(req: FastifyRequest, reply: FastifyReply): Promise<User | null | undefined> {
+    if (!(await loginGateActive())) return null;
+    const user = await userFromToken(requestToken(req));
+    if (!user) {
+      reply.status(401).send({ code: 'unauthenticated', message: 'Not signed in' });
+      return undefined;
+    }
+    return user;
+  }
+
+  app.get('/api/sessions', async (req, reply) => {
     const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
     const store = new SessionStore(cwd);
+    const user = await sessionUser(req, reply);
+    if (user === undefined) return reply;
     const sessions = await store.listSummaries();
-    return { sessions, count: sessions.length };
+    // Calisan isolation: чужой sessions never appear in the list.
+    const visible = user ? sessions.filter((s) => canViewSession(user, s.ownerId)) : sessions;
+    return { sessions: visible, count: visible.length };
   });
 
   app.get('/api/sessions/search', async (req, reply) => {
+    const user = await sessionUser(req, reply);
+    if (user === undefined) return reply;
     const q = (req.query as { q?: unknown; cwd?: string; limit?: unknown }) ?? {};
     const cwd = typeof q.cwd === 'string' && q.cwd ? q.cwd : process.cwd();
     try {
-      return await searchSessionsDetailed(cwd, q.q, { limit: q.limit });
+      const result = await searchSessionsDetailed(cwd, q.q, { limit: q.limit });
+      if (!user) return result;
+      // Calisan isolation: drop hits from чужой sessions.
+      const store = new SessionStore(cwd);
+      const hits: typeof result.hits = [];
+      for (const hit of result.hits) {
+        const meta = await store.readMeta(hit.sessionId).catch(() => null);
+        if (canViewSession(user, meta?.ownerId)) hits.push(hit);
+      }
+      return { hits, count: hits.length, engine: result.engine };
     } catch (e) {
       const err = e as { statusCode?: number; code?: string; message?: string };
       return reply
@@ -62,6 +106,8 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/sessions/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
     assertSessionId(id);
+    const user = await sessionUser(req, reply);
+    if (user === undefined) return reply;
     const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
     const store = new SessionStore(cwd);
     const messages = await store.read(id);
@@ -69,10 +115,15 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     if (messages.length === 0 && meta == null) {
       return reply.status(404).send({ code: 'session_not_found', message: `No transcript for ${id}` });
     }
+    if (user && !canViewSession(user, meta?.ownerId)) {
+      return reply.status(403).send({ code: 'forbidden', message: 'forbidden: not your session' });
+    }
     return { id, cwd, model: meta?.model ?? null, botId: meta?.botId ?? null, messages, count: messages.length };
   });
 
   app.post('/api/sessions', async (req, reply) => {
+    const user = await sessionUser(req, reply);
+    if (user === undefined) return reply;
     const body = req.body as { cwd?: string; model?: string; botId?: string } | undefined;
     // Explicit cwd wins; otherwise the configured session default
     // (`sessions.defaultCwd`, REQ-009); empty = server working dir.
@@ -94,10 +145,12 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     // Create empty session file by appending a system marker (not a user message)
     const store = new SessionStore(cwd);
     await store.append(id, { role: 'assistant', content: `Session ${id} created`, timestamp: new Date().toISOString() });
-    const metaPatch: { model?: string; botId?: string } = {};
+    const metaPatch: { model?: string; botId?: string; ownerId?: string } = {};
     if (typeof body?.model === 'string' && body.model) metaPatch.model = body.model;
     else if (botModel) metaPatch.model = botModel;
     if (botId) metaPatch.botId = botId;
+    // REQ-064: stamp the creator so calisan isolation works from birth.
+    if (user) metaPatch.ownerId = user.id;
     if (Object.keys(metaPatch).length > 0) {
       await store.writeMeta(id, metaPatch);
     }
@@ -111,13 +164,23 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     } catch {
       return reply.status(400).send({ code: 'bad_session_id', message: 'Invalid session id' });
     }
+    const user = await sessionUser(req, reply);
+    if (user === undefined) return reply;
     const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
     const store = new SessionStore(cwd);
+    if (user) {
+      const meta = await store.readMeta(id).catch(() => null);
+      if (meta && !canViewSession(user, meta.ownerId)) {
+        return reply.status(403).send({ code: 'forbidden', message: 'forbidden: not your session' });
+      }
+    }
     const existing = await store.read(id);
     if (existing.length === 0) {
       return reply.status(404).send({ code: 'session_not_found', message: `No transcript for ${id}` });
     }
     const forked = await store.fork(id, newSessionId());
+    // The forker owns the fork (never inherits чужой ownership).
+    if (user) await store.writeMeta(forked.id, { ownerId: user.id });
     return { ok: true, id: forked.id, from: id, copied: forked.copied };
   });
 
@@ -128,6 +191,8 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     } catch {
       return reply.status(400).send({ code: 'bad_session_id', message: 'Invalid session id' });
     }
+    const user = await sessionUser(req, reply);
+    if (user === undefined) return reply;
     const body = (req.body ?? {}) as { model?: unknown; title?: unknown; botId?: unknown };
     const patch: { model?: string; title?: string; botId?: string } = {};
     if (body.model !== undefined) {
@@ -166,6 +231,12 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     }
     const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
     const store = new SessionStore(cwd);
+    if (user) {
+      const meta = await store.readMeta(id).catch(() => null);
+      if (meta && !canViewSession(user, meta.ownerId)) {
+        return reply.status(403).send({ code: 'forbidden', message: 'forbidden: not your session' });
+      }
+    }
     const meta = await store.writeMeta(id, patch);
     return { ok: true, id, model: meta.model, title: meta.title ?? null, botId: meta.botId ?? null };
   });
@@ -177,8 +248,16 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     } catch {
       return reply.status(400).send({ code: 'bad_session_id', message: 'Invalid session id' });
     }
+    const user = await sessionUser(req, reply);
+    if (user === undefined) return reply;
     const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
     const store = new SessionStore(cwd);
+    if (user) {
+      const meta = await store.readMeta(id).catch(() => null);
+      if (meta && !canViewSession(user, meta.ownerId)) {
+        return reply.status(403).send({ code: 'forbidden', message: 'forbidden: not your session' });
+      }
+    }
     const result = await store.remove(id);
     if (!result.existed) {
       return reply.status(404).send({ code: 'session_not_found', message: `No transcript for ${id}` });
@@ -193,12 +272,22 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     } catch {
       return reply.status(400).send({ code: 'bad_session_id', message: 'Invalid session id' });
     }
+    const user = await sessionUser(req, reply);
+    if (user === undefined) return reply;
     const body = (req.body ?? {}) as { from?: unknown };
     if (typeof body.from !== 'string' || !SESSION_ID_PATTERN.test(body.from)) {
       return reply.status(400).send({ code: 'bad_merge', message: 'POST needs { from: "<sessionId>" }' });
     }
     const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
     const store = new SessionStore(cwd);
+    if (user) {
+      for (const sid of [id, body.from]) {
+        const meta = await store.readMeta(sid).catch(() => null);
+        if (meta && !canViewSession(user, meta.ownerId)) {
+          return reply.status(403).send({ code: 'forbidden', message: 'forbidden: not your session' });
+        }
+      }
+    }
     try {
       const result = await store.merge(id, body.from);
       return { ok: true, ...result };
@@ -218,6 +307,8 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     } catch {
       return reply.status(400).send({ code: 'bad_session_id', message: 'Invalid session id' });
     }
+    const user = await sessionUser(req, reply);
+    if (user === undefined) return reply;
     const body = (req.body ?? {}) as { keepMessages?: unknown };
     const keep = typeof body.keepMessages === 'number' ? body.keepMessages : NaN;
     if (!Number.isFinite(keep) || keep < 0) {
@@ -225,6 +316,12 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     }
     const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
     const store = new SessionStore(cwd);
+    if (user) {
+      const meta = await store.readMeta(id).catch(() => null);
+      if (meta && !canViewSession(user, meta.ownerId)) {
+        return reply.status(403).send({ code: 'forbidden', message: 'forbidden: not your session' });
+      }
+    }
     try {
       const result = await store.rewind(id, Math.floor(keep));
       return { ok: true, id: result.id, kept: result.kept };
@@ -244,6 +341,8 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     } catch {
       return reply.status(400).send({ code: 'bad_session_id', message: 'Invalid session id' });
     }
+    const user = await sessionUser(req, reply);
+    if (user === undefined) return reply;
     const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
     try {
       return await compactionStatus(cwd, id);
@@ -262,6 +361,8 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     } catch {
       return reply.status(400).send({ code: 'bad_session_id', message: 'Invalid session id' });
     }
+    const user = await sessionUser(req, reply);
+    if (user === undefined) return reply;
     const body = (req.body ?? {}) as { mode?: unknown };
     const mode = body.mode ?? 'full';
     if (mode !== 'hygiene' && mode !== 'full') {

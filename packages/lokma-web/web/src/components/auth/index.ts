@@ -1,4 +1,5 @@
 export { AuthPane } from './auth-pane';
+export { LoginGate } from './login-gate';
 export {
   TOKEN_KEY,
   canDo,
@@ -14,6 +15,7 @@ export {
   initials,
   joinMembers,
   memberCountLabel,
+  roleLabel,
   roleTone,
   statusTone,
   storeToken,

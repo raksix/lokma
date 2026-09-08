@@ -80,8 +80,8 @@
 - [REQ-059](finished/REQ-059-gercek-pty-terminal.md) — Terminal gerçek PTY gibi — done
 - [REQ-060](finished/REQ-060-terminal-proje-dizini.md) — Terminal seçili proje dizininde açılsın — done
 - [REQ-061](finished/REQ-061-harness-cift-yazi-yazamiyor.md) — Çift cevap + yazamama fixi — done
-- [REQ-062](REQ-062-auth-roller-todo-claim.md) — Auth gate + roller + todo claim — pending
-- [REQ-063](REQ-063-auth-gate.md) — Loginsiz web erişimi yok — pending
-- [REQ-064](REQ-064-roller-superadmin-calisan.md) — superadmin/admin/çalışan — pending
-- [REQ-065](REQ-065-todo-oto-assign.md) — Todo + AI oto-assign claim — pending
+- [REQ-062](finished/REQ-062-auth-roller-todo-claim.md) — Auth gate + roller + todo claim — done
+- [REQ-063](finished/REQ-063-auth-gate.md) — Loginsiz web erişimi yok — done (covered by REQ-062 Parça A)
+- [REQ-064](finished/REQ-064-roller-superadmin-calisan.md) — superadmin/admin/çalışan — done (covered by REQ-062 Parça B)
+- [REQ-065](finished/REQ-065-todo-oto-assign.md) — Todo + AI oto-assign claim — done (covered by REQ-062 Parça C)
 - [REQ-066](REQ-066-onboarding-superadmin.md) — Onboarding: auth sor + superadmin aç — pending

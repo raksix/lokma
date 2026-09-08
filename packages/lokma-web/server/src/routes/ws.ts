@@ -1,10 +1,26 @@
 import { readFile, stat } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { SessionStore, TerminalError, UsageLedger, estimateCost, estimateTokens, loadConfig, onAgentEvent, recordApprovalDecision, resolveBotChatContext, resolveInRoot, saveGlobal, terminalManager } from 'lokma-core';
+import {
+  SessionStore,
+  TerminalError,
+  UsageLedger,
+  estimateCost,
+  estimateTokens,
+  loadConfig,
+  loginGateActive,
+  onAgentEvent,
+  recordApprovalDecision,
+  resolveBotChatContext,
+  resolveInRoot,
+  saveGlobal,
+  terminalManager,
+  userFromToken,
+} from 'lokma-core';
 import { decodeClientMessage, encodeServerMessage } from 'lokma-shared';
 import { LoopAborted, buildLoopHistory, runAgentLoop, type ApprovalDecision } from '../agent-loop.js';
 import { resolveProviderUpstream } from './providers.js';
+import { requestToken } from './auth.js';
 
 /**
  * WS /ws/:sessionId — runs the agent tool loop (`../agent-loop.js`) over
@@ -60,6 +76,32 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
     const { sessionId } = req.params as { sessionId: string };
     const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
     const store = new SessionStore(cwd);
+
+    // REQ-062 Parça A (REQ-063): when the login gate is active
+    // (bootstrapped + `requireLogin`), tokenless sockets are rejected at
+    // the handshake — the chat cannot be driven without a login. Browsers
+    // cannot set WS headers, so the token rides `?token=` or the httpOnly
+    // `lokma_token` cookie; CLI/SDK callers use either. Gate-off
+    // instances keep the legacy open handshake.
+    void (async () => {
+      try {
+        if (!(await loginGateActive())) return;
+        const query = req.query as { token?: unknown };
+        const token = (typeof query.token === 'string' && query.token) || requestToken(req);
+        const user = await userFromToken(token);
+        if (!user) {
+          try {
+            socket.send(encodeServerMessage({ type: 'error', message: 'Login required', code: 'login_required', sessionId }));
+          } catch {
+            // Socket already gone — just close below.
+          }
+          socket.close(4401, 'login required');
+        }
+      } catch {
+        // Gate checks never break the socket — fail open, the prompt path
+        // re-resolves the user per turn.
+      }
+    })();
 
     app.log.info(`[ws] client connected session=${sessionId} cwd=${cwd}`);
 
@@ -161,11 +203,15 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
           store.read(sessionId).catch(() => []),
           loadConfig(cwd).catch(() => null),
         ]);
+        // REQ-062: claim attribution — the todo tools record this user
+        // beside the session. Anonymous/agent runs claim as `agent`.
+        const turnUser = await userFromToken(requestToken(req)).catch(() => null);
         const history = buildLoopHistory(historyMessages);
         try {
           const result = await runAgentLoop({
             cwd,
             sessionId,
+            userId: turnUser?.id,
             model,
             upstream,
             history,

@@ -12,12 +12,19 @@ export type ApiErrorShape = { code: string; message: string };
 export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
+  /**
+   * Raw parsed error body when the server sent one (REQ-062: 409
+   * `todo_claimed` carries `holder`, so the board can name the session
+   * that holds the lease). Undefined for non-JSON failures.
+   */
+  readonly details?: unknown;
 
-  constructor(code: string, message: string, status: number) {
+  constructor(code: string, message: string, status: number, details?: unknown) {
     super(message);
     this.name = 'ApiError';
     this.code = code;
     this.status = status;
+    this.details = details;
   }
 }
 
@@ -54,11 +61,13 @@ async function toApiError(res: Response, redirect = true): Promise<ApiError> {
   }
   let code = 'http_error';
   let message = `HTTP ${status}`;
+  let details: unknown;
   try {
     const text = await res.text();
     if (text) {
       try {
         const body = JSON.parse(text) as Record<string, unknown>;
+        details = body;
         if (typeof body.code === 'string' && typeof body.message === 'string') {
           code = body.code;
           message = body.message;
@@ -78,7 +87,7 @@ async function toApiError(res: Response, redirect = true): Promise<ApiError> {
   } catch {
     // Keep the default HTTP message when the body is unreadable.
   }
-  return new ApiError(code, message, status);
+  return new ApiError(code, message, status, details);
 }
 
 /**
@@ -221,6 +230,8 @@ export type SessionSummary = {
   model?: string | null;
   /** Bot binding id (REQ-027) — null when the session is plain chat. */
   botId?: string | null;
+  /** Owner user id (REQ-062 Parça B) — null for legacy/anonymous sessions. */
+  ownerId?: string | null;
   messageCount?: number;
   /** ISO timestamps for Today/Yesterday/Earlier grouping. */
   createdAt?: string;
@@ -782,9 +793,10 @@ export type RunBotRes = {
 };
 
 // Auth + users + projects — RBAC matrix + visibility (W6-21, Docs/36).
-// Roles mirror `lokma-shared` (admin/member/viewer); the server enforces
-// every gate, the pane only mirrors the matrix for gating buttons.
-export type AuthRole = 'admin' | 'member' | 'viewer';
+// Roles mirror `lokma-shared` (superadmin/admin/calisan/viewer + legacy
+// member); the server enforces every gate, the pane only mirrors the
+// matrix for gating buttons.
+export type AuthRole = 'superadmin' | 'admin' | 'calisan' | 'member' | 'viewer';
 export type UserStatus = 'active' | 'invited' | 'disabled';
 export type AuthUser = {
   id: string;
@@ -808,7 +820,7 @@ export type AuthProject = {
 export type ProjectMember = {
   projectId: string;
   userId: string;
-  role: 'member' | 'viewer';
+  role: 'calisan' | 'member' | 'viewer';
   permissions: string[];
   addedAt: string;
   addedBy: string;
@@ -818,6 +830,8 @@ export type AuthSettings = {
   projectVisibilityDefault: ProjectVisibility;
   inviteExpiryDays: number;
   sessionRetentionDays: number | null;
+  /** REQ-062 Parça A — full-screen login + WS token gate when true. */
+  requireLogin: boolean;
 };
 export type AuthSessionRes = { ok: boolean; user: AuthUser; token: string };
 export type AuthMeRes = { ok: boolean; user: AuthUser };
@@ -830,6 +844,24 @@ export type ProjectDetailRes = { ok: boolean; project: AuthProject; members: Pro
 export type ProjectMutationRes = { ok: boolean; project: AuthProject };
 export type MembersRes = { members: ProjectMember[] };
 export type MemberMutationRes = { ok: boolean; member: ProjectMember };
+
+// ─── Todos + agent claims (REQ-062 Parça C, REQ-065, Docs/36 §11) ───
+
+export type TodoStatus = 'open' | 'claimed' | 'done';
+export type TodoClaimView = { sessionId: string; userId: string; claimedAt: string };
+export type TodoView = {
+  id: string;
+  projectId: string;
+  title: string;
+  status: TodoStatus;
+  claimedBy: TodoClaimView | null;
+  leaseUntil: number | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+};
+export type TodosRes = { todos: TodoView[]; count: number };
+export type TodoMutationRes = { ok: boolean; todo: TodoView };
 
 // ─── Plugins (kernel registry + hot toggle + add-from-URL, W6-23) ───
 
@@ -1398,11 +1430,47 @@ export const api = {
   /** Project members — invite/add/remove (requires `project:edit`). */
   listMembers: (projectId: string) =>
     get<MembersRes>(`/api/projects/${encodeURIComponent(projectId)}/members`),
-  addMember: (projectId: string, body: { userId: string; role?: 'member' | 'viewer' }) =>
+  addMember: (projectId: string, body: { userId: string; role?: 'calisan' | 'member' | 'viewer' }) =>
     post<MemberMutationRes>(`/api/projects/${encodeURIComponent(projectId)}/members`, body),
   removeMember: (projectId: string, userId: string) =>
     del<{ ok: boolean; id: string }>(
       `/api/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(userId)}`,
+    ),
+
+  // Todos + agent claims — per-project board (REQ-062 Parça C, Docs/36 §11).
+  /** Board list (expired claims auto-release server-side on read). */
+  listTodos: (projectId: string) => get<TodosRes>(`/api/projects/${encodeURIComponent(projectId)}/todos`),
+  /** Create an open todo. */
+  createTodo: (projectId: string, body: { title: string }) =>
+    post<TodoMutationRes>(`/api/projects/${encodeURIComponent(projectId)}/todos`, body),
+  /** Atomic open→claimed (409 `todo_claimed` + holder when чужой lease live). */
+  claimTodo: (projectId: string, todoId: string, body: { sessionId: string }) =>
+    post<TodoMutationRes>(
+      `/api/projects/${encodeURIComponent(projectId)}/todos/${encodeURIComponent(todoId)}/claim`,
+      body,
+    ),
+  /** Extend the holder lease (agent heartbeats call this, not the model). */
+  heartbeatTodo: (projectId: string, todoId: string, body: { sessionId: string }) =>
+    post<{ ok: boolean; extended: boolean }>(
+      `/api/projects/${encodeURIComponent(projectId)}/todos/${encodeURIComponent(todoId)}/heartbeat`,
+      body,
+    ),
+  /** Mark done (holder session or expired lease required). */
+  completeTodo: (projectId: string, todoId: string, body: { sessionId?: string }) =>
+    post<TodoMutationRes>(
+      `/api/projects/${encodeURIComponent(projectId)}/todos/${encodeURIComponent(todoId)}/complete`,
+      body,
+    ),
+  /** Release a claim back to open. */
+  releaseTodo: (projectId: string, todoId: string, body: { sessionId?: string }) =>
+    post<TodoMutationRes>(
+      `/api/projects/${encodeURIComponent(projectId)}/todos/${encodeURIComponent(todoId)}/release`,
+      body,
+    ),
+  /** Delete a todo row. */
+  deleteTodo: (projectId: string, todoId: string) =>
+    del<{ ok: boolean; id: string }>(
+      `/api/projects/${encodeURIComponent(projectId)}/todos/${encodeURIComponent(todoId)}`,
     ),
 
   // Setup + doctor — optional stack + init + subsystem probes (W6-22,

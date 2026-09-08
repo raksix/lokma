@@ -57,6 +57,9 @@ export * from './bots/index.js';
 // Auth (users + projects + invites + RBAC can() for the AuthPane)
 export * from './auth/index.js';
 
+// Todos (project todo boards + agent claim leases for the TodoPane)
+export * from './todos/index.js';
+
 // Setup (optional-stack features + init for the SetupPane, Docs/32)
 export * from './setup/index.js';
 

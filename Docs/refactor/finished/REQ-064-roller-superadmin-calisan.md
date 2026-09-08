@@ -1,6 +1,6 @@
 # REQ-064 — superadmin / admin / çalışan rol tanımları
 
-- **Status:** pending (kod yazılmadı — kullanıcı "yap" deyince başlanacak)
+- **Status:** done (2026-09-08 — implemented as REQ-062 Parça B in the same atomic run; this split file tracked the same work, no separate code)
 - **Asked:** 2026-09-08 — "rol tanımları olacak: superadmin, admin, çalışan. çalışan sadece adminlerin izin verdiği projelere kendi özel session'larını açacak" (REQ-062'nin B parçası, bağımsız istek).
 - **Mevcut durum:** global `admin|member|viewer` + proje üyeliği `member|viewer` (`can()` hepsini çözer). `superadmin` YOK. "Çalışan" YOK (en yakın: `member`).
 - **İstenen rol matrisi:**

@@ -27,6 +27,7 @@ import {
   LazySkillsPane,
   LazyTerminalPane,
   LazyTestingPane,
+  LazyTodosPane,
   LazyUsagePane,
   LazyVaultPane,
   PaneFallback,
@@ -98,6 +99,7 @@ function LazyTab({
   if (tab === 'observability') return <LazyObservabilityPane />;
   if (tab === 'cron') return <LazyCronApprovalsPane />;
   if (tab === 'memory') return <LazyMemoryPane onOpenSession={onOpenSession} />;
+  if (tab === 'todos') return <LazyTodosPane sessionId={sessionId} onOpenSession={onOpenSession} />;
   if (tab === 'extras') {
     return <LazyExtrasPane onOpenTab={(t: ExtrasTabId) => onOpenInspectorTab(t)} />;
   }

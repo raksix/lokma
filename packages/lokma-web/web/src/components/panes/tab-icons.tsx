@@ -14,6 +14,7 @@ import {
   HardDrive,
   Info,
   Layers,
+  ListTodo,
   Package,
   Paintbrush,
   Plug2,
@@ -57,4 +58,5 @@ export const TAB_ICONS: Record<InspectorTabId, React.ReactNode> = {
   cron: <Clock3 className="h-3 w-3" />,
   extras: <Star className="h-3 w-3" />,
   memory: <Brain className="h-3 w-3" />,
+  todos: <ListTodo className="h-3 w-3" />,
 };

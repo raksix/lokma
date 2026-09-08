@@ -1,9 +1,11 @@
 import {
   buildBuiltinTools,
+  buildTodoTools,
   buildToolSystemPrompt,
   buildUiControlTools,
   createBlockFilter,
   executeToolCall,
+  heartbeatSession,
   mintCallId,
   runApprovedCall,
   SessionStore,
@@ -60,6 +62,12 @@ export type AgentLoopOpts = {
   waitAnswer: (req: { requestId: string; question: string; choices?: string[] }) => Promise<string>;
   /** Parent abort (WS `abort` / socket close) — rejects waits, kills turns. */
   signal: AbortSignal;
+  /**
+   * Claiming user id for the todo tools (REQ-062 Parça C) — recorded as
+   * the claim holder beside the session. Undefined for anonymous/agent
+   * runs (recorded as `agent`).
+   */
+  userId?: string;
   /**
    * Bot SOUL + knowledge preamble (REQ-027, Docs/35 §8) — prepended ahead
    * of the tool system prompt so a bot-bound session chats AS the bot.
@@ -137,6 +145,11 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
   })) {
     registry.register(tool);
   }
+  // REQ-062 Parça C (REQ-065): todo claim discipline for multi-agent
+  // projects — claim before starting shared work, complete when done.
+  for (const tool of buildTodoTools({ sessionId: opts.sessionId, userId: opts.userId })) {
+    registry.register(tool);
+  }
   const toolSystem = buildToolSystemPrompt(registry.list().map((t) => ({ name: t.name, description: t.description })));
   const preamble = opts.systemPreamble?.trim() ? `${opts.systemPreamble.trim()}\n\n` : '';
   const system = `${preamble}${toolSystem}`;
@@ -168,6 +181,16 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
 
   for (turns = 1; turns <= maxTurns; turns++) {
     if (opts.signal.aborted) return { outcome: 'aborted', inputChars, outputChars, turns: turns - 1 };
+
+    // REQ-065: keep this session's todo claims leased. Once per turn
+    // approximates the ~60s heartbeat cadence; best-effort so the sweep
+    // never breaks a turn (a dead loop simply stops heartbeating and its
+    // claims auto-release).
+    try {
+      await heartbeatSession(opts.sessionId);
+    } catch {
+      // Heartbeat sweep is best-effort — ignore and run the turn.
+    }
 
     // Per-turn timeout: a hung model call ends the turn, not the socket.
     const turnCtrl = new AbortController();

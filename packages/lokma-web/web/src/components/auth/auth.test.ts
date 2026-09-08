@@ -17,6 +17,7 @@ import {
   initials,
   joinMembers,
   memberCountLabel,
+  roleLabel,
   roleTone,
   statusTone,
   storeToken,
@@ -77,19 +78,27 @@ check('blank name falls back to email', initials('', 'mira@x.com') === 'MI');
 check('singular member', memberCountLabel(1) === '1 member');
 check('plural members', memberCountLabel(3) === '3 members');
 
-// ─── canDo (client mirror — server re-checks) ───────────────────────
+// ─── canDo (client mirror — server re-checks, REQ-062/REQ-064 matrix) ───
 check('anonymous cannot manage', !canDo(null, 'manageUsers'));
+check('superadmin can manage users', canDo(user({ role: 'superadmin' }), 'manageUsers'));
+check('superadmin can patch settings', canDo(user({ role: 'superadmin' }), 'manageSettings'));
 check('admin can manage users', canDo(user({ role: 'admin' }), 'manageUsers'));
-check('admin can patch settings', canDo(user({ role: 'admin' }), 'manageSettings'));
+check('admin cannot patch settings', !canDo(user({ role: 'admin' }), 'manageSettings'));
+check('admin can invite', canDo(user({ role: 'admin' }), 'inviteUsers'));
+check('calisan cannot invite', !canDo(user({ role: 'calisan' }), 'inviteUsers'));
 check('member cannot manage users', !canDo(user({ role: 'member' }), 'manageUsers'));
 check('viewer cannot delete project', !canDo(user({ role: 'viewer' }), 'deleteProject'));
-check('member creates under members policy', canDo(user({ role: 'member' }), 'createProject', { projectCreation: 'members' }));
+check('calisan blocked under members policy', !canDo(user({ role: 'calisan' }), 'createProject', { projectCreation: 'members' }));
+check('calisan creates under open policy', canDo(user({ role: 'calisan' }), 'createProject', { projectCreation: 'open' }));
 check('member blocked under admin-only policy', !canDo(user({ role: 'member' }), 'createProject', { projectCreation: 'admin-only' }));
 check('viewer never creates', !canDo(user({ role: 'viewer' }), 'createProject', { projectCreation: 'open' }));
 check('disabled admin cannot manage', !canDo(user({ role: 'admin', status: 'disabled' }), 'manageUsers'));
 check('owner edits own project', canEditProject(user({ id: 'u_1' }), project()));
 check('non-owner member cannot edit', !canEditProject(user({ id: 'u_9' }), project()));
 check('admin edits any project', canEditProject(user({ id: 'u_9', role: 'admin' }), project()));
+check('superadmin edits any project', canEditProject(user({ id: 'u_9', role: 'superadmin' }), project()));
+check('legacy member reads as calisan', roleLabel('member') === 'calisan');
+check('superadmin tone is terracotta', roleTone('superadmin').includes('bg-[#C96442]'));
 
 // ─── filters ───────────────────────────────────────────────────────
 const users = [user(), user({ id: 'u_2', name: 'Furkan', email: 'furkan@fermag.com.tr', role: 'admin' })];

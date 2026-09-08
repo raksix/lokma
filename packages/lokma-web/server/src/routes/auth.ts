@@ -48,7 +48,7 @@ function authErr(reply: FastifyReply, e: unknown): unknown {
 }
 
 /** Token from the httpOnly cookie first, Bearer fallback (CLI + web). */
-function requestToken(req: FastifyRequest): string | null {
+export function requestToken(req: FastifyRequest): string | null {
   const cookie = req.headers.cookie;
   if (typeof cookie === 'string') {
     for (const part of cookie.split(';')) {
@@ -90,12 +90,26 @@ async function requireUser(req: FastifyRequest, reply: FastifyReply): Promise<Us
   return user;
 }
 
-/** Admin gate — 403 for member/viewer (Docs/36 §3.1, W6 acceptance leg). */
+/** Admin gate — 403 for calisan/viewer (Docs/36 §3.1, W6 acceptance leg). */
 async function requireAdmin(req: FastifyRequest, reply: FastifyReply): Promise<User | null> {
   const user = await requireUser(req, reply);
   if (!user) return null;
-  if (user.role !== 'admin' && !user.permissions.includes('*')) {
+  if (user.role !== 'admin' && user.role !== 'superadmin' && !user.permissions.includes('*')) {
     reply.status(403).send({ code: 'forbidden', message: 'forbidden: requires admin' });
+    return null;
+  }
+  return user;
+}
+
+/**
+ * Superadmin gate (REQ-062 Parça B, REQ-064) — instance ownership only:
+ * auth policy (`requireLogin` et al). 403 for admin/calisan/viewer.
+ */
+async function requireSuperadmin(req: FastifyRequest, reply: FastifyReply): Promise<User | null> {
+  const user = await requireUser(req, reply);
+  if (!user) return null;
+  if (user.role !== 'superadmin') {
+    reply.status(403).send({ code: 'forbidden', message: 'forbidden: requires superadmin' });
     return null;
   }
   return user;
@@ -167,8 +181,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.patch('/api/auth/settings', async (req, reply) => {
-    const admin = await requireAdmin(req, reply);
-    if (!admin) return reply;
+    // Instance policy is superadmin-only (REQ-064) — admins run projects,
+    // they do not flip the instance-wide login gate.
+    const superadmin = await requireSuperadmin(req, reply);
+    if (!superadmin) return reply;
     try {
       const settings = await saveAuthSettings(req.body ?? {});
       return { ok: true, settings };
@@ -193,7 +209,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     try {
       const { user, inviteLink } = await inviteUser(admin, {
         email: body.email as string,
-        role: (body.role ?? 'member') as 'admin' | 'member' | 'viewer',
+        role: (body.role ?? 'calisan') as 'admin' | 'calisan' | 'member' | 'viewer',
         projectIds: Array.isArray(body.projectIds) ? (body.projectIds as string[]) : [],
       });
       return { ok: true, user, inviteLink };
@@ -219,7 +235,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     if (!admin) return reply;
     const { id } = req.params as { id: string };
     try {
-      await deleteUser(id);
+      await deleteUser(id, admin);
       return { ok: true, id };
     } catch (e) {
       return authErr(reply, e);
@@ -302,7 +318,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     try {
       const project = await getProject(id);
       if (!project) return reply.status(404).send({ code: 'project_not_found', message: 'Project not found' });
-      const editor = user.role === 'admin' || project.ownerId === user.id || (await memberOf(id, user.id)) !== null;
+      const editor = user.role === 'admin' || user.role === 'superadmin' || project.ownerId === user.id || (await memberOf(id, user.id)) !== null;
       if (!editor || !(await can(user, 'project:edit', id))) {
         return reply.status(403).send({ code: 'forbidden', message: 'forbidden: missing project:edit' });
       }
@@ -354,7 +370,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       }
       const member = await addMember(id, user, {
         userId: body.userId as string,
-        role: (body.role ?? 'member') as 'member' | 'viewer',
+        role: (body.role ?? 'calisan') as 'calisan' | 'member' | 'viewer',
       });
       return { ok: true, member };
     } catch (e) {

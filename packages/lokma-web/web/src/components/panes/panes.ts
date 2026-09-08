@@ -61,6 +61,7 @@ export const INSPECTOR_TABS = [
   { id: 'cron', label: 'Cron' },
   { id: 'extras', label: 'Extras' },
   { id: 'memory', label: 'Memory' },
+  { id: 'todos', label: 'Todos' },
 ] as const;
 
 export type InspectorTabId = (typeof INSPECTOR_TABS)[number]['id'];

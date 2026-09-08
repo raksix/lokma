@@ -54,8 +54,9 @@ const inputClass =
   'h-7 rounded-md border border-line bg-white px-2 text-xs focus:outline-none dark:bg-[#1E1E21]';
 
 const ROLES: { id: AuthRole; label: string; desc: string; can: string }[] = [
-  { id: 'admin', label: 'Admin', desc: 'Full access — users, projects, providers, config', can: "can('*') → true" },
-  { id: 'member', label: 'Member', desc: 'Create sessions, edit files, run agents in assigned projects', can: "scoped to membership" },
+  { id: 'superadmin', label: 'Superadmin', desc: 'Instance owner — users, roles, auth policy, all projects', can: "can('*') → true" },
+  { id: 'admin', label: 'Admin', desc: 'Projects, invites, every session in a project — no auth policy', can: 'all but auth:manage' },
+  { id: 'calisan', label: 'Calisan', desc: 'Assigned projects only, own sessions only', can: 'session:view-own' },
   { id: 'viewer', label: 'Viewer', desc: 'Read-only transcript + files in assigned projects', can: 'read-only defaults' },
 ];
 
@@ -153,7 +154,7 @@ export function AuthPane() {
         if (prev && projRes.projects.some((p) => p.id === prev)) return prev;
         return projRes.projects[0]?.id ?? null;
       });
-      if (viewer.role === 'admin') {
+      if (viewer.role === 'admin' || viewer.role === 'superadmin') {
         const usersRes = await api.listUsers();
         setUsers(usersRes.users);
       }
@@ -405,7 +406,7 @@ export function AuthPane() {
     }
   };
 
-  const setMemberRole = async (projectId: string, userId: string, role: 'member' | 'viewer') => {
+  const setMemberRole = async (projectId: string, userId: string, role: 'calisan' | 'member' | 'viewer') => {
     try {
       await api.addMember(projectId, { userId, role });
       if (me) await loadTables(me);
@@ -640,7 +641,8 @@ export function AuthPane() {
   }
 
   // ─── Logged in ───────────────────────────────────────────────────────
-  const isAdmin = me.role === 'admin';
+  const isAdmin = me.role === 'admin' || me.role === 'superadmin';
+  const isSuperadmin = me.role === 'superadmin';
   const shownUsers = filterUsers(users, userQuery);
   const shownProjects = filterProjects(projects, projectQuery);
 
@@ -652,7 +654,7 @@ export function AuthPane() {
         <span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] flex items-center gap-1">
           <Check className="w-3 h-3" /> {me.name} · {me.role}
         </span>
-        <span className="hidden @min-[320px]:inline ml-1 text-[11px] text-zinc-400">admin/member/viewer · project-scoped</span>
+        <span className="hidden @min-[320px]:inline ml-1 text-[11px] text-zinc-400">superadmin/admin/calisan/viewer · project-scoped</span>
         <Button variant="ghost" size="sm" className="ml-auto h-5 text-[11px] gap-1" onClick={doLogout}>
           <LogOut className="w-3 h-3" /> Sign out
         </Button>
@@ -672,7 +674,7 @@ export function AuthPane() {
           {ROLES.map((r) => (
             <div key={r.id} className={`rounded-lg border p-2.5 ${roleTone(r.id)}`}>
               <div className="text-xs font-semibold flex items-center gap-1">
-                {r.id === 'admin' ? <Crown className="w-3 h-3" /> : r.id === 'member' ? <Users className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                {r.id === 'superadmin' ? <Crown className="w-3 h-3" /> : r.id === 'admin' ? <Shield className="w-3 h-3" /> : r.id === 'calisan' ? <Users className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                 {r.label}
                 {me.role === r.id && (
                   <span className="ml-auto text-[10px] font-normal opacity-70">you</span>
@@ -684,11 +686,11 @@ export function AuthPane() {
           ))}
         </div>
 
-        {isAdmin && settings && (
+        {isSuperadmin && settings && (
           <div className="rounded-lg border border-line overflow-hidden">
             <div className="h-7 flex items-center px-3 bg-[#FDFCFB] dark:bg-[#1E1E21] border-b border-line text-xs font-medium">
               Instance policy
-              <span className="ml-auto text-[11px] font-normal text-zinc-400">admin write · viewer 403</span>
+              <span className="ml-auto text-[11px] font-normal text-zinc-400">superadmin write · admin 403</span>
             </div>
             <div className="p-2 flex flex-wrap items-center gap-2 text-xs">
               <label className="text-[11px] text-zinc-500" htmlFor="auth-policy-creation">Who can create projects</label>
@@ -712,6 +714,16 @@ export function AuthPane() {
                 <option value="private">private</option>
                 <option value="public">public</option>
               </select>
+              <label className="flex items-center gap-1.5 text-[11px] text-zinc-600 dark:text-zinc-300" htmlFor="auth-policy-require-login">
+                <input
+                  id="auth-policy-require-login"
+                  type="checkbox"
+                  checked={settings.requireLogin}
+                  onChange={(e) => savePolicy({ requireLogin: e.target.checked })}
+                  className="h-3.5 w-3.5 accent-[#C96442]"
+                />
+                Require login for web + WS
+              </label>
             </div>
           </div>
         )}
@@ -819,11 +831,11 @@ export function AuthPane() {
                               <>
                                 <select
                                   value={member.role}
-                                  onChange={(e) => setMemberRole(p.id, member.userId, e.target.value as 'member' | 'viewer')}
+                                  onChange={(e) => setMemberRole(p.id, member.userId, e.target.value as 'calisan' | 'member' | 'viewer')}
                                   className="h-6 rounded-md border border-line bg-white dark:bg-[#1E1E21] text-[11px] px-1"
                                   aria-label={`Role for ${u?.email ?? member.userId}`}
                                 >
-                                  <option value="member">member</option>
+                                  <option value="calisan">calisan</option>
                                   <option value="viewer">viewer</option>
                                 </select>
                                 <Button
@@ -898,8 +910,9 @@ export function AuthPane() {
                     className="h-6 rounded-md border border-line bg-white dark:bg-[#1E1E21] text-[11px] px-1"
                     aria-label={`Role for ${u.email}`}
                   >
+                    <option value="superadmin" disabled={!isSuperadmin}>superadmin</option>
                     <option value="admin">admin</option>
-                    <option value="member">member</option>
+                    <option value="calisan">calisan</option>
                     <option value="viewer">viewer</option>
                   </select>
                   {u.status === 'disabled' ? (
@@ -942,7 +955,7 @@ export function AuthPane() {
                   aria-label="Invite role"
                 >
                   <option value="viewer">viewer</option>
-                  <option value="member">member</option>
+                  <option value="calisan">calisan</option>
                 </select>
                 <Button size="sm" className="h-7 text-xs gap-1" disabled={inviteBusy} onClick={doInvite}>
                   <UserPlus className="w-3 h-3" /> Invite

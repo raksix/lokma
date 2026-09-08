@@ -83,6 +83,10 @@ export const LazyUsagePane = React.lazy(() =>
   import('@/components/usage/usage-pane').then((m) => ({ default: m.UsagePane })),
 );
 
+export const LazyTodosPane = React.lazy(() =>
+  import('@/components/todos/todo-pane').then((m) => ({ default: m.TodoPane })),
+);
+
 /**
  * PaneFallback — honest loading state while a pane chunk downloads.
  * Named for screen readers (`role=status`); the global reduced-motion

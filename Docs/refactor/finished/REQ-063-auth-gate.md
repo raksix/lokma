@@ -1,6 +1,6 @@
 # REQ-063 — Config'de auth açıksa loginsiz web'e erişim yok
 
-- **Status:** pending (kod yazılmadı — kullanıcı "yap" deyince başlanacak)
+- **Status:** done (2026-09-08 — implemented as REQ-062 Parça A in the same atomic run; this split file tracked the same work, no separate code)
 - **Asked:** 2026-09-08 — "config'den auth açıksa hesapla login olmadan web harness'e ulaşılamasın" (REQ-062'nin A parçası, bağımsız istek).
 - **Mevcut durum:** `AuthSettings`'te `enabled` anahtarı YOK; kural "ilk admin kaydolana kadar instance açık" (bootstrap). Web `App.tsx`'te login guard YOK — Auth sadece bir pane. API token istiyor ama arayüz istemiyor. (Canlıdaki nginx basic-auth uygulama-dışı, sayılmaz.)
 - **İstenen:**

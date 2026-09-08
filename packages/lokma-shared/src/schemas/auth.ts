@@ -8,8 +8,13 @@ import { z } from 'zod';
  * No secrets ever cross the wire — only `hasPassword`-style booleans.
  */
 
-/** Global role — admin > member > viewer (Docs/36 §2). */
-export const RoleSchema = z.enum(['admin', 'member', 'viewer']);
+/**
+ * Global role — superadmin > admin > calisan > viewer (Docs/36 §2,
+ * REQ-062/REQ-064). `member` is a legacy alias of `calisan` (accepted on
+ * read, normalized on write — pre-062 rows keep working, no migration
+ * script needed).
+ */
+export const RoleSchema = z.enum(['superadmin', 'admin', 'calisan', 'member', 'viewer']);
 
 export type Role = z.infer<typeof RoleSchema>;
 
@@ -57,7 +62,7 @@ export type Project = z.infer<typeof ProjectSchema>;
 export const ProjectMemberSchema = z.object({
   projectId: z.string().min(1).max(64),
   userId: z.string().min(1).max(64),
-  role: z.enum(['member', 'viewer']).default('member'),
+  role: z.enum(['calisan', 'member', 'viewer']).default('calisan'),
   /** Per-project permission overrides for this user. */
   permissions: z.array(z.string().min(1).max(80)).default([]),
   addedAt: z.string().datetime(),
@@ -72,6 +77,13 @@ export const AuthSettingsSchema = z.object({
   projectVisibilityDefault: ProjectVisibilitySchema.default('private'),
   inviteExpiryDays: z.number().int().min(1).max(90).default(7),
   sessionRetentionDays: z.number().int().positive().max(3650).nullable().default(null),
+  /**
+   * REQ-062 Parça A (REQ-063): when true AND the instance is bootstrapped,
+   * the web App shows a full-screen login until `/api/auth/me` 200s, and
+   * the WS handshake rejects tokenless sockets. Default false — existing
+   * open instances keep working until a superadmin flips it.
+   */
+  requireLogin: z.boolean().default(false),
 });
 
 export type AuthSettings = z.infer<typeof AuthSettingsSchema>;

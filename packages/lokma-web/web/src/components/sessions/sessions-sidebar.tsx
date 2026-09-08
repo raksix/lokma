@@ -6,6 +6,7 @@ import {
   GitFork,
   GitMerge,
   LayoutGrid,
+  MoreVertical,
   Pencil,
   Plus,
   Search,
@@ -50,6 +51,7 @@ function SessionRow({
   onAction,
   onResume,
   onOpenAsPane,
+  onFork,
   onSubmitRename,
   onCancelAction,
   mergeTargets,
@@ -61,6 +63,7 @@ function SessionRow({
   onAction: (a: Exclude<RowAction, null>) => void;
   onResume: () => void;
   onOpenAsPane: () => void;
+  onFork: () => void;
   onSubmitRename: (title: string) => void;
   onCancelAction: () => void;
   mergeTargets: SessionSummary[];
@@ -77,12 +80,31 @@ function SessionRow({
   }, [session, mergeTargets]);
 
   const title = displayTitle(session);
-  // REQ-051 — compact one-token activity badge (`5m`/`3h`/`2d`); the full
-  // relative string stays as the tooltip. Empty when no timestamp.
+  // REQ-055 — the inline `5m` badge is gone from the row; the duration
+  // (full relative string + compact token) lives inside the kebab menu.
   const badge = activityBadge(session.updatedAt);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const rowRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (rowRef.current && !rowRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
+  const closeMenu = React.useCallback(() => setMenuOpen(false), []);
 
   return (
     <div
+      ref={rowRef}
       draggable={!isMobile}
       onDragStart={(e) => {
         if (isMobileViewport()) return;
@@ -99,7 +121,7 @@ function SessionRow({
       }}
       title={`Drag into a tiling pane (open, split, fork, merge) — ${session.id}`}
       className={cn(
-        'group rounded-md border bg-white dark:bg-[#1E1E21] transition cursor-grab active:cursor-grabbing',
+        'group relative rounded-md border bg-white dark:bg-[#1E1E21] transition cursor-grab active:cursor-grabbing',
         active
           ? 'border-terracotta/50 shadow-sm'
           : 'border-line hover:border-terracotta/30 hover:shadow-sm',
@@ -119,53 +141,93 @@ function SessionRow({
         <div className="flex-1 min-w-0 cursor-pointer" onClick={onResume}>
           <div className="text-xs font-medium truncate pr-1" title={title}>{title}</div>
         </div>
-        {badge ? (
-          <span
-            title={relativeTime(session.updatedAt)}
-            className="shrink-0 rounded bg-zinc-100 px-1 py-px text-[10px] tabular-nums text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+        {/* REQ-055 — kebab menu: the inline badge is gone; duration info
+            (full relative string + compact token) lives in the menu header,
+            row actions move into the menu. Always visible (no hover-only). */}
+        <div className="relative shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            title="Session actions"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="Session actions"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
           >
-            {badge}
-          </span>
-        ) : null}
-        <div className="flex items-center shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition">
-          {isMobile ? null : (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              title="Open as pane tab"
-              onClick={onOpenAsPane}
-             aria-label="Open as pane tab">
-              <Columns2 className="w-3 h-3" />
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            title="Rename"
-            onClick={() => onAction('rename')}
-           aria-label="Rename">
-            <Pencil className="w-3 h-3" />
+            <MoreVertical className="w-3 h-3" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            title="Merge into another session…"
-            onClick={() => onAction('merge')}
-           aria-label="Merge into another session…">
-            <GitMerge className="w-3 h-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 hover:text-red-600"
-            title="Delete"
-            onClick={() => onAction('delete-confirm')}
-           aria-label="Delete">
-            <Trash2 className="w-3 h-3" />
-          </Button>
+          {menuOpen ? (
+            <div
+              role="menu"
+              aria-label="Session actions menu"
+              className="absolute right-0 top-7 z-50 min-w-52 overflow-hidden rounded-md border border-line bg-white shadow-lg dark:bg-[#1E1E21]"
+            >
+              <div className="flex items-center gap-1.5 px-2.5 py-2 border-b border-line/60 text-[11px] text-zinc-500 dark:text-zinc-400">
+                <Clock className="w-3 h-3 shrink-0" />
+                <span className="truncate" title={session.id}>
+                  {relativeTime(session.updatedAt) || 'No activity yet'}
+                </span>
+                {badge ? (
+                  <span className="ml-auto shrink-0 rounded bg-zinc-100 px-1 py-px text-[10px] tabular-nums text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                    {badge}
+                  </span>
+                ) : null}
+              </div>
+              {isMobile ? null : (
+                <button
+                  role="menuitem"
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  onClick={() => {
+                    closeMenu();
+                    onOpenAsPane();
+                  }}
+                >
+                  <Columns2 className="w-3 h-3 shrink-0" /> Open as pane tab
+                </button>
+              )}
+              <button
+                role="menuitem"
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                onClick={() => {
+                  closeMenu();
+                  onAction('rename');
+                }}
+              >
+                <Pencil className="w-3 h-3 shrink-0" /> Rename
+              </button>
+              <button
+                role="menuitem"
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                onClick={() => {
+                  closeMenu();
+                  onAction('merge');
+                }}
+              >
+                <GitMerge className="w-3 h-3 shrink-0" /> Merge into another session
+              </button>
+              <button
+                role="menuitem"
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                onClick={() => {
+                  closeMenu();
+                  onFork();
+                }}
+              >
+                <GitFork className="w-3 h-3 shrink-0" /> Fork session
+              </button>
+              <button
+                role="menuitem"
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                onClick={() => {
+                  closeMenu();
+                  onAction('delete-confirm');
+                }}
+              >
+                <Trash2 className="w-3 h-3 shrink-0" /> Delete
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -444,6 +506,7 @@ export function SessionsSidebar({
                   onAction={(a) => setOpenAction({ id: s.id, action: a })}
                   onResume={() => onSelect(s.id)}
                   onOpenAsPane={() => handleOpenAsPane(s)}
+                  onFork={() => handleFork(s.id)}
                   onSubmitRename={(title) => {
                     const trimmed = title.trim();
                     if (!trimmed || trimmed === displayTitle(s)) {

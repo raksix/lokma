@@ -75,3 +75,5 @@
 - [REQ-054](REQ-054-thinking-tool-ayri-satir.md) — Thinking/tool ayrı satırlar + error card — done
 - [REQ-055](REQ-055-kebab-menu.md) — Süre yerine dikey ... context menü — pending
 - [REQ-056](REQ-056-sag-tik-menu.md) — Her yerde sağ-tık context menü — pending
+- [REQ-057](REQ-057-harness-kendini-kontrol.md) — Harness UI'ı kontrol etsin — pending
+- [REQ-058](REQ-058-yeni-proje-butonu.md) — Yeni proje butonu — pending

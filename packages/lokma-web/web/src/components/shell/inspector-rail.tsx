@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Beaker, Bot, Brain, Clock3, Cpu, Folder, GitBranch, Globe, HardDrive, Info, Layers, Package, Paintbrush, Plug2, Puzzle, Settings, Shield, Star, Terminal, Users, Workflow } from 'lucide-react';
+import { Activity, BarChart3, Beaker, Bot, Brain, Clock3, Cpu, Folder, FolderOpen, GitBranch, Globe, HardDrive, Info, Layers, Package, Paintbrush, Plug2, Puzzle, Settings, Shield, Star, Terminal, Users, Workflow } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { INSPECTOR_DRAG_MIME, encodeInspectorDrag } from '@/components/panes/panes';
 import type { InspectorTab } from '@/components/providers';
@@ -8,7 +8,7 @@ import type { ExplorerSide, SidebarSide } from './responsive';
  * InspectorRail — REQ-010 thin icon strip (~44px, REQ-023) docked on the Inspector's
  * outer edge. One icon-only button per Inspector tab (same lucide icons and
  * labels as before, tooltip via `title`), so the
- * 23 menus stay reachable without the wide panel open. Purely
+ * 24 menus stay reachable without the wide panel open. Purely
  * presentational: the parent owns the active tab and reveals the Inspector
  * panel on select. Follows the REQ-007 swap via the `side` prop.
  */
@@ -19,6 +19,9 @@ interface InspectorRailItem {
 }
 
 export const INSPECTOR_RAIL_ITEMS: InspectorRailItem[] = [
+  // REQ-043 — Files first (VS Code Explorer position): its page shows
+  // ONLY files, separate from every other Inspector tab.
+  { tab: 'files', label: 'Files', Icon: FolderOpen },
   { tab: 'info', label: 'Info', Icon: Info },
   { tab: 'providers', label: 'Providers', Icon: Plug2 },
   { tab: 'models', label: 'Models', Icon: Layers },

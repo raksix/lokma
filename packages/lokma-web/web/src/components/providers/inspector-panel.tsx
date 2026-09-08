@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { FileBrowser } from '@/components/files';
 import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
 import {
@@ -90,6 +91,9 @@ import {
  * renders only the selected content, no tab list.
  */
 export type InspectorTab =
+  // REQ-043 — Files is its own Inspector page (rail icon, VS Code
+  // Explorer position): only the FileBrowser, no sessions/server card.
+  | 'files'
   | 'info'
   | 'providers'
   | 'models'
@@ -136,6 +140,16 @@ export function InspectorPanel({
       <React.Suspense fallback={<PaneFallback pane={tab} />}>
       {tab === 'info' ? (
         <InfoPanel />
+      ) : tab === 'files' ? (
+        // REQ-043 — the Files page shows ONLY files (same session scope
+        // the docked browser used to have, now behind its own tab).
+        sessionId ? (
+          <FileBrowser key={sessionId} sessionId={sessionId} />
+        ) : (
+          <div className="rounded border border-dashed p-3 text-xs text-muted-foreground">
+            Open a session to browse files.
+          </div>
+        )
       ) : tab === 'memory' ? (
         <LazyMemoryPane />
       ) : tab === 'extras' ? (

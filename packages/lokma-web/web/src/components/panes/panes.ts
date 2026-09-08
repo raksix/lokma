@@ -28,6 +28,9 @@ export const TILING_TABS_KEY = 'lokma:tiling-tabs:v1';
 
 /** Every Inspector tab the tiling bar can open (single source — mirrors the right Inspector). */
 export const INSPECTOR_TABS = [
+  // REQ-043 — Files is its own Inspector page (VS Code Explorer position,
+  // first), no longer docked above every other tab.
+  { id: 'files', label: 'Files' },
   { id: 'info', label: 'Info' },
   { id: 'providers', label: 'Providers' },
   { id: 'models', label: 'Models' },

@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
+import { FileBrowser } from '@/components/files';
 import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
 import { useSessionStore } from '@/stores/session';
@@ -74,6 +75,12 @@ function LazyTab({
   onOpenInspectorTab: (id: InspectorTabId) => void;
 }) {
   if (tab === 'providers') return <LazyProvidersPane />;
+  // REQ-043 — Files is a first-class pane tab (same FileBrowser as the
+  // sidebar Files page, session-scoped with a remount key).
+  if (tab === 'files') {
+    if (!sessionId) return <NeedsSessionPane pane={tab} onOpenSession={onOpenSession} />;
+    return <FileBrowser key={sessionId} sessionId={sessionId} />;
+  }
   if (tab === 'models') return <LazyModelsPane />;
   if (tab === 'usage') return <LazyUsagePane onOpenSession={onOpenSession} />;
   if (tab === 'settings') return <LazySettingsPane />;
@@ -131,7 +138,7 @@ function NeedsSessionPane({ pane, onOpenSession }: { pane: string; onOpenSession
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
       <p className="text-xs text-muted-foreground">
-        {pane === 'terminal' ? 'Terminal' : pane === 'git' ? 'Git' : 'Browser'} needs a session for its working directory.
+        {pane === 'terminal' ? 'Terminal' : pane === 'git' ? 'Git' : pane === 'files' ? 'Files' : 'Browser'} needs a session for its working directory.
       </p>
       <Button variant="default" size="sm" className="h-7 text-xs" disabled={busy} onClick={create}>
         {busy ? 'Creating…' : 'New session'}

@@ -1,7 +1,8 @@
 # REQ-043 — Inspector ve Explorer ayrı sayfa; rail'e dosya ikonu, o sayfada sadece dosyalar
 
-- **Status:** pending (kod yazılmadı — kullanıcı "yap" deyince başlanacak)
+- **Status:** done (2026-09-08, commit below)
 - **Asked:** 2026-09-07 — "Inspector da explorer ayrı sayfa olarak olacak, inspector'ın yan küçük menüsüne dosya ikonu eklersin, vscode'daki gibi, o sayfada sadece dosyalar gözükecek, tamam mı?"
 - **Interpretation:** Inspector ve Explorer iki AYRI sayfa/görünüm olur (aynı panelde üst üste değil). Inspector yanındaki ince şeride (rail) VS Code'daki gibi dosya ikonu eklenir; o sayfa açılınca SADECE dosyalar görünür (sessions/server kartı yok). REQ-034'ün devamı niteliğinde (file explorer'ın tek yuvası = bu dosya sayfası).
-- **Touched (plan):** rail'e files ikonu + Inspector'da files sayfası (sadece `FileBrowser`), Explorer sayfasından FileBrowser çıkışı.
-- **Verify (plan):** root+web `tsc` 0, web build green, single-proc restart, headless ile dosya sayfasında sadece ağaç olduğu + Explorer'da dosya olmadığı kanıtlanır, bundle match.
+- **Touched (this run):** `panes/panes.ts` (`INSPECTOR_TABS` gains `{id:'files'}` first — VS Code Explorer position, so rail drag/drop + `isRailDropId` keep working) + `panes/tiling-bar.tsx` (`TAB_ICONS.files`, FolderOpen; Vault keeps closed Folder) + `panes/inspector-host.tsx` (LazyTab `files` branch renders session-gated FileBrowser, pane-tab capable; NeedsSessionPane label covers Files) + `providers/inspector-panel.tsx` (`InspectorTab` gains `'files'`, renders ONLY FileBrowser with no-session fallback) + `shell/inspector-rail.tsx` (Files icon FIRST in rail, 23→24 items) + `app-shell.tsx` (REQ-034 always-on-top FileBrowser docking REMOVED — other tabs render without files; Explorer already sessions+server only) + rail/panes tests (24-count, files-first).
+- **Proof:** root `tsc` 0 + web `tsc --noEmit` 0 + rail 9/9 + panes 96/96 + web build green (`index-BIdWpqAX.js`), single-proc `lokma-web` restart online, served bundle == disk dist (BUNDLE-MATCH, first bytes identical). Headless (basic-auth, xvfb Chromium): rail 24 items Files-first; Files page Inspector aside = FileBrowser search + real tree (.agentlocks, Docs, packages…) with NO server card + NO sessions list; Info tab = zero file inputs.
+- **Commit:** 68be8cd

@@ -8,6 +8,7 @@ import {
   Clock3,
   Cpu,
   Folder,
+  FolderOpen,
   GitBranch,
   Globe,
   HardDrive,
@@ -32,6 +33,8 @@ import { Button } from '@/components/ui/button';
 import { TILING_BAR_TABS, inspectorLabel, type InspectorTabId } from './panes';
 
 export const TAB_ICONS: Record<InspectorTabId, React.ReactNode> = {
+  // REQ-043 — Files page icon (open folder; Vault keeps the closed Folder).
+  files: <FolderOpen className="h-3 w-3" />,
   info: <Info className="h-3 w-3" />,
   providers: <Plug2 className="h-3 w-3" />,
   models: <Layers className="h-3 w-3" />,

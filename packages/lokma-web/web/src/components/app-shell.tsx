@@ -5,7 +5,7 @@ import { Sidebar } from '@/components/sidebar';
 import { InspectorPanel } from '@/components/providers';
 import type { InspectorTab } from '@/components/providers';
 import { SessionsSidebar } from '@/components/sessions';
-import { FileBrowser, FOCUS_FILES_EVENT } from '@/components/files';
+import { FOCUS_FILES_EVENT } from '@/components/files';
 import { Chat } from '@/components/chat';
 import { TilingWorkspace } from '@/components/panes';
 import { LayoutGrid, X } from 'lucide-react';
@@ -74,10 +74,10 @@ const LazySettingsModal = React.lazy(() =>
  * button (`explorerSide`, persisted to localStorage) — toggle titles,
  * drawer labels and `[`/`]` shortcut copy all follow the swap.
  *
- * REQ-034: the FileBrowser lives INSIDE the Inspector content (docked
- * above the InspectorPanel) — file work travels with the Inspector across
- * the swap, while sessions + the server card stay in the Explorer panel
- * wherever the swap puts it.
+ * REQ-043: Inspector and Explorer are separate pages — file work lives
+ * ONLY behind the rail's Files tab (VS Code Explorer position) where it
+ * renders alone, while sessions + the server card stay in the Explorer
+ * panel wherever the swap puts it.
  */
 export function AppShell({ sessionId }: { sessionId: string }) {
   const [activeId, setActiveId] = React.useState(sessionId);
@@ -367,8 +367,8 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     return () => window.removeEventListener(SHOW_SHORTCUTS_EVENT, open);
   }, []);
 
-  // REQ-034 — the Explorer panel keeps sessions + the server card wherever
-  // the swap puts it; file work moved into the Inspector content below.
+  // REQ-043 — the Explorer panel keeps sessions + the server card wherever
+  // the swap puts it; files moved to the Inspector's own Files page.
   const explorerContent = (
     <div className="space-y-4">
       <SessionsSidebar activeId={activeId} onSelect={switchSession} />
@@ -382,15 +382,14 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     </div>
   );
 
-  // REQ-034 — the FileBrowser docks above the InspectorPanel so file work
-  // travels WITH the Inspector across the REQ-007 swap (it used to sit
-  // fixed on the left and stayed behind when the Inspector moved right).
-  // Session scope is unchanged (`key` remounts per session, exactly as
-  // before). Exactly one FileBrowser exists in the DOM: inspectorContent
-  // renders on one physical side only.
+  // REQ-043 — Inspector and Explorer are SEPARATE pages now (supersedes the
+  // REQ-034 docking): the FileBrowser lives ONLY behind the rail's Files
+  // tab (VS Code Explorer position, first icon) where it renders alone —
+  // no sessions/server card on that page. Other Inspector tabs render
+  // without files, so each page shows exactly its own content. Session
+  // scope is unchanged (`key` remounts per session, exactly as before).
   const inspectorContent = (
     <div className="space-y-4">
-      <FileBrowser key={activeId} sessionId={activeId} />
       <InspectorPanel onOpenSession={switchSession} sessionId={activeId} ws={ws} requestedTab={inspectorTab} />
     </div>
   );

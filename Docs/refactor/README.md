@@ -74,3 +74,4 @@
 - [REQ-053](REQ-053-inspector-tam-genislik.md) — Öğeler Inspector tam genişliği — pending
 - [REQ-054](REQ-054-thinking-tool-ayri-satir.md) — Thinking/tool ayrı satırlar + error card — done
 - [REQ-055](REQ-055-kebab-menu.md) — Süre yerine dikey ... context menü — pending
+- [REQ-056](REQ-056-sag-tik-menu.md) — Her yerde sağ-tık context menü — pending

@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Bot as BotIcon, CheckCircle2, Copy, GitFork, MessageCircle, Play, RefreshCw, Search, Share2, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ContextMenu, useContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
 import { Input } from '@/components/ui/input';
 import { ApiError, api, type AgentInfo, type Bot, type BotVisibility } from '@/lib/api';
 import {
@@ -264,6 +265,153 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
     }
   }
 
+  function copyText(text: string, okLabel: string): void {
+    try {
+      void navigator.clipboard.writeText(text).then(
+        () => toast(okLabel),
+        () => toast('Copy failed — clipboard unavailable'),
+      );
+    } catch {
+      toast('Copy failed — clipboard unavailable');
+    }
+  }
+
+  // REQ-056 — right-click a gallery row for the bot menu on the shared
+  // ContextMenu primitive. Headless-safe actions (chat/fork/publish/
+  // copy) call the API with the row's own id; task-gated Run and the
+  // two-click Delete arm the detail panel instead of guessing input.
+  const botCtx = useContextMenu<string>();
+  const openBotMenu = botCtx.menu;
+  const ctxBot: Bot | null = openBotMenu ? (bots.find((b) => b.id === openBotMenu.key) ?? null) : null;
+
+  async function chatAs(id: string): Promise<void> {
+    const bot = bots.find((b) => b.id === id);
+    if (!bot || chatting) return;
+    setSelectedId(id);
+    setChatting(true);
+    try {
+      const res = await api.createSession({ botId: id, model: bot.model });
+      toast(`Chat opened as ${bot.name}`);
+      if (onOpenSession) onOpenSession(res.id);
+    } catch (e) {
+      toast(`Chat failed: ${errMessage(e)}`);
+    } finally {
+      setChatting(false);
+    }
+  }
+
+  async function forkBotAs(id: string): Promise<void> {
+    if (forking) return;
+    setSelectedId(id);
+    setForking(true);
+    try {
+      const res = await api.forkBot(id, {});
+      toast(`Forked as ${res.bot.id}`);
+      await load(res.bot.id);
+      setTab('mine');
+    } catch (e) {
+      toast(`Fork failed: ${errMessage(e)}`);
+    } finally {
+      setForking(false);
+    }
+  }
+
+  async function publishAs(id: string): Promise<void> {
+    if (publishing) return;
+    setSelectedId(id);
+    setPublishing(true);
+    try {
+      const res = await api.publishBot(id, { visibility: publishVisibility });
+      toast(`Visibility: ${res.visibility}`);
+      await load(id);
+    } catch (e) {
+      toast(`Publish failed: ${errMessage(e)}`);
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  function copyBotDoc(id: string): void {
+    const bot = bots.find((b) => b.id === id);
+    if (!bot) return;
+    const doc = {
+      id: bot.id,
+      name: bot.name,
+      model: bot.model,
+      fallback: bot.fallback,
+      memoryScope: bot.memoryScope,
+      budgets: bot.budgets,
+      visibility: bot.visibility,
+      version: bot.version,
+      createdFrom: bot.createdFrom,
+      tags: bot.tags,
+    };
+    copyText(JSON.stringify(doc, null, 2), 'bot.json copied');
+  }
+
+  const ctxItems: ContextMenuEntry[] = ctxBot
+    ? [
+        { type: 'header', label: `${ctxBot.name} · v${ctxBot.version}` },
+        {
+          type: 'item',
+          label: 'Chat as bot',
+          icon: MessageCircle,
+          onSelect: () => void chatAs(ctxBot.id),
+        },
+        {
+          type: 'item',
+          label: 'Run with task…',
+          icon: Play,
+          hint: 'detail panel',
+          onSelect: () => {
+            setSelectedId(ctxBot.id);
+            toast('Enter a task in the detail panel, then press Run');
+          },
+        },
+        {
+          type: 'item',
+          label: 'Fork',
+          icon: GitFork,
+          onSelect: () => void forkBotAs(ctxBot.id),
+        },
+        {
+          type: 'item',
+          label: `Publish (${publishVisibility})`,
+          icon: Share2,
+          disabled: ctxBot.source === 'bundled',
+          hint: ctxBot.source === 'bundled' ? 'read-only' : undefined,
+          onSelect: () => void publishAs(ctxBot.id),
+        },
+        { type: 'separator' },
+        {
+          type: 'item',
+          label: 'Copy bot.json',
+          icon: Copy,
+          onSelect: () => copyBotDoc(ctxBot.id),
+        },
+        {
+          type: 'item',
+          label: 'Copy bot id',
+          icon: Copy,
+          onSelect: () => copyText(ctxBot.id, 'Bot id copied'),
+        },
+        { type: 'separator' },
+        {
+          type: 'item',
+          label: confirmDelete === ctxBot.id ? 'Confirm delete' : 'Delete…',
+          icon: Trash2,
+          danger: true,
+          disabled: deleteBlockReason(ctxBot) !== null,
+          hint: deleteBlockReason(ctxBot) ?? 'confirm below',
+          onSelect: () => {
+            setSelectedId(ctxBot.id);
+            setConfirmDelete(ctxBot.id);
+            toast('Delete armed — press Delete in the detail panel to confirm');
+          },
+        },
+      ]
+    : [];
+
   return (
     <div className="h-full flex flex-col bg-white dark:bg-[#161618] rounded-lg overflow-hidden border border-line">
       <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0">
@@ -332,6 +480,10 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
                   <button
                     key={b.id}
                     onClick={() => setSelectedId(b.id)}
+                    onContextMenu={(e) => {
+                      setSelectedId(b.id);
+                      botCtx.open(e, b.id);
+                    }}
                     className={`w-full text-left p-2.5 rounded-lg border flex gap-2.5 transition ${
                       selectedId === b.id
                         ? 'bg-[#FDF0E6] border-[#F2D5C2] dark:bg-[#2A1E15] dark:border-[#3A2A1A]'
@@ -595,6 +747,15 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
           )}
         </div>
       </div>
+      {openBotMenu && ctxBot ? (
+        <ContextMenu
+          x={openBotMenu.x}
+          y={openBotMenu.y}
+          items={ctxItems}
+          onClose={botCtx.close}
+          label="Bot actions menu"
+        />
+      ) : null}
     </div>
   );
 }

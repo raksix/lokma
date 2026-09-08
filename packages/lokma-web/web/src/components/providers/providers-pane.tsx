@@ -10,6 +10,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
 import { cn } from '@/lib/utils';
 import type { CreateProviderBody, PatchProviderBody, ProviderInfo } from '@/lib/api';
 import { useProviderStore } from '@/stores';
@@ -50,6 +51,8 @@ function ProviderRow({
   const deleteProvider = useProviderStore((s) => s.deleteProvider);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  // REQ-056 — right-click menu anchor on the shared ContextMenu primitive.
+  const [menuAt, setMenuAt] = React.useState<{ x: number; y: number } | null>(null);
 
   const result = testResults[provider.id];
   const testing = testingId === provider.id;
@@ -94,7 +97,14 @@ function ProviderRow({
   }
 
   return (
-    <div className="rounded-lg border border-line bg-white p-2.5 transition hover:border-terracotta/20 hover:shadow-sm dark:bg-[#1E1E21]">
+    <div
+      className="rounded-lg border border-line bg-white p-2.5 transition hover:border-terracotta/20 hover:shadow-sm dark:bg-[#1E1E21]"
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setMenuAt({ x: e.clientX, y: e.clientY });
+      }}
+    >
       <div className="flex items-center gap-2">
         <GripVertical className="h-3 w-3 shrink-0 text-zinc-300" />
         <span
@@ -206,8 +216,117 @@ function ProviderRow({
           />
         </div>
       )}
+      {menuAt ? (
+        <ProviderContextMenu
+          x={menuAt.x}
+          y={menuAt.y}
+          onClose={() => setMenuAt(null)}
+          providerName={provider.name}
+          enabled={provider.enabled}
+          testing={testing}
+          isFirst={isFirst}
+          isLast={isLast}
+          custom={provider.custom}
+          confirmDelete={confirmDelete}
+          onTest={() => void handleTest()}
+          onEdit={() => setDialogOpen(true)}
+          onToggle={() => void handleToggleEnabled()}
+          onMoveUp={() => onMove(-1)}
+          onMoveDown={() => onMove(1)}
+          onDelete={() => void handleDelete()}
+        />
+      ) : null}
     </div>
   );
+}
+
+/**
+ * ProviderContextMenu — the provider row right-click menu (REQ-056) on
+ * the shared ContextMenu primitive: the same Test/Edit/Enable/Move/
+ * Delete actions as the inline row buttons, no new behavior.
+ */
+function ProviderContextMenu({
+  x,
+  y,
+  onClose,
+  providerName,
+  enabled,
+  testing,
+  isFirst,
+  isLast,
+  custom,
+  confirmDelete,
+  onTest,
+  onEdit,
+  onToggle,
+  onMoveUp,
+  onMoveDown,
+  onDelete,
+}: {
+  x: number;
+  y: number;
+  onClose: () => void;
+  providerName: string;
+  enabled: boolean;
+  testing: boolean;
+  isFirst: boolean;
+  isLast: boolean;
+  custom: boolean;
+  confirmDelete: boolean;
+  onTest: () => void;
+  onEdit: () => void;
+  onToggle: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onDelete: () => void;
+}) {
+  const items: ContextMenuEntry[] = [
+    { type: 'header', label: providerName },
+    {
+      type: 'item',
+      label: testing ? 'Testing…' : 'Test endpoint',
+      icon: FlaskConical,
+      disabled: testing,
+      onSelect: onTest,
+    },
+    {
+      type: 'item',
+      label: 'Edit',
+      icon: Pencil,
+      onSelect: onEdit,
+    },
+    {
+      type: 'item',
+      label: enabled ? 'Disable' : 'Enable',
+      onSelect: onToggle,
+    },
+    { type: 'separator' },
+    {
+      type: 'item',
+      label: 'Move up (higher priority)',
+      icon: ArrowUp,
+      disabled: isFirst,
+      onSelect: onMoveUp,
+    },
+    {
+      type: 'item',
+      label: 'Move down (lower priority)',
+      icon: ArrowDown,
+      disabled: isLast,
+      onSelect: onMoveDown,
+    },
+    { type: 'separator' },
+    {
+      type: 'item',
+      label: confirmDelete ? 'Confirm delete' : 'Delete',
+      icon: Trash2,
+      danger: true,
+      disabled: !custom,
+      hint: custom ? undefined : 'built-in',
+      onSelect: onDelete,
+    },
+  ];
+  return <ContextMenu x={x} y={y} items={items} onClose={onClose} label="Provider actions menu" />;
 }
 
 export function ProvidersPane() {

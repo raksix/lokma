@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
 import { Input } from '@/components/ui/input';
 import { ApiError, api } from '@/lib/api';
 import type { UseWs } from '@/hooks/use-ws';
@@ -578,6 +579,22 @@ export function WorkspacePane({
     onTabsChange(id, next, nextActive);
   };
 
+  // REQ-056: right-click "Close other tabs" — keeps one tab, asks
+  // first when any closed tab carries unsaved file edits.
+  const closeOtherTabs = (keepId: string) => {
+    const doomed = tabs.filter((t) => t.id !== keepId);
+    if (doomed.length === 0) return;
+    if (typeof window !== 'undefined' && doomed.some((t) => dirtyTabs.has(t.id))) {
+      if (!window.confirm('Close other tabs with unsaved changes? They will be lost.')) return;
+    }
+    setDirtyTabs((prev) => {
+      const next = new Set(prev);
+      for (const t of doomed) next.delete(t.id);
+      return next;
+    });
+    onTabsChange(id, tabs.filter((t) => t.id === keepId), keepId);
+  };
+
   // Verify a dropped session id against the live list first (the common
   // path — drops originate from the sidebar showing that list), falling
   // back to one GET so a fresh session never 404s into a fake tab.
@@ -752,6 +769,7 @@ export function WorkspacePane({
         dirtyTabIds={dirtyTabs}
         onSelect={(tabId) => onTabsChange(id, tabs, tabId)}
         onClose={closeTab}
+        onCloseOthers={closeOtherTabs}
         onAdd={() => {
           setPickerOpen((v) => !v);
         }}
@@ -842,6 +860,7 @@ function PaneTabBar({
   dirtyTabIds,
   onSelect,
   onClose,
+  onCloseOthers,
   onAdd,
   onSplitEmpty,
   onClosePane,
@@ -854,6 +873,7 @@ function PaneTabBar({
   dirtyTabIds: ReadonlySet<string>;
   onSelect: (tabId: string) => void;
   onClose: (tabId: string) => void;
+  onCloseOthers: (tabId: string) => void;
   onAdd: () => void;
   onSplitEmpty: (dir: 'row' | 'col') => void;
   onClosePane: () => void;
@@ -864,6 +884,51 @@ function PaneTabBar({
   // Drops here land as CENTER (open tab / chooser, never split) so aiming
   // at the top of a pane no longer loses the drop.
   const [barOver, setBarOver] = React.useState(false);
+  // REQ-056: right-click a tab for its context menu (close / close
+  // others / split / pop out) on the shared ContextMenu primitive.
+  const [tabMenu, setTabMenu] = React.useState<{ x: number; y: number; id: string } | null>(null);
+  const menuTab = tabMenu ? (tabs.find((t) => t.id === tabMenu.id) ?? null) : null;
+  const menuItems: ContextMenuEntry[] = menuTab
+    ? [
+        { type: 'header', label: menuTab.title },
+        {
+          type: 'item',
+          label: 'Close tab',
+          icon: X,
+          onSelect: () => onClose(menuTab.id),
+        },
+        {
+          type: 'item',
+          label: 'Close other tabs',
+          icon: X,
+          disabled: tabs.length < 2,
+          onSelect: () => onCloseOthers(menuTab.id),
+        },
+        { type: 'separator' },
+        {
+          type: 'item',
+          label: 'Split side-by-side',
+          icon: Columns2,
+          onSelect: () => onSplitEmpty('row'),
+        },
+        {
+          type: 'item',
+          label: 'Split stacked',
+          icon: Rows2,
+          onSelect: () => onSplitEmpty('col'),
+        },
+        ...(onPopout
+          ? [
+              {
+                type: 'item',
+                label: 'Pop out as window',
+                icon: PictureInPicture2,
+                onSelect: () => onPopout(),
+              } as ContextMenuEntry,
+            ]
+          : []),
+      ]
+    : [];
   return (
     <div
       onDragOver={(e) => {
@@ -911,6 +976,11 @@ function PaneTabBar({
               // idempotent onSelect, so double delivery is harmless.
               onMouseDown={() => onSelect(tab.id)}
               onClick={() => onSelect(tab.id)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setTabMenu({ x: e.clientX, y: e.clientY, id: tab.id });
+              }}
               title={`${tab.title} — drag to another pane to move it`}
               className={`flex max-w-36 shrink-0 cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-[11px] ${
                 isActive ? 'bg-[#262624] text-white dark:bg-white dark:text-black' : 'text-muted-foreground hover:bg-muted'
@@ -953,6 +1023,15 @@ function PaneTabBar({
       <Button variant="ghost" size="sm" className="h-5 w-5 shrink-0 p-0" title="Close this pane" onClick={onClosePane} aria-label="Close this pane">
         <X className="h-3 w-3" />
       </Button>
+      {tabMenu && menuTab ? (
+        <ContextMenu
+          x={tabMenu.x}
+          y={tabMenu.y}
+          items={menuItems}
+          onClose={() => setTabMenu(null)}
+          label="Pane tab actions menu"
+        />
+      ) : null}
     </div>
   );
 }

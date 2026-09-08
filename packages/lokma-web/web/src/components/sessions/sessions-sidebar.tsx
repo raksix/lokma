@@ -84,6 +84,9 @@ function SessionRow({
   // (full relative string + compact token) lives inside the kebab menu.
   const badge = activityBadge(session.updatedAt);
   const [menuOpen, setMenuOpen] = React.useState(false);
+  // REQ-056 — right-click opens the same kebab menu at the cursor
+  // (fixed position); the ... button keeps the anchored dropdown.
+  const [menuAt, setMenuAt] = React.useState<{ x: number; y: number } | null>(null);
   const rowRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     if (!menuOpen) return;
@@ -99,6 +102,9 @@ function SessionRow({
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
+  }, [menuOpen]);
+  React.useEffect(() => {
+    if (!menuOpen) setMenuAt(null);
   }, [menuOpen]);
   const closeMenu = React.useCallback(() => setMenuOpen(false), []);
 
@@ -120,6 +126,11 @@ function SessionRow({
         }
       }}
       title={`Drag into a tiling pane (open, split, fork, merge) — ${session.id}`}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setMenuAt({ x: e.clientX, y: e.clientY });
+        setMenuOpen(true);
+      }}
       className={cn(
         'group relative rounded-md border bg-white dark:bg-[#1E1E21] transition cursor-grab active:cursor-grabbing',
         active
@@ -161,7 +172,19 @@ function SessionRow({
             <div
               role="menu"
               aria-label="Session actions menu"
-              className="absolute right-0 top-7 z-50 min-w-52 overflow-hidden rounded-md border border-line bg-white shadow-lg dark:bg-[#1E1E21]"
+              style={
+                menuAt
+                  ? {
+                      left: Math.max(4, Math.min(menuAt.x, window.innerWidth - 224)),
+                      top: Math.max(4, Math.min(menuAt.y, window.innerHeight - 220)),
+                    }
+                  : undefined
+              }
+              className={
+                menuAt
+                  ? 'fixed z-[100] min-w-52 overflow-hidden rounded-md border border-line bg-white shadow-lg dark:bg-[#1E1E21]'
+                  : 'absolute right-0 top-7 z-50 min-w-52 overflow-hidden rounded-md border border-line bg-white shadow-lg dark:bg-[#1E1E21]'
+              }
             >
               <div className="flex items-center gap-1.5 px-2.5 py-2 border-b border-line/60 text-[11px] text-zinc-500 dark:text-zinc-400">
                 <Clock className="w-3 h-3 shrink-0" />

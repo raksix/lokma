@@ -16,6 +16,8 @@ import {
   Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ContextMenu, useContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
+import { emitToast } from '@/components/shell';
 import { api } from '@/lib/api';
 import { useAgentStore } from '@/stores/agent';
 import { AgentDialog } from './agent-dialog';
@@ -151,16 +153,19 @@ function AgentRow({
   selected,
   position,
   onSelect,
+  onContextMenu,
 }: {
   agent: HubAgent;
   selected: boolean;
   position: number | null;
   onSelect: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
 }) {
   const created = formatRelativeTime(agent.createdAt);
   return (
     <button
       onClick={onSelect}
+      onContextMenu={onContextMenu}
       className={`w-full text-left p-2.5 rounded-lg border flex gap-2.5 transition hover:shadow-sm ${
         selected
           ? 'bg-[#FDF0E6] border-[#F2D5C2] dark:bg-[#2A1E15] dark:border-[#3A2A1A]'
@@ -299,6 +304,81 @@ export function AgentsPane() {
   const inputClass =
     'rounded-md border border-line bg-white px-2 py-1 text-xs text-zinc-800 dark:bg-[#1E1E21] dark:text-zinc-100';
 
+  // REQ-056 — right-click a registry row for the lifecycle menu on the
+  // shared ContextMenu primitive. Actions call the store with the
+  // row's own id (never the selection), under the same guards as the
+  // detail buttons below.
+  const rowCtx = useContextMenu<string>();
+  const openMenu = rowCtx.menu;
+  const ctxAgent: HubAgent | null = openMenu ? (rows.find((a) => a.id === openMenu.key) ?? null) : null;
+  const copyAgentId = (id: string) => {
+    try {
+      void navigator.clipboard.writeText(id).then(
+        () => emitToast('Agent id copied'),
+        () => emitToast('Copy failed'),
+      );
+    } catch {
+      emitToast('Copy failed');
+    }
+  };
+  const ctxItems: ContextMenuEntry[] = ctxAgent
+    ? [
+        { type: 'header', label: `${ctxAgent.name} · ${ctxAgent.state}` },
+        {
+          type: 'item',
+          label: 'Pause',
+          icon: Pause,
+          disabled: !['idle', 'queued', 'running'].includes(ctxAgent.state),
+          onSelect: () => void move(ctxAgent.id, 'pause').catch(() => undefined),
+        },
+        {
+          type: 'item',
+          label: 'Resume',
+          icon: Play,
+          disabled: ctxAgent.state !== 'paused',
+          onSelect: () => void move(ctxAgent.id, 'resume').catch(() => undefined),
+        },
+        {
+          type: 'item',
+          label: 'Kill',
+          icon: Square,
+          disabled: TERMINAL_STATES.includes(ctxAgent.state),
+          onSelect: () => void move(ctxAgent.id, 'kill').catch(() => undefined),
+        },
+        { type: 'separator' },
+        {
+          type: 'item',
+          label: 'Fork (same SOUL/MEMORY)',
+          icon: GitFork,
+          onSelect: () => void copy(ctxAgent.id, 'fork').catch(() => undefined),
+        },
+        {
+          type: 'item',
+          label: 'Clone (full copy)',
+          icon: Copy,
+          onSelect: () => void copy(ctxAgent.id, 'clone').catch(() => undefined),
+        },
+        {
+          type: 'item',
+          label: 'Copy agent id',
+          icon: Copy,
+          onSelect: () => copyAgentId(ctxAgent.id),
+        },
+        { type: 'separator' },
+        {
+          type: 'item',
+          label: 'Delete…',
+          icon: Trash2,
+          danger: true,
+          hint: 'confirm below',
+          onSelect: () => {
+            selectAgent(ctxAgent.id);
+            emitToast('Press Delete in the detail panel to confirm');
+          },
+        },
+      ]
+    : [];
+
   return (
     <div className="h-full flex flex-col bg-white dark:bg-[#161618] rounded-lg overflow-hidden border border-line">
       <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0">
@@ -390,6 +470,10 @@ export function AgentsPane() {
                 selected={a.id === selected?.id}
                 position={queuePosition(rows, a.id)}
                 onSelect={() => selectAgent(a.id)}
+                onContextMenu={(e) => {
+                  selectAgent(a.id);
+                  rowCtx.open(e, a.id);
+                }}
               />
             ))
           )}
@@ -682,6 +766,15 @@ export function AgentsPane() {
         onClose={() => setDialogOpen(false)}
         onCreate={handleCreate}
       />
+      {openMenu && ctxAgent ? (
+        <ContextMenu
+          x={openMenu.x}
+          y={openMenu.y}
+          items={ctxItems}
+          onClose={rowCtx.close}
+          label="Agent actions menu"
+        />
+      ) : null}
     </div>
   );
 }

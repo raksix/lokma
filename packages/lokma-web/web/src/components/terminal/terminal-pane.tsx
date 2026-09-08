@@ -10,6 +10,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ContextMenu, useContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
 import { api, type TerminalInfo } from '@/lib/api';
 import type { UseWs } from '@/hooks/use-ws';
 import { emitToast } from '@/components/shell';
@@ -232,6 +233,60 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
 
   const exitNote = selected ? exitSummary(selected) : null;
 
+  // REQ-056 — right-click a terminal tab for its lifecycle menu on the
+  // shared ContextMenu primitive. Kill keeps its two-click arm: the
+  // first menu click arms, the second (re-opened) menu click confirms.
+  const termCtx = useContextMenu<string>();
+  const openTermMenu = termCtx.menu;
+  const ctxTerm: TerminalInfo | null = openTermMenu
+    ? (terminals.find((t) => t.id === openTermMenu.key) ?? null)
+    : null;
+  const copyTermId = (id: string) => {
+    try {
+      void navigator.clipboard.writeText(id).then(
+        () => emitToast('Terminal id copied'),
+        () => emitToast('Copy failed'),
+      );
+    } catch {
+      emitToast('Copy failed');
+    }
+  };
+  const ctxItems: ContextMenuEntry[] = ctxTerm
+    ? [
+        { type: 'header', label: `${terminalLabel(ctxTerm)} · ${statusLabel(ctxTerm)}` },
+        {
+          type: 'item',
+          label: 'Open terminal',
+          icon: TerminalIcon,
+          onSelect: () => select(ctxTerm.id),
+        },
+        {
+          type: 'item',
+          label: armedKill === ctxTerm.id ? 'Confirm kill' : 'Kill process',
+          icon: Square,
+          danger: true,
+          disabled: ctxTerm.status !== 'running',
+          onSelect: () => void kill(ctxTerm.id),
+        },
+        {
+          type: 'item',
+          label: 'Forget record',
+          icon: Trash2,
+          danger: true,
+          disabled: ctxTerm.status === 'running',
+          hint: ctxTerm.status === 'running' ? 'kill first' : undefined,
+          onSelect: () => void forget(ctxTerm.id),
+        },
+        { type: 'separator' },
+        {
+          type: 'item',
+          label: 'Copy terminal id',
+          icon: Copy,
+          onSelect: () => copyTermId(ctxTerm.id),
+        },
+      ]
+    : [];
+
   return (
     <div className="flex h-[420px] flex-col overflow-hidden rounded-lg border border-[#232326] bg-[#0F0F11] text-[#EDE9E2]">
       <div className="flex h-7 shrink-0 items-center gap-1 overflow-x-auto border-b border-white/10 bg-[#1E1E21] px-2">
@@ -242,6 +297,10 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
             <button
               key={t.id}
               onClick={() => select(t.id)}
+              onContextMenu={(e) => {
+                select(t.id);
+                termCtx.open(e, t.id);
+              }}
               title={`${terminalLabel(t)} — ${statusLabel(t)}`}
               className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${
                 t.id === selectedId
@@ -460,6 +519,15 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
         </span>
         <span className="ml-auto hidden text-white/30 lg:inline">ws {ws.status}</span>
       </div>
+      {openTermMenu && ctxTerm ? (
+        <ContextMenu
+          x={openTermMenu.x}
+          y={openTermMenu.y}
+          items={ctxItems}
+          onClose={termCtx.close}
+          label="Terminal actions menu"
+        />
+      ) : null}
     </div>
   );
 }

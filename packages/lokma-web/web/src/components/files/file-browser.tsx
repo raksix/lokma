@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -597,50 +598,65 @@ export function FileBrowser({ sessionId }: { sessionId: string }) {
         </div>
       )}
 
-      {menu && (
-        <div
-          className="fixed z-50 w-44 rounded-md border border-line bg-white py-1 shadow-lg dark:bg-[#1E1E21]"
-          style={{ left: Math.min(menu.x, window.innerWidth - 190), top: Math.min(menu.y, window.innerHeight - 160) }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs hover:bg-muted"
-            onClick={() => {
-              copyText(menu.path, 'Path');
-              setMenu(null);
-            }}
-          >
-            <Copy className="h-3 w-3" /> Copy path
-          </button>
-          <button
-            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs hover:bg-muted"
-            onClick={() => {
-              copyText(basename(menu.path), 'Filename');
-              setMenu(null);
-            }}
-          >
-            <Copy className="h-3 w-3" /> Copy filename
-          </button>
-          <button
-            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs hover:bg-muted"
-            onClick={() => {
-              emitInsertMention(menu.path);
-              setMenu(null);
-            }}
-          >
-            <AtSign className="h-3 w-3" /> Insert @mention
-          </button>
-          <button
-            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs hover:bg-muted"
-            onClick={() => {
-              setMenu(null);
-              void openFile(menu.path);
-            }}
-          >
-            <FileIcon className="h-3 w-3" /> Open file
-          </button>
-        </div>
-      )}
+      {menu ? (
+        <FileContextMenu
+          x={menu.x}
+          y={menu.y}
+          path={menu.path}
+          onClose={() => setMenu(null)}
+          onOpenFile={(p) => void openFile(p)}
+        />
+      ) : null}
     </div>
   );
+}
+
+/**
+ * FileContextMenu — the Explorer right-click menu (REQ-056) on the
+ * shared ContextMenu primitive: same 4 actions as before (copy path /
+ * copy filename / insert @mention / open file), now with viewport
+ * clamping and Escape/scroll dismissal.
+ */
+function FileContextMenu({
+  x,
+  y,
+  path,
+  onClose,
+  onOpenFile,
+}: {
+  x: number;
+  y: number;
+  path: string;
+  onClose: () => void;
+  onOpenFile: (p: string) => void;
+}) {
+  const items: ContextMenuEntry[] = [
+    { type: 'header', label: path },
+    {
+      type: 'item',
+      label: 'Copy path',
+      icon: Copy,
+      onSelect: () => copyText(path, 'Path'),
+    },
+    {
+      type: 'item',
+      label: 'Copy filename',
+      icon: Copy,
+      onSelect: () => copyText(basename(path), 'Filename'),
+    },
+    {
+      type: 'item',
+      label: 'Insert @mention',
+      icon: AtSign,
+      hint: 'chat',
+      onSelect: () => emitInsertMention(path),
+    },
+    {
+      type: 'item',
+      label: 'Open file',
+      icon: FileIcon,
+      onSelect: () => onOpenFile(path),
+    },
+  ];
+  return <ContextMenu x={x} y={y} items={items} onClose={onClose} label="File actions menu" />;
 }

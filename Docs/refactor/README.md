@@ -84,3 +84,4 @@
 - [REQ-063](REQ-063-auth-gate.md) — Loginsiz web erişimi yok — pending
 - [REQ-064](REQ-064-roller-superadmin-calisan.md) — superadmin/admin/çalışan — pending
 - [REQ-065](REQ-065-todo-oto-assign.md) — Todo + AI oto-assign claim — pending
+- [REQ-066](REQ-066-onboarding-superadmin.md) — Onboarding: auth sor + superadmin aç — pending

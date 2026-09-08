@@ -20,6 +20,7 @@ import {
   copyText,
   exitSummary,
   filterLines,
+  keyToBytes,
   statusLabel,
   stripAnsi,
   terminalLabel,
@@ -27,11 +28,14 @@ import {
 
 /**
  * TerminalPane — live shell tabs over real server processes (W3-10).
- * Spawn via `POST /api/terminal`, stdin over the shared WS socket
- * (`terminal/input`), output as `terminal/data` frames, end as
- * `terminal/exit`. Kill ends the real PID; forget drops the record.
- * No mocks: tabs, bytes, pids and exit codes all come from the server.
- * No xterm.js yet (plain scrollback + stdin line) — see the footer note.
+ * Spawn via `POST /api/terminal`, keystrokes travel over the shared WS
+ * socket (`terminal/input`) as raw PTY bytes, output arrives as
+ * `terminal/data` frames, end as `terminal/exit`. Kill ends the real PID;
+ * forget drops the record. No mocks: tabs, bytes, pids and exit codes all
+ * come from the server.
+ * REQ-059: no command box — the scrollback itself is the terminal. Click
+ * it and type: printable keys, Enter, Backspace, Tab, arrows (shell
+ * history), Ctrl+C (interrupt), Ctrl+D (EOF) all reach the server PTY.
  */
 
 function shortId(id: string): string {
@@ -43,7 +47,6 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [buffers, setBuffers] = React.useState<Record<string, string>>({});
   const [cwd, setCwd] = React.useState('');
-  const [input, setInput] = React.useState('');
   const [search, setSearch] = React.useState('');
   const [follow, setFollow] = React.useState(true);
   const [loading, setLoading] = React.useState(false);
@@ -157,6 +160,8 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
       setCreating(false);
       setNewAgent('');
       emitToast(`Terminal ${shortId(res.terminal.id)} started (pid ${res.terminal.pid ?? '?'})`);
+      // REQ-059: hand focus to the scrollback so typing starts immediately.
+      window.setTimeout(() => scrollRef.current?.focus({ preventScroll: true }), 50);
     } catch (e) {
       emitToast(e instanceof Error ? e.message : 'terminal create failed');
     } finally {
@@ -164,13 +169,39 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
     }
   }, [cwd, newAgent, sessionId, refresh, select]);
 
-  const send = React.useCallback(() => {
-    if (!selectedId || !input.trim()) return;
-    // Piped shells do not echo stdin — show the command so output reads sanely.
-    setBuffers((prev) => ({ ...prev, [selectedId]: appendCapped(prev[selectedId] ?? '', `$ ${input.trim()}\n`) }));
-    ws.sendTerminal(selectedId, `${input.trim()}\n`);
-    setInput('');
-  }, [selectedId, input, ws]);
+  const sendRaw = React.useCallback(
+    (data: string) => {
+      if (!selectedId || !data || ws.status !== 'open') return;
+      // PTY shells echo input themselves — never paint it client-side.
+      ws.sendTerminal(selectedId, data);
+    },
+    [selectedId, ws],
+  );
+
+  // REQ-059 direct typing: the scrollback is the terminal. Every handled
+  // key becomes raw PTY bytes; unmapped keys (Cmd-combos, F-keys) fall
+  // through to the browser.
+  const onTermKeyDown = React.useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (!selectedId || selected?.status !== 'running') return;
+      const bytes = keyToBytes({ key: e.key, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey });
+      if (bytes === null) return;
+      e.preventDefault();
+      sendRaw(bytes);
+    },
+    [selectedId, selected, sendRaw],
+  );
+
+  const onTermPaste = React.useCallback(
+    (e: React.ClipboardEvent<HTMLDivElement>) => {
+      if (!selectedId || selected?.status !== 'running') return;
+      const text = e.clipboardData.getData('text');
+      if (!text) return;
+      e.preventDefault();
+      sendRaw(text.replace(/\r\n/g, '\n'));
+    },
+    [selectedId, selected, sendRaw],
+  );
 
   const kill = React.useCallback(
     async (id: string) => {
@@ -462,7 +493,19 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
         </span>
       </div>
 
-      <div ref={scrollRef} className="flex-1 space-y-0.5 overflow-auto p-3 font-mono text-xs leading-5">
+      <div
+        ref={scrollRef}
+        tabIndex={selected?.status === 'running' ? 0 : -1}
+        role="application"
+        aria-label={
+          selected?.status === 'running'
+            ? 'Terminal — click and type directly, arrows for history, Control C interrupts'
+            : 'Terminal scrollback'
+        }
+        onKeyDown={onTermKeyDown}
+        onPaste={onTermPaste}
+        className="flex-1 cursor-text space-y-0.5 overflow-auto p-3 font-mono text-xs leading-5 focus:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500/40"
+      >
         {lastError && terminals.length === 0 ? (
           <div className="text-red-400">{lastError}</div>
         ) : !selected ? (
@@ -488,34 +531,15 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
         )}
       </div>
 
-      <div className="shrink-0 border-t border-white/5 bg-[#161618] p-2">
-        <label htmlFor="terminal-stdin" className="mb-1 block text-[10px] uppercase tracking-wide text-white/40">
-          Command (sent to {selected ? terminalLabel(selected) : 'shell'} stdin)
-        </label>
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-xs text-emerald-400">$</span>
-          <input
-            id="terminal-stdin"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') send();
-            }}
-            placeholder={selected?.status === 'running' ? 'echo hello' : 'start a shell first'}
-            disabled={!selected || selected.status !== 'running'}
-            className="h-7 flex-1 rounded border border-white/10 bg-white/5 px-2 font-mono text-xs text-white placeholder:text-white/30 focus:border-white/20 focus:outline-none disabled:opacity-40"
-          />
-          <Button size="sm" className="h-7 text-[11px]" disabled={!selected || selected.status !== 'running' || !input.trim()} onClick={send}>
-            Send
-          </Button>
-        </div>
-      </div>
-
       <div className="flex h-6 shrink-0 items-center gap-1 overflow-x-auto border-t border-white/5 bg-[#161618] px-2 text-[10px]">
-        <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5">shell · pipes</span>
+        <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5">
+          {selected ? (selected.pty ? 'shell · pty' : 'shell · pipes') : 'shell'}
+        </span>
         <span className="hidden text-white/30 @min-[320px]:inline">
-          {terminals.filter((t) => t.status === 'running').length}/{terminals.length} live · no pty yet (plain
-          scrollback, follow-up: xterm.js)
+          {terminals.filter((t) => t.status === 'running').length}/{terminals.length} live ·{' '}
+          {selected?.status === 'running'
+            ? 'click the output and type — arrows history, ctrl+c interrupts, ctrl+d exits'
+            : 'start a shell to type'}
         </span>
         <span className="ml-auto hidden text-white/30 lg:inline">ws {ws.status}</span>
       </div>

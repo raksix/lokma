@@ -7,6 +7,7 @@ import {
   appendCapped,
   exitSummary,
   filterLines,
+  keyToBytes,
   statusLabel,
   stripAnsi,
   terminalLabel,
@@ -30,6 +31,7 @@ const info = (over: Partial<TerminalInfo> = {}): TerminalInfo => ({
   shell: '/bin/bash',
   cwd: '/tmp/work',
   pid: 4242,
+  pty: true,
   agentId: null,
   sessionId: 'sess_1',
   status: 'running',
@@ -77,6 +79,25 @@ check('empty query returns all lines', filterLines(buf, '').length === 3);
 check('substring match', filterLines(buf, 'npm').length === 1);
 check('case-insensitive', filterLines(buf, 'HELLO').length === 1);
 check('no match is empty', filterLines(buf, 'zzz').length === 0);
+
+// keyToBytes (REQ-059 direct typing)
+check('printable passes through', keyToBytes({ key: 'a' }) === 'a');
+check('digit passes through', keyToBytes({ key: '7' }) === '7');
+check('enter is newline', keyToBytes({ key: 'Enter' }) === '\n');
+check('backspace is DEL', keyToBytes({ key: 'Backspace' }) === '');
+check('tab passes through', keyToBytes({ key: 'Tab' }) === '\t');
+check('escape passes through', keyToBytes({ key: 'Escape' }) === '');
+check('arrow up is history', keyToBytes({ key: 'ArrowUp' }) === '[A');
+check('arrow down', keyToBytes({ key: 'ArrowDown' }) === '[B');
+check('arrow left/right', keyToBytes({ key: 'ArrowLeft' }) === '[D' && keyToBytes({ key: 'ArrowRight' }) === '[C');
+check('ctrl+c interrupts', keyToBytes({ key: 'c', ctrlKey: true }) === '');
+check('ctrl+d EOF', keyToBytes({ key: 'd', ctrlKey: true }) === '');
+check('ctrl+l clears', keyToBytes({ key: 'l', ctrlKey: true }) === '');
+check('ctrl uppercase folds', keyToBytes({ key: 'C', ctrlKey: true }) === '');
+check('cmd combo falls through', keyToBytes({ key: 'c', metaKey: true }) === null);
+check('alt combo falls through', keyToBytes({ key: 'b', altKey: true }) === null);
+check('f-keys fall through', keyToBytes({ key: 'F5' }) === null);
+check('shift alone falls through', keyToBytes({ key: 'Shift' }) === null);
 
 console.log(`terminal: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

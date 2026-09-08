@@ -460,6 +460,8 @@ export type TerminalInfo = {
   shell: string;
   cwd: string;
   pid: number | null;
+  /** True when the shell runs inside a real PTY (REQ-059), false on plain pipes. */
+  pty: boolean;
   agentId: string | null;
   sessionId: string;
   status: TerminalStatus;

@@ -57,6 +57,65 @@ export function filterLines(text: string, query: string): string[] {
   return lines.filter((line) => line.toLowerCase().includes(q));
 }
 
+/** Minimal key shape for direct terminal typing (DOM-free, unit-tested). */
+export type TermKey = {
+  key: string;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+  altKey?: boolean;
+};
+
+/**
+ * Map a browser key event to raw PTY bytes (REQ-059 direct typing).
+ * Returns the bytes to send, or null when the browser should handle the
+ * key itself (Cmd-combos, Alt-combos, unmapped function keys).
+ * Ctrl+letter folds to control codes (Ctrl+C = \x03 interrupts, Ctrl+D =
+ * \x04 EOF, Ctrl+L clears), arrows/history keys become ANSI sequences so
+ * the shell's own readline owns history and completion.
+ */
+export function keyToBytes(e: TermKey): string | null {
+  if (e.metaKey || e.altKey) return null;
+  const { key } = e;
+  if (e.ctrlKey) {
+    if (key === '[') return '\u001b';
+    if (key.length === 1) {
+      const code = key.toLowerCase().charCodeAt(0);
+      if (code >= 97 && code <= 122) return String.fromCharCode(code - 96);
+    }
+    return null;
+  }
+  switch (key) {
+    case 'Enter':
+      return '\n';
+    case 'Backspace':
+      return '\u007f';
+    case 'Tab':
+      return '\t';
+    case 'Escape':
+      return '\u001b';
+    case 'ArrowUp':
+      return '\u001b[A';
+    case 'ArrowDown':
+      return '\u001b[B';
+    case 'ArrowRight':
+      return '\u001b[C';
+    case 'ArrowLeft':
+      return '\u001b[D';
+    case 'Delete':
+      return '\u001b[3~';
+    case 'Home':
+      return '\u001b[H';
+    case 'End':
+      return '\u001b[F';
+    case 'PageUp':
+      return '\u001b[5~';
+    case 'PageDown':
+      return '\u001b[6~';
+    default:
+      return key.length === 1 ? key : null;
+  }
+}
+
 /** Copy helper — clipboard API with a textarea fallback (non-secure contexts). */
 export async function copyText(text: string): Promise<boolean> {
   try {

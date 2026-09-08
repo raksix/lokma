@@ -1,15 +1,18 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 
 /**
  * Terminal manager — real shell processes behind the TerminalPane (W3-10).
- * Each terminal is a live `$SHELL` child with piped stdio: stdin arrives via
- * WS `terminal/input` (or POST input), stdout+stderr stream back as WS
+ * Each terminal is a live `$SHELL` child: stdin arrives via WS
+ * `terminal/input` (or POST input), stdout+stderr stream back as WS
  * `terminal/data`, process end as `terminal/exit`. Kill ends the real PID.
  *
- * Honest scope: pipes, not a PTY — job control, prompts and full-screen TUIs
- * do not work here (node-pty is the follow-up). Plain commands, scripts and
- * build output stream byte-for-byte.
+ * REQ-059: shells run inside a REAL PTY via `script(1)` (util-linux,
+ * zero-dep) when available — prompts echo, readline history/completion
+ * work, Ctrl+C (`\x03`) interrupts, interactive programs behave. Without
+ * `script` (or with `LOKMA_NO_PTY=1`) it falls back to plain pipes
+ * (`pty: false` on the record) — same API, no echo/job-control.
  * See Docs/24 §terminal pane.
  */
 
@@ -29,6 +32,8 @@ export type TerminalRecord = {
   shell: string;
   cwd: string;
   pid: number | null;
+  /** True when the shell runs inside a real PTY (`script(1)`), false on plain pipes. */
+  pty: boolean;
   /** Owning agent (optional label) — tabs group by this when set. */
   agentId: string | null;
   /** Spawning web session — WS broadcast only reaches this session's sockets. */
@@ -65,6 +70,29 @@ export class TerminalError extends Error {
 }
 
 const TERMINAL_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+/**
+ * Whether `script(1)` (util-linux) is usable for real PTYs.
+ * Cached after the first check; `LOKMA_NO_PTY=1` forces pipe mode.
+ */
+let ptyAvailable: boolean | null = null;
+
+export function isPtyAvailable(): boolean {
+  if (ptyAvailable !== null) return ptyAvailable;
+  if (process.env.LOKMA_NO_PTY === '1') {
+    ptyAvailable = false;
+    return false;
+  }
+  ptyAvailable = existsSync('/usr/bin/script') || existsSync('/bin/script');
+  return ptyAvailable;
+}
+
+/** Shell command line for `script -c`: interactive (prompt, history, completion). */
+function shellCommand(shell: string): string {
+  const base = shell.split('/').pop() || shell;
+  if (base === 'bash') return `${shell} --norc -i`;
+  return `${shell} -i`;
+}
 
 function newTerminalId(): string {
   return `term_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -130,12 +158,14 @@ export class TerminalManager {
     }
     const agentId = opts.agentId?.trim() ? opts.agentId.trim().slice(0, 128) : null;
     const shell = process.env.SHELL || 'bash';
+    const usePty = isPtyAvailable();
     const id = newTerminalId();
     const record: TerminalRecord = {
       id,
       shell,
       cwd,
       pid: null,
+      pty: usePty,
       agentId,
       sessionId: opts.sessionId ?? '',
       status: 'running',
@@ -148,11 +178,20 @@ export class TerminalManager {
     const entry: LiveEntry = { proc: null as unknown as ChildProcess, record, tail: '', exitWaiters: [] };
     this.live.set(id, entry);
     try {
-      const proc = spawn(shell, [], {
-        cwd,
-        env: { ...process.env, TERM: 'xterm-256color' },
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
+      // REQ-059: `script -qec` gives the shell a real slave PTY while our
+      // stdio stays plain pipes — zero native deps. Control chars
+      // (Ctrl+C = \x03, Ctrl+D = \x04) arrive as PTY input and behave.
+      const proc = usePty
+        ? spawn('script', ['-qec', shellCommand(shell), '/dev/null'], {
+            cwd,
+            env: { ...process.env, TERM: 'xterm-256color' },
+            stdio: ['pipe', 'pipe', 'pipe'],
+          })
+        : spawn(shell, [], {
+            cwd,
+            env: { ...process.env, TERM: 'xterm-256color' },
+            stdio: ['pipe', 'pipe', 'pipe'],
+          });
       entry.proc = proc;
       record.pid = proc.pid ?? null;
     } catch (e) {
@@ -199,7 +238,7 @@ export class TerminalManager {
     return { bytes: data.length };
   }
 
-  /** Record the pane size (no PTY to resize yet — stored for the future pty). */
+  /** Record the pane size (stored for the UI; `script(1)` inherits the daemon winsize). */
   resize(id: string, cols: unknown, rows: unknown): { cols: number; rows: number } {
     assertTerminalId(id);
     const entry = this.live.get(id);

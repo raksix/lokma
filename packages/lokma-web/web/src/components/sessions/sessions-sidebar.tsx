@@ -22,8 +22,6 @@ import {
   displayTitle,
   filterSessions,
   groupSessions,
-  messageCountLabel,
-  relativeTime,
 } from './grouping';
 
 /**
@@ -77,7 +75,6 @@ function SessionRow({
   }, [session, mergeTargets]);
 
   const title = displayTitle(session);
-  const model = (session.model ?? '').trim();
 
   return (
     <div
@@ -113,19 +110,6 @@ function SessionRow({
         />
         <div className="flex-1 min-w-0 cursor-pointer" onClick={onResume}>
           <div className="text-xs font-medium truncate pr-1" title={title}>{title}</div>
-          <div className="flex items-center gap-1 mt-0.5">
-            {model ? (
-              <span className="px-1 py-0.5 rounded bg-muted border border-line text-[10px] truncate max-w-[140px]" title={model}>
-                {model}
-              </span>
-            ) : null}
-            {typeof session.messageCount === 'number' ? (
-              <span className="text-[11px] text-zinc-400">{messageCountLabel(session.messageCount)}</span>
-            ) : null}
-            {session.updatedAt ? (
-              <span className="text-[11px] text-zinc-400">· {relativeTime(session.updatedAt)}</span>
-            ) : null}
-          </div>
         </div>
         <div className="flex items-center shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition">
           {isMobile ? null : (

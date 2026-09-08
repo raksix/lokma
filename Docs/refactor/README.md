@@ -65,3 +65,4 @@
 - [REQ-044](REQ-044-session-sadece-baslik.md) — Session listede sadece başlık — pending
 - [REQ-045](REQ-045-tiling-bar-kaldir.md) — Tiling üst menü çubuğu kalkar — pending
 - [REQ-046](REQ-046-pane-popout.md) — Pane'de ayrı pencere butonu — pending
+- [REQ-047](REQ-047-cift-tik-kaldir.md) — Bozuk çift-tık büyütme kaldırılır — pending

@@ -1,6 +1,7 @@
 import {
   buildBuiltinTools,
   buildToolSystemPrompt,
+  buildUiControlTools,
   createBlockFilter,
   executeToolCall,
   mintCallId,
@@ -126,6 +127,16 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
 
   const registry = new ToolRegistry();
   for (const tool of buildBuiltinTools(opts.cwd)) registry.register(tool);
+  // REQ-057: UI-control tools run the server effect (browser tab, shell,
+  // session) and emit a `ui_action` frame per call so connected clients
+  // open/focus the matching pane — the harness drives its own surface.
+  for (const tool of buildUiControlTools(opts.cwd, {
+    sessionId: opts.sessionId,
+    emit: (payload) =>
+      opts.send({ type: 'ui_action', actionId: mintCallId('ui'), ...payload, sessionId: opts.sessionId }),
+  })) {
+    registry.register(tool);
+  }
   const toolSystem = buildToolSystemPrompt(registry.list().map((t) => ({ name: t.name, description: t.description })));
   const preamble = opts.systemPreamble?.trim() ? `${opts.systemPreamble.trim()}\n\n` : '';
   const system = `${preamble}${toolSystem}`;

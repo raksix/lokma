@@ -24,6 +24,8 @@ export type QuestionRequest = Extract<ServerMessage, { type: 'ask_user_question'
 /** Live shell output + exit frames behind the TerminalPane (W3-10). */
 export type TerminalDataFrame = Extract<ServerMessage, { type: 'terminal/data' }>;
 export type TerminalExitFrame = Extract<ServerMessage, { type: 'terminal/exit' }>;
+/** Agent-driven UI request (REQ-057) — queued for the shell consumer. */
+export type UiActionRequest = Extract<ServerMessage, { type: 'ui_action' }>;
 export type ToolCallEntry = {
   tool: string;
   input: unknown;
@@ -41,6 +43,8 @@ export type WsUiState = {
   cost: CostTotal;
   permissions: PermissionRequest[];
   questions: QuestionRequest[];
+  /** Agent UI-control queue (REQ-057) — the shell opens panes per entry. */
+  uiActions: UiActionRequest[];
   done: boolean;
   doneReason: string | null;
   lastError: string | null;
@@ -168,6 +172,7 @@ export function initialWsUiState(): WsUiState {
     cost: { inputTokens: 0, outputTokens: 0, costUsd: 0, model: '' },
     permissions: [],
     questions: [],
+    uiActions: [],
     done: false,
     doneReason: null,
     lastError: null,
@@ -213,6 +218,8 @@ export function applyServerFrame(state: WsUiState, msg: ServerMessage): WsUiStat
       return { ...state, permissions: [...state.permissions, msg] };
     case 'ask_user_question':
       return { ...state, questions: [...state.questions, msg] };
+    case 'ui_action':
+      return { ...state, uiActions: [...state.uiActions, msg] };
     case 'cost':
       return { ...state, cost: addCost(state.cost, msg) };
     case 'agent_state':

@@ -170,6 +170,18 @@ export function upsertSessionTab(state: PaneTabState, sessionId: string, title?:
   return { tabs: [...state.tabs, tab], active: tab.id };
 }
 
+/**
+ * Open-or-focus an inspector tab in a pane state (REQ-057): the same
+ * inspector focuses its existing tab instead of duplicating it; anything
+ * else appends a fresh inspector tab and activates it.
+ */
+export function upsertInspectorTab(state: PaneTabState, inspectorId: InspectorTabId): PaneTabState {
+  const existing = state.tabs.find((t) => t.kind === 'inspector' && t.inspectorId === inspectorId);
+  if (existing) return { tabs: state.tabs, active: existing.id };
+  const tab = makeInspectorTab(inspectorId);
+  return { tabs: [...state.tabs, tab], active: tab.id };
+}
+
 /** Runtime guard for persisted / drag-carried tabs (corrupt rows are dropped, never rendered). */
 export function isPaneTab(value: unknown): value is PaneTab {
   if (typeof value !== 'object' || value === null) return false;

@@ -22,6 +22,7 @@ import {
   type QuestionRequest,
   type ServerMessage,
   type ToolCallEntry,
+  type UiActionRequest,
   type WsStatus,
   type WsUiState,
 } from '@/lib/ws';
@@ -47,6 +48,8 @@ export type UseWs = {
   cost: CostTotal;
   permissions: PermissionRequest[];
   questions: QuestionRequest[];
+  /** Agent UI-control queue (REQ-057) — the shell opens panes per entry. */
+  uiActions: UiActionRequest[];
   done: boolean;
   lastError: string | null;
   sendText: (prompt: string, opts?: SendOpts) => void;
@@ -60,6 +63,8 @@ export type UseWs = {
   resizeTerminal: (terminalId: string, cols: number, rows: number) => void;
   /** End a live shell (server confirms with `terminal/exit`). */
   killTerminal: (terminalId: string) => void;
+  /** Drop one consumed agent UI action from the queue (REQ-057). */
+  dismissUiAction: (actionId: string) => void;
   reconnect: () => void;
   disconnect: () => void;
   connect: () => void;
@@ -230,6 +235,11 @@ export function useWs(sessionId: string): UseWs {
     socketSend(wsRef.current, terminalKill(terminalId));
   }, []);
 
+  const dismissUiAction = useCallback((actionId: string) => {
+    if (!actionId) return;
+    setUi((prev) => ({ ...prev, uiActions: prev.uiActions.filter((a) => a.actionId !== actionId) }));
+  }, []);
+
   return {
     status,
     messages,
@@ -239,6 +249,7 @@ export function useWs(sessionId: string): UseWs {
     cost: ui.cost,
     permissions: ui.permissions,
     questions: ui.questions,
+    uiActions: ui.uiActions,
     done: ui.done,
     lastError: ui.lastError,
     sendText,
@@ -249,6 +260,7 @@ export function useWs(sessionId: string): UseWs {
     sendTerminal,
     resizeTerminal,
     killTerminal,
+    dismissUiAction,
     reconnect: connect,
     disconnect,
     connect,

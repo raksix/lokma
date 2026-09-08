@@ -22,6 +22,7 @@ import {
   type PaneTab,
   type PaneTabState,
   upsertFileTab,
+  upsertInspectorTab,
   upsertSessionTab,
 } from './panes';
 
@@ -50,6 +51,8 @@ export function TilingWorkspace({
   const consumeFileTab = usePaneStore((s) => s.consumeFileTab);
   const pendingSessionTab = usePaneStore((s) => s.pendingSessionTab);
   const consumeSessionTab = usePaneStore((s) => s.consumeSessionTab);
+  const pendingInspectorTab = usePaneStore((s) => s.pendingInspectorTab);
+  const consumeInspectorTab = usePaneStore((s) => s.consumeInspectorTab);
 
   const [tabStates, setTabStates] = React.useState<Record<string, PaneTabState>>(loadTabStates);
   // REQ-042: floating window positions+sizes persist across reloads.
@@ -139,6 +142,23 @@ export function TilingWorkspace({
     }
     consumeSessionTab();
   }, [pendingSessionTab, paneIds, focusedPaneId, focusPane, consumeSessionTab]);
+
+  // REQ-057: agent UI actions ("open the browser/terminal for me") land here
+  // as a tab in the last-focused pane (same inspector focuses instead of
+  // duplicating). One-shot: consumed even when no pane exists.
+  React.useEffect(() => {
+    if (!pendingInspectorTab) return;
+    const target = paneIds.includes(focusedPaneId) ? focusedPaneId : paneIds[0];
+    if (target) {
+      const { inspectorId } = pendingInspectorTab;
+      setTabStates((prev) => ({
+        ...prev,
+        [target]: upsertInspectorTab(prev[target] ?? { tabs: [], active: null }, inspectorId),
+      }));
+      focusPane(target);
+    }
+    consumeInspectorTab();
+  }, [pendingInspectorTab, paneIds, focusedPaneId, focusPane, consumeInspectorTab]);
 
   const tabsChange = (paneId: string, tabs: PaneTab[], active: string | null) => {
     setTabStates((prev) => ({ ...prev, [paneId]: { tabs, active } }));

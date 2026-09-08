@@ -6,7 +6,7 @@ import { InspectorPanel } from '@/components/providers';
 import type { InspectorTab } from '@/components/providers';
 import { SessionsSidebar } from '@/components/sessions';
 import { FOCUS_FILES_EVENT } from '@/components/files';
-import { Chat } from '@/components/chat';
+import { Chat, INITIAL_PREFIX } from '@/components/chat';
 import { RESET_LAYOUT_EVENT, TilingWorkspace } from '@/components/panes';
 import { AppWindow, LayoutGrid, RotateCcw, Square, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -88,6 +88,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   const setTiling = usePaneStore((s) => s.setTiling);
   const setWindowed = usePaneStore((s) => s.setWindowed);
   const requestSessionTab = usePaneStore((s) => s.requestSessionTab);
+  const requestInspectorTab = usePaneStore((s) => s.requestInspectorTab);
   // REQ-019 — resizable sidebars: widths persist in the pane store
   // (`lokma:layout:v1`), the Sidebar handle writes back live via setSideWidth.
   const leftW = usePaneStore((s) => s.leftW);
@@ -308,6 +309,48 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     },
     [activeId, isMobile, refreshSessions, selectSession, tiling, requestSessionTab],
   );
+
+  // REQ-057 — agent UI actions: the loop drives the Web UI surface through
+  // `ui_action` frames. Browser/terminal open as a pane tab when tiling
+  // (sidebar Inspector tab otherwise); a new session opens as a pane tab or
+  // switches the single chat, with the agent prompt staged so Chat
+  // auto-sends it on socket open. One-shot: every entry is dismissed after
+  // handling, toasts keep the action visible in the transcript timeline.
+  const uiActions = ws.uiActions;
+  const dismissUiAction = ws.dismissUiAction;
+  React.useEffect(() => {
+    if (uiActions.length === 0) return;
+    for (const entry of uiActions) {
+      if (entry.action === 'open_browser' || entry.action === 'open_terminal') {
+        const tab = entry.action === 'open_browser' ? 'browser' : 'terminal';
+        if (!isMobile && tiling) {
+          requestInspectorTab(tab);
+        } else {
+          setInspectorTab(tab);
+          setSidebars((current) => ({ ...current, [inspectorSide]: true }));
+        }
+        emitToast(entry.action === 'open_browser' ? `Agent opened browser: ${entry.url ?? ''}` : 'Agent opened a terminal');
+      } else if (entry.action === 'open_session' && entry.targetSessionId) {
+        const id = entry.targetSessionId;
+        if (entry.prompt) {
+          try {
+            sessionStorage.setItem(`${INITIAL_PREFIX}${id}`, entry.prompt);
+          } catch {
+            // Fresh session still opens; the prompt is dropped only for this tab.
+          }
+        }
+        void refreshSessions();
+        if (!isMobile && tiling) {
+          requestSessionTab(id, id);
+        } else {
+          setActiveId(id);
+          selectSession(id);
+        }
+        emitToast(entry.prompt ? 'Agent opened a session with a prompt' : 'Agent opened a new session');
+      }
+      dismissUiAction(entry.actionId);
+    }
+  }, [uiActions, dismissUiAction, isMobile, tiling, inspectorSide, requestInspectorTab, requestSessionTab, refreshSessions, selectSession]);
 
   // Global shortcuts — every combo is listed in the SHORTCUTS registry so
   // the help dialog (`?`) can never drift from what the keys actually do.

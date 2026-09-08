@@ -20,7 +20,13 @@ import { formatCostBadge } from '@/components/header';
  */
 
 const MODEL_KEY = 'lokma-model';
-const INITIAL_PREFIX = 'lokma:initial:';
+/**
+ * sessionStorage key prefix for a first prompt handed to a fresh session
+ * (starter cards, `/new <prompt>`, REQ-057 agent `open_session`). Exported
+ * so the shell can stage an agent prompt the same way — Chat consumes and
+ * removes it on socket open, then auto-sends.
+ */
+export const INITIAL_PREFIX = 'lokma:initial:';
 
 function readStoredModel(): string {
   try {

@@ -68,6 +68,21 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
     sessionId: z.string(),
   }),
   z.object({ type: z.literal('done'), sessionId: z.string(), reason: z.enum(['complete', 'aborted', 'error']).default('complete') }),
+  // REQ-057: the agent loop drives the Web UI surface (browser / terminal /
+  // session panes) through the same socket. Tools run server-side AND emit
+  // one of these so every connected client opens/focuses the matching pane —
+  // the user sees exactly what the agent did, live.
+  z.object({
+    type: z.literal('ui_action'),
+    actionId: z.string().min(1).max(64),
+    action: z.enum(['open_browser', 'open_terminal', 'open_session']),
+    url: z.string().max(2048).optional(),
+    tabId: z.string().max(64).optional(),
+    terminalId: z.string().max(64).optional(),
+    targetSessionId: z.string().max(128).optional(),
+    prompt: z.string().max(8000).optional(),
+    sessionId: z.string(),
+  }),
   z.object({ type: z.literal('error'), message: z.string(), code: z.string().optional(), sessionId: z.string().optional() }),
 ]);
 

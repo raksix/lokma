@@ -32,6 +32,11 @@ export type PendingSessionTab = {
   title: string;
 };
 
+/** One-shot inspector-open request from agent UI actions (REQ-057, consumed by TilingWorkspace, never persisted). */
+export type PendingInspectorTab = {
+  inspectorId: 'browser' | 'terminal';
+};
+
 type PaneState = {
   layout: LayoutNode;
   leftW: number;
@@ -43,6 +48,7 @@ type PaneState = {
   activeSessionId: string | null;
   pendingFileTab: PendingFileTab | null;
   pendingSessionTab: PendingSessionTab | null;
+  pendingInspectorTab: PendingInspectorTab | null;
   setLayout: (layout: LayoutNode) => void;
   setSideWidth: (side: 'left' | 'right', width: number) => void;
   setTiling: (on: boolean) => void;
@@ -55,6 +61,8 @@ type PaneState = {
   consumeFileTab: () => void;
   requestSessionTab: (sessionId: string, title: string) => void;
   consumeSessionTab: () => void;
+  requestInspectorTab: (inspectorId: 'browser' | 'terminal') => void;
+  consumeInspectorTab: () => void;
   resetLayout: () => void;
 };
 
@@ -69,6 +77,7 @@ const initial = {
   activeSessionId: null as string | null,
   pendingFileTab: null as PendingFileTab | null,
   pendingSessionTab: null as PendingSessionTab | null,
+  pendingInspectorTab: null as PendingInspectorTab | null,
 };
 
 export const usePaneStore = create<PaneState>()(
@@ -108,6 +117,9 @@ export const usePaneStore = create<PaneState>()(
 
       requestSessionTab: (sessionId: string, title: string) => set({ pendingSessionTab: { sessionId, title } }),
       consumeSessionTab: () => set({ pendingSessionTab: null }),
+
+      requestInspectorTab: (inspectorId: 'browser' | 'terminal') => set({ pendingInspectorTab: { inspectorId } }),
+      consumeInspectorTab: () => set({ pendingInspectorTab: null }),
 
       resetLayout: () => set({ ...initial, layout: defaultLayout(), openTabs: [] }),
     }),

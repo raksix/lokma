@@ -79,6 +79,16 @@ export function describeToolCall(tool: string, input: unknown): string {
       const cmd = arg('command') ?? 'a command';
       return `Run \`${cmd}\``;
     }
+    case 'open_browser':
+      return `Open browser on ${arg('url') ?? 'a URL'}`;
+    case 'open_terminal': {
+      const cmd = arg('command');
+      return cmd ? `Open a terminal running \`${cmd}\`` : 'Open a terminal pane';
+    }
+    case 'open_session': {
+      const title = arg('title');
+      return title ? `Open session "${title}"` : 'Open a new session pane';
+    }
     default:
       return `Run ${tool}`;
   }

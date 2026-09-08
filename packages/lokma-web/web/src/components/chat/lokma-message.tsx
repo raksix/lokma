@@ -184,6 +184,31 @@ export function ThoughtTrace({ toolCalls }: { toolCalls: Record<string, ToolCall
   );
 }
 
+// ─── Thinking trace (live `thinking_delta` frames, REQ-050) ───────────────────
+// Claude-Code style reasoning block: open + pulsing while the model thinks,
+// collapsed to a quiet line once the answer streams. Never persisted —
+// `thinking` resets on every new prompt (see use-ws sendText).
+export function ThinkingTrace({ thinking, streaming }: { thinking: string; streaming: boolean }) {
+  if (!thinking) return null;
+  return (
+    <details
+      open={streaming}
+      className="mt-2 overflow-hidden rounded-lg border border-dashed border-line bg-white/60 dark:bg-[#1E1E21]/40"
+    >
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-500 hover:bg-muted/50">
+        <Brain className={`h-3.5 w-3.5 text-terracotta ${streaming ? 'animate-pulse' : ''}`} />
+        Thinking{streaming ? '…' : ''}
+        <span className="ml-auto text-[11px] font-normal text-zinc-400">
+          {thinking.length > 120 ? `${thinking.slice(0, 120)}…` : thinking}
+        </span>
+      </summary>
+      <div className="max-h-48 overflow-auto border-t border-line px-3 py-2 text-xs leading-[1.6] text-zinc-500 whitespace-pre-wrap">
+        {thinking}
+      </div>
+    </details>
+  );
+}
+
 // ─── Permission card (real permission_request frame) ─────────────────────────
 
 export function PermissionCard({

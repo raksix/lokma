@@ -13,6 +13,7 @@ import {
   AssistantBody,
   PermissionCard,
   QuestionCard,
+  ThinkingTrace,
   ThoughtTrace,
 } from './lokma-message';
 import type { PermissionRequest, QuestionRequest, ToolCallEntry } from '@/lib/ws';
@@ -198,6 +199,7 @@ export function SingleChatView({
   pending,
   stream,
   streaming,
+  thinking,
   costLabel,
   toolCalls,
   permissions,
@@ -216,6 +218,7 @@ export function SingleChatView({
   pending: PendingMessage[];
   stream: string;
   streaming: boolean;
+  thinking: string;
   costLabel: string | null;
   toolCalls: Record<string, ToolCallEntry>;
   permissions: PermissionRequest[];
@@ -289,7 +292,17 @@ export function SingleChatView({
                 </div>
               </div>
             ))}
-            {stream && (
+            {thinking && (
+              <div className="flex gap-3">
+                <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full border border-line bg-muted font-serif text-xs">
+                  ?
+                </span>
+                <div className="min-w-0 flex-1">
+                  <ThinkingTrace thinking={thinking} streaming={streaming} />
+                </div>
+              </div>
+            )}
+            {(stream || Object.keys(toolCalls).length > 0) && (
               <div className="flex gap-3">
                 <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full border border-line bg-[#262624] font-serif text-xs text-white">
                   L
@@ -297,10 +310,12 @@ export function SingleChatView({
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-semibold">Lokma</div>
                   <ThoughtTrace toolCalls={toolCalls} />
+                  {stream && (
                   <div className="mt-1.5 text-[13.5px] leading-[1.6] whitespace-pre-wrap">
                     {stream}
                     {streaming && <span className="ml-1 inline-block h-4 w-0.5 animate-pulse bg-foreground align-middle" />}
                   </div>
+                  )}
                 </div>
               </div>
             )}

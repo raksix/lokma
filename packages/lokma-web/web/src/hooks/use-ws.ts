@@ -42,6 +42,7 @@ export type UseWs = {
   status: WsStatus;
   messages: ServerMessage[];
   stream: string;
+  thinking: string;
   toolCalls: Record<string, ToolCallEntry>;
   cost: CostTotal;
   permissions: PermissionRequest[];
@@ -192,7 +193,7 @@ export function useWs(sessionId: string): UseWs {
     const text = prompt.trim();
     if (!text) return;
     // A new prompt starts a new run — clear the previous run's trace with it.
-    setUi((prev) => ({ ...prev, stream: '', done: false, doneReason: null, lastError: null, toolCalls: {} }));
+    setUi((prev) => ({ ...prev, stream: '', thinking: '', done: false, doneReason: null, lastError: null, toolCalls: {} }));
     socketSend(wsRef.current, promptMessage(text, sessionRef.current, opts));
   }, []);
 
@@ -233,6 +234,7 @@ export function useWs(sessionId: string): UseWs {
     status,
     messages,
     stream: ui.stream,
+    thinking: ui.thinking,
     toolCalls: ui.toolCalls,
     cost: ui.cost,
     permissions: ui.permissions,

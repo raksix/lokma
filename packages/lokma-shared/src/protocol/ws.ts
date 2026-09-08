@@ -44,6 +44,8 @@ export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 // ─── Server → Client ───────────────────────────────────────────────────────
 export const ServerMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('text_delta'), delta: z.string(), sessionId: z.string() }),
+  // REQ-050: live reasoning stream (Claude-Code style thinking block).
+  z.object({ type: z.literal('thinking_delta'), delta: z.string(), sessionId: z.string() }),
   z.object({ type: z.literal('tool_start'), tool: z.string(), input: z.unknown(), callId: z.string(), sessionId: z.string() }),
   z.object({ type: z.literal('tool_result'), callId: z.string(), result: z.unknown(), isError: z.boolean().default(false), sessionId: z.string() }),
   z.object({ type: z.literal('permission_request'), requestId: z.string(), tool: z.string(), description: z.string(), sessionId: z.string() }),

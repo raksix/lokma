@@ -185,6 +185,10 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
             clean += visible;
             opts.send({ type: 'text_delta', delta: visible, sessionId: opts.sessionId });
           }
+        } else if (chunk.type === 'thinking_delta') {
+          // REQ-050: reasoning streams straight through (never filtered,
+          // never persisted as answer text).
+          if (chunk.delta) opts.send({ type: 'thinking_delta', delta: chunk.delta, sessionId: opts.sessionId });
         } else if (chunk.type === 'done') {
           break;
         }

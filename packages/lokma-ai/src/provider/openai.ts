@@ -63,6 +63,23 @@ export function responsesOutputText(output: unknown): string {
   return text;
 }
 
+/** Pull finished reasoning summaries out of a `response.completed` payload. */
+export function responsesThinkingText(output: unknown): string {
+  if (!Array.isArray(output)) return '';
+  let text = '';
+  for (const item of output) {
+    if (typeof item !== 'object' || item === null) continue;
+    const rec = item as { type?: unknown; summary?: unknown };
+    if (rec.type !== 'reasoning' || !Array.isArray(rec.summary)) continue;
+    for (const part of rec.summary) {
+      if (typeof part !== 'object' || part === null) continue;
+      const p = part as { type?: unknown; text?: unknown };
+      if (p.type === 'summary_text' && typeof p.text === 'string') text += p.text;
+    }
+  }
+  return text;
+}
+
 export class OpenAIAdapter implements ProviderAdapter {
   id = 'openai' as const;
 
@@ -131,15 +148,25 @@ export class OpenAIAdapter implements ProviderAdapter {
         }
         if (viaResponses) {
           // Responses API: `response.output_text.delta` carries live text,
+          // `response.reasoning_summary_text.delta` carries live thinking,
           // `response.completed` carries the finished output array.
-          const r = evt as { delta?: unknown; response?: { output?: unknown } };
+          const r = evt as { type?: unknown; delta?: unknown; response?: { output?: unknown } };
+          if (r?.type === 'response.reasoning_summary_text.delta') {
+            if (typeof r?.delta === 'string' && r.delta) yield { type: 'thinking_delta', delta: r.delta };
+            continue;
+          }
           if (typeof r?.delta === 'string' && r.delta) yield { type: 'text_delta', delta: r.delta };
           const tail = responsesOutputText(r?.response?.output);
           if (tail) yield { type: 'text_delta', delta: tail };
+          const thinkTail = responsesThinkingText(r?.response?.output);
+          if (thinkTail) yield { type: 'thinking_delta', delta: thinkTail };
           continue;
         }
         const content = record?.choices?.[0]?.delta?.content;
         if (typeof content === 'string' && content) yield { type: 'text_delta', delta: content };
+        // DeepSeek-style reasoning stream rides the same delta object.
+        const reasoning = (record?.choices?.[0]?.delta as { reasoning_content?: unknown } | undefined)?.reasoning_content;
+        if (typeof reasoning === 'string' && reasoning) yield { type: 'thinking_delta', delta: reasoning };
       }
     } catch (e) {
       if (e instanceof ProviderError) throw e;

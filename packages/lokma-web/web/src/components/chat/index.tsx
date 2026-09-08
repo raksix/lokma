@@ -68,7 +68,7 @@ export function Chat({
   const storeModels = useProviderStore((s) => s.models);
   const refreshProviders = useProviderStore((s) => s.refresh);
 
-  const { status, stream, cost, done, lastError, toolCalls, permissions, questions, sendText, interrupt, answerPermission, answerQuestion } = ws;
+  const { status, stream, thinking, cost, done, lastError, toolCalls, permissions, questions, sendText, interrupt, answerPermission, answerQuestion } = ws;
   const socketOpen = status === 'open';
   const streaming = socketOpen && !done && stream.length > 0;
   const [answerBusy, setAnswerBusy] = React.useState<string | null>(null);
@@ -532,6 +532,7 @@ export function Chat({
           pending={pending}
           stream={streamVisible ? stream : ''}
           streaming={streaming}
+          thinking={thinking}
           costLabel={costLabel}
           toolCalls={toolCalls}
           permissions={permissions}

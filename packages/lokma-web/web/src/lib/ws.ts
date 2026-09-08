@@ -35,6 +35,8 @@ export type CostTotal = { inputTokens: number; outputTokens: number; costUsd: nu
 /** Reducer state derived from the append-only server frame log. */
 export type WsUiState = {
   stream: string;
+  /** Live reasoning text (REQ-050) — shown while streaming, never persisted. */
+  thinking: string;
   toolCalls: Record<string, ToolCallEntry>;
   cost: CostTotal;
   permissions: PermissionRequest[];
@@ -161,6 +163,7 @@ export function terminalKill(terminalId: string): string {
 export function initialWsUiState(): WsUiState {
   return {
     stream: '',
+    thinking: '',
     toolCalls: {},
     cost: { inputTokens: 0, outputTokens: 0, costUsd: 0, model: '' },
     permissions: [],
@@ -188,6 +191,8 @@ export function applyServerFrame(state: WsUiState, msg: ServerMessage): WsUiStat
   switch (msg.type) {
     case 'text_delta':
       return { ...state, stream: state.stream + msg.delta, done: false };
+    case 'thinking_delta':
+      return { ...state, thinking: state.thinking + msg.delta, done: false };
     case 'tool_start':
       return {
         ...state,

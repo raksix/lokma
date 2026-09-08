@@ -30,6 +30,7 @@ export type AdapterStreamOpts = {
 
 export type StreamChunk =
   | { type: 'text_delta'; delta: string }
+  | { type: 'thinking_delta'; delta: string }
   | { type: 'tool_start'; tool: string; input: unknown; callId: string }
   | { type: 'tool_result'; callId: string; result: unknown }
   | { type: 'done'; reason: 'complete' | 'error' };

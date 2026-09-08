@@ -344,8 +344,8 @@ export function Composer({
             {modelOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setModelOpen(false)} />
-                <div className="absolute right-0 bottom-[calc(100%+8px)] z-50 flex max-h-[420px] w-[340px] max-w-[92vw] flex-col overflow-hidden rounded-xl border border-[#2A2A2E] bg-[#111113] shadow-2xl">
-                  <div className="border-b border-white/10 p-2">
+                <div className="absolute right-0 bottom-[calc(100%+8px)] z-50 flex max-h-[420px] w-[340px] max-w-[92vw] flex-col overflow-hidden rounded-xl border border-line bg-white shadow-2xl dark:border-[#2A2A2E] dark:bg-[#111113]">
+                  <div className="border-b border-line p-2 dark:border-white/10">
                     <div className="relative">
                       <Search className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
                       <input
@@ -353,7 +353,7 @@ export function Composer({
                         placeholder="Search models"
                         value={modelQuery}
                         onChange={(e) => setModelQuery(e.target.value)}
-                        className="h-8 w-full rounded-lg border border-white/10 bg-[#1E1E20] pr-3 pl-8 text-[13px] text-white placeholder:text-zinc-500 focus:border-white/20 focus:outline-none"
+                        className="h-8 w-full rounded-lg border border-line bg-muted pr-3 pl-8 text-[13px] text-ink placeholder:text-zinc-400 focus:outline-none dark:border-white/10 dark:bg-[#1E1E20] dark:text-white dark:placeholder:text-zinc-500"
                       />
                     </div>
                   </div>
@@ -377,8 +377,8 @@ export function Composer({
                               setModelQuery('');
                             }}
                             className={cn(
-                              'mx-1 w-[calc(100%-8px)] justify-start text-[13px] text-white hover:bg-white/10 hover:text-white',
-                              model === m.id && 'border border-white/5 bg-white/10',
+                              'mx-1 w-[calc(100%-8px)] justify-start text-[13px] text-ink hover:bg-muted dark:text-white dark:hover:bg-white/10 dark:hover:text-white',
+                              model === m.id && 'border border-line bg-muted dark:border-white/5 dark:bg-white/10',
                             )}
                           >
                             <span className="flex items-center gap-1.5">

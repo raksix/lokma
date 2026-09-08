@@ -48,7 +48,7 @@ import {
   type PaneTab,
 } from './panes';
 import { InspectorHost } from './inspector-host';
-import { TAB_ICONS } from './tiling-bar';
+import { TAB_ICONS } from './tab-icons';
 
 // PaneFilePreview (REQ-017): IDE-style editable file tab. Loads the
 // owning session's cwd (GET /api/sessions/:id) then the real bytes

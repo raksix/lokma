@@ -7,6 +7,7 @@ export {
   INSPECTOR_DRAG_MIME,
   INSPECTOR_TABS,
   PANE_TAB_MIME,
+  RESET_LAYOUT_EVENT,
   SESSION_DRAG_MIME,
   TILING_BAR_TABS,
   TILING_TABS_KEY,
@@ -47,6 +48,6 @@ export {
 export { WorkspacePane, PaneFilePreview, PaneTabPicker, SessionDropChooser, formatBytes, type PaneCtx } from './pane';
 export { SplitTree } from './split-tree';
 export { WindowedCanvas, parseWindowedPos, WINDOWED_POS_KEY, WINDOWED_MIN_W, WINDOWED_MIN_H, type WindowPos } from './windowed-canvas';
-export { TilingBar, TAB_ICONS } from './tiling-bar';
+export { TAB_ICONS } from './tab-icons';
 export { InspectorHost } from './inspector-host';
 export { TilingWorkspace } from './workspace';

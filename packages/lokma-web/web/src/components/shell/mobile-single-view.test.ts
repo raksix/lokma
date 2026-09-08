@@ -55,7 +55,7 @@ check('shell renders MobileSingleView', shell.includes('<MobileSingleView'));
 check('shell forces tiling off on mobile', shell.includes('setTiling(false)'));
 check('shell forces windowed off on mobile', shell.includes('setWindowed(false)'));
 check('shell hides drawer chrome on mobile', shell.includes('hideSideToggles'));
-check('tiling toggle hides on mobile', shell.includes('tiling || isMobile'));
+check('tiling toggle hides on mobile', shell.includes('if (isMobile) return null'));
 check('shell has a dedicated mobile branch', shell.includes('if (isMobile) {'));
 
 const single = read(join('components', 'shell', 'mobile-single-view.tsx'));

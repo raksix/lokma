@@ -5,7 +5,7 @@
  *
  * Everything here is UI-framework-free so it runs under `bun` probes.
  * Rendering lives in `pane.tsx` / `split-tree.tsx` / `windowed-canvas.tsx` /
- * `tiling-bar.tsx` / `workspace.tsx`. No mock content is ever produced here —
+ * `tab-icons.tsx` / `workspace.tsx`. No mock content is ever produced here —
  * every factory carries a real session id, inspector id, or file path.
  */
 import type { LayoutNode } from '@/stores/layout';
@@ -22,6 +22,13 @@ export const INSPECTOR_DRAG_MIME = 'application/x-lokma-inspector';
 
 /** Tab-bar drag payload MIME (a whole real tab moving between panes). */
 export const PANE_TAB_MIME = 'application/x-lokma-tab';
+
+/**
+ * Window event for the tiling reset button (REQ-045: the TilingBar strip is
+ * gone, its Reset lived in the workspace). AppShell dispatches, the
+ * workspace listens — same CustomEvent pattern as FOCUS_FILES_EVENT.
+ */
+export const RESET_LAYOUT_EVENT = 'lokma:reset-layout';
 
 /** localStorage key for the per-pane tab snapshot (layout tree itself lives in `lokma:layout:v1`). */
 export const TILING_TABS_KEY = 'lokma:tiling-tabs:v1';

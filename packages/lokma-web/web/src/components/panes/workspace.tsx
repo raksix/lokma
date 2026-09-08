@@ -5,23 +5,20 @@ import type { UseWs } from '@/hooks/use-ws';
 import { emitToast } from '@/components/shell';
 import { SplitTree } from './split-tree';
 import { WindowedCanvas, parseWindowedPos, WINDOWED_POS_KEY, type WindowPos } from './windowed-canvas';
-import { TilingBar } from './tiling-bar';
 import { WorkspacePane } from './pane';
 import {
+  RESET_LAYOUT_EVENT,
   TILING_TABS_KEY,
-  appendLayoutPane,
   closeLayoutPane,
   collectPaneIds,
   countPanes,
   isPaneTab,
-  makeInspectorTab,
   makePaneId,
   makeSessionTab,
   parseTabStates,
   resizeLayoutNode,
   serializeTabStates,
   splitLayout,
-  type InspectorTabId,
   type PaneTab,
   type PaneTabState,
   upsertFileTab,
@@ -45,8 +42,6 @@ export function TilingWorkspace({
   const layout = usePaneStore((s) => s.layout);
   const setLayout = usePaneStore((s) => s.setLayout);
   const windowed = usePaneStore((s) => s.windowed);
-  const setWindowed = usePaneStore((s) => s.setWindowed);
-  const setTiling = usePaneStore((s) => s.setTiling);
   const focusedPaneId = usePaneStore((s) => s.focusedPaneId);
   const focusPane = usePaneStore((s) => s.focusPane);
   const resetStoreLayout = usePaneStore((s) => s.resetLayout);
@@ -109,8 +104,6 @@ export function TilingWorkspace({
       // Private-mode storage never breaks the workspace.
     }
   }, [winPos]);
-
-  const tabCount = paneIds.reduce((n, pid) => n + (states[pid]?.tabs.length ?? 0), 0);
 
   // REQ-002: Explorer file clicks land here as a tab in the last-focused
   // pane (same path+session focuses instead of duplicating). One-shot: the
@@ -226,37 +219,26 @@ export function TilingWorkspace({
     focusPane(toPaneId);
   };
 
-  const openInspector = (inspectorId: InspectorTabId) => {
-    const tab = makeInspectorTab(inspectorId);
-    const newPaneId = makePaneId();
-    setLayout(appendLayoutPane(layout, newPaneId));
-    setTabStates((prev) => ({ ...prev, [newPaneId]: { tabs: [tab], active: tab.id } }));
-    focusPane(newPaneId);
-  };
+  // REQ-045 — the TilingBar Reset button moved to the AppShell mode
+  // cluster; the handler stays here where the tab/window state lives.
+  // Dispatched as RESET_LAYOUT_EVENT, same pattern as FOCUS_FILES_EVENT.
+  React.useEffect(() => {
+    const onReset = () => {
+      resetStoreLayout();
+      setTabStates({});
+      setWinPos({});
+      try {
+        localStorage.removeItem(TILING_TABS_KEY);
+        localStorage.removeItem(WINDOWED_POS_KEY);
+      } catch {
+        // Private-mode storage never breaks reset.
+      }
+      emitToast('Layout reset to the default 3-pane view');
+    };
+    window.addEventListener(RESET_LAYOUT_EVENT, onReset);
+    return () => window.removeEventListener(RESET_LAYOUT_EVENT, onReset);
+  }, [resetStoreLayout]);
 
-  const addPane = () => {
-    const newPaneId = makePaneId();
-    setLayout(appendLayoutPane(layout, newPaneId));
-    setTabStates((prev) => ({ ...prev, [newPaneId]: { tabs: [], active: null } }));
-    focusPane(newPaneId);
-  };
-
-  const save = () => {
-    emitToast(`Layout saved — ${paneIds.length} ${paneIds.length === 1 ? 'pane' : 'panes'}, ${tabCount} ${tabCount === 1 ? 'tab' : 'tabs'}`);
-  };
-
-  const reset = () => {
-    resetStoreLayout();
-    setTabStates({});
-    setWinPos({});
-    try {
-      localStorage.removeItem(TILING_TABS_KEY);
-      localStorage.removeItem(WINDOWED_POS_KEY);
-    } catch {
-      // Private-mode storage never breaks reset.
-    }
-    emitToast('Layout reset to the default 3-pane view');
-  };
   const renderPane = (paneId: string) => {
     const st = states[paneId] ?? { tabs: [], active: null };
     return (
@@ -302,19 +284,10 @@ export function TilingWorkspace({
     window.addEventListener('pointerup', up);
   };
 
+  // REQ-045 — the TilingBar strip is gone (tool buttons live on the rail,
+  // splits on the pane strip). The workspace renders only the live layout.
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-      <TilingBar
-        paneCount={paneIds.length}
-        tabCount={tabCount}
-        windowed={windowed}
-        onToggleWindowed={() => setWindowed(!windowed)}
-        onOpenInspector={openInspector}
-        onAddPane={addPane}
-        onSave={save}
-        onReset={reset}
-        onSingle={() => setTiling(false)}
-      />
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {windowed ? (
           <WindowedCanvas

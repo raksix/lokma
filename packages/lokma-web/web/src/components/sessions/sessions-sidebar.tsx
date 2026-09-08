@@ -3,6 +3,7 @@ import {
   Check,
   Clock,
   Columns2,
+  FolderPlus,
   GitFork,
   GitMerge,
   LayoutGrid,
@@ -16,7 +17,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import type { SessionSummary } from '@/lib/api';
+import { api, type SessionSummary } from '@/lib/api';
+import { emptyProjectForm, validateProjectForm } from '../auth/auth';
 import { usePaneStore, useSessionStore } from '@/stores';
 import { emitToast, isMobileViewport, useIsMobile } from '@/components/shell';
 import {
@@ -404,6 +406,12 @@ export function SessionsSidebar({
   const [openAction, setOpenAction] = React.useState<{ id: string; action: RowAction } | null>(null);
   const [showAll, setShowAll] = React.useState(false);
   const [creating, setCreating] = React.useState(false);
+  // REQ-058 — visible "New Project" affordance in the Explorer header:
+  // inline name + cwd + visibility form over POST /api/projects.
+  const [showProjectForm, setShowProjectForm] = React.useState(false);
+  const [projectForm, setProjectForm] = React.useState({ ...emptyProjectForm });
+  const [projectBusy, setProjectBusy] = React.useState(false);
+  const [projectError, setProjectError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     setShowAll(false);
@@ -426,6 +434,44 @@ export function SessionsSidebar({
       }
     });
   }, [createSession, onSelect]);
+
+  // REQ-058 — create the project, then open its first session (in the
+  // chosen cwd when one was given) so the new project is usable at once.
+  const handleCreateProject = React.useCallback(() => {
+    const problem = validateProjectForm(projectForm);
+    if (problem) {
+      setProjectError(problem);
+      return;
+    }
+    setProjectBusy(true);
+    setProjectError(null);
+    const cwd = projectForm.cwd.trim();
+    void api
+      .createProject({
+        name: projectForm.name.trim(),
+        ...(cwd ? { cwd } : {}),
+        visibility: projectForm.visibility,
+      })
+      .then((res) => {
+        setProjectForm({ ...emptyProjectForm });
+        setShowProjectForm(false);
+        emitToast(`Project "${res.project.name}" created`);
+        if (cwd) {
+          return createSession({ cwd }).then((id) => {
+            if (id) onSelect(id);
+          });
+        }
+        return undefined;
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : 'Project create failed';
+        setProjectError(message);
+        emitToast(message);
+      })
+      .finally(() => {
+        setProjectBusy(false);
+      });
+  }, [projectForm, createSession, onSelect]);
 
   const handleFork = React.useCallback(
     (id: string) => {
@@ -467,6 +513,90 @@ export function SessionsSidebar({
         >
           <Plus className="w-3 h-3" /> {creating ? 'Creating…' : 'New Session'}
         </Button>
+        {/* REQ-058 — visible New Project button: expands the inline
+            name + cwd + visibility form below (POST /api/projects). */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full h-7 text-xs gap-1.5 justify-center"
+          onClick={() => {
+            setProjectError(null);
+            setShowProjectForm((v) => !v);
+          }}
+          aria-expanded={showProjectForm}
+          aria-label="New project"
+          title="Create a new project (name + working directory)"
+        >
+          <FolderPlus className="w-3 h-3" /> New Project
+        </Button>
+        {showProjectForm ? (
+          <form
+            className="space-y-1.5 rounded-md border border-line bg-zinc-50 p-2 dark:bg-zinc-900"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleCreateProject();
+            }}
+          >
+            <Input
+              autoFocus
+              placeholder="Project name"
+              value={projectForm.name}
+              maxLength={60}
+              onChange={(e) => setProjectForm((f) => ({ ...f, name: e.target.value }))}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setShowProjectForm(false);
+              }}
+              className="h-7 text-xs"
+              aria-label="Project name"
+            />
+            <Input
+              placeholder="Working directory (optional, must exist)"
+              value={projectForm.cwd}
+              maxLength={500}
+              onChange={(e) => setProjectForm((f) => ({ ...f, cwd: e.target.value }))}
+              className="h-7 text-xs"
+              aria-label="Project working directory"
+            />
+            <div className="flex items-center gap-1">
+              <select
+                value={projectForm.visibility}
+                onChange={(e) =>
+                  setProjectForm((f) => ({
+                    ...f,
+                    visibility: e.target.value as 'private' | 'public',
+                  }))
+                }
+                className="h-7 flex-1 min-w-0 rounded-md border border-line bg-white dark:bg-[#1E1E21] px-2 text-xs"
+                aria-label="Project visibility"
+              >
+                <option value="private">Private</option>
+                <option value="public">Public</option>
+              </select>
+              <Button
+                variant="default"
+                size="sm"
+                className="h-7 text-xs shrink-0 bg-terracotta text-white hover:bg-terracotta-hover"
+                disabled={projectBusy}
+              >
+                {projectBusy ? 'Creating…' : 'Create'}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0"
+                title="Cancel"
+                type="button"
+                onClick={() => setShowProjectForm(false)}
+                aria-label="Cancel"
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            </div>
+            {projectError ? (
+              <div className="text-[11px] text-red-600">{projectError}</div>
+            ) : null}
+          </form>
+        ) : null}
         <div className="flex items-center gap-1">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-400" />

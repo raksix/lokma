@@ -71,3 +71,4 @@
 - [REQ-050](finished/REQ-050-stream-thinking-tools.md) — Stream + thinking + tool calling detaylı — done
 - [REQ-051](REQ-051-session-compact-zaman.md) — Compact satır + m/h/d + aktiflik sırası — pending
 - [REQ-052](REQ-052-agent-hub-tam-sayfa.md) — Agent Hub tam sayfa + detaylı — pending
+- [REQ-053](REQ-053-inspector-tam-genislik.md) — Öğeler Inspector tam genişliği — pending

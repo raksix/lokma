@@ -87,6 +87,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   // phone viewport inside the pane system.
   const setTiling = usePaneStore((s) => s.setTiling);
   const setWindowed = usePaneStore((s) => s.setWindowed);
+  const requestSessionTab = usePaneStore((s) => s.requestSessionTab);
   // REQ-019 — resizable sidebars: widths persist in the pane store
   // (`lokma:layout:v1`), the Sidebar handle writes back live via setSideWidth.
   const leftW = usePaneStore((s) => s.leftW);
@@ -290,13 +291,22 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       if (!id || id === activeId) return;
       setActiveId(id);
       selectSession(id);
+      // REQ-040 — tiling sessions open VS Code-style: the session is
+      // appended as a NEW tab in the last-focused pane (existing file/tool
+      // tabs stay put, the new tab activates; re-opening the same session
+      // just focuses it via upsertSessionTab — never a replace, never a
+      // duplicate). Single-chat and mobile keep the plain switch.
+      if (!isMobile && tiling) {
+        const known = useSessionStore.getState().sessions.find((s) => s.id === id);
+        requestSessionTab(id, known?.title || id);
+      }
       // On mobile both sidebars are drawers — dismiss them so the chat is
       // visible (REQ-011: files live in the left drawer, sessions in the
       // Explorer drawer, so dismissing one no longer covers both).
       if (isMobile) setSidebars(() => ({ left: false, right: false }));
       void refreshSessions();
     },
-    [activeId, isMobile, refreshSessions, selectSession],
+    [activeId, isMobile, refreshSessions, selectSession, tiling, requestSessionTab],
   );
 
   // Global shortcuts — every combo is listed in the SHORTCUTS registry so

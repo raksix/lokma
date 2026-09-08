@@ -1,0 +1,9 @@
+# REQ-040 — Session açılınca VS Code gibi yeni sekme olarak eklensin
+
+- **Status:** done (2026-09-08, commit below)
+- **Asked:** 2026-09-07 — "bir dosya açık pane'de ama ben session açınca onu yeni tab olarak eklemiyor, vscode tab sistemi gibi olacak".
+- **Interpretation:** Pane'de dosya sekmesi açıkken session açılınca mevcut sekme DEĞİŞMEMELİ — session VS Code mantığıyla YENİ sekme olarak eklenmeli (sekmeler birikir, aktif olan değişir, kapatılmadıkça kaybolmaz). Mevcut `upsertSessionTab` aynı session'ı focus'luyor ama farklı session açılışında replacing davranışı gözlenecek ve düzeltilecek.
+- **Root cause:** `upsertSessionTab` (panes.ts) was already append-on-new / focus-on-same — the replacing behavior lived one layer up: sidebar/chat/bot session picks all funneled through `switchSession` (app-shell.tsx), which only swapped the workspace `activeId` and never created a pane tab. In tiling mode the opened session appeared nowhere — the file tab stayed but no session tab was added.
+- **Touched (this run):** `packages/lokma-web/web/src/components/app-shell.tsx` only — `switchSession` now also calls the pane store's `requestSessionTab(id, title)` when tiling is on and viewport is desktop, so `TilingWorkspace` appends the session as a NEW tab in the last-focused pane (same session just focuses via upsert, no duplicate; file/tool tabs untouched). Single-chat desktop and mobile keep the plain switch (no stale pending request: nothing enqueued when the workspace isn't rendered).
+- **Proof:** web `tsc --noEmit` 0; bun probe of the pure path PASS (file tab + session B appended → active = B; re-open B focuses, still 2 tabs; session C accumulates to 3); web build green `index-CxRYY551.js`; single-proc `lokma-web` restart online; live `https://lokma.fermag.com.tr/` serves `index-CxRYY551.js` == disk dist (MATCH).
+- **Commit:** 2fa8f94

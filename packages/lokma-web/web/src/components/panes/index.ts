@@ -46,7 +46,7 @@ export {
 } from './panes';
 export { WorkspacePane, PaneFilePreview, PaneTabPicker, SessionDropChooser, formatBytes, type PaneCtx } from './pane';
 export { SplitTree } from './split-tree';
-export { WindowedCanvas, type WindowPos } from './windowed-canvas';
+export { WindowedCanvas, parseWindowedPos, WINDOWED_POS_KEY, WINDOWED_MIN_W, WINDOWED_MIN_H, type WindowPos } from './windowed-canvas';
 export { TilingBar, TAB_ICONS } from './tiling-bar';
 export { InspectorHost } from './inspector-host';
 export { TilingWorkspace } from './workspace';

@@ -4,7 +4,7 @@ import { useSessionStore } from '@/stores/session';
 import type { UseWs } from '@/hooks/use-ws';
 import { emitToast } from '@/components/shell';
 import { SplitTree } from './split-tree';
-import { WindowedCanvas, type WindowPos } from './windowed-canvas';
+import { WindowedCanvas, parseWindowedPos, WINDOWED_POS_KEY, type WindowPos } from './windowed-canvas';
 import { TilingBar } from './tiling-bar';
 import { WorkspacePane } from './pane';
 import {
@@ -56,7 +56,8 @@ export function TilingWorkspace({
   const consumeSessionTab = usePaneStore((s) => s.consumeSessionTab);
 
   const [tabStates, setTabStates] = React.useState<Record<string, PaneTabState>>(loadTabStates);
-  const [winPos, setWinPos] = React.useState<Record<string, WindowPos>>({});
+  // REQ-042: floating window positions+sizes persist across reloads.
+  const [winPos, setWinPos] = React.useState<Record<string, WindowPos>>(loadWindowedPos);
   const dragWin = React.useRef<{ id: string; startX: number; startY: number; origX: number; origY: number } | null>(null);
 
   const paneIds = React.useMemo(() => collectPaneIds(layout), [layout]);
@@ -98,6 +99,16 @@ export function TilingWorkspace({
       // Private-mode storage never breaks the workspace.
     }
   }, [states, paneIds]);
+
+  // REQ-042: windowed positions+sizes survive reload (validated on load —
+  // corrupt rows drop via parseWindowedPos).
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(WINDOWED_POS_KEY, JSON.stringify(winPos));
+    } catch {
+      // Private-mode storage never breaks the workspace.
+    }
+  }, [winPos]);
 
   const tabCount = paneIds.reduce((n, pid) => n + (states[pid]?.tabs.length ?? 0), 0);
 
@@ -161,6 +172,7 @@ export function TilingWorkspace({
       const fresh = makePaneId();
       setLayout({ type: 'pane', id: fresh });
       setTabStates({ [fresh]: { tabs: [], active: null } });
+      setWinPos({});
       focusPane(fresh);
       return;
     }
@@ -169,6 +181,13 @@ export function TilingWorkspace({
     setTabStates((prev) => {
       const pruned: Record<string, PaneTabState> = {};
       for (const [pid, st] of Object.entries(prev)) if (alive.has(pid)) pruned[pid] = st;
+      return pruned;
+    });
+    // REQ-042: drop saved geometry for closed windows so the persisted map
+    // never grows stale entries.
+    setWinPos((prev) => {
+      const pruned: Record<string, WindowPos> = {};
+      for (const [pid, p] of Object.entries(prev)) if (alive.has(pid)) pruned[pid] = p;
       return pruned;
     });
     if (!alive.has(focusedPaneId)) focusPane([...alive][0]);
@@ -232,6 +251,7 @@ export function TilingWorkspace({
     setWinPos({});
     try {
       localStorage.removeItem(TILING_TABS_KEY);
+      localStorage.removeItem(WINDOWED_POS_KEY);
     } catch {
       // Private-mode storage never breaks reset.
     }
@@ -302,7 +322,12 @@ export function TilingWorkspace({
             pos={winPos}
             renderPane={renderPane}
             onDragStart={onWinDragStart}
-            onResize={(winId, w, h) => setWinPos((prev) => ({ ...prev, [winId]: { ...prev[winId], w, h } }))}
+            onResize={(winId, next) =>
+              setWinPos((prev) => {
+                const cur = prev[winId] ?? { 'x': 24, 'y': 24, 'w': 560, 'h': 420 };
+                return { ...prev, [winId]: { ...cur, ...next } };
+              })
+            }
             onMaximize={(winId) => setWinPos((prev) => ({ ...prev, [winId]: { x: 8, y: 8, w: 1100, h: 680 } }))}
             onClose={closePane}
           />
@@ -317,6 +342,14 @@ export function TilingWorkspace({
 function loadTabStates(): Record<string, PaneTabState> {
   try {
     return parseTabStates(localStorage.getItem(TILING_TABS_KEY));
+  } catch {
+    return {};
+  }
+}
+
+function loadWindowedPos(): Record<string, WindowPos> {
+  try {
+    return parseWindowedPos(JSON.parse(localStorage.getItem(WINDOWED_POS_KEY) ?? 'null'));
   } catch {
     return {};
   }

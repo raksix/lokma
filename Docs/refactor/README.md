@@ -86,4 +86,4 @@
 - [REQ-065](finished/REQ-065-todo-oto-assign.md) — Todo + AI oto-assign claim — done (covered by REQ-062 Parça C)
 - [REQ-066](finished/REQ-066-onboarding-superadmin.md) — Onboarding: auth sor + superadmin aç — done
 - [REQ-067](finished/REQ-067-sidebar-baslik-kaldir.md) — Sidebar Explorer/Inspector yazıları kalktı — done
-- [REQ-068](REQ-068-model-dropdown-light.md) — Model dropdown açık temada açık — done
+- [REQ-068](finished/REQ-068-model-dropdown-light.md) — Model dropdown açık temada açık — done

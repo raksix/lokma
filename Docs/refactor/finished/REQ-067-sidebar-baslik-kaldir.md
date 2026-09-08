@@ -2,8 +2,8 @@
 
 ## Status
 
-- Status: in-progress (recovered from cut-off run's dirty tree, 2026-09-08)
-- Commit: TBD
+- Status: done (2026-09-08 — recovery: cut-off run's dirty tree committed; `Sidebar` gains optional `hideHeader` prop skipping the h-10 title bar, all 4 AppShell usages hideHeader'd, FileBrowser "Explorer" label removed. Gates: root tsc 0, web build green index-BahqFRHb.js, single-proc lokma-web restart online, served == disk BUNDLE-MATCH, /health 200.)
+- Commit: TBD (this run)
 
 ## Asked
 

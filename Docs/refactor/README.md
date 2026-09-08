@@ -79,7 +79,7 @@
 - [REQ-058](REQ-058-yeni-proje-butonu.md) — Yeni proje butonu — pending
 - [REQ-059](REQ-059-gercek-pty-terminal.md) — Terminal gerçek PTY gibi — pending
 - [REQ-060](REQ-060-terminal-proje-dizini.md) — Terminal seçili proje dizininde açılsın — pending
-- [REQ-061](REQ-061-harness-cift-yazi-yazamiyor.md) — Çift cevap + yazamama fixi — done
+- [REQ-061](finished/REQ-061-harness-cift-yazi-yazamiyor.md) — Çift cevap + yazamama fixi — done
 - [REQ-062](REQ-062-auth-roller-todo-claim.md) — Auth gate + roller + todo claim — pending
 - [REQ-063](REQ-063-auth-gate.md) — Loginsiz web erişimi yok — pending
 - [REQ-064](REQ-064-roller-superadmin-calisan.md) — superadmin/admin/çalışan — pending

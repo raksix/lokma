@@ -34,8 +34,14 @@ export type ParsedAsk = {
   choices?: string[];
 };
 
-/** Max buffered tail kept while waiting for a block to close (fail-open). */
-export const BLOCK_FILTER_BUFFER_CAP = 8192;
+/**
+ * Max buffered tail kept while waiting for a block to close (fail-open).
+ * REQ-071: 8KB silently dropped every real file write (a landing page is
+ * 30KB+) — the block streamed through as chat text and nothing was ever
+ * executed. 256KB covers generated files; anything bigger still fail-opens
+ * instead of hanging the stream.
+ */
+export const BLOCK_FILTER_BUFFER_CAP = 262_144;
 
 const COMPLETE_BLOCK =
   /<(tool|ask)\b([^>]*?)(\/>|>([\s\S]*?)<\/\1\s*>)/g;
@@ -164,6 +170,7 @@ export function buildToolSystemPrompt(tools: { name: string; description: string
     '<tool name="read_file">{"path": "src/index.ts"}</tool>',
     'Use a self-closing tag for empty input: <tool name="list_files" />',
     'One block per call, valid JSON body only. Text outside blocks is your reply.',
+    'Emit ONLY <tool name="...">...</tool> — never <tool_call>, never bare name{...}, never any other tag shape.',
     'To ask the user something blocking, emit <ask question="...">a|b|c</ask> (omit choices for free text).',
     'RULES: never narrate intent ("I will look", "hazırlıyorum", "bakıyorum") — emit the tool block immediately, then report the result.',
     'Never call the same tool twice in a row with the same input. Chain: list/search → read → write/run, one turn at a time.',

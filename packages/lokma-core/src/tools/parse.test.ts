@@ -135,6 +135,19 @@ function assert(cond: boolean, label: string): void {
   assert(sys.includes('read_file: Read a file'), 'tool listed with description');
   assert(sys.includes('<tool name="read_file">'), 'syntax example present');
   assert(sys.includes('<ask question='), 'ask syntax documented');
+  assert(sys.includes('ONLY <tool name='), 'single tag shape enforced');
+}
+
+// ─── REQ-071: big tool blocks survive the filter ─────────────────────────────
+{
+  // A 20KB write_file body must parse (the old 8KB cap swallowed it as text).
+  const big = 'x'.repeat(20_000);
+  const f = createBlockFilter();
+  const shown = f.push(`Intro <tool name="write_file">{"path": "a.html", "content": "${big}"}</tool>`);
+  const end = f.finish();
+  assert(end.toolCalls.length === 1 && end.toolCalls[0]?.tool === 'write_file', '20KB tool block parsed');
+  assert(shown.includes('Intro'), 'leading text streams while block buffers');
+  assert(!(end.tail.includes('<tool')), 'block markup never leaks to chat');
 }
 
 console.log(`\nparse probe: ${passed} passed`);

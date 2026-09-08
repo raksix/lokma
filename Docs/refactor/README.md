@@ -89,3 +89,4 @@
 - [REQ-068](finished/REQ-068-model-dropdown-light.md) — Model dropdown açık temada açık — done
 - [REQ-069](finished/REQ-069-asistan-markdown-render.md) — Asistan mesajları markdown render — done
 - [REQ-070](finished/REQ-070-backend-run-queue.md) — Backend run queue, F5-proof — done
+- [REQ-071](finished/REQ-071-buyuk-tool-blok-gecmisi.md) — Buyuk tool bloklari + gecmis budama — done

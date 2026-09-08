@@ -100,6 +100,9 @@ export function Composer({
   const fileRef = React.useRef<HTMLInputElement>(null);
   const taRef = React.useRef<HTMLTextAreaElement>(null);
   const keySeq = React.useRef(0);
+  /** REQ-071: double-Enter guard — setText is async, so a fast second Enter
+   * re-delivers the same text before the box clears (double user rows). */
+  const lastSent = React.useRef<{ text: string; at: number }>({ text: '', at: 0 });
 
   const storeModels = useProviderStore((s) => s.models);
   const refreshProviders = useProviderStore((s) => s.refresh);
@@ -168,6 +171,9 @@ export function Composer({
     (raw: string) => {
       const body = raw.trim();
       if (!body) return;
+      const now = Date.now();
+      if (body === lastSent.current.text && now - lastSent.current.at < 1500) return;
+      lastSent.current = { text: body, at: now };
       const slash = parseSlashCommand(body);
       if (slash && commands.some((c) => c.id === slash.id)) {
         onSlash(slash.id, slash.args, body);

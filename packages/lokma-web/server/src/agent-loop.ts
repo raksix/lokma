@@ -86,9 +86,23 @@ export type AgentLoopResult = {
 
 export const LOOP_DEFAULT_MAX_TURNS = 15;
 export const LOOP_DEFAULT_TURN_TIMEOUT_MS = 120_000;
-/** Transcript window rebuilt as model history (newest-first cap). */
-const HISTORY_MESSAGE_CAP = 20;
-const HISTORY_CHAR_CAP = 24_000;
+/**
+ * Transcript window rebuilt as model history (newest-first cap).
+ * REQ-071: per-message truncation — one giant message (a 31KB tool block
+ * the model echoed as text, a huge tool_result JSON) must never evict the
+ * whole conversation. Chat turns keep 8K each, tool rows 2K; the newest
+ * message (the prompt being answered) always rides whole.
+ */
+const HISTORY_MESSAGE_CAP = 30;
+const HISTORY_CHAR_CAP = 48_000;
+const HISTORY_CHAT_TRUNC = 8_000;
+const HISTORY_TOOL_TRUNC = 2_000;
+
+/** Cut `text` to `cap` chars, marking the cut so the model knows. */
+export function truncateHistoryText(text: string, cap: number): string {
+  if (text.length <= cap) return text;
+  return `${text.slice(0, cap)}\n…[truncated ${text.length - cap} chars]`;
+}
 
 /**
  * Rebuild model history from the JSONL transcript. Tool rows become
@@ -102,14 +116,19 @@ export function buildLoopHistory(messages: SessionMessage[]): ProviderMessage[] 
   for (let i = recent.length - 1; i >= 0; i--) {
     const m = recent[i];
     if (!m) continue;
+    // REQ-071: the newest message always rides whole (it is the prompt being
+    // answered); older rows are truncated per-role so giants cannot evict
+    // the conversation the model is supposed to remember.
+    const isNewest = i === recent.length - 1;
     let text: string;
     let role: ProviderMessage['role'];
     if (m.role === 'tool') {
       role = 'user';
-      text = `<tool_result tool="${m.toolName ?? 'unknown'}" id="${m.toolCallId ?? ''}">${m.content}</tool_result>`;
+      const body = isNewest ? m.content : truncateHistoryText(m.content, HISTORY_TOOL_TRUNC);
+      text = `<tool_result tool="${m.toolName ?? 'unknown'}" id="${m.toolCallId ?? ''}">${body}</tool_result>`;
     } else {
       role = m.role === 'assistant' ? 'assistant' : 'user';
-      text = m.content;
+      text = isNewest ? m.content : truncateHistoryText(m.content, HISTORY_CHAT_TRUNC);
     }
     if (!text.trim()) continue;
     chars += text.length;

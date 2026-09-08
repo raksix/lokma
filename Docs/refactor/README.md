@@ -66,3 +66,4 @@
 - [REQ-045](REQ-045-tiling-bar-kaldir.md) — Tiling üst menü çubuğu kalkar — pending
 - [REQ-046](REQ-046-pane-popout.md) — Pane'de ayrı pencere butonu — pending
 - [REQ-047](REQ-047-cift-tik-kaldir.md) — Bozuk çift-tık büyütme kaldırılır — pending
+- [REQ-048](REQ-048-buton-arka-plan.md) — Ayar butonlarına tema arka planı — pending

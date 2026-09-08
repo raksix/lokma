@@ -47,6 +47,37 @@ export function relativeTime(iso: string | undefined, now: number = Date.now()):
   return new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
+/**
+ * Compact one-token activity badge for session rows (REQ-051): `5m`,
+ * `3h`, `2d` — minutes / hours / day-bucket days, `now` under a minute,
+ * short date past 30 days, empty when the timestamp is missing.
+ * The full `relativeTime` string stays available as the badge tooltip.
+ */
+export function activityBadge(iso: string | undefined, now: number = Date.now()): string {
+  if (!iso) return '';
+  const ts = Date.parse(iso);
+  if (Number.isNaN(ts)) return '';
+  const diff = now - ts;
+  if (diff < 0) return 'now';
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24 && startOfDay(now) === startOfDay(ts)) return `${hours}h`;
+  const diffDays = Math.round((startOfDay(now) - startOfDay(ts)) / DAY_MS);
+  if (diffDays < 30) return `${diffDays}d`;
+  return new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
+/** Newest-first comparator on `updatedAt` (REQ-051: latest prompt on top). */
+function byRecency(a: SessionSummary, b: SessionSummary): number {
+  const ta = a.updatedAt ? Date.parse(a.updatedAt) : Number.NaN;
+  const tb = b.updatedAt ? Date.parse(b.updatedAt) : Number.NaN;
+  const na = Number.isNaN(ta) ? 0 : ta;
+  const nb = Number.isNaN(tb) ? 0 : tb;
+  return nb - na;
+}
+
 /** Display title — server title, else the raw id (never an empty row). */
 export function displayTitle(s: SessionSummary): string {
   const t = (s.title ?? '').trim();
@@ -82,6 +113,8 @@ export type SessionGroup = { key: string; label: string; items: SessionSummary[]
  * Group sessions for the sidebar list.
  * `time` → Today / Yesterday / Earlier (non-empty only, newest first);
  * `project` → one group per cwd basename, most sessions first.
+ * Every group lists sessions newest-first by `updatedAt` (REQ-051: the
+ * session with the latest prompt/activity always sits on top).
  */
 export function groupSessions(
   sessions: SessionSummary[],
@@ -97,12 +130,12 @@ export function groupSessions(
       else byProject.set(p, [s]);
     }
     return [...byProject.entries()]
-      .map(([key, items]) => ({ key, label: key, items }))
+      .map(([key, items]) => ({ key, label: key, items: [...items].sort(byRecency) }))
       .sort((a, b) => b.items.length - a.items.length || a.key.localeCompare(b.key));
   }
   const buckets: Record<DayGroup, SessionSummary[]> = { Today: [], Yesterday: [], Earlier: [] };
   for (const s of sessions) buckets[dayGroup(s.updatedAt, now)].push(s);
   return (Object.keys(buckets) as DayGroup[])
     .filter((g) => buckets[g].length > 0)
-    .map((g) => ({ key: g, label: g, items: buckets[g] }));
+    .map((g) => ({ key: g, label: g, items: buckets[g].sort(byRecency) }));
 }

@@ -3,6 +3,7 @@
  * Run: `bun src/components/sessions/sessions.test.ts` (no DOM, no server).
  */
 import {
+  activityBadge,
   dayGroup,
   displayTitle,
   filterSessions,
@@ -82,6 +83,31 @@ check(
 // messageCountLabel (area C screenshot review: `1 msgs` read wrong)
 check('singular 1 msg', messageCountLabel(1) === '1 msg');
 check('plural 0/2 msgs', messageCountLabel(0) === '0 msgs' && messageCountLabel(2) === '2 msgs');
+
+// activityBadge (REQ-051: compact m/h/d row token)
+check('badge now', activityBadge(iso(NOW - 20_000), NOW) === 'now');
+check('badge minutes', activityBadge(iso(NOW - 5 * 60_000), NOW) === '5m');
+check('badge hours', activityBadge(iso(NOW - 3 * 3_600_000), NOW) === '3h');
+check('badge yesterday is 1d', activityBadge(iso(NOW - 26 * 3_600_000), NOW) === '1d');
+check('badge days', activityBadge(iso(NOW - 4 * 86_400_000), NOW) === '4d');
+check('badge missing is empty', activityBadge(undefined, NOW) === '' && activityBadge('nope', NOW) === '');
+
+// recency sort (REQ-051: latest prompt/activity on top in every group)
+const shuffled: SessionSummary[] = [list[2], sess({ id: 'sess_bare' }), list[1], list[0]];
+const sortedToday = groupSessions(shuffled, 'time', NOW).find((g) => g.key === 'Today');
+check('time group sorts newest first', (sortedToday?.items.map((s) => s.id) ?? []).join(',') === 'sess_today');
+const earlierGroup = groupSessions(
+  [sess({ id: 'e_old', updatedAt: iso(NOW - 9 * 86_400_000) }), sess({ id: 'e_new', updatedAt: iso(NOW - 4 * 86_400_000) })],
+  'time',
+  NOW,
+).find((g) => g.key === 'Earlier');
+check('earlier group sorts newest first', (earlierGroup?.items.map((s) => s.id) ?? []).join(',') === 'e_new,e_old');
+const projLokma = groupSessions(
+  [sess({ id: 'p_old', cwd: '/x/lokma', updatedAt: iso(NOW - 9 * 86_400_000) }), sess({ id: 'p_new', cwd: '/x/lokma', updatedAt: iso(NOW - 60_000) })],
+  'project',
+  NOW,
+).find((g) => g.key === 'lokma');
+check('project group sorts newest first', (projLokma?.items.map((s) => s.id) ?? []).join(',') === 'p_new,p_old');
 
 console.log(`sessions probe: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

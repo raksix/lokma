@@ -19,9 +19,11 @@ import type { SessionSummary } from '@/lib/api';
 import { usePaneStore, useSessionStore } from '@/stores';
 import { emitToast, isMobileViewport, useIsMobile } from '@/components/shell';
 import {
+  activityBadge,
   displayTitle,
   filterSessions,
   groupSessions,
+  relativeTime,
 } from './grouping';
 
 /**
@@ -75,6 +77,9 @@ function SessionRow({
   }, [session, mergeTargets]);
 
   const title = displayTitle(session);
+  // REQ-051 — compact one-token activity badge (`5m`/`3h`/`2d`); the full
+  // relative string stays as the tooltip. Empty when no timestamp.
+  const badge = activityBadge(session.updatedAt);
 
   return (
     <div
@@ -100,7 +105,10 @@ function SessionRow({
           : 'border-line hover:border-terracotta/30 hover:shadow-sm',
       )}
     >
-      <div className="flex items-center gap-2 p-2">
+      {/* REQ-051 — compact single-line row: tighter padding, the title
+          flexes and truncates to whatever width is left, and the m/h/d
+          badge pins to the right of it. */}
+      <div className="flex items-center gap-1.5 px-2 py-1">
         <span
           title={active ? 'Open session' : 'Idle'}
           className={cn(
@@ -111,6 +119,14 @@ function SessionRow({
         <div className="flex-1 min-w-0 cursor-pointer" onClick={onResume}>
           <div className="text-xs font-medium truncate pr-1" title={title}>{title}</div>
         </div>
+        {badge ? (
+          <span
+            title={relativeTime(session.updatedAt)}
+            className="shrink-0 rounded bg-zinc-100 px-1 py-px text-[10px] tabular-nums text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+          >
+            {badge}
+          </span>
+        ) : null}
         <div className="flex items-center shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition">
           {isMobile ? null : (
             <Button

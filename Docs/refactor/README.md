@@ -69,6 +69,6 @@
 - [REQ-048](finished/REQ-048-buton-arka-plan.md) — Ayar butonlarına tema arka planı — done
 - [REQ-049](finished/REQ-049-plugin-switch.md) — Plugin switch + disabllar görünür — done
 - [REQ-050](finished/REQ-050-stream-thinking-tools.md) — Stream + thinking + tool calling detaylı — done
-- [REQ-051](REQ-051-session-compact-zaman.md) — Compact satır + m/h/d + aktiflik sırası — pending
+- [REQ-051](finished/REQ-051-session-compact-zaman.md) — Compact satır + m/h/d + aktiflik sırası — done
 - [REQ-052](REQ-052-agent-hub-tam-sayfa.md) — Agent Hub tam sayfa + detaylı — pending
 - [REQ-053](REQ-053-inspector-tam-genislik.md) — Öğeler Inspector tam genişliği — pending

@@ -263,6 +263,16 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
         }
         return { outcome: 'aborted', inputChars, outputChars: outputChars + clean.length, turns };
       }
+      // REQ-071: a dead upstream used to vanish without a trace (no frame a
+      // refresh can catch, nothing in the transcript) — the user saw "sent,
+      // nothing happened". Leave a short honest note in the transcript so
+      // the failure is visible and retryable with context intact.
+      const reason = streamFailed instanceof Error ? streamFailed.message : String(streamFailed);
+      await opts.store.append(opts.sessionId, {
+        role: 'assistant',
+        content: `[run failed: ${reason.slice(0, 300)}]`,
+        timestamp: new Date().toISOString(),
+      });
       throw streamFailed;
     }
 

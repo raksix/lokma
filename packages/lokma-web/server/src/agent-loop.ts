@@ -281,6 +281,19 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
       clean += end.tail;
       opts.send({ type: 'text_delta', delta: end.tail, sessionId: opts.sessionId });
     }
+    // REQ-071: a first turn with no text, no tool calls and no questions is
+    // an empty upstream reply, NOT a completed run — completing silently
+    // shows "Response complete" with no response. Fail honestly instead
+    // (the error path leaves a transcript note + toast); later quiet turns
+    // still mean "tool work is done", preserving the tool-then-silence flow.
+    if (turns === 1 && !clean.trim() && end.toolCalls.length === 0 && end.asks.length === 0) {
+      await opts.store.append(opts.sessionId, {
+        role: 'assistant',
+        content: '[run failed: model returned an empty response — please retry the prompt]',
+        timestamp: new Date().toISOString(),
+      });
+      throw new Error('Model returned an empty response — please retry the prompt');
+    }
     outputChars += clean.length;
     if (clean.trim()) {
       await opts.store.append(opts.sessionId, {

@@ -181,6 +181,8 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
   let inputChars = system.length + opts.prompt.length + opts.history.reduce((n, m) => n + m.content.length, 0);
   let outputChars = 0;
   let turns = 0;
+  /** REQ-071: one quiet-turn nudge per run (see the followUps-empty leg). */
+  let nudgedQuiet = false;
 
   const forwardEvent = (event: ToolEvent): void => {
     if (event.type === 'tool_start') {
@@ -392,6 +394,18 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
     }
 
     if (followUps.length === 0) {
+      // REQ-071: the model went quiet with nothing done this turn. Once per
+      // run, nudge it instead of calling the job complete (tool-then-silence
+      // used to abandon real tasks: list_files ran, write_file never came).
+      // A second quiet turn still means done — no poke loops.
+      const quietTurn = !clean.trim() && end.toolCalls.length === 0 && end.asks.length === 0;
+      if (quietTurn && turns < maxTurns && !nudgedQuiet) {
+        nudgedQuiet = true;
+        const nudge = '<system>You stopped without responding. Continue the user task now: emit the next <tool> block or write the answer.</system>';
+        inputChars += nudge.length;
+        messages.push({ role: 'user', content: nudge });
+        continue;
+      }
       return { outcome: 'complete', inputChars, outputChars, turns };
     }
     const followUp = followUps.join('\n');

@@ -85,7 +85,7 @@ export type AgentLoopResult = {
 };
 
 export const LOOP_DEFAULT_MAX_TURNS = 15;
-export const LOOP_DEFAULT_TURN_TIMEOUT_MS = 120_000;
+export const LOOP_DEFAULT_TURN_TIMEOUT_MS = 180_000;
 /**
  * Transcript window rebuilt as model history (newest-first cap).
  * REQ-071: per-message truncation — one giant message (a 31KB tool block
@@ -260,6 +260,15 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
           await opts.store.append(opts.sessionId, {
             role: 'assistant',
             content: clean,
+            timestamp: new Date().toISOString(),
+          });
+        } else {
+          // REQ-071: a turn that produced zero output before aborting
+          // (timeout with a stalled upstream) also leaves a trace — never
+          // complete silently with nothing to show.
+          await opts.store.append(opts.sessionId, {
+            role: 'assistant',
+            content: '[run aborted: turn produced no output before it ended]',
             timestamp: new Date().toISOString(),
           });
         }

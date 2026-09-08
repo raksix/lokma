@@ -171,6 +171,7 @@ export function buildToolSystemPrompt(tools: { name: string; description: string
     'Use a self-closing tag for empty input: <tool name="list_files" />',
     'One block per call, valid JSON body only. Text outside blocks is your reply.',
     'Emit ONLY <tool name="...">...</tool> — never <tool_call>, never bare name{...}, never any other tag shape.',
+    'Each result comes back as <tool_result tool="..." id="...">...</tool_result>. After EVERY result you MUST continue: emit the next <tool> block or write the answer. Stopping silently after a result is a failure.',
     'To ask the user something blocking, emit <ask question="...">a|b|c</ask> (omit choices for free text).',
     'RULES: never narrate intent ("I will look", "hazırlıyorum", "bakıyorum") — emit the tool block immediately, then report the result.',
     'Never call the same tool twice in a row with the same input. Chain: list/search → read → write/run, one turn at a time.',

@@ -74,7 +74,7 @@
 - [REQ-053](finished/REQ-053-inspector-tam-genislik.md) — Öğeler Inspector tam genişliği — done
 - [REQ-054](finished/REQ-054-thinking-tool-ayri-satir.md) — Thinking/tool ayrı satırlar + error card — done
 - [REQ-055](finished/REQ-055-kebab-menu.md) — Süre yerine dikey ... context menü — done
-- [REQ-056](REQ-056-sag-tik-menu.md) — Her yerde sağ-tık context menü — pending
+- [REQ-056](finished/REQ-056-sag-tik-menu.md) — Her yerde sağ-tık context menü — done
 - [REQ-057](REQ-057-harness-kendini-kontrol.md) — Harness UI'ı kontrol etsin — pending
 - [REQ-058](REQ-058-yeni-proje-butonu.md) — Yeni proje butonu — pending
 - [REQ-059](REQ-059-gercek-pty-terminal.md) — Terminal gerçek PTY gibi — pending

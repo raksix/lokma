@@ -8,6 +8,7 @@ import {
   exitSummary,
   filterLines,
   keyToBytes,
+  resolveTerminalCwd,
   statusLabel,
   stripAnsi,
   terminalLabel,
@@ -98,6 +99,55 @@ check('cmd combo falls through', keyToBytes({ key: 'c', metaKey: true }) === nul
 check('alt combo falls through', keyToBytes({ key: 'b', altKey: true }) === null);
 check('f-keys fall through', keyToBytes({ key: 'F5' }) === null);
 check('shift alone falls through', keyToBytes({ key: 'Shift' }) === null);
+
+// resolveTerminalCwd (REQ-060: new shells default to the selected project dir)
+const rtc = (
+  over: Partial<Parameters<typeof resolveTerminalCwd>[0]> = {},
+): { cwd: string; adopted: boolean } =>
+  resolveTerminalCwd({ sessionChanged: false, knownCwd: '/proj/a', currentCwd: '', adopted: false, ...over });
+check(
+  'switch adopts new cwd over a manual edit',
+  JSON.stringify(rtc({ sessionChanged: true, knownCwd: '/proj/b', currentCwd: '/manual/x', adopted: true })) ===
+    JSON.stringify({ cwd: '/proj/b', adopted: true }),
+);
+check(
+  'switch to unknown session clears to pristine',
+  JSON.stringify(rtc({ sessionChanged: true, knownCwd: undefined, currentCwd: '/proj/a', adopted: true })) ===
+    JSON.stringify({ cwd: '', adopted: false }),
+);
+check(
+  'null known cwd clears on switch',
+  JSON.stringify(rtc({ sessionChanged: true, knownCwd: null, currentCwd: '/proj/a', adopted: true })) ===
+    JSON.stringify({ cwd: '', adopted: false }),
+);
+check(
+  'blank known cwd never adopts on switch',
+  JSON.stringify(rtc({ sessionChanged: true, knownCwd: '   ', currentCwd: '/proj/a', adopted: true })) ===
+    JSON.stringify({ cwd: '', adopted: false }),
+);
+check(
+  'late arrival adopts into pristine input',
+  JSON.stringify(rtc()) === JSON.stringify({ cwd: '/proj/a', adopted: true }),
+);
+check(
+  'manual edit survives late arrival',
+  JSON.stringify(rtc({ currentCwd: '/manual/x' })) === JSON.stringify({ cwd: '/manual/x', adopted: false }),
+);
+check(
+  'refresh keeps adopted cwd',
+  JSON.stringify(rtc({ currentCwd: '/proj/a', adopted: true })) ===
+    JSON.stringify({ cwd: '/proj/a', adopted: true }),
+);
+check(
+  'refresh never clobbers a manual edit',
+  JSON.stringify(rtc({ knownCwd: '/proj/b', currentCwd: '/manual/x', adopted: false })) ===
+    JSON.stringify({ cwd: '/manual/x', adopted: false }),
+);
+check(
+  'adopted input ignores later server-side drift',
+  JSON.stringify(rtc({ knownCwd: '/proj/b', currentCwd: '/proj/a', adopted: true })) ===
+    JSON.stringify({ cwd: '/proj/a', adopted: true }),
+);
 
 console.log(`terminal: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

@@ -137,3 +137,32 @@ export async function copyText(text: string): Promise<boolean> {
     }
   }
 }
+
+/**
+ * REQ-060 — default a new terminal to the selected session/project cwd.
+ * Pure decision helper so the pane adopts the project dir on session
+ * switch but never clobbers a manual cwd edit on plain session-list
+ * refreshes (the list cache hands out a new object identity per refresh).
+ * - session switch → adopt the newly selected session cwd (manual edits
+ *   belonged to the old session; open shells are server processes and
+ *   are unaffected);
+ * - same session → adopt a late-arriving cwd only into a pristine (empty)
+ *   input, i.e. the list was still loading at mount; otherwise keep the
+ *   current input untouched.
+ * Returns the cwd the pane should store plus whether it counts as adopted.
+ */
+export function resolveTerminalCwd(input: {
+  sessionChanged: boolean;
+  knownCwd: string | null | undefined;
+  currentCwd: string;
+  adopted: boolean;
+}): { cwd: string; adopted: boolean } {
+  const known = (input.knownCwd ?? '').trim();
+  if (input.sessionChanged) {
+    return { cwd: known, adopted: known !== '' };
+  }
+  if (!input.adopted && input.currentCwd === '' && known !== '') {
+    return { cwd: known, adopted: true };
+  }
+  return { cwd: input.currentCwd, adopted: input.adopted };
+}

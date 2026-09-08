@@ -78,7 +78,7 @@
 - [REQ-057](finished/REQ-057-harness-kendini-kontrol.md) — Harness UI'ı kontrol etsin — done
 - [REQ-058](finished/REQ-058-yeni-proje-butonu.md) — Yeni proje butonu — done
 - [REQ-059](finished/REQ-059-gercek-pty-terminal.md) — Terminal gerçek PTY gibi — done
-- [REQ-060](REQ-060-terminal-proje-dizini.md) — Terminal seçili proje dizininde açılsın — pending
+- [REQ-060](finished/REQ-060-terminal-proje-dizini.md) — Terminal seçili proje dizininde açılsın — done
 - [REQ-061](finished/REQ-061-harness-cift-yazi-yazamiyor.md) — Çift cevap + yazamama fixi — done
 - [REQ-062](REQ-062-auth-roller-todo-claim.md) — Auth gate + roller + todo claim — pending
 - [REQ-063](REQ-063-auth-gate.md) — Loginsiz web erişimi yok — pending

@@ -8,6 +8,7 @@ export {
   copyText,
   exitSummary,
   filterLines,
+  resolveTerminalCwd,
   statusLabel,
   stripAnsi,
   terminalLabel,

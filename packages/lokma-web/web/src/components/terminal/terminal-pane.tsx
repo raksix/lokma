@@ -21,6 +21,7 @@ import {
   exitSummary,
   filterLines,
   keyToBytes,
+  resolveTerminalCwd,
   statusLabel,
   stripAnsi,
   terminalLabel,
@@ -73,20 +74,41 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
   }, []);
   refreshRef.current = refresh;
 
-  // Session scope: cwd for new shells + reset buffers on session switch.
-  // cwd comes from the cached server list — never a detail GET (fresh
-  // sessions used to 404 here once per mounted pane).
+  // Session scope: new shells default to the selected session/project cwd
+  // (REQ-060) — the value comes from the cached server list, never a
+  // detail GET (fresh sessions used to 404 here once per mounted pane).
+  // Resets + cwd adoption run ONLY on session switch: plain session-list
+  // refreshes hand out a new object identity but must not wipe buffers,
+  // selection, or a manual cwd edit. A late-arriving cwd (list still
+  // loading at mount) is adopted once into a pristine input.
   const known = useKnownSession(sessionId);
+  // Null sentinel (a real sessionId is never null): the first run counts
+  // as a change so mount resets + loads the terminal/agent lists.
+  const prevSessionRef = React.useRef<string | null>(null);
+  const cwdAdoptedRef = React.useRef(false);
   React.useEffect(() => {
-    setBuffers({});
-    setSelectedId(null);
-    setArmedKill(null);
-    processedRef.current = 0;
-    if (known === 'loading') return;
-    setCwd(known?.cwd ?? '');
-    void refresh();
-    void refreshAgents();
-  }, [sessionId, refresh, refreshAgents, known]);
+    const sessionChanged = prevSessionRef.current !== sessionId;
+    if (sessionChanged) {
+      prevSessionRef.current = sessionId;
+      setBuffers({});
+      setSelectedId(null);
+      setArmedKill(null);
+      processedRef.current = 0;
+      cwdAdoptedRef.current = false;
+    }
+    const next = resolveTerminalCwd({
+      sessionChanged,
+      knownCwd: known === 'loading' || known === null ? undefined : known.cwd,
+      currentCwd: cwd,
+      adopted: cwdAdoptedRef.current,
+    });
+    cwdAdoptedRef.current = next.adopted;
+    if (next.cwd !== cwd) setCwd(next.cwd);
+    if (sessionChanged) {
+      void refresh();
+      void refreshAgents();
+    }
+  }, [sessionId, refresh, refreshAgents, known, cwd]);
 
   // Fold WS terminal frames into per-terminal scrollback (incremental, capped).
   React.useEffect(() => {

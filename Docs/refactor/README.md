@@ -85,3 +85,4 @@
 - [REQ-064](finished/REQ-064-roller-superadmin-calisan.md) — superadmin/admin/çalışan — done (covered by REQ-062 Parça B)
 - [REQ-065](finished/REQ-065-todo-oto-assign.md) — Todo + AI oto-assign claim — done (covered by REQ-062 Parça C)
 - [REQ-066](finished/REQ-066-onboarding-superadmin.md) — Onboarding: auth sor + superadmin aç — done
+- [REQ-067](REQ-067-sidebar-baslik-kaldir.md) — Sidebar Explorer/Inspector yazıları kalktı — done

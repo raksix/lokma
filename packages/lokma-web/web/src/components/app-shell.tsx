@@ -550,7 +550,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           isMobile ? (
             <MobileDrawer side="left" label={`${leftPanel} panel`} onClose={closeDrawers}>
               <PaneErrorBoundary paneName={leftPanel}>
-                <Sidebar side="left" title={leftPanel} className="h-full w-full">
+                <Sidebar side="left" title={leftPanel} hideHeader className="h-full w-full">
                   {leftContent}
                 </Sidebar>
               </PaneErrorBoundary>
@@ -560,6 +560,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
               <Sidebar
                 side="left"
                 title={leftPanel}
+                hideHeader
                 width={leftW}
                 defaultWidth={DEFAULT_LEFT_WIDTH}
                 onResize={(w) => setSideWidth('left', w)}
@@ -585,7 +586,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           isMobile ? (
             <MobileDrawer side="right" label={`${rightPanel} panel`} onClose={closeDrawers}>
               <PaneErrorBoundary paneName={rightPanel}>
-                <Sidebar side="right" title={rightPanel} className="h-full w-full">
+                <Sidebar side="right" title={rightPanel} hideHeader className="h-full w-full">
                   {rightContent}
                 </Sidebar>
               </PaneErrorBoundary>
@@ -595,6 +596,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
               <Sidebar
                 side="right"
                 title={rightPanel}
+                hideHeader
                 width={rightW}
                 defaultWidth={DEFAULT_RIGHT_WIDTH}
                 onResize={(w) => setSideWidth('right', w)}

@@ -33,6 +33,7 @@ export function Sidebar({
   defaultWidth,
   onResize,
   resizable,
+  hideHeader,
 }: {
   side: 'left' | 'right';
   title: string;
@@ -47,6 +48,8 @@ export function Sidebar({
   onResize?: (width: number) => void;
   /** Force the handle on/off (default: on when width + onResize are set). */
   resizable?: boolean;
+  /** REQ-067 — hide the h-10 title bar (Explorer/Inspector labels removed). */
+  hideHeader?: boolean;
 }) {
   const canResize = (resizable ?? (width !== undefined && onResize !== undefined)) === true;
   const dragRef = React.useRef<{ startX: number; startW: number } | null>(null);
@@ -100,9 +103,11 @@ export function Sidebar({
       className={`relative flex ${className ?? (width !== undefined ? 'min-w-0' : 'w-[280px]')} shrink-0 flex-col ${side === 'left' ? 'border-r' : 'border-l'} border-line bg-card`}
       style={className === undefined && width !== undefined ? { width } : undefined}
     >
-      <div className="flex h-10 items-center border-b px-3">
-        <span className="text-sm font-medium">{title}</span>
-      </div>
+      {hideHeader ? null : (
+        <div className="flex h-10 items-center border-b px-3">
+          <span className="text-sm font-medium">{title}</span>
+        </div>
+      )}
       {/* @container: Inspector panes use container queries (@min-*) instead of
           viewport sm: so subtitles/grids adapt to this 280px column even on
           wide viewports (area C run 3: sm:inline subtitles overflowed). */}

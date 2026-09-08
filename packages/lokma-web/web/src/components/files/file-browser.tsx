@@ -355,7 +355,7 @@ export function FileBrowser({ sessionId }: { sessionId: string }) {
     <div className="flex flex-col" onClick={() => setMenu(null)}>
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1.5 font-serif text-xs">
-          <Folder className="h-3 w-3 text-zinc-500" /> Explorer
+          <Folder className="h-3 w-3 text-zinc-500" />
         </span>
         <Button
           variant="ghost"

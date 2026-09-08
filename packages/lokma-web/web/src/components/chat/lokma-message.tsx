@@ -67,7 +67,94 @@ export function summarizeInput(input: unknown, max = 120): string {
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 }
 
-// ─── Code block ──────────────────────────────────────────────────────────────
+// ─── Markdown (pure parsers, unit-tested) ────────────────────────────────────
+// REQ-069: assistant text renders markdown. No external dep, no
+// dangerouslySetInnerHTML — the renderer below emits React elements from
+// these token lists, so model output can never inject markup/scripts.
+
+export type MdBlock =
+  | { kind: 'p'; body: string }
+  | { kind: 'h'; level: 1 | 2 | 3 | 4; body: string }
+  | { kind: 'quote'; body: string }
+  | { kind: 'hr' }
+  | { kind: 'ul'; items: string[] }
+  | { kind: 'ol'; items: string[] };
+
+/** Split a text segment into block tokens (headers, quotes, lists, rules, paragraphs). */
+export function parseMarkdownBlocks(text: string): MdBlock[] {
+  const blocks: MdBlock[] = [];
+  const lines = text.split('\n');
+  let para: string[] = [];
+  let list: { ordered: boolean; items: string[] } | null = null;
+  const flushPara = () => {
+    const body = para.join('\n').trim();
+    if (body) blocks.push({ kind: 'p', body });
+    para = [];
+  };
+  const flushList = () => {
+    if (list && list.items.length > 0) blocks.push(list.ordered ? { kind: 'ol', items: list.items } : { kind: 'ul', items: list.items });
+    list = null;
+  };
+  for (const line of lines) {
+    const h = line.match(/^(#{1,4})\s+(.*)$/);
+    if (h) {
+      flushPara();
+      flushList();
+      blocks.push({ kind: 'h', level: h[1].length as 1 | 2 | 3 | 4, body: (h[2] ?? '').trim() });
+      continue;
+    }
+    if (/^\s*---\s*$/.test(line)) {
+      flushPara();
+      flushList();
+      blocks.push({ kind: 'hr' });
+      continue;
+    }
+    const q = line.match(/^\s*>\s?(.*)$/);
+    if (q) {
+      flushPara();
+      flushList();
+      blocks.push({ kind: 'quote', body: (q[1] ?? '').trim() });
+      continue;
+    }
+    const ul = line.match(/^\s*[-*+]\s+(.*)$/);
+    if (ul) {
+      flushPara();
+      if (!list || list.ordered) {
+        flushList();
+        list = { ordered: false, items: [] };
+      }
+      list.items.push((ul[1] ?? '').trim());
+      continue;
+    }
+    const ol = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    if (ol) {
+      flushPara();
+      if (!list || !list.ordered) {
+        flushList();
+        list = { ordered: true, items: [] };
+      }
+      list.items.push((ol[1] ?? '').trim());
+      continue;
+    }
+    if (!line.trim()) {
+      flushPara();
+      flushList();
+      continue;
+    }
+    flushList();
+    para.push(line);
+  }
+  flushPara();
+  flushList();
+  return blocks;
+}
+
+/** Links the renderer will open — everything else renders as plain text. */
+export function sanitizeMdUrl(url: string): string | null {
+  const u = url.trim();
+  if (/^(https?:\/\/|mailto:|#|\/)/i.test(u) && !/[\s<>"]/.test(u)) return u;
+  return null;
+}
 
 export function CodeBlock({
   lang,
@@ -97,7 +184,111 @@ export function CodeBlock({
   );
 }
 
-// ─── Assistant body (real text + real code blocks) ───────────────────────────
+// ─── Inline + block renderer (React elements, never raw HTML) ───────────────
+
+/** Inline spans: **bold**, *italic*, `code`, ~~strike~~, [label](url). Pure text in, React nodes out. */
+function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  // link | bold | italic | code | strike — leftmost match wins each step
+  const re = /\[([^\]]+)\]\(([^)\s]+)\)|\*\*([^*]+)\*\*|\*([^*\n]+)\*|_([^_\n]+)_|`([^`\n]+)`|~~([^~\n]+)~~/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let k = 0;
+  const pushText = (t: string) => {
+    if (t) out.push(<React.Fragment key={`${keyPrefix}t${k++}`}>{t}</React.Fragment>);
+  };
+  while ((m = re.exec(text)) !== null) {
+    pushText(text.slice(last, m.index));
+    last = m.index + m[0].length;
+    if (m[1] !== undefined && m[2] !== undefined) {
+      const href = sanitizeMdUrl(m[2]);
+      out.push(
+        href ? (
+          <a key={`${keyPrefix}l${k++}`} href={href} target="_blank" rel="noopener noreferrer" className="text-terracotta underline underline-offset-2">
+            {m[1]}
+          </a>
+        ) : (
+          <React.Fragment key={`${keyPrefix}l${k++}`}>{m[0]}</React.Fragment>
+        ),
+      );
+    } else if (m[3] !== undefined) {
+      out.push(
+        <strong key={`${keyPrefix}b${k++}`} className="font-semibold">
+          {m[3]}
+        </strong>,
+      );
+    } else if (m[4] !== undefined || m[5] !== undefined) {
+      out.push(
+        <em key={`${keyPrefix}i${k++}`}>{m[4] ?? m[5]}</em>,
+      );
+    } else if (m[6] !== undefined) {
+      out.push(
+        <code key={`${keyPrefix}c${k++}`} className="rounded border border-line bg-muted px-1 py-px font-mono text-[12px] dark:bg-[#1E1E21]">
+          {m[6]}
+        </code>,
+      );
+    } else if (m[7] !== undefined) {
+      out.push(
+        <del key={`${keyPrefix}s${k++}`} className="text-zinc-500">
+          {m[7]}
+        </del>,
+      );
+    }
+  }
+  pushText(text.slice(last));
+  return out;
+}
+
+/** One markdown block token → element (headers/lists/quotes/rules/paragraphs). */
+function renderMdBlock(block: MdBlock, keyPrefix: string): React.ReactNode {
+  switch (block.kind) {
+    case 'h': {
+      const cls =
+        block.level === 1
+          ? 'text-base font-semibold'
+          : block.level === 2
+            ? 'text-[15px] font-semibold'
+            : 'text-[14px] font-semibold';
+      const Tag = (block.level <= 2 ? `h${block.level + 1}` : 'h4') as 'h2' | 'h3' | 'h4';
+      return (
+        <Tag key={keyPrefix} className={`${cls} mt-2 first:mt-0`}>
+          {renderInline(block.body, `${keyPrefix}h`)}
+        </Tag>
+      );
+    }
+    case 'quote':
+      return (
+        <blockquote key={keyPrefix} className="mt-1.5 border-l-2 border-terracotta/60 pl-2.5 text-zinc-600 italic dark:text-zinc-400">
+          {renderInline(block.body, `${keyPrefix}q`)}
+        </blockquote>
+      );
+    case 'hr':
+      return <hr key={keyPrefix} className="my-2 border-line" />;
+    case 'ul':
+      return (
+        <ul key={keyPrefix} className="mt-1.5 list-disc space-y-0.5 pl-5">
+          {block.items.map((item, i) => (
+            <li key={i}>{renderInline(item, `${keyPrefix}u${i}`)}</li>
+          ))}
+        </ul>
+      );
+    case 'ol':
+      return (
+        <ol key={keyPrefix} className="mt-1.5 list-decimal space-y-0.5 pl-5">
+          {block.items.map((item, i) => (
+            <li key={i}>{renderInline(item, `${keyPrefix}o${i}`)}</li>
+          ))}
+        </ol>
+      );
+    case 'p':
+    default:
+      return (
+        <div key={keyPrefix} className="mt-1.5 whitespace-pre-wrap first:mt-0">
+          {renderInline(block.body, `${keyPrefix}p`)}
+        </div>
+      );
+  }
+}
 
 export function AssistantBody({
   content,
@@ -113,9 +304,9 @@ export function AssistantBody({
         s.kind === 'code' ? (
           <CodeBlock key={i} lang={s.lang} code={s.body} onCopy={onCopy} />
         ) : (
-          <div key={i} className="whitespace-pre-wrap">
-            {s.body}
-          </div>
+          <React.Fragment key={i}>
+            {parseMarkdownBlocks(s.body).map((b, j) => renderMdBlock(b, `s${i}b${j}`))}
+          </React.Fragment>
         ),
       )}
     </div>

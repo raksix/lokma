@@ -19,12 +19,24 @@ import {
 } from 'lokma-core';
 import { decodeClientMessage, encodeServerMessage } from 'lokma-shared';
 import { LoopAborted, buildLoopHistory, runAgentLoop, type ApprovalDecision } from '../agent-loop.js';
+import {
+  broadcast,
+  enqueuePrompt,
+  getRunState,
+  pruneRunState,
+  type SessionRunState,
+} from '../session-runs.js';
 import { resolveProviderUpstream } from './providers.js';
 import { requestToken } from './auth.js';
 
 /**
  * WS /ws/:sessionId — runs the agent tool loop (`../agent-loop.js`) over
  * `lokma-ai stream()`, forwarding typed server frames.
+ * REQ-070: prompts run on a SESSION-scoped backend queue (`session-runs.js`),
+ * never on the socket. A refresh (socket close) detaches the socket but the
+ * run continues; frames fan out to whatever sockets are attached and the
+ * JSONL transcript stays the source of truth reconnects read. Only an
+ * explicit `abort` (Stop button) cancels a run.
  * Model resolution per prompt: message `model` > bound bot's model >
  * session meta > default. A bot-bound session (`meta.botId`, REQ-027,
  * Docs/35 §8) additionally injects the bot's SOUL + knowledge ahead of the
@@ -43,6 +55,159 @@ const MAX_CONTEXT_FILES = 5;
 const MAX_CONTEXT_BYTES = 20 * 1024;
 /** A gate left unanswered this long auto-denies (the loop must not hang). */
 const APPROVAL_TIMEOUT_MS = 10 * 60_000;
+
+/**
+ * Drain one session's prompt queue (REQ-070). Reentrancy-safe: concurrent
+ * callers return while a pump owns the run. Each queued prompt resolves its
+ * model/upstream/history fresh (a bot edit between two prompts applies to
+ * the second), then runs the agent loop with a per-prompt AbortController.
+ * Frames broadcast to attached sockets; with none attached the run still
+ * completes into the transcript (refresh-proof).
+ */
+async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: string): Promise<void> {
+  const state = getRunState(sessionId);
+  if (state.running) return;
+  state.running = true;
+  const store = new SessionStore(cwd);
+  const send = (frame: Parameters<typeof encodeServerMessage>[0]): void => {
+    try {
+      broadcast(state, encodeServerMessage(frame));
+    } catch {
+      // Broadcast never fails a run (dead sockets are pruned on close).
+    }
+  };
+  try {
+    while (state.queue.length > 0) {
+      const item = state.queue.shift();
+      if (!item) break;
+      // Effective model: per-prompt override wins, then the bound bot's
+      // model, then the session meta. The bot context (SOUL + knowledge)
+      // resolves live per turn; a deleted bot degrades to plain chat.
+      const meta = await store.readMeta(sessionId);
+      const botCtx = meta?.botId ? await resolveBotChatContext(meta.botId, cwd).catch(() => null) : null;
+      const model = item.model?.trim() || botCtx?.model || meta?.model || DEFAULT_MODEL;
+      if (item.model?.trim() && item.model.trim() !== meta?.model) {
+        await store.writeMeta(sessionId, { model: model });
+      }
+      const provider = model.split('/')[0] ?? 'anthropic';
+      const contextPrefix = await readContextBlocks(cwd, item.contextPaths);
+      const effectivePrompt = contextPrefix ? `${contextPrefix}${item.prompt}` : item.prompt;
+
+      // Wire-level upstream: credentials store + provider config decide the
+      // key and base URL (never a mock echo — missing keys fail honestly).
+      let upstream: { provider: 'anthropic' | 'openai'; baseUrl: string; apiKey: string | null };
+      try {
+        upstream = await resolveProviderUpstream(provider);
+      } catch (e) {
+        send({ type: 'error', message: e instanceof Error ? e.message : String(e), sessionId });
+        continue;
+      }
+
+      const ctrl = new AbortController();
+      state.abort = ctrl;
+      // History for model continuity (capped) + live permissions for the gate.
+      const [historyMessages, config] = await Promise.all([
+        store.read(sessionId).catch(() => []),
+        loadConfig(cwd).catch(() => null),
+      ]);
+      const history = buildLoopHistory(historyMessages);
+      try {
+        const result = await runAgentLoop({
+          cwd,
+          sessionId,
+          userId: item.userId,
+          model,
+          upstream,
+          history,
+          prompt: effectivePrompt,
+          systemPreamble: botCtx?.systemPreamble || undefined,
+          permissions: config?.permissions,
+          store,
+          send,
+          waitApproval: ({ requestId, tool }) =>
+            new Promise<ApprovalDecision>((resolve, reject) => {
+              const timer = setTimeout(() => {
+                state.gates.delete(requestId);
+                resolve('deny');
+              }, APPROVAL_TIMEOUT_MS);
+              state.gates.set(requestId, { kind: 'approval', tool, resolve, reject, timer });
+            }),
+          waitAnswer: ({ requestId }) =>
+            new Promise<string>((resolve, reject) => {
+              const timer = setTimeout(() => {
+                state.gates.delete(requestId);
+                resolve('');
+              }, APPROVAL_TIMEOUT_MS);
+              state.gates.set(requestId, { kind: 'answer', resolve, reject, timer });
+            }),
+          signal: ctrl.signal,
+        });
+        if (state.abort === ctrl) state.abort = null;
+        if (result.outcome === 'aborted') {
+          // Interrupted (Stop button or turn timeout): no usage billing —
+          // the loop already kept the partial output it really produced.
+          // Exactly one `done/aborted`.
+          send({ type: 'done', sessionId, reason: 'aborted' });
+          continue;
+        }
+        send({ type: 'done', sessionId, reason: 'complete' });
+        // Real accounting: token estimates from the core price table land
+        // in the per-project usage ledger (powers GET /api/usage/*) and in
+        // the `cost` frame (powers the header badge + message cost footer).
+        // Unpriced models report costUsd 0 + priced:false — never a guess.
+        // Char counts now span every loop turn (prompt + tool follow-ups).
+        const inputTokens = estimateTokens(result.inputChars);
+        const outputTokens = estimateTokens(result.outputChars);
+        const { costUsd, priced } = estimateCost(model, inputTokens, outputTokens);
+        try {
+          await new UsageLedger(cwd).record({
+            sessionId,
+            provider,
+            model,
+            inputTokens,
+            outputTokens,
+            costUsd,
+            priced,
+          });
+        } catch (e) {
+          // Accounting must never break chat — log and keep streaming.
+          app.log.warn(`[ws] usage record failed session=${sessionId}: ${String(e)}`);
+        }
+        send({
+          type: 'cost',
+          sessionId,
+          inputTokens,
+          outputTokens,
+          costUsd,
+          model,
+        });
+      } catch (e) {
+        if (state.abort === ctrl) state.abort = null;
+        if (e instanceof LoopAborted || ctrl.signal.aborted) {
+          // Interrupted (Stop button or turn timeout): the loop already
+          // kept the partial output it really produced, no usage billing,
+          // exactly one `done/aborted`.
+          send({ type: 'done', sessionId, reason: 'aborted' });
+          continue;
+        }
+        send({ type: 'error', message: e instanceof Error ? e.message : String(e), sessionId });
+        continue;
+      }
+    }
+  } finally {
+    state.running = false;
+    state.abort = null;
+  }
+}
+
+/** Reject every pending gate of a session (Stop button only — never socket close). */
+function rejectSessionGates(state: SessionRunState): void {
+  for (const [id, gate] of state.gates) {
+    clearTimeout(gate.timer);
+    state.gates.delete(id);
+    gate.reject(new LoopAborted());
+  }
+}
 
 /** Read workspace-relative paths into `<context>` blocks (real file content). */
 async function readContextBlocks(cwd: string, paths: string[] | undefined): Promise<string> {
@@ -140,21 +305,11 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
       );
     });
 
-    // Real interrupt: `abort` cancels the in-flight model call inside the
-    // agent loop (it used to only send `done` while the stream kept running
-    // + billing usage). Pending gates reject so the loop ends aborted.
-    let currentAbort: AbortController | null = null;
-    type PendingGate =
-      | { kind: 'approval'; tool: string; resolve: (d: ApprovalDecision) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }
-      | { kind: 'answer'; resolve: (a: string) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> };
-    const pendingGates = new Map<string, PendingGate>();
-    const rejectPendingGates = (): void => {
-      for (const [id, gate] of pendingGates) {
-        clearTimeout(gate.timer);
-        pendingGates.delete(id);
-        gate.reject(new LoopAborted());
-      }
-    };
+    // REQ-070: the run state lives on the SESSION (session-runs.js), not the
+    // socket. This socket attaches for fan-out; a refresh detaches it while
+    // the run continues. Only an explicit `abort` cancels a run.
+    const runState = getRunState(sessionId);
+    runState.sockets.add(socket);
 
     socket.on('message', async (raw: Buffer) => {
       const msg = decodeClientMessage(raw.toString());
@@ -169,144 +324,42 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
         const prompt = msg.prompt.trim();
         if (!prompt) return;
         await store.append(sessionId, { role: 'user', content: prompt, timestamp: new Date().toISOString() });
-
-        // Effective model: per-prompt override wins, then the bound bot's
-        // model, then the session meta. The bot context (SOUL + knowledge)
-        // resolves live per turn; a deleted bot degrades to plain chat.
-        const meta = await store.readMeta(sessionId);
-        const botCtx = meta?.botId ? await resolveBotChatContext(meta.botId, cwd).catch(() => null) : null;
-        const model = msg.model?.trim() || botCtx?.model || meta?.model || DEFAULT_MODEL;
-        if (msg.model?.trim() && msg.model.trim() !== meta?.model) {
-          await store.writeMeta(sessionId, { model: model });
-        }
-        const provider = model.split('/')[0] ?? 'anthropic';
-
-        const contextPrefix = await readContextBlocks(cwd, msg.contextPaths);
-        const effectivePrompt = contextPrefix ? `${contextPrefix}${prompt}` : prompt;
-
-        // Wire-level upstream: credentials store + provider config decide the
-        // key and base URL (never a mock echo — missing keys fail honestly).
-        let upstream: { provider: 'anthropic' | 'openai'; baseUrl: string; apiKey: string | null };
-        try {
-          upstream = await resolveProviderUpstream(provider);
-        } catch (e) {
-          socket.send(
-            encodeServerMessage({ type: 'error', message: e instanceof Error ? e.message : String(e), sessionId }),
-          );
-          return;
-        }
-
-        const ctrl = new AbortController();
-        currentAbort = ctrl;
-        // History for model continuity (capped) + live permissions for the gate.
-        const [historyMessages, config] = await Promise.all([
-          store.read(sessionId).catch(() => []),
-          loadConfig(cwd).catch(() => null),
-        ]);
-        // REQ-062: claim attribution — the todo tools record this user
-        // beside the session. Anonymous/agent runs claim as `agent`.
+        // Claim attribution is resolved now (the socket may be gone by turn time).
         const turnUser = await userFromToken(requestToken(req)).catch(() => null);
-        const history = buildLoopHistory(historyMessages);
-        try {
-          const result = await runAgentLoop({
-            cwd,
-            sessionId,
-            userId: turnUser?.id,
-            model,
-            upstream,
-            history,
-            prompt: effectivePrompt,
-            systemPreamble: botCtx?.systemPreamble || undefined,
-            permissions: config?.permissions,
-            store,
-            send: (frame) => socket.send(encodeServerMessage(frame)),
-            waitApproval: ({ requestId, tool }) =>
-              new Promise<ApprovalDecision>((resolve, reject) => {
-                const timer = setTimeout(() => {
-                  pendingGates.delete(requestId);
-                  resolve('deny');
-                }, APPROVAL_TIMEOUT_MS);
-                pendingGates.set(requestId, { kind: 'approval', tool, resolve, reject, timer });
-              }),
-            waitAnswer: ({ requestId }) =>
-              new Promise<string>((resolve, reject) => {
-                const timer = setTimeout(() => {
-                  pendingGates.delete(requestId);
-                  resolve('');
-                }, APPROVAL_TIMEOUT_MS);
-                pendingGates.set(requestId, { kind: 'answer', resolve, reject, timer });
-              }),
-            signal: ctrl.signal,
-          });
-          if (currentAbort === ctrl) currentAbort = null;
-          if (result.outcome === 'aborted') {
-            // Interrupted (Stop button, timeout, or socket close): no usage
-            // billing — the loop already kept the partial output it really
-            // produced. Exactly one `done/aborted`, like the old path.
-            socket.send(encodeServerMessage({ type: 'done', sessionId, reason: 'aborted' }));
-            return;
-          }
-          socket.send(encodeServerMessage({ type: 'done', sessionId, reason: 'complete' }));
-          // Real accounting: token estimates from the core price table land
-          // in the per-project usage ledger (powers GET /api/usage/*) and in
-          // the `cost` frame (powers the header badge + message cost footer).
-          // Unpriced models report costUsd 0 + priced:false — never a guess.
-          // Char counts now span every loop turn (prompt + tool follow-ups).
-          const inputTokens = estimateTokens(result.inputChars);
-          const outputTokens = estimateTokens(result.outputChars);
-          const { costUsd, priced } = estimateCost(model, inputTokens, outputTokens);
-          try {
-            await new UsageLedger(cwd).record({
-              sessionId,
-              provider,
-              model,
-              inputTokens,
-              outputTokens,
-              costUsd,
-              priced,
-            });
-          } catch (e) {
-            // Accounting must never break chat — log and keep streaming.
-            app.log.warn(`[ws] usage record failed session=${sessionId}: ${String(e)}`);
-          }
+        const depth = enqueuePrompt(sessionId, {
+          prompt,
+          model: msg.model?.trim() || undefined,
+          contextPaths: msg.contextPaths,
+          userId: turnUser?.id,
+          enqueuedAt: new Date().toISOString(),
+        });
+        if (depth > 1) {
           socket.send(
-            encodeServerMessage({
-              type: 'cost',
-              sessionId,
-              inputTokens,
-              outputTokens,
-              costUsd,
-              model,
-            }),
+            encodeServerMessage({ type: 'error', message: `Queued behind ${depth - 1} prompt(s) — it runs automatically.`, code: 'queued', sessionId }),
           );
-        } catch (e) {
-          if (currentAbort === ctrl) currentAbort = null;
-          if (e instanceof LoopAborted || ctrl.signal.aborted) {
-            // Interrupted (Stop button, turn timeout, or socket close): the
-            // loop already kept the partial output it really produced, no
-            // usage billing, exactly one `done/aborted`.
-            socket.send(encodeServerMessage({ type: 'done', sessionId, reason: 'aborted' }));
-            return;
-          }
-          socket.send(
-            encodeServerMessage({ type: 'error', message: e instanceof Error ? e.message : String(e), sessionId }),
-          );
-          return;
         }
+        // Fire-and-forget: the pump owns the run; rejections are impossible
+        // by construction (every leg catches), but never float one.
+        void pumpSessionRun(app, sessionId, cwd).catch((e) => {
+          app.log.warn(`[ws] pump failed session=${sessionId}: ${String(e)}`);
+        });
+        return;
+
       } else if (msg.type === 'abort') {
-        // Cancels the in-flight model call AND rejects pending gates — the
-        // loop's catch block sends the single `done/aborted` (no double-done,
-        // no phantom usage record).
-        rejectPendingGates();
-        if (currentAbort) currentAbort.abort();
+        // Stop button: cancels the session run AND rejects pending gates —
+        // the loop's catch block sends the single `done/aborted` (no
+        // double-done, no phantom usage record). Socket close never lands
+        // here (REQ-070: refresh must not kill the run).
+        rejectSessionGates(runState);
+        if (runState.abort) runState.abort.abort();
         else socket.send(encodeServerMessage({ type: 'done', sessionId, reason: 'aborted' }));
       } else if (msg.type === 'permission_response' || msg.type === 'ask_response') {
         // Resume a gate the agent loop is suspended on (or log it when the
         // client answers with nothing pending — e.g. after a restart).
-        const pending = pendingGates.get(msg.requestId);
+        const pending = runState.gates.get(msg.requestId);
         if (pending) {
           clearTimeout(pending.timer);
-          pendingGates.delete(msg.requestId);
+          runState.gates.delete(msg.requestId);
         }
         // The answer is still real evidence: append it to the approvals
         // decision log (powers GET /api/approvals), best-effort so logging
@@ -395,7 +448,10 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
       offData();
       offExit();
       offAgent();
-      rejectPendingGates();
+      // REQ-070: detach only — the session run (and its gates) survive a
+      // refresh. A reconnected socket reattaches to the same run state.
+      runState.sockets.delete(socket);
+      pruneRunState(sessionId);
       app.log.info(`[ws] client disconnected session=${sessionId}`);
     });
   });

@@ -76,8 +76,47 @@ export function Chat({
 
   const { status, stream, thinking, cost, done, lastError, toolCalls, permissions, questions, sendText, interrupt, answerPermission, answerQuestion } = ws;
   const socketOpen = status === 'open';
-  const streaming = socketOpen && !done && stream.length > 0;
+  // REQ-070: a backend run outlives refresh — the badge stays on while the
+  // server reports running/queued even with no live stream on this socket.
+  const [runActive, setRunActive] = React.useState(false);
+  const streaming = (socketOpen && !done && stream.length > 0) || runActive;
   const [answerBusy, setAnswerBusy] = React.useState<string | null>(null);
+
+  // REQ-070: on mount (fresh boot after F5) ask the backend whether a run is
+  // still in flight; while it is, poll status + transcript so the refresh
+  // catches up live instead of showing a dead "complete".
+  React.useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const poll = () => {
+      api
+        .getSessionRun(sessionId)
+        .then((res) => {
+          if (cancelled) return;
+          const active = res.running || res.queued > 0;
+          setRunActive((prev) => {
+            // Idle edge after a live run: one final reload catches the tail
+            // the last poll may have missed.
+            if (prev && !active) void loadTranscript(sessionId, true);
+            return active;
+          });
+          if (active) {
+            void loadTranscript(sessionId, true);
+            timer = setTimeout(poll, 4000);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setRunActive(false);
+        });
+    };
+    void loadTranscript(sessionId).then(() => {
+      if (!cancelled) poll();
+    });
+    return () => {
+      cancelled = true;
+      if (timer !== null) clearTimeout(timer);
+    };
+  }, [sessionId, loadTranscript]);
 
   // Transcript + session model (server meta wins, tab storage is fallback).
   // While the server list is not in yet the effect re-runs when it flips —
@@ -135,6 +174,7 @@ export function Chat({
     if (!done || doneSeen.current) return;
     doneSeen.current = true;
     setPending([]);
+    setRunActive(false);
     void reloadTranscript().then(() => setStreamVisible(false));
   }, [done, reloadTranscript]);
 

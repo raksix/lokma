@@ -239,6 +239,8 @@ export type SessionSummary = {
 };
 export type SessionsRes = { sessions: SessionSummary[]; count: number };
 export type SessionDetail = { id: string; cwd: string; model: string | null; botId: string | null; messages: unknown[]; count: number };
+/** REQ-070: backend run status — a run in flight or prompts waiting behind it. */
+export type SessionRunStatus = { sessionId: string; running: boolean; queued: number };
 export type CreateSessionRes = { ok: boolean; id: string; cwd: string };
 export type ForkSessionRes = { ok: boolean; id: string; from: string; copied?: number };
 export type PatchSessionRes = { ok: boolean; id: string; model: string; title?: string | null; botId?: string | null };
@@ -1050,6 +1052,8 @@ export const api = {
     get<SessionsRes>(cwd ? `/api/sessions?cwd=${encodeURIComponent(cwd)}` : '/api/sessions'),
   sessions: () => get<SessionsRes>('/api/sessions'),
   getSession: (id: string) => get<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
+  /** REQ-070: is a backend run in flight (refresh-proof badge + polling)? */
+  getSessionRun: (id: string) => get<SessionRunStatus>(`/api/sessions/${encodeURIComponent(id)}/run`),
   createSession: (body?: { cwd?: string; model?: string; botId?: string }) => post<CreateSessionRes>('/api/sessions', body ?? {}),
   forkSession: (id: string) => post<ForkSessionRes>(`/api/sessions/${encodeURIComponent(id)}/fork`),
   patchSession: (id: string, body: { model?: string; botId?: string | null }) =>

@@ -12,6 +12,7 @@ import {
   type User,
 } from 'lokma-core';
 import { requestToken } from './auth.js';
+import { runStatus } from '../session-runs.js';
 
 /**
  * Sessions — JSONL same files as CLI (SessionStore).
@@ -101,6 +102,23 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
         .status(err.statusCode === 400 ? 400 : 500)
         .send({ code: err.code ?? 'search_failed', message: err.message ?? 'Session search failed' });
     }
+  });
+
+  app.get('/api/sessions/:id/run', async (req, reply) => {
+    // REQ-070: live run status for reconnect badges + polling — does the
+    // session have a run in flight or prompts waiting behind it?
+    const { id } = req.params as { id: string };
+    assertSessionId(id);
+    const user = await sessionUser(req, reply);
+    if (user === undefined) return reply;
+    if (user) {
+      const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
+      const meta = await new SessionStore(cwd).readMeta(id).catch(() => null);
+      if (!canViewSession(user, meta?.ownerId)) {
+        return reply.status(404).send({ code: 'not_found', message: 'Session not found' });
+      }
+    }
+    return { sessionId: id, ...runStatus(id) };
   });
 
   app.get('/api/sessions/:id', async (req, reply) => {

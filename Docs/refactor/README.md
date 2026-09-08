@@ -64,7 +64,7 @@
 - [REQ-043](finished/REQ-043-dosya-sayfasi.md) — Dosyalar ayrı sayfa (rail'de dosya ikonu) — done
 - [REQ-044](finished/REQ-044-session-sadece-baslik.md) — Session listede sadece başlık — done
 - [REQ-045](finished/REQ-045-tiling-bar-kaldir.md) — Tiling üst menü çubuğu kalkar — done
-- [REQ-046](REQ-046-pane-popout.md) — Pane'de ayrı pencere butonu — pending
+- [REQ-046](finished/REQ-046-pane-popout.md) — Pane'de ayrı pencere butonu — done
 - [REQ-047](REQ-047-cift-tik-kaldir.md) — Bozuk çift-tık büyütme kaldırılır — pending
 - [REQ-048](REQ-048-buton-arka-plan.md) — Ayar butonlarına tema arka planı — pending
 - [REQ-049](REQ-049-plugin-switch.md) — Plugin switch + disabllar görünür — pending

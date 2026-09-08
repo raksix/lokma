@@ -50,7 +50,7 @@ export function WindowedCanvas({
     <div className="relative min-h-0 flex-1 overflow-hidden rounded border bg-muted/20">
       {panes.length === 0 ? (
         <div className="flex h-full items-center justify-center p-6 text-center text-xs text-muted-foreground">
-          No floating windows. Open a pane from the tiling bar, then switch back to float it here.
+          No floating windows. Pop a pane out from its strip button, then drag it here.
         </div>
       ) : null}
       {/* REQ-014: window frames use a solid card surface. `bg-background`

@@ -11,6 +11,7 @@ import {
   Loader2,
   MessageSquare,
   Pencil,
+  PictureInPicture2,
   Plus,
   Rows2,
   Save,
@@ -513,6 +514,7 @@ export function WorkspacePane({
   onClosePane,
   onMoveTab,
   onOpenSession,
+  onPopout,
 }: {
   id: string;
   tabs: PaneTab[];
@@ -526,6 +528,7 @@ export function WorkspacePane({
   onClosePane: (paneId: string) => void;
   onMoveTab: (tab: PaneTab, fromPaneId: string, toPaneId: string, split: { dir: 'row' | 'col'; pos: 'before' | 'after' } | null) => void;
   onOpenSession?: (id: string) => void;
+  onPopout?: (paneId: string) => void;
 }) {
   const bodyRef = React.useRef<HTMLDivElement | null>(null);
   const [zone, setZone] = React.useState<DropZone | null>(null);
@@ -760,6 +763,7 @@ export function WorkspacePane({
         }}
         onSplitEmpty={(dir) => onSplitEmpty(id, dir)}
         onClosePane={() => onClosePane(id)}
+        onPopout={onPopout ? () => onPopout(id) : undefined}
         onTabBarDrop={(e) => void handleDrop(e, 'center')}
       />
       <div
@@ -847,6 +851,7 @@ function PaneTabBar({
   onAdd,
   onSplitEmpty,
   onClosePane,
+  onPopout,
   onTabBarDrop,
 }: {
   tabs: PaneTab[];
@@ -858,6 +863,7 @@ function PaneTabBar({
   onAdd: () => void;
   onSplitEmpty: (dir: 'row' | 'col') => void;
   onClosePane: () => void;
+  onPopout?: () => void;
   onTabBarDrop: (e: React.DragEvent) => void;
 }) {
   // REQ-029: the tab strip is a drop target too (concept handleTabBarDrop).
@@ -945,6 +951,11 @@ function PaneTabBar({
       <Button variant="ghost" size="sm" className="h-5 w-5 shrink-0 p-0" title="Split into stacked rows" onClick={() => onSplitEmpty('col')} aria-label="Split into stacked rows">
         <Rows2 className="h-3 w-3" />
       </Button>
+      {onPopout ? (
+        <Button variant="ghost" size="sm" className="h-5 w-5 shrink-0 p-0" title="Pop out as a floating window (drag the title bar to move, edges to resize)" onClick={onPopout} aria-label="Pop out as a floating window">
+          <PictureInPicture2 className="h-3 w-3" />
+        </Button>
+      ) : null}
       <Button variant="ghost" size="sm" className="h-5 w-5 shrink-0 p-0" title="Close this pane" onClick={onClosePane} aria-label="Close this pane">
         <X className="h-3 w-3" />
       </Button>

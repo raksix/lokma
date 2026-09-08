@@ -42,6 +42,7 @@ export function TilingWorkspace({
   const layout = usePaneStore((s) => s.layout);
   const setLayout = usePaneStore((s) => s.setLayout);
   const windowed = usePaneStore((s) => s.windowed);
+  const setWindowed = usePaneStore((s) => s.setWindowed);
   const focusedPaneId = usePaneStore((s) => s.focusedPaneId);
   const focusPane = usePaneStore((s) => s.focusPane);
   const resetStoreLayout = usePaneStore((s) => s.resetLayout);
@@ -219,6 +220,24 @@ export function TilingWorkspace({
     focusPane(toPaneId);
   };
 
+  // REQ-046 — per-pane pop-out: the strip button floats this pane as an
+  // independent window. The windowed canvas reuses the REQ-014 solid
+  // surface plus the REQ-042 drag/resize handles, so entering windowed
+  // mode plus a cascaded geometry slot is the whole move. Already
+  // windowed → just focus (geometry is kept, never reset).
+  const popoutPane = (paneId: string) => {
+    setWinPos((prev) => {
+      if (prev[paneId]) return prev;
+      const n = Object.keys(prev).length % 8;
+      return { ...prev, [paneId]: { x: 24 + n * 28, y: 24 + n * 28, w: 560, h: 420 } };
+    });
+    focusPane(paneId);
+    if (!windowed) {
+      setWindowed(true);
+      emitToast('Pane popped out — drag the title bar to move, edges to resize');
+    }
+  };
+
   // REQ-045 — the TilingBar Reset button moved to the AppShell mode
   // cluster; the handler stays here where the tab/window state lives.
   // Dispatched as RESET_LAYOUT_EVENT, same pattern as FOCUS_FILES_EVENT.
@@ -255,6 +274,7 @@ export function TilingWorkspace({
         onClosePane={closePane}
         onMoveTab={moveTab}
         onOpenSession={onOpenSession}
+        onPopout={popoutPane}
       />
     );
   };

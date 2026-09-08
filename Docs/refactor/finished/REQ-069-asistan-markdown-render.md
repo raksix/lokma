@@ -10,3 +10,4 @@
   - Stil: tam-literal Tailwind sınıfları (`border-terracotta/60`, `list-disc`, `list-decimal`, `text-terracotta`, `border-line`, `bg-muted`), lucide dışı ikon yok.
 - **Touched:** `packages/lokma-web/web/src/components/chat/lokma-message.tsx` (yeni `MdBlock` + `parseMarkdownBlocks` + `sanitizeMdUrl` + `renderInline` + `renderMdBlock`; `AssistantBody` metin dalı).
 - **Proof:** root tsc 0, web tsc 0, web build green `index-DgC6pRuj.js`, single-proc `lokma-web` restart online, served bundle == disk dist (BUNDLE-MATCH).
+- **Live follow-up (2026-09-08):** `lokma-message.test.ts` §7'ye 12 markdown/sanitize case'i eklendi (32/32 pass); headless mimo probu: `#lokma-chat` içinde `h:1, strong:1` render doğrulandı (liste satırını model tek satır yazdığı için `ul:0` — parser gruplama testte kanıtlı).

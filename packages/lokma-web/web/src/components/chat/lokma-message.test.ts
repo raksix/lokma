@@ -5,7 +5,7 @@
  * Not imported by app code, so the Vite bundle ignores it.
  */
 import { applyServerFrame, dropRequest, initialWsUiState, permissionAnswer, questionAnswer } from '@/lib/ws';
-import { splitCodeFences, summarizeInput } from './lokma-message';
+import { parseMarkdownBlocks, sanitizeMdUrl, splitCodeFences, summarizeInput } from './lokma-message';
 
 function assert(cond: boolean, label: string): void {
   if (!cond) throw new Error(`FAIL: ${label}`);
@@ -62,5 +62,21 @@ assert(ques.type === 'ask_response' && ques.answer === 'a', 'question answer fra
 // 6. Answering drops the card from its queue (hook mirrors this via dropRequest).
 assert(dropRequest(ui.permissions, 'p1').length === 0, 'answered permission leaves queue');
 assert(dropRequest(ui.questions, 'q1').length === 0, 'answered question leaves queue');
+
+// 7. REQ-069: markdown block parser (headers/lists/quotes/rules/paragraphs).
+const md = parseMarkdownBlocks('## Title\n\n- a\n- b\n\n1. x\n2. y\n\n> note\n\n---\n\nplain');
+assert(md.length === 6, `six blocks parsed, got ${md.length}`);
+assert(md[0].kind === 'h' && (md[0] as { level: number }).level === 2, 'h2 level parsed');
+assert(md[1].kind === 'ul' && (md[1] as { items: string[] }).items.length === 2, 'ul items grouped');
+assert(md[2].kind === 'ol' && (md[2] as { items: string[] }).items.length === 2, 'ol items grouped');
+assert(md[3].kind === 'quote', 'quote parsed');
+assert(md[4].kind === 'hr', 'rule parsed');
+assert(md[5].kind === 'p', 'trailing paragraph parsed');
+assert(parseMarkdownBlocks('just text').length === 1, 'plain text is one paragraph');
+assert(parseMarkdownBlocks('**bold** and more')[0].kind === 'p', 'inline markup stays in paragraph');
+assert(sanitizeMdUrl('https://example.com/a') === 'https://example.com/a', 'https link allowed');
+assert(sanitizeMdUrl('/docs/x') === '/docs/x', 'relative link allowed');
+assert(sanitizeMdUrl('javascript:alert(1)') === null, 'javascript: url rejected');
+assert(sanitizeMdUrl('data:text/html,<b>x</b>') === null, 'data: url rejected');
 
 console.log('lokma-message.test.ts: all W1-2 checks passed');

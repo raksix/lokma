@@ -88,3 +88,4 @@
 - [REQ-067](finished/REQ-067-sidebar-baslik-kaldir.md) — Sidebar Explorer/Inspector yazıları kalktı — done
 - [REQ-068](finished/REQ-068-model-dropdown-light.md) — Model dropdown açık temada açık — done
 - [REQ-069](finished/REQ-069-asistan-markdown-render.md) — Asistan mesajları markdown render — done
+- [REQ-070](REQ-070-backend-run-queue.md) — Backend run queue, F5-proof — done

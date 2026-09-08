@@ -72,3 +72,4 @@
 - [REQ-051](finished/REQ-051-session-compact-zaman.md) — Compact satır + m/h/d + aktiflik sırası — done
 - [REQ-052](REQ-052-agent-hub-tam-sayfa.md) — Agent Hub tam sayfa + detaylı — pending
 - [REQ-053](REQ-053-inspector-tam-genislik.md) — Öğeler Inspector tam genişliği — pending
+- [REQ-054](REQ-054-thinking-tool-ayri-satir.md) — Thinking/tool ayrı satırlar + error card — done

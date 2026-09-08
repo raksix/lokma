@@ -62,3 +62,4 @@
 - [REQ-041](finished/REQ-041-cursor-pointer.md) — Tüm tıklanabilirlerde cursor:pointer (REQ-036 crosshair'ı geçersiz kılar) — done
 - [REQ-042](finished/REQ-042-windowed-resize.md) — Windowed pencereler resize edilebilir — done
 - [REQ-043](REQ-043-dosya-sayfasi.md) — Dosyalar ayrı sayfa (rail'de dosya ikonu) — pending
+- [REQ-044](REQ-044-session-sadece-baslik.md) — Session listede sadece başlık — pending

@@ -48,6 +48,38 @@ export function filterPlugins(
   });
 }
 
+/**
+ * Unified registry list (REQ-049) — every plugin in ONE list, disabled rows
+ * stay visible (dimmed by the pane) instead of hiding behind a tab.
+ * Enabled rows sort first (stable), then the same query/category match.
+ */
+export function filterVisiblePlugins(
+  plugins: Plugin[],
+  query: string,
+  category: PluginCategoryFilter,
+): Plugin[] {
+  const q = query.trim().toLowerCase();
+  const matched = plugins.filter((plugin) => {
+    if (category !== 'all' && plugin.category !== category) return false;
+    if (!q) return true;
+    return (
+      plugin.name.toLowerCase().includes(q) ||
+      plugin.description.toLowerCase().includes(q) ||
+      plugin.id.toLowerCase().includes(q) ||
+      plugin.author.toLowerCase().includes(q)
+    );
+  });
+  return matched
+    .map((plugin, index) => ({ plugin, index }))
+    .sort((a, b) => Number(b.plugin.enabled) - Number(a.plugin.enabled) || a.index - b.index)
+    .map((entry) => entry.plugin);
+}
+
+/** "2/3 enabled" — header counter for the unified list. */
+export function countEnabledPlugins(plugins: Plugin[]): number {
+  return plugins.filter((plugin) => plugin.enabled).length;
+}
+
 /** Initial squares (the concept uses these — no invented glyphs). */
 export function initials(name: string): string {
   const clean = name.trim();

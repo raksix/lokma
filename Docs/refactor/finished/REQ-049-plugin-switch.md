@@ -1,0 +1,9 @@
+# REQ-049 — Plugin enable/disable switch olsun, disabllar da görünsün
+
+- **Status:** done (2026-09-08 — implemented + live verified, close-out commit below)
+- **Asked:** 2026-09-08 — "burda plugin enable disable switch olarak olsun, disabled pluginler de gözüksün" (SS'e bakılamadı — görüntü servisi 500).
+- **Interpretation:** Plugin listesinde her satırda açma/kapama **switch** (toggle) olur; kapalı pluginler listeden kaybolmaz, soluk/disabled görünür. Models panelindeki switch deseni referans alınır.
+- **Touched (plan):** plugins pane satırları (switch component + disabled stili + persist).
+- **Touched (this run):** new `components/ui/switch.tsx` (accessible `button[role=switch]`, terracotta ON matching models accent, full literal classes) · `plugins.ts` gains `filterVisiblePlugins` (unified list, enabled-first stable sort, same query/category match) + `countEnabledPlugins` (legacy `tabOf/tabCounts/filterPlugins` kept + still tested) · `plugins-pane.tsx` drops the Installed/Suspended tab split for ONE list (header `X/Y enabled` counter, per-row Switch wired to the existing PATCH persist, disabled rows `opacity-60` + `suspended` badge) · `plugins.test.ts` +9 unified-list/counter checks.
+- **Proof:** probe 51/51 PASS · root `bun x tsc --noEmit` 0 · web `typecheck` 0 · web `bun run build` green (`index-C-1FpKe2.js`) · single-proc `lokma-web` restart online · served bundle == disk dist (BUNDLE-MATCH, served JS carries switch + suspended) · headless live PASS: 6 switches (5 on + 1 off, disabled Archify visible in-list), `5/6 enabled` counter, 0 legacy tabs, toggle Bots off → reload persists `checked=false` → toggled back on (`5/6 enabled`, live state restored).
+- **Verify (plan):** root+web `tsc` 0, web build green, single-proc restart, headless ile switch aç/kapa + reload sonrası durum + disabl'ların görünürlüğü kanıtlanır, bundle match.

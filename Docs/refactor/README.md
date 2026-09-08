@@ -67,5 +67,5 @@
 - [REQ-046](finished/REQ-046-pane-popout.md) — Pane'de ayrı pencere butonu — done
 - [REQ-047](finished/REQ-047-cift-tik-kaldir.md) — Bozuk çift-tık büyütme kaldırılır — done
 - [REQ-048](finished/REQ-048-buton-arka-plan.md) — Ayar butonlarına tema arka planı — done
-- [REQ-049](REQ-049-plugin-switch.md) — Plugin switch + disabllar görünür — pending
+- [REQ-049](finished/REQ-049-plugin-switch.md) — Plugin switch + disabllar görünür — done
 - [REQ-050](REQ-050-stream-thinking-tools.md) — Stream + thinking + tool calling detaylı — done

@@ -5,7 +5,9 @@
  */
 import {
   categoryTone,
+  countEnabledPlugins,
   filterPlugins,
+  filterVisiblePlugins,
   formatStars,
   initials,
   isMarketplaceInstalled,
@@ -65,6 +67,21 @@ check('query matches id', filterPlugins(rows, 'suspended', 'vault', 'all').lengt
 check('category filter narrows', filterPlugins(rows, 'installed', '', 'tool').length === 1);
 check('category mismatch empties', filterPlugins(rows, 'installed', '', 'skill').length === 0);
 check('blank query returns tab rows', filterPlugins(rows, 'installed', '   ', 'all').length === 2);
+
+// ─── unified list (REQ-049: disabled rows stay visible, enabled first) ─
+check('unified shows all rows', filterVisiblePlugins(rows, '', 'all').length === 3);
+check(
+  'unified sorts enabled first',
+  JSON.stringify(filterVisiblePlugins(rows, '', 'all').map((p) => p.id)) ===
+    JSON.stringify(['@lokma/plugin-archify', 'demo-tool', '@lokma/plugin-vault']),
+);
+check('unified query matches name', filterVisiblePlugins(rows, 'arch', 'all').length === 1);
+check('unified query finds disabled', filterVisiblePlugins(rows, 'vault', 'all').length === 1);
+check('unified category narrows', filterVisiblePlugins(rows, '', 'tool').length === 1);
+check('unified category mismatch empties', filterVisiblePlugins(rows, '', 'skill').length === 0);
+check('unified blank query returns all', filterVisiblePlugins(rows, '   ', 'all').length === 3);
+check('enabled counter counts live', countEnabledPlugins(rows) === 2);
+check('enabled counter empty is 0', countEnabledPlugins([]) === 0);
 
 // ─── presentation ────────────────────────────────────────────────────
 check('initials two letters', initials('Archify') === 'AR');

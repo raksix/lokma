@@ -2,19 +2,19 @@ import * as React from 'react';
 import { ChevronDown, ChevronRight, Download, Layers, Puzzle, Search, Star, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { ApiError, api, type MarketplaceItem, type Plugin } from '@/lib/api';
 import {
   PLUGIN_CATEGORIES,
   categoryTone,
-  filterPlugins,
+  countEnabledPlugins,
+  filterVisiblePlugins,
   formatStars,
   initials,
   isMarketplaceInstalled,
   summarizeRegistry,
-  tabCounts,
   validatePluginUrl,
   type PluginCategoryFilter,
-  type PluginTab,
 } from './plugins';
 
 function toast(message: string): void {
@@ -26,9 +26,9 @@ function errMessage(e: unknown): string {
 }
 
 /**
- * PluginsPane — kernel registry + hot toggle + add-from-URL + remote
+ * PluginsPane — kernel registry + switch toggle + add-from-URL + remote
  * marketplace (W6-23 + Phase 2 wiring, Docs/23 §9).
- * Concept layout 1:1 (header tabs + search + rows + kernel footer), but every
+ * Concept layout 1:1 (header + search + rows + kernel footer), but every
  * control is live: `GET /api/plugins` (bundled manifests with REAL endpoint
  * lists + URL records), `PATCH /api/plugins/:id { enabled }` (suspends the
  * plugin's routes server-side with 503 — no restart), `POST
@@ -36,13 +36,15 @@ function errMessage(e: unknown): string {
  * `DELETE /api/plugins/:id` (URL records only), `GET
  * /api/plugins/marketplace?q=` (live GitHub `lokma-plugin` topic — every
  * row is a real repo, Install feeds the same `POST /install` endpoint).
+ * REQ-049: ONE unified registry list — every row carries a Switch, disabled
+ * rows stay visible dimmed (`opacity-60` + `suspended` badge) instead of
+ * hiding behind an Installed/Suspended tab split; enabled rows sort first.
  * NOT ported: the concept's invented `downloads` figures and the fake
  * marketplace rows with toast-only Install buttons.
  */
 export function PluginsPane() {
   const [plugins, setPlugins] = React.useState<Plugin[] | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [tab, setTab] = React.useState<PluginTab>('installed');
   const [query, setQuery] = React.useState('');
   const [category, setCategory] = React.useState<PluginCategoryFilter>('all');
   const [busy, setBusy] = React.useState<Record<string, boolean>>({});
@@ -116,7 +118,6 @@ export function PluginsPane() {
       const res = await api.installPlugin(url.trim());
       setPlugins((prev) => (prev ? [...prev, res.plugin] : [res.plugin]));
       setUrl('');
-      setTab('suspended');
       toast(`${res.plugin.name} added — suspended until enabled`);
     } catch (e) {
       setUrlError(errMessage(e));
@@ -143,8 +144,9 @@ export function PluginsPane() {
     }
   };
 
-  const counts = tabCounts(plugins ?? []);
-  const rows = plugins ? filterPlugins(plugins, tab, query, category) : [];
+  const all = plugins ?? [];
+  const enabledCount = countEnabledPlugins(all);
+  const rows = plugins ? filterVisiblePlugins(plugins, query, category) : [];
 
   const searchMarket = React.useCallback(async (q: string) => {
     setMloading(true);
@@ -187,29 +189,10 @@ export function PluginsPane() {
         <span className="ml-1 text-[11px] text-zinc-400 hidden @min-[320px]:inline">
           Kernel manifest · hot toggle · no restart
         </span>
-        <span className="ml-auto flex shrink-0 gap-1">
-          <Button
-            variant={tab === 'installed' && !marketOpen ? 'default' : 'ghost'}
-            size="sm"
-            className="h-5 px-2 text-[11px]"
-            onClick={() => {
-              setMarketOpen(false);
-              setTab('installed');
-            }}
-          >
-            Installed {counts.installed}
-          </Button>
-          <Button
-            variant={tab === 'suspended' && !marketOpen ? 'default' : 'ghost'}
-            size="sm"
-            className="h-5 px-2 text-[11px]"
-            onClick={() => {
-              setMarketOpen(false);
-              setTab('suspended');
-            }}
-          >
-            Suspended {counts.suspended}
-          </Button>
+        <span className="ml-auto flex shrink-0 items-center gap-1">
+          <span className="text-[11px] text-zinc-400">
+            {enabledCount}/{all.length} enabled
+          </span>
           <Button
             variant={marketOpen ? 'default' : 'ghost'}
             size="sm"
@@ -407,7 +390,7 @@ export function PluginsPane() {
             return (
               <div
                 key={plugin.id}
-                className="flex gap-3 p-2.5 rounded-lg border border-line bg-white dark:bg-[#1E1E21] hover:border-terracotta/20 hover:shadow-sm transition"
+                className={`flex gap-3 p-2.5 rounded-lg border border-line bg-white dark:bg-[#1E1E21] hover:border-terracotta/20 hover:shadow-sm transition ${plugin.enabled ? '' : 'opacity-60'}`}
               >
                 <span className="w-8 h-8 rounded-lg bg-[#262624] dark:bg-white text-white dark:text-black grid place-items-center text-[10px] font-bold shrink-0">
                   {initials(plugin.name)}
@@ -420,6 +403,11 @@ export function PluginsPane() {
                     </span>
                     {plugin.source === 'url' && (
                       <span className="hidden @min-[320px]:inline px-1 py-0 rounded border text-[10px] bg-muted border-line">url</span>
+                    )}
+                    {!plugin.enabled && (
+                      <span className="hidden @min-[320px]:inline px-1 py-0 rounded border text-[10px] bg-muted border-line">
+                        suspended
+                      </span>
                     )}
                     <span
                       className={`w-2 h-2 rounded-full ${plugin.enabled ? 'bg-emerald-500' : 'bg-zinc-300'}`}
@@ -456,16 +444,13 @@ export function PluginsPane() {
                     </div>
                   )}
                 </div>
-                <div className="flex flex-col gap-1 shrink-0">
-                  <Button
-                    variant={plugin.enabled ? 'default' : 'outline'}
-                    size="sm"
-                    className="h-6 text-xs px-2"
-                    onClick={() => void toggle(plugin)}
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <Switch
+                    checked={plugin.enabled}
+                    onChange={() => void toggle(plugin)}
                     disabled={busy[plugin.id] ?? false}
-                  >
-                    {plugin.enabled ? 'Enabled' : 'Enable'}
-                  </Button>
+                    label={plugin.enabled ? `Suspend ${plugin.name}` : `Enable ${plugin.name}`}
+                  />
                   <Button variant="ghost" size="sm" className="h-5 text-[11px] gap-1" onClick={() => void toggleKernel(plugin)}>
                     {isOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                     Kernel
@@ -488,7 +473,7 @@ export function PluginsPane() {
           })}
         {plugins !== null && rows.length === 0 && !loadError && (
           <div className="p-6 text-center text-xs text-zinc-400">
-            {tab === 'suspended' ? 'Nothing suspended — all plugins live' : 'No plugins match — try the search'}
+            No plugins match — try the search
           </div>
         )}
       </div>

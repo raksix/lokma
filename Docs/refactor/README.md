@@ -57,3 +57,4 @@
 - [REQ-036](finished/REQ-036-crosshair-imlec.md) — Butonlarda crosshair imleç — done
 - [REQ-037](finished/REQ-037-browser-full-height.md) — Browser içeriği full height — done
 - [REQ-038](finished/REQ-038-sending-takiliyor.md) — Gönderince sending'de takılma — done
+- [REQ-039](REQ-039-spark-500-cozumu.md) — spark 500: bölge kilidi + ölü proxy, yol haritası — done

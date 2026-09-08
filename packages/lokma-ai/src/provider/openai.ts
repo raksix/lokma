@@ -80,6 +80,20 @@ export function responsesThinkingText(output: unknown): string {
   return text;
 }
 
+/**
+ * Portion of a completed-output `tail` the live deltas have not covered yet.
+ * Upstream replays the FULL text on `response.completed`, so the common case
+ * is `tail === seen` (→ '') or `tail` extending it (→ suffix). Anything else
+ * (reordered snapshot) passes through to avoid dropping real content.
+ */
+export function unseenSuffix(seen: string, tail: string): string {
+  if (!tail) return '';
+  if (!seen) return tail;
+  if (tail.startsWith(seen)) return tail.slice(seen.length);
+  if (seen.includes(tail)) return '';
+  return tail;
+}
+
 export class OpenAIAdapter implements ProviderAdapter {
   id = 'openai' as const;
 
@@ -135,6 +149,8 @@ export class OpenAIAdapter implements ProviderAdapter {
       );
     }
     try {
+      let streamedSeen = '';
+      let thinkingSeen = '';
       for await (const { data } of readSse(res)) {
         let evt: unknown;
         try {
@@ -150,16 +166,37 @@ export class OpenAIAdapter implements ProviderAdapter {
           // Responses API: `response.output_text.delta` carries live text,
           // `response.reasoning_summary_text.delta` carries live thinking,
           // `response.completed` carries the finished output array.
+          // REQ-061: the completed payload repeats the FULL text (not just
+          // the remainder), so blindly appending it doubles every answer.
+          // Emit only the unseen suffix of each tail.
           const r = evt as { type?: unknown; delta?: unknown; response?: { output?: unknown } };
           if (r?.type === 'response.reasoning_summary_text.delta') {
-            if (typeof r?.delta === 'string' && r.delta) yield { type: 'thinking_delta', delta: r.delta };
+            if (typeof r?.delta === 'string' && r.delta) {
+              thinkingSeen += r.delta;
+              yield { type: 'thinking_delta', delta: r.delta };
+            }
             continue;
           }
-          if (typeof r?.delta === 'string' && r.delta) yield { type: 'text_delta', delta: r.delta };
+          if (typeof r?.delta === 'string' && r.delta) {
+            streamedSeen += r.delta;
+            yield { type: 'text_delta', delta: r.delta };
+          }
           const tail = responsesOutputText(r?.response?.output);
-          if (tail) yield { type: 'text_delta', delta: tail };
+          if (tail) {
+            const fresh = unseenSuffix(streamedSeen, tail);
+            if (fresh) {
+              streamedSeen += fresh;
+              yield { type: 'text_delta', delta: fresh };
+            }
+          }
           const thinkTail = responsesThinkingText(r?.response?.output);
-          if (thinkTail) yield { type: 'thinking_delta', delta: thinkTail };
+          if (thinkTail) {
+            const freshThink = unseenSuffix(thinkingSeen, thinkTail);
+            if (freshThink) {
+              thinkingSeen += freshThink;
+              yield { type: 'thinking_delta', delta: freshThink };
+            }
+          }
           continue;
         }
         const content = record?.choices?.[0]?.delta?.content;

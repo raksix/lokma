@@ -165,6 +165,10 @@ export function buildToolSystemPrompt(tools: { name: string; description: string
     'Use a self-closing tag for empty input: <tool name="list_files" />',
     'One block per call, valid JSON body only. Text outside blocks is your reply.',
     'To ask the user something blocking, emit <ask question="...">a|b|c</ask> (omit choices for free text).',
+    'RULES: never narrate intent ("I will look", "hazırlıyorum", "bakıyorum") — emit the tool block immediately, then report the result.',
+    'Never call the same tool twice in a row with the same input. Chain: list/search → read → write/run, one turn at a time.',
+    'To create or change a file: read_file first (it returns the sha), then write_file with {"path": ..., "content": ..., "expectedSha": "<sha>"}; new files omit expectedSha.',
+    'To run a command: {"command": "bun", "args": ["run", "build"]}. Shell syntax (|, &&, $) is refused — one binary plus args only.',
     'Available tools:',
     ...lines,
   ].join('\n');

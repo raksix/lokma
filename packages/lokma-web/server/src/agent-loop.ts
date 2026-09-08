@@ -76,7 +76,7 @@ export type AgentLoopResult = {
   turns: number;
 };
 
-export const LOOP_DEFAULT_MAX_TURNS = 5;
+export const LOOP_DEFAULT_MAX_TURNS = 15;
 export const LOOP_DEFAULT_TURN_TIMEOUT_MS = 120_000;
 /** Transcript window rebuilt as model history (newest-first cap). */
 const HISTORY_MESSAGE_CAP = 20;
@@ -336,7 +336,7 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
 
   opts.send({
     type: 'error',
-    message: `Tool turn limit (${maxTurns}) reached — remaining calls skipped. Ask the model to continue if needed.`,
+    message: `Paused after ${maxTurns} tool turns with work still queued — say "continue" and I will pick up where I left off.`,
     code: 'turn_limit',
     sessionId: opts.sessionId,
   });

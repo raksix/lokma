@@ -10,7 +10,7 @@ import { createServer, type Server } from 'node:http';
 import { type AddressInfo } from 'node:net';
 import { AnthropicAdapter } from './anthropic';
 import { ProviderError } from './errors';
-import { OpenAIAdapter, shortModelId, usesResponsesApi } from './openai';
+import { OpenAIAdapter, shortModelId, unseenSuffix, usesResponsesApi } from './openai';
 import { stream } from '../stream';
 
 let passed = 0;
@@ -179,6 +179,35 @@ try {
   assert(!usesResponsesApi('https://api.openai.com/v1', 'muse-spark-1.3-contributor'), 'spark off-zen stays on chat');
 } finally {
   respStub.server.close();
+}
+
+// 2d. REQ-061: `response.completed` replays the FULL text — the adapter must
+// not append it on top of already-streamed deltas (live transcript doubled
+// every spark answer: "Selam!...Selam!...").
+const dupStub = await listen((_req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+  res.end(
+    'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"Hi"}\n\n' +
+      'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":" there"}\n\n' +
+      'event: response.completed\ndata: {"type":"response.completed","response":{"output":[{"type":"message","content":[{"type":"output_text","text":"Hi there"}]}]}}\n\n',
+  );
+});
+try {
+  const out = await collectText(
+    new OpenAIAdapter().stream({
+      model: 'opencode-go/muse-spark-1.3-contributor',
+      messages: [{ role: 'user', content: 'hi' }],
+      apiKey: 'test-key',
+      baseUrl: `${dupStub.base}/opencode.ai/zen/go/v1`,
+    }),
+  );
+  assert(out.text === 'Hi there', `completed full-text replay deduped, got: ${JSON.stringify(out.text)}`);
+  assert(unseenSuffix('Hi there', 'Hi there') === '', 'identical tail skipped');
+  assert(unseenSuffix('Hi', 'Hi there!') === ' there!', 'extended tail yields suffix only');
+  assert(unseenSuffix('', 'abc') === 'abc', 'empty seen passes tail through');
+  assert(unseenSuffix('abc', '') === '', 'empty tail yields nothing');
+} finally {
+  dupStub.server.close();
 }
 
 // 3. OpenAI-compatible upstream 401 surfaces as http_error with the status.

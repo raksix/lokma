@@ -59,5 +59,5 @@
 - [REQ-038](finished/REQ-038-sending-takiliyor.md) — Gönderince sending'de takılma — done
 - [REQ-039](finished/REQ-039-spark-500-cozumu.md) — spark 500: bölge kilidi + ölü proxy, yol haritası — done
 - [REQ-040](finished/REQ-040-session-yeni-sekme.md) — Session açılınca yeni sekme eklensin (VS Code) — done
-- [REQ-041](REQ-041-cursor-pointer.md) — Tüm tıklanabilirlerde cursor:pointer (REQ-036 ile çakışır) — pending
+- [REQ-041](finished/REQ-041-cursor-pointer.md) — Tüm tıklanabilirlerde cursor:pointer (REQ-036 crosshair'ı geçersiz kılar) — done
 - [REQ-042](REQ-042-windowed-resize.md) — Windowed pencereler resize edilebilir — pending

@@ -187,6 +187,40 @@ export function formatBudget(tokens: number, usd: number): string {
   return `${short} tokens · $${usd}`;
 }
 
+/**
+ * Short relative time for registry timestamps (REQ-052: created + last
+ * activity read at a glance). Null when the input is missing or unparsable —
+ * the caller renders nothing instead of a fake date. `nowMs` is injectable
+ * so probes stay deterministic.
+ */
+export function formatRelativeTime(iso: string | null, nowMs: number = Date.now()): string | null {
+  if (!iso) return null;
+  const stamp = Date.parse(iso);
+  if (!Number.isFinite(stamp)) return null;
+  const diff = Math.max(0, nowMs - stamp);
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(stamp).toISOString().slice(0, 10);
+}
+
+export type BulkAction = 'pause' | 'resume' | 'kill';
+
+/**
+ * Agents eligible for one bulk lifecycle move (REQ-052 bulk bar). Mirrors
+ * the per-agent guards in the pane (`canPause`/`canResume`/`canKill`) so the
+ * bulk bar and the detail buttons never disagree.
+ */
+export function bulkTargets(agents: HubAgent[], action: BulkAction): HubAgent[] {
+  if (action === 'pause') return agents.filter((a) => ['idle', 'queued', 'running'].includes(a.state));
+  if (action === 'resume') return agents.filter((a) => a.state === 'paused');
+  return agents.filter((a) => !TERMINAL_STATES.includes(a.state));
+}
+
 /** Empty create-form defaults (model matches the server default). */
 export function emptyAgentForm(): AgentForm {
   return { name: '', persona: 'builder', model: 'anthropic/claude-4-sonnet', cwd: '', tokens: '', usd: '' };

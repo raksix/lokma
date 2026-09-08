@@ -5,8 +5,10 @@
 import {
   AGENT_STATES,
   PERSONA_OPTIONS,
+  bulkTargets,
   emptyAgentForm,
   formatBudget,
+  formatRelativeTime,
   initials,
   isAiCreated,
   normalizeAgent,
@@ -103,6 +105,31 @@ check('million budget line', formatBudget(2_000_000, 25) === '2M tokens · $25')
 check('seven personas', PERSONA_OPTIONS.length === 7);
 check('seven states', AGENT_STATES.length === 7);
 check('empty form model is server default', emptyAgentForm().model === 'anthropic/claude-4-sonnet');
+
+// formatRelativeTime (REQ-052 registry timestamps)
+const NOW = Date.parse('2026-09-08T12:00:00.000Z');
+check('null time is null', formatRelativeTime(null, NOW) === null);
+check('garbage time is null', formatRelativeTime('not-a-date', NOW) === null);
+check('seconds ago is just now', formatRelativeTime('2026-09-08T11:59:40.000Z', NOW) === 'just now');
+check('minutes ago', formatRelativeTime('2026-09-08T11:45:00.000Z', NOW) === '15m ago');
+check('hours ago', formatRelativeTime('2026-09-08T09:00:00.000Z', NOW) === '3h ago');
+check('days ago', formatRelativeTime('2026-09-05T12:00:00.000Z', NOW) === '3d ago');
+check('old dates fall back to yyyy-mm-dd', formatRelativeTime('2026-06-01T00:00:00.000Z', NOW) === '2026-06-01');
+check('future stamps clamp to just now', formatRelativeTime('2026-09-09T00:00:00.000Z', NOW) === 'just now');
+
+// bulkTargets (REQ-052 bulk bar mirrors the per-agent guards)
+const mixed = [
+  { ...info({ id: 'run', state: 'running' }) },
+  { ...info({ id: 'idle', state: 'idle' }) },
+  { ...info({ id: 'q', state: 'queued' }) },
+  { ...info({ id: 'p', state: 'paused' }) },
+  { ...info({ id: 'done', state: 'completed' }) },
+  { ...info({ id: 'dead', state: 'failed' }) },
+].map(normalizeAgent);
+check('bulk pause hits idle+queued+running', bulkTargets(mixed, 'pause').map((a) => a.id).join(',') === 'run,idle,q');
+check('bulk resume hits paused only', bulkTargets(mixed, 'resume').map((a) => a.id).join(',') === 'p');
+check('bulk kill skips terminal states', bulkTargets(mixed, 'kill').map((a) => a.id).join(',') === 'run,idle,q,p');
+check('bulk on empty list is empty', bulkTargets([], 'kill').length === 0);
 
 console.log(`agents probe: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

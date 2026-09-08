@@ -70,6 +70,6 @@
 - [REQ-049](finished/REQ-049-plugin-switch.md) — Plugin switch + disabllar görünür — done
 - [REQ-050](finished/REQ-050-stream-thinking-tools.md) — Stream + thinking + tool calling detaylı — done
 - [REQ-051](finished/REQ-051-session-compact-zaman.md) — Compact satır + m/h/d + aktiflik sırası — done
-- [REQ-052](REQ-052-agent-hub-tam-sayfa.md) — Agent Hub tam sayfa + detaylı — pending
+- [REQ-052](finished/REQ-052-agent-hub-tam-sayfa.md) — Agent Hub tam sayfa + detaylı — done
 - [REQ-053](REQ-053-inspector-tam-genislik.md) — Öğeler Inspector tam genişliği — pending
 - [REQ-054](REQ-054-thinking-tool-ayri-satir.md) — Thinking/tool ayrı satırlar + error card — done

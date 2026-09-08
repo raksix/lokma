@@ -1,5 +1,6 @@
 import * as React from 'react';
 import {
+  Activity,
   Brain,
   Copy,
   Cpu,
@@ -20,13 +21,16 @@ import { useAgentStore } from '@/stores/agent';
 import { AgentDialog } from './agent-dialog';
 import {
   TERMINAL_STATES,
+  bulkTargets,
   formatBudget,
+  formatRelativeTime,
   initials,
   isAiCreated,
   normalizeAgent,
   queuePosition,
   stateBadge,
   stateTone,
+  type BulkAction,
   type HubAgent,
 } from './agents';
 
@@ -112,6 +116,36 @@ function useAgentLocks(agentId: string | null) {
   return summary;
 }
 
+/**
+ * Last activity for one agent (REQ-052) — the newest event of the live
+ * `GET /api/agents/:id/trace` timeline. Null while loading, when the agent
+ * has no events yet, or when the trace fails: the caller renders nothing
+ * instead of inventing activity.
+ */
+function useAgentActivity(agentId: string | null) {
+  const [activity, setActivity] = React.useState<{ label: string; ts: string } | null>(null);
+  React.useEffect(() => {
+    setActivity(null);
+    if (!agentId) return;
+    let cancelled = false;
+    api
+      .getAgentTrace(agentId)
+      .then((r) => {
+        if (cancelled) return;
+        const events = Array.isArray(r.events) ? r.events : [];
+        const last = events[events.length - 1];
+        setActivity(last ? { label: last.label, ts: last.ts } : null);
+      })
+      .catch(() => {
+        if (!cancelled) setActivity(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [agentId]);
+  return activity;
+}
+
 function AgentRow({
   agent,
   selected,
@@ -123,6 +157,7 @@ function AgentRow({
   position: number | null;
   onSelect: () => void;
 }) {
+  const created = formatRelativeTime(agent.createdAt);
   return (
     <button
       onClick={onSelect}
@@ -152,9 +187,15 @@ function AgentRow({
             {agent.state}
           </span>
         </div>
-        <div className="mt-1 flex items-center gap-2 text-[11px] text-zinc-400">
-          <span>{formatBudget(agent.budgetTokens, agent.budgetUsd)}</span>
-          {agent.cwd ? <span className="truncate hidden @min-[320px]:inline">{agent.cwd}</span> : null}
+        <div className="mt-1.5 h-1 rounded-full bg-line overflow-hidden" title="Budget is a configured cap — live spend accrues with orchestration runs">
+          <div className="h-full bg-terracotta" style={{ width: '0%' }} />
+        </div>
+        <div className="mt-1 flex items-center gap-2 text-[11px] text-zinc-400 flex-wrap">
+          <span>{formatBudget(agent.budgetTokens, agent.budgetUsd)} cap</span>
+          {created ? (
+            <span title={agent.createdAt ?? undefined}>created {created}</span>
+          ) : null}
+          {agent.cwd ? <span className="truncate">{agent.cwd}</span> : null}
         </div>
       </div>
     </button>
@@ -188,6 +229,8 @@ export function AgentsPane() {
 
   const docs = useAgentDocs(selected?.id ?? null);
   const lockSummary = useAgentLocks(selected?.id ?? null);
+  const activity = useAgentActivity(selected?.id ?? null);
+  const [bulkBusy, setBulkBusy] = React.useState<BulkAction | null>(null);
 
   // Seed the edit form whenever the selection changes.
   React.useEffect(() => {
@@ -234,6 +277,25 @@ export function AgentsPane() {
   const canPause = selected && ['idle', 'queued', 'running'].includes(selected.state);
   const canResume = selected && selected.state === 'paused';
   const canKill = selected && !TERMINAL_STATES.includes(selected.state);
+
+  /**
+   * Bulk lifecycle move (REQ-052 bulk bar) — same per-agent guards as the
+   * detail buttons, applied one by one so a single 409 never aborts the
+   * rest. Per-item failures land in the store `lastError` banner; the loop
+   * continues.
+   */
+  const runBulk = async (action: BulkAction) => {
+    const targets = bulkTargets(rows, action);
+    if (targets.length === 0 || bulkBusy !== null) return;
+    setBulkBusy(action);
+    try {
+      for (const t of targets) {
+        await move(t.id, action).catch(() => undefined);
+      }
+    } finally {
+      setBulkBusy(null);
+    }
+  };
   const inputClass =
     'rounded-md border border-line bg-white px-2 py-1 text-xs text-zinc-800 dark:bg-[#1E1E21] dark:text-zinc-100';
 
@@ -280,41 +342,68 @@ export function AgentsPane() {
         </span>
       </div>
 
+      {rows.length > 0 ? (
+        <div className="px-2 py-1.5 flex flex-wrap items-center gap-1 border-b border-line/50 bg-white dark:bg-[#1E1E21] text-[11px] shrink-0">
+          <span className="text-zinc-500 mr-1">Bulk:</span>
+          {(['pause', 'resume', 'kill'] as BulkAction[]).map((action) => {
+            const targets = bulkTargets(rows, action);
+            const label = action === 'pause' ? 'Pause all' : action === 'resume' ? 'Resume all' : 'Kill all';
+            const Icon = action === 'pause' ? Pause : action === 'resume' ? Play : Square;
+            return (
+              <Button
+                key={action}
+                variant="outline"
+                size="sm"
+                className="h-6 text-xs gap-1"
+                disabled={targets.length === 0 || bulkBusy !== null}
+                title={
+                  targets.length === 0
+                    ? `No agents eligible to ${action}`
+                    : `${label} — ${targets.length} agent${targets.length === 1 ? '' : 's'} (${targets.map((t) => t.id).join(', ')})`
+                }
+                onClick={() => void runBulk(action)}
+              >
+                <Icon className="w-3 h-3" /> {bulkBusy === action ? 'Working…' : `${label} (${targets.length})`}
+              </Button>
+            );
+          })}
+        </div>
+      ) : null}
+
       {lastError ? (
         <div className="mx-2 mt-2 rounded-md border border-red-200 bg-red-50 p-2 text-[11px] text-red-700">{lastError}</div>
       ) : null}
 
-      <div className="flex flex-1 min-h-0">
-        <div className="w-[46%] min-w-[200px] border-r border-line flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-auto p-1.5 space-y-1.5">
-            {loading && rows.length === 0 ? (
-              <div className="p-2 text-[11px] text-zinc-500">Loading agents…</div>
-            ) : rows.length === 0 ? (
-              <div className="p-2 rounded-md bg-muted/50 border border-dashed border-line text-[11px] text-zinc-500">
-                No agents yet — create the first one with + Create. `lokma agent create` in the CLI lands here too.
-              </div>
-            ) : (
-              rows.map((a) => (
-                <AgentRow
-                  key={a.id}
-                  agent={a}
-                  selected={a.id === selected?.id}
-                  position={queuePosition(rows, a.id)}
-                  onSelect={() => selectAgent(a.id)}
-                />
-              ))
-            )}
+      <div className="flex-1 min-h-0 overflow-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-1.5 p-2">
+          {loading && rows.length === 0 ? (
+            <div className="p-2 text-[11px] text-zinc-500">Loading agents…</div>
+          ) : rows.length === 0 ? (
             <div className="p-2 rounded-md bg-muted/50 border border-dashed border-line text-[11px] text-zinc-500">
-              Orchestration shows the live tree, Hub shows the registry + budgets.
+              No agents yet — create the first one with + Create. `lokma agent create` in the CLI lands here too.
             </div>
-          </div>
+          ) : (
+            rows.map((a) => (
+              <AgentRow
+                key={a.id}
+                agent={a}
+                selected={a.id === selected?.id}
+                position={queuePosition(rows, a.id)}
+                onSelect={() => selectAgent(a.id)}
+              />
+            ))
+          )}
+        </div>
+        <div className="px-2 pb-2 text-[11px] text-zinc-500">
+          Orchestration shows the live tree, Hub shows the registry + budgets.
         </div>
 
-        <div className="flex-1 flex flex-col min-w-0 bg-[#FAF9F5]/50 dark:bg-[#0F0F11]/50 overflow-auto">
-          {!selected ? (
-            <div className="p-4 text-[11px] text-zinc-500">Select an agent to inspect it.</div>
-          ) : (
-            <>
+        {!selected ? (
+          <div className="px-2 pb-4 text-[11px] text-zinc-500">
+            {rows.length > 0 ? 'Select an agent to inspect it — the full detail opens below.' : null}
+          </div>
+        ) : (
+          <div className="border-t border-line bg-[#FAF9F5]/50 dark:bg-[#0F0F11]/50">
               <div className="p-3 border-b border-line/50 bg-white dark:bg-[#1E1E21]">
                 <div className="flex items-center gap-2">
                   <span className="w-8 h-8 rounded-full bg-[#262624] dark:bg-white text-white dark:text-black grid place-items-center text-xs font-bold">
@@ -328,15 +417,28 @@ export function AgentsPane() {
                         {selected.state}
                       </span>
                     </div>
-                    <div className="text-[11px] text-zinc-500">
-                      {selected.cwd ? `cwd: ${selected.cwd} · ` : ''}createdBy: {selected.createdBy} · model{' '}
-                      {selected.model} · {formatBudget(selected.budgetTokens, selected.budgetUsd)}
-                      {queuePosition(rows, selected.id) !== null
-                        ? ` · queue #${queuePosition(rows, selected.id)}`
-                        : ''}
-                      {lockSummary
-                        ? ` · locks: ${lockSummary.locks}${lockSummary.expired ? ` (+${lockSummary.expired} expired)` : ''} · worktrees: ${lockSummary.worktrees}`
-                        : ''}
+                    <div className="text-[11px] text-zinc-500 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                      {selected.cwd ? <span>cwd: {selected.cwd} ·</span> : null}
+                      <span>createdBy: {selected.createdBy} ·</span>
+                      <span>
+                        model {selected.model} · {formatBudget(selected.budgetTokens, selected.budgetUsd)}
+                      </span>
+                      {queuePosition(rows, selected.id) !== null ? (
+                        <span>· queue #{queuePosition(rows, selected.id)}</span>
+                      ) : null}
+                      {lockSummary ? (
+                        <span>
+                          · locks: {lockSummary.locks}
+                          {lockSummary.expired ? ` (+${lockSummary.expired} expired)` : ''} · worktrees:{' '}
+                          {lockSummary.worktrees}
+                        </span>
+                      ) : null}
+                      {activity ? (
+                        <span className="inline-flex items-center gap-1" title={activity.ts}>
+                          · <Activity className="w-3 h-3" /> last: {activity.label}
+                          {formatRelativeTime(activity.ts) ? ` · ${formatRelativeTime(activity.ts)}` : ''}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -569,9 +671,8 @@ export function AgentsPane() {
                   run tree arrive with the Orchestration pane — the Hub never invents usage figures.
                 </div>
               </div>
-            </>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <AgentDialog

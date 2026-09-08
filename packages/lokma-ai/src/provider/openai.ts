@@ -1,6 +1,6 @@
 import { ProviderError } from './errors.js';
 import { isLocalBaseUrl, readErrorSnippet, readSse } from './sse.js';
-import type { AdapterStreamOpts, ProviderAdapter, StreamChunk } from './types.js';
+import type { AdapterStreamOpts, ProviderAdapter, ProviderMessage, StreamChunk } from './types.js';
 
 /**
  * OpenAI-compatible adapter — real HTTP streaming, no SDK dependency.
@@ -29,6 +29,40 @@ export function shortModelId(model: string): string {
   return slash >= 0 ? model.slice(slash + 1) : model;
 }
 
+/**
+ * True for Muse Spark on OpenCode Zen/Go (REQ-039): the model 500s on
+ * `/chat/completions` and requires the Responses API instead (upstream
+ * issue anomalyco/opencode#44627, cross-ref #44659).
+ */
+export function usesResponsesApi(baseUrl: string, model: string): boolean {
+  return baseUrl.includes('opencode.ai/zen') && shortModelId(model).includes('muse-spark');
+}
+
+/** Adapt harness messages to Responses `input` (tool turns read as user). */
+export function toResponsesInput(messages: ProviderMessage[]): { role: string; content: string }[] {
+  return messages.map((m) => ({
+    role: m.role === 'tool' ? 'user' : m.role,
+    content: m.content,
+  }));
+}
+
+/** Pull finished `output_text` out of a `response.completed` payload. */
+export function responsesOutputText(output: unknown): string {
+  if (!Array.isArray(output)) return '';
+  let text = '';
+  for (const item of output) {
+    if (typeof item !== 'object' || item === null) continue;
+    const rec = item as { type?: unknown; content?: unknown };
+    if (rec.type !== 'message' || !Array.isArray(rec.content)) continue;
+    for (const part of rec.content) {
+      if (typeof part !== 'object' || part === null) continue;
+      const p = part as { type?: unknown; text?: unknown };
+      if (p.type === 'output_text' && typeof p.text === 'string') text += p.text;
+    }
+  }
+  return text;
+}
+
 export class OpenAIAdapter implements ProviderAdapter {
   id = 'openai' as const;
 
@@ -55,16 +89,21 @@ export class OpenAIAdapter implements ProviderAdapter {
     }
     for (const [k, v] of Object.entries(opts.extraHeaders ?? {})) headers[k] = v;
     let res: Response;
-    try {
-      res = await fetch(`${base}/chat/completions`, {
-        method: 'POST',
-        headers,
-        signal: opts.signal,
-        body: JSON.stringify({
+    const viaResponses = usesResponsesApi(base, opts.model);
+    const url = viaResponses ? `${base}/responses` : `${base}/chat/completions`;
+    const body = viaResponses
+      ? { model: shortModelId(opts.model), input: toResponsesInput(opts.messages), stream: true }
+      : {
           model: shortModelId(opts.model),
           messages: opts.messages.map((m) => ({ role: m.role === 'tool' ? 'user' : m.role, content: m.content })),
           stream: true,
-        }),
+        };
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers,
+        signal: opts.signal,
+        body: JSON.stringify(body),
       });
     } catch (e) {
       if (e instanceof Error && e.name === 'AbortError') throw e;
@@ -89,6 +128,15 @@ export class OpenAIAdapter implements ProviderAdapter {
         const record = evt as { error?: { message?: string }; choices?: { delta?: { content?: unknown } }[] };
         if (record && typeof record === 'object' && record.error) {
           throw new ProviderError('http_error', `Upstream error: ${record.error.message ?? 'unknown'}`);
+        }
+        if (viaResponses) {
+          // Responses API: `response.output_text.delta` carries live text,
+          // `response.completed` carries the finished output array.
+          const r = evt as { delta?: unknown; response?: { output?: unknown } };
+          if (typeof r?.delta === 'string' && r.delta) yield { type: 'text_delta', delta: r.delta };
+          const tail = responsesOutputText(r?.response?.output);
+          if (tail) yield { type: 'text_delta', delta: tail };
+          continue;
         }
         const content = record?.choices?.[0]?.delta?.content;
         if (typeof content === 'string' && content) yield { type: 'text_delta', delta: content };

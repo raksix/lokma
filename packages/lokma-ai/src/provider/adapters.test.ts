@@ -10,7 +10,7 @@ import { createServer, type Server } from 'node:http';
 import { type AddressInfo } from 'node:net';
 import { AnthropicAdapter } from './anthropic';
 import { ProviderError } from './errors';
-import { OpenAIAdapter, shortModelId } from './openai';
+import { OpenAIAdapter, shortModelId, usesResponsesApi } from './openai';
 import { stream } from '../stream';
 
 let passed = 0;
@@ -131,6 +131,54 @@ try {
   assert(seenGo.session === 'keep-me', 'explicit x-opencode-session wins over mint');
 } finally {
   goStub.server.close();
+}
+
+// 2c. REQ-039: spark on zen/go rides /responses (chat 500s upstream).
+const seenResp: { path: string; model: string; hasInput: boolean } = { path: '', model: '', hasInput: false };
+const respStub = await listen((req, res) => {
+  let body = '';
+  req.on('data', (c) => {
+    body += c;
+  });
+  req.on('end', () => {
+    seenResp.path = req.url ?? '';
+    try {
+      const parsed = JSON.parse(body) as { model?: string; input?: unknown };
+      seenResp.model = parsed.model ?? '';
+      seenResp.hasInput = Array.isArray(parsed.input);
+    } catch {
+      seenResp.model = '';
+    }
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    res.end(
+      'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"Hi"}\n\n' +
+        'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":" there"}\n\n' +
+        'event: response.completed\ndata: {"type":"response.completed","response":{"output":[{"type":"message","content":[{"type":"output_text","text":"!"}]}]}}\n\n',
+    );
+  });
+});
+try {
+  const out = await collectText(
+    new OpenAIAdapter().stream({
+      model: 'opencode-go/muse-spark-1.3-contributor',
+      messages: [
+        { role: 'system', content: 'sys' },
+        { role: 'user', content: 'hi' },
+      ],
+      apiKey: 'k',
+      baseUrl: `${respStub.base}/opencode.ai/zen/go/v1`,
+    }),
+  );
+  assert(seenResp.path === '/opencode.ai/zen/go/v1/responses', 'spark posts to {base}/responses');
+  assert(seenResp.model === 'muse-spark-1.3-contributor', 'responses keeps the short model id');
+  assert(seenResp.hasInput, 'responses carries input array');
+  assert(out.text === 'Hi there!', 'responses deltas + completed tail concatenate');
+  assert(out.done, 'responses stream ends with done');
+  assert(usesResponsesApi('https://opencode.ai/zen/go/v1', 'muse-spark-1.2-contributor'), 'spark matches responses routing');
+  assert(!usesResponsesApi('https://opencode.ai/zen/go/v1', 'mimo-v2.5'), 'non-spark stays on chat');
+  assert(!usesResponsesApi('https://api.openai.com/v1', 'muse-spark-1.3-contributor'), 'spark off-zen stays on chat');
+} finally {
+  respStub.server.close();
 }
 
 // 3. OpenAI-compatible upstream 401 surfaces as http_error with the status.

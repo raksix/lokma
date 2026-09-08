@@ -12,6 +12,10 @@ import type { AdapterStreamOpts, ProviderAdapter, StreamChunk } from './types.js
 
 export const OPENAI_DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 
+/** Client identity for upstreams that require it (OpenCode Go docs:
+ * "identify itself with its own user agent, rather than a generic
+ * SDK or HTTP-library name"). */
+export const LOKMA_USER_AGENT = 'lokma-harness/1.0 (+https://lokma.fermag.com.tr)';
 /** Case-insensitive header lookup for optional caller-supplied headers. */
 function hasHeader(headers: Record<string, string> | undefined, name: string): boolean {
   if (!headers) return false;
@@ -41,8 +45,13 @@ export class OpenAIAdapter implements ProviderAdapter {
     // REQ-038: OpenCode Go routes efficiently only with an x-opencode-session
     // header (missing → HTTP 400). Explicit value wins; otherwise mint a
     // per-request id so Go never sees a headerless call.
-    if (base.includes('opencode.ai/zen/go') && !hasHeader(opts.extraHeaders, 'x-opencode-session')) {
-      headers['x-opencode-session'] = `lokma-${Date.now().toString(36)}-${Math.floor(Math.random() * 0xffff).toString(16)}`;
+    if (base.includes('opencode.ai/zen/go')) {
+      // REQ-039: Go docs require a real client identity (not a generic
+      // SDK/HTTP-library UA) plus a stable session id per conversation.
+      headers['User-Agent'] = LOKMA_USER_AGENT;
+      if (!hasHeader(opts.extraHeaders, 'x-opencode-session')) {
+        headers['x-opencode-session'] = `lokma-${Date.now().toString(36)}-${Math.floor(Math.random() * 0xffff).toString(16)}`;
+      }
     }
     for (const [k, v] of Object.entries(opts.extraHeaders ?? {})) headers[k] = v;
     let res: Response;

@@ -95,12 +95,13 @@ try {
 }
 
 // 2b. REQ-038: opencode-go base auto-sends x-opencode-session (explicit wins).
-const seenGo: { session: string | undefined; custom: string | undefined } = { session: undefined, custom: undefined };
+const seenGo: { session: string | undefined; custom: string | undefined; ua: string | undefined } = { session: undefined, custom: undefined, ua: undefined };
 const goStub = await listen((req, res) => {
   req.resume();
   req.on('end', () => {
     seenGo.session = req.headers['x-opencode-session'] as string | undefined;
     seenGo.custom = req.headers['x-test-mark'] as string | undefined;
+    seenGo.ua = req.headers['user-agent'] as string | undefined;
     res.writeHead(200, { 'Content-Type': 'text/event-stream' });
     res.end(sseBody(['[DONE]']));
   });
@@ -117,6 +118,7 @@ try {
   );
   assert(typeof seenGo.session === 'string' && seenGo.session.startsWith('lokma-'), 'go base auto-mints x-opencode-session');
   assert(seenGo.custom === 'yes', 'extraHeaders forwarded upstream');
+  assert(seenGo.ua === 'lokma-harness/1.0 (+https://lokma.fermag.com.tr)', 'go base identifies with lokma UA');
   await collectText(
     new OpenAIAdapter().stream({
       model: 'm',

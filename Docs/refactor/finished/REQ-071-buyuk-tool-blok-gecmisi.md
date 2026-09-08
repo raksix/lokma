@@ -1,6 +1,6 @@
 # REQ-071 — Buyuk tool bloklari ve gecmis budama
 
-Status: done (2026-09-08, recovery commit — see hash in chronology)
+Status: done (2026-09-08, recovery commit 5cd2548)
 Asked: agent loop buyuk dosya yazimlarini calistiramiyordu; tek dev mesaj tum konusmayi bellekten dusuruyordu.
 Interpretation: (1) block-filter tamponu 8KB idi — gercek dosya yazimlari (30KB+ landing page) hic kapanmayan blok sayilip chat metni olarak akip hic calistirilmiyordu; tampon 256KB oldu. (2) model gecmisi dev mesajlarda tum pencereyi kaybediyordu — artik mesaj basina budama var (chat 8K, tool 2K) ve en yeni mesaj her zaman butun biniyor. (3) sistem promptu sadece `<tool name="...">` seklini zorunlu kilar (`<tool_call>`/ciplak ad bicimleri yasak).
 Touched:

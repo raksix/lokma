@@ -453,7 +453,8 @@ export function AuthPane() {
           <span className="text-[11px] text-zinc-400">RBAC · scrypt · can()</span>
         </div>
         <div className="flex-1 grid place-items-center p-6 bg-[#FAF9F5]/50 dark:bg-[#0F0F11]/50 overflow-auto">
-          <div className="w-full max-w-[360px] rounded-xl bg-white dark:bg-[#1E1E21] border border-line p-5 shadow-sm">
+          {/* REQ-053 — login card spans the full Inspector page width (no max-width cap). */}
+          <div className="w-full min-w-0 rounded-xl bg-white dark:bg-[#1E1E21] border border-line p-5 shadow-sm">
             <div className="w-8 h-8 rounded-lg bg-[#262624] text-white grid place-items-center text-xs font-bold mx-auto font-serif">
               L
             </div>

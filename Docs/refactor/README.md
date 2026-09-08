@@ -61,10 +61,11 @@
 - [REQ-040](finished/REQ-040-session-yeni-sekme.md) — Session açılınca yeni sekme eklensin (VS Code) — done
 - [REQ-041](finished/REQ-041-cursor-pointer.md) — Tüm tıklanabilirlerde cursor:pointer (REQ-036 crosshair'ı geçersiz kılar) — done
 - [REQ-042](finished/REQ-042-windowed-resize.md) — Windowed pencereler resize edilebilir — done
-- [REQ-043](REQ-043-dosya-sayfasi.md) — Dosyalar ayrı sayfa (rail'de dosya ikonu) — pending
+- [REQ-043](finished/REQ-043-dosya-sayfasi.md) — Dosyalar ayrı sayfa (rail'de dosya ikonu) — done
 - [REQ-044](REQ-044-session-sadece-baslik.md) — Session listede sadece başlık — pending
 - [REQ-045](REQ-045-tiling-bar-kaldir.md) — Tiling üst menü çubuğu kalkar — pending
 - [REQ-046](REQ-046-pane-popout.md) — Pane'de ayrı pencere butonu — pending
 - [REQ-047](REQ-047-cift-tik-kaldir.md) — Bozuk çift-tık büyütme kaldırılır — pending
 - [REQ-048](REQ-048-buton-arka-plan.md) — Ayar butonlarına tema arka planı — pending
 - [REQ-049](REQ-049-plugin-switch.md) — Plugin switch + disabllar görünür — pending
+- [REQ-050](REQ-050-stream-thinking-tools.md) — Stream + thinking + tool calling detaylı — done

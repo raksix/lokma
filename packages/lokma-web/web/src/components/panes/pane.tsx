@@ -535,7 +535,6 @@ export function WorkspacePane({
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [pending, setPending] = React.useState<PendingSession | null>(null);
   const [busy, setBusy] = React.useState(false);
-  const [maximized, setMaximized] = React.useState(false);
   // REQ-017: file tabs with unsaved edits report here (PaneFilePreview →
   // PaneTabContent → markDirty); the strip shows a dot and closing asks.
   const [dirtyTabs, setDirtyTabs] = React.useState<ReadonlySet<string>>(() => new Set());
@@ -742,14 +741,9 @@ export function WorkspacePane({
     <div
       data-pane={id}
       onMouseDown={() => onFocus(id)}
-      onDoubleClick={(e) => {
-        if ((e.target as HTMLElement).closest('[data-pane-tab]')) return;
-        setMaximized((m) => !m);
-      }}
       className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded border bg-card ${
         isFocused ? 'border-[#C96442]/60' : 'border-border'
       }`}
-      style={maximized ? { flex: 'none', width: 1024, height: 640 } : undefined}
     >
       <PaneTabBar
         tabs={tabs}

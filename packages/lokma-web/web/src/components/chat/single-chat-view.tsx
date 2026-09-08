@@ -13,6 +13,7 @@ import {
   AssistantBody,
   PermissionCard,
   QuestionCard,
+  RunErrorCard,
   ThinkingTrace,
   ThoughtTrace,
 } from './lokma-message';
@@ -200,6 +201,7 @@ export function SingleChatView({
   stream,
   streaming,
   thinking,
+  runError,
   costLabel,
   toolCalls,
   permissions,
@@ -219,6 +221,7 @@ export function SingleChatView({
   stream: string;
   streaming: boolean;
   thinking: string;
+  runError: string | null;
   costLabel: string | null;
   toolCalls: Record<string, ToolCallEntry>;
   permissions: PermissionRequest[];
@@ -327,6 +330,13 @@ export function SingleChatView({
                 onAnswer={onAnswerPermission}
               />
             ))}
+            {runError && (
+              <div className="flex gap-3">
+                <div className="min-w-0 flex-1">
+                  <RunErrorCard message={runError} />
+                </div>
+              </div>
+            )}
             {questions.map((q) => (
               <QuestionCard key={q.requestId} req={q} onAnswer={onAnswerQuestion} />
             ))}

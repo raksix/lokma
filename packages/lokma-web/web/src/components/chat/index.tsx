@@ -533,6 +533,7 @@ export function Chat({
           stream={streamVisible ? stream : ''}
           streaming={streaming}
           thinking={thinking}
+          runError={done && lastError ? lastError : null}
           costLabel={costLabel}
           toolCalls={toolCalls}
           permissions={permissions}

@@ -127,34 +127,20 @@ export function AssistantBody({
 export function ThoughtTrace({ toolCalls }: { toolCalls: Record<string, ToolCallEntry> }) {
   const entries = Object.entries(toolCalls);
   if (entries.length === 0) return null;
-  const finished = entries.filter(([, e]) => e.result !== undefined).length;
-  const errors = entries.filter(([, e]) => e.isError).length;
-  const headline = entries
-    .slice(-2)
-    .map(([, e]) => e.tool)
-    .join(' · ');
   return (
-    <details
-      open={finished < entries.length}
-      className="mt-2 overflow-hidden rounded-lg border border-line bg-muted/30 dark:bg-[#1E1E21]/50"
-    >
-      <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-1.5 text-xs font-medium hover:bg-muted/50">
-        <Brain className="h-3.5 w-3.5 text-terracotta" />
-        Thought
-        <span className="ml-auto text-[11px] font-normal text-zinc-400">
-          {headline}
-          {errors > 0 && <span className="ml-2 text-red-500">{errors} failed</span>}
-          {finished === entries.length && (
-            <span className="ml-2 text-emerald-600">
-              {entries.length} tool{entries.length === 1 ? '' : 's'}
-            </span>
-          )}
-        </span>
-      </summary>
-      <div className="space-y-1.5 border-t border-line px-3 py-2 text-xs leading-[1.6]">
-        {entries.map(([callId, e]) => (
-          <div key={callId} className="flex items-start gap-2">
-            {e.result === undefined ? (
+    <div className="mt-2 space-y-1.5">
+      {entries.map(([callId, e]) => {
+        const running = e.result === undefined;
+        return (
+          <div
+            key={callId}
+            className={`flex items-start gap-2 rounded-lg border px-2.5 py-1.5 text-xs leading-[1.6] ${
+              e.isError
+                ? 'border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950/30'
+                : 'border-line bg-muted/30 dark:bg-[#1E1E21]/50'
+            }`}
+          >
+            {running ? (
               <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-terracotta" />
             ) : e.isError ? (
               <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-red-100 text-[10px] text-red-600">
@@ -163,7 +149,7 @@ export function ThoughtTrace({ toolCalls }: { toolCalls: Record<string, ToolCall
             ) : (
               <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
             )}
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <span className="inline-flex items-center gap-1 font-mono text-[11px] text-zinc-500">
                 <Wrench className="h-3 w-3" />
                 {e.tool}
@@ -173,14 +159,31 @@ export function ThoughtTrace({ toolCalls }: { toolCalls: Record<string, ToolCall
                   {summarizeInput(e.input)}
                 </code>
               )}
+              {running && <span className="ml-1.5 text-[11px] text-zinc-400">Running…</span>}
               {typeof e.result === 'string' && e.result.trim() && (
                 <div className="mt-0.5 truncate text-[11px] text-zinc-400">{e.result.slice(0, 160)}</div>
               )}
             </div>
           </div>
-        ))}
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Run error card (REQ-054, OpenCode `Error` row): a failed run leaves a
+// visible trace in the live area until the next prompt — not just a toast.
+export function RunErrorCard({ message }: { message: string }) {
+  return (
+    <div className="mt-2 flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 px-2.5 py-2 text-xs leading-[1.6] text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
+      <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-red-500 text-[10px] text-white">
+        !
+      </span>
+      <div className="min-w-0 flex-1">
+        <span className="font-medium">Send failed</span>
+        <div className="mt-0.5 break-words font-mono text-[11px] opacity-90">{message}</div>
       </div>
-    </details>
+    </div>
   );
 }
 

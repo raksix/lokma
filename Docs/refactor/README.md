@@ -78,3 +78,4 @@
 - [REQ-057](REQ-057-harness-kendini-kontrol.md) — Harness UI'ı kontrol etsin — pending
 - [REQ-058](REQ-058-yeni-proje-butonu.md) — Yeni proje butonu — pending
 - [REQ-059](REQ-059-gercek-pty-terminal.md) — Terminal gerçek PTY gibi — pending
+- [REQ-060](REQ-060-terminal-proje-dizini.md) — Terminal seçili proje dizininde açılsın — pending

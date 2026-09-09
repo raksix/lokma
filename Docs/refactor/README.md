@@ -113,3 +113,4 @@
 - [REQ-092](REQ-092-kullanici-yonetimi-bolumu.md) — Settings'e admin kullanıcı yönetimi bölümü — pending
 - [REQ-093](REQ-093-kullanici-proje-atama.md) — Kullanıcı ekleme + projeye atama + proje-açma yetkisi — pending
 - [REQ-094](REQ-094-session-izolasyonu.md) — Session'lar kullanıcıya özel (admin dahil) — pending
+- [REQ-095](REQ-095-windowed-toggle-donus.md) — Pane windowed butonu toggle: tiling'e dönüş — pending

@@ -1,12 +1,16 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { stat } from 'node:fs/promises';
 import {
   SessionStore,
   canViewSession,
   compactSession,
   compactionStatus,
   getBot,
+  listAllSummaries,
   loadConfig,
+  locateSession,
   loginGateActive,
+  normalizeCwd,
   searchSessionsDetailed,
   userFromToken,
   type User,
@@ -51,6 +55,45 @@ function assertSessionId(id: unknown): asserts id is string {
   }
 }
 
+/** True when the cwd-scoped store holds the transcript (or its meta). */
+async function sessionLivesIn(cwd: string, sessionId: string): Promise<boolean> {
+  for (const path of [
+    SessionStore.pathFor(cwd, sessionId),
+    SessionStore.pathFor(cwd, sessionId).replace(/\.jsonl$/, '.meta.json'),
+  ]) {
+    try {
+      await stat(path);
+      return true;
+    } catch {
+      // Not here — try the next candidate.
+    }
+  }
+  return false;
+}
+
+/**
+ * Resolve the cwd-scoped store for one session (REQ-087). An explicit
+ * `?cwd=` wins when it actually holds the session (both slash variants
+ * are tried); otherwise the session's home dir is located by filename
+ * scan; unknown ids fall back to the server cwd. Without this, sessions
+ * created in a project's cwd 404 on open/fork/rename because every
+ * per-id route defaulted to the server cwd.
+ */
+async function resolveSessionCwd(queryCwd: unknown, sessionId?: string): Promise<string> {
+  const explicit = typeof queryCwd === 'string' && queryCwd.trim() ? queryCwd.trim() : null;
+  if (sessionId) {
+    if (explicit) {
+      for (const candidate of [explicit, normalizeCwd(explicit)]) {
+        if (await sessionLivesIn(candidate, sessionId)) return candidate;
+      }
+    }
+    const found = await locateSession(sessionId).catch(() => null);
+    if (found?.cwd) return found.cwd;
+  }
+  if (explicit) return normalizeCwd(explicit);
+  return process.cwd();
+}
+
 export async function sessionRoutes(app: FastifyInstance): Promise<void> {
   /**
    * Caller resolution (REQ-062, REQ-064): the login gate (`loginGateActive`
@@ -70,11 +113,17 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
   }
 
   app.get('/api/sessions', async (req, reply) => {
-    const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
-    const store = new SessionStore(cwd);
+    // REQ-087: an explicit `?cwd=` keeps the scoped list (CLI callers);
+    // otherwise ALL project dirs are aggregated — a session created in a
+    // new project's cwd used to live in a dir this list never read, so it
+    // looked like creation silently failed.
+    const rawCwd = (req.query as { cwd?: string })?.cwd;
     const user = await sessionUser(req, reply);
     if (user === undefined) return reply;
-    const sessions = await store.listSummaries();
+    const sessions =
+      typeof rawCwd === 'string' && rawCwd.trim()
+        ? await new SessionStore(normalizeCwd(rawCwd)).listSummaries()
+        : await listAllSummaries();
     // Calisan isolation: чужой sessions never appear in the list.
     const visible = user ? sessions.filter((s) => canViewSession(user, s.ownerId)) : sessions;
     return { sessions: visible, count: visible.length };
@@ -112,7 +161,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     const user = await sessionUser(req, reply);
     if (user === undefined) return reply;
     if (user) {
-      const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
+      const cwd = await resolveSessionCwd((req.query as { cwd?: string })?.cwd, id);
       const meta = await new SessionStore(cwd).readMeta(id).catch(() => null);
       if (!canViewSession(user, meta?.ownerId)) {
         return reply.status(404).send({ code: 'not_found', message: 'Session not found' });
@@ -126,7 +175,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     assertSessionId(id);
     const user = await sessionUser(req, reply);
     if (user === undefined) return reply;
-    const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
+    const cwd = await resolveSessionCwd((req.query as { cwd?: string })?.cwd, id);
     const store = new SessionStore(cwd);
     const messages = await store.read(id);
     const meta = await store.readMeta(id);
@@ -143,10 +192,12 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     const user = await sessionUser(req, reply);
     if (user === undefined) return reply;
     const body = req.body as { cwd?: string; model?: string; botId?: string } | undefined;
-    // Explicit cwd wins; otherwise the configured session default
-    // (`sessions.defaultCwd`, REQ-009); empty = server working dir.
+    // Explicit cwd wins (canonicalized — REQ-087); otherwise the configured
+    // session default (`sessions.defaultCwd`, REQ-009); blank/empty = server
+    // working dir. A blank string must NOT become a `hash('')` dir.
     const configured = (await loadConfig(process.cwd())).sessions.defaultCwd.trim();
-    const cwd = body?.cwd ?? (configured || process.cwd());
+    const rawBodyCwd = typeof body?.cwd === 'string' ? body.cwd.trim() : '';
+    const cwd = rawBodyCwd ? normalizeCwd(rawBodyCwd) : normalizeCwd(configured || process.cwd());
     // Bot binding is validated up front — a bad id 404s instead of minting
     // a session bound to nothing.
     let botId: string | undefined;
@@ -184,7 +235,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     }
     const user = await sessionUser(req, reply);
     if (user === undefined) return reply;
-    const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
+    const cwd = await resolveSessionCwd((req.query as { cwd?: string })?.cwd, id);
     const store = new SessionStore(cwd);
     if (user) {
       const meta = await store.readMeta(id).catch(() => null);
@@ -228,7 +279,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
       }
       const clean = body.botId.trim();
       if (clean) {
-        const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
+        const cwd = await resolveSessionCwd((req.query as { cwd?: string })?.cwd, id);
         const bot = await getBot(clean, cwd);
         if (!bot) {
           return reply.status(404).send({ code: 'bot_not_found', message: `No bot '${clean}'` });
@@ -247,7 +298,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     if (Object.keys(patch).length === 0) {
       return reply.status(400).send({ code: 'bad_patch', message: 'PATCH needs { model } and/or { title } and/or { botId }' });
     }
-    const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
+    const cwd = await resolveSessionCwd((req.query as { cwd?: string })?.cwd, id);
     const store = new SessionStore(cwd);
     if (user) {
       const meta = await store.readMeta(id).catch(() => null);
@@ -268,7 +319,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     }
     const user = await sessionUser(req, reply);
     if (user === undefined) return reply;
-    const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
+    const cwd = await resolveSessionCwd((req.query as { cwd?: string })?.cwd, id);
     const store = new SessionStore(cwd);
     if (user) {
       const meta = await store.readMeta(id).catch(() => null);
@@ -296,7 +347,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     if (typeof body.from !== 'string' || !SESSION_ID_PATTERN.test(body.from)) {
       return reply.status(400).send({ code: 'bad_merge', message: 'POST needs { from: "<sessionId>" }' });
     }
-    const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
+    const cwd = await resolveSessionCwd((req.query as { cwd?: string })?.cwd, id);
     const store = new SessionStore(cwd);
     if (user) {
       for (const sid of [id, body.from]) {
@@ -332,7 +383,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     if (!Number.isFinite(keep) || keep < 0) {
       return reply.status(400).send({ code: 'bad_rewind', message: 'POST needs { keepMessages: <non-negative int> }' });
     }
-    const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
+    const cwd = await resolveSessionCwd((req.query as { cwd?: string })?.cwd, id);
     const store = new SessionStore(cwd);
     if (user) {
       const meta = await store.readMeta(id).catch(() => null);
@@ -361,7 +412,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     }
     const user = await sessionUser(req, reply);
     if (user === undefined) return reply;
-    const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
+    const cwd = await resolveSessionCwd((req.query as { cwd?: string })?.cwd, id);
     try {
       return await compactionStatus(cwd, id);
     } catch (e) {
@@ -386,7 +437,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     if (mode !== 'hygiene' && mode !== 'full') {
       return reply.status(400).send({ code: 'bad_mode', message: 'POST accepts { mode: "hygiene" | "full" }' });
     }
-    const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
+    const cwd = await resolveSessionCwd((req.query as { cwd?: string })?.cwd, id);
     try {
       const report = await compactSession(cwd, id, { mode });
       return { ok: true, ...report };

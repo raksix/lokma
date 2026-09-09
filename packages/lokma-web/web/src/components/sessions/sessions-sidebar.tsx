@@ -29,6 +29,7 @@ import {
   filterSessions,
   groupSessions,
   relativeTime,
+  sameCwd,
 } from './grouping';
 
 /**
@@ -637,14 +638,17 @@ export function SessionsSidebar({
   const refreshProjects = useSessionStore((s) => s.refreshProjects);
 
   // REQ-080 — the modal reports the new project: refresh the list, then
-  // open its first session (in the chosen cwd) so it is usable at once.
+  // open its first session so it is usable at once. REQ-087: ALWAYS create
+  // the session — the old `if (project.cwd)` guard skipped cwd-less
+  // projects entirely (server projects may legally have an empty cwd),
+  // and the server defaults those sessions to its working dir.
   const handleProjectCreated = React.useCallback((project: { id: string; name: string; cwd: string }) => {
     void refreshProjects();
-    if (project.cwd) {
-      void createSession({ cwd: project.cwd }).then((id) => {
-        if (id) onSelect(id);
-      });
-    }
+    const cwd = project.cwd?.trim() ? project.cwd.trim() : undefined;
+    void createSession(cwd ? { cwd } : {}).then((id) => {
+      if (id) onSelect(id);
+      else emitToast('Project created, but the session failed — is the server up?');
+    });
   }, [createSession, refreshProjects, onSelect]);
 
   // REQ-080 — delete the project record (entity), then refresh the list.
@@ -864,7 +868,9 @@ export function SessionsSidebar({
               </span>
             </div>
             {projects.map((p) => {
-              const inProject = sessions.filter((s) => (s.cwd ?? '') === (p.cwd ?? ''));
+              // REQ-087: tolerant cwd match — a session whose stored cwd has
+              // a trailing slash still belongs to this project entity.
+              const inProject = sessions.filter((s) => sameCwd(s.cwd, p.cwd));
               return (
                 <ProjectGroup
                   key={p.id}

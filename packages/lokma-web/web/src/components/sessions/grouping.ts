@@ -93,6 +93,21 @@ export function projectOf(s: SessionSummary): string {
   return parts[parts.length - 1] || cwd;
 }
 
+/**
+ * Tolerant cwd equality (REQ-087): trailing slashes must not split one
+ * project into two groups. `/x/proj` and `/x/proj/` are the same project
+ * (they only differ because older records stored the raw typed path).
+ */
+export function sameCwd(a: string | null | undefined, b: string | null | undefined): boolean {
+  const norm = (v: string | null | undefined): string => {
+    const t = (v ?? '').trim();
+    if (!t) return '';
+    if (t === '~' || t === '~/') return '~';
+    return t.length > 1 ? t.replace(/\/+$/, '') : t;
+  };
+  return norm(a) === norm(b);
+}
+
 /** Sidebar count label with correct singular (`1 msg`, otherwise `N msgs`). */
 export function messageCountLabel(count: number): string {
   return count === 1 ? '1 msg' : `${count} msgs`;

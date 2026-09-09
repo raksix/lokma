@@ -16,6 +16,7 @@ import {
 } from '@lokma/shared';
 import type { User } from '@lokma/shared';
 import { readJson, writeAtomic } from '../utils/fs.js';
+import { normalizeCwd } from '../session/store.js';
 
 /** Re-export the public user type so server routes import from one place. */
 export type { User } from '@lokma/shared';
@@ -507,7 +508,10 @@ async function resolveCwd(cwd: unknown): Promise<string> {
     await mkdir(resolved, { recursive: true });
     const st = await stat(resolved);
     if (!st.isDirectory()) throw new AuthError('bad_cwd', `cwd is not a directory: ${resolved}`, 400);
-    return resolved;
+    // REQ-087: canonical form (no trailing slash) so project records and
+    // session metas hash identically — `/x/proj` vs `/x/proj/` used to
+    // split one project into two session dirs.
+    return normalizeCwd(resolved);
   } catch (e) {
     if (e instanceof AuthError) throw e;
     throw new AuthError('bad_cwd', `cannot use cwd: ${resolved}`, 400);

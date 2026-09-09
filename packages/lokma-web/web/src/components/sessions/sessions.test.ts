@@ -11,6 +11,7 @@ import {
   messageCountLabel,
   projectOf,
   relativeTime,
+  sameCwd,
 } from './grouping';
 import type { SessionSummary } from '@/lib/api';
 
@@ -108,6 +109,14 @@ const projLokma = groupSessions(
   NOW,
 ).find((g) => g.key === 'lokma');
 check('project group sorts newest first', (projLokma?.items.map((s) => s.id) ?? []).join(',') === 'p_new,p_old');
+
+// sameCwd (REQ-087: trailing slashes must not split one project in two)
+check('sameCwd exact', sameCwd('/x/proj', '/x/proj') === true);
+check('sameCwd trailing slash', sameCwd('/x/proj/', '/x/proj') === true);
+check('sameCwd both slashed', sameCwd('/x/proj//', '/x/proj/') === true);
+check('sameCwd different', sameCwd('/x/proj', '/x/other') === false);
+check('sameCwd empty vs set', sameCwd('', '/x/proj') === false && sameCwd(null, undefined) === true);
+check('sameCwd home', sameCwd('~', '~/') === true);
 
 console.log(`sessions probe: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

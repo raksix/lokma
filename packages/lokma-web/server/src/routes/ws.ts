@@ -8,7 +8,9 @@ import {
   estimateCost,
   estimateTokens,
   loadConfig,
+  locateSession,
   loginGateActive,
+  normalizeCwd,
   onAgentEvent,
   recordApprovalDecision,
   resolveBotChatContext,
@@ -241,8 +243,22 @@ async function readContextBlocks(cwd: string, paths: string[] | undefined): Prom
 export async function wsRoutes(app: FastifyInstance): Promise<void> {
   app.get('/ws/:sessionId', { websocket: true }, (socket, req) => {
     const { sessionId } = req.params as { sessionId: string };
-    const cwd = (req.query as { cwd?: string })?.cwd ?? process.cwd();
-    const store = new SessionStore(cwd);
+    // REQ-087: the client never sends `?cwd=`, so an explicit value wins
+    // but otherwise the session's home dir is located by filename scan.
+    // Without this every prompt on a project-cwd session appended to (and
+    // pumped from) the server-cwd store — chat on new projects silently
+    // went to the wrong transcript.
+    const rawQueryCwd = (req.query as { cwd?: string })?.cwd;
+    const queryCwd =
+      typeof rawQueryCwd === 'string' && rawQueryCwd.trim() ? normalizeCwd(rawQueryCwd) : null;
+    let resolvedCwd: string | null = null;
+    async function effectiveCwd(): Promise<string> {
+      if (queryCwd) return queryCwd;
+      if (!resolvedCwd) {
+        resolvedCwd = (await locateSession(sessionId).catch(() => null))?.cwd ?? process.cwd();
+      }
+      return resolvedCwd;
+    }
 
     // REQ-062 Parça A (REQ-063): when the login gate is active
     // (bootstrapped + `requireLogin`), tokenless sockets are rejected at
@@ -270,7 +286,9 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
       }
     })();
 
-    app.log.info(`[ws] client connected session=${sessionId} cwd=${cwd}`);
+    void effectiveCwd().then((cwd) => {
+      app.log.info(`[ws] client connected session=${sessionId} cwd=${cwd}`);
+    });
 
     // Terminal fan-out: process output reaches only this session's sockets.
     // Terminals spawned without a session tag (CLI) fan out to every socket.
@@ -325,7 +343,8 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
       if (msg.type === 'prompt') {
         const prompt = msg.prompt.trim();
         if (!prompt) return;
-        await store.append(sessionId, { role: 'user', content: prompt, timestamp: new Date().toISOString() });
+        const cwd = await effectiveCwd();
+        await new SessionStore(cwd).append(sessionId, { role: 'user', content: prompt, timestamp: new Date().toISOString() });
         // Claim attribution is resolved now (the socket may be gone by turn time).
         const turnUser = await userFromToken(requestToken(req)).catch(() => null);
         const depth = enqueuePrompt(sessionId, {
@@ -378,7 +397,7 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
             // `always` persists a rule so the gate never asks again.
             if (msg.decision === 'always' && pending?.kind === 'approval') {
               try {
-                const cfg = await loadConfig(cwd);
+                const cfg = await loadConfig(await effectiveCwd());
                 if (!cfg.permissions.allow.includes(pending.tool)) {
                   await saveGlobal({ permissions: { ...cfg.permissions, allow: [...cfg.permissions.allow, pending.tool] } });
                 }

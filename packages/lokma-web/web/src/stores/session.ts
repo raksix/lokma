@@ -145,7 +145,12 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
   createSession: async (opts?: { cwd?: string; model?: string; botId?: string }) => {
     try {
       const res = await api.createSession(opts ?? {});
-      await get().refreshSessions(opts?.cwd);
+      // REQ-087: always a GLOBAL refresh — a scoped `refreshSessions(cwd)`
+      // used to REPLACE the whole list with one project's sessions (every
+      // other session vanished) and the next unscoped refresh dropped the
+      // new session again. The server list is global now, so one load shows
+      // the new row inside its project group.
+      await get().refreshSessions();
       get().selectSession(res.id);
       return res.id;
     } catch (e) {

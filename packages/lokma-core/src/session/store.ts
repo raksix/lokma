@@ -30,6 +30,118 @@ function metaPath(cwd: string, sessionId: string): string {
   return join(sessionDir(cwd), `${sessionId}.meta.json`);
 }
 
+/** Session ids are filename-safe tokens — rejects traversal before any scan. */
+const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+
+/**
+ * Canonical cwd form (REQ-087): trim, expand a leading `~` to the server
+ * home, drop trailing slashes. Without this, `/x/proj` vs `/x/proj/` hash
+ * to DIFFERENT project dirs and the same project splits in two — the
+ * "session opens in the wrong project" half of REQ-087. Idempotent.
+ */
+export function normalizeCwd(cwd: string): string {
+  const raw = cwd.trim();
+  const expanded =
+    raw === '~' ? homedir() : raw.startsWith('~/') ? join(homedir(), raw.slice(2)) : raw;
+  if (expanded.length > 1) return expanded.replace(/\/+$/, '');
+  return expanded;
+}
+
+/** Root holding one `<hash(cwd)>` dir per project with sessions. */
+function projectsRoot(): string {
+  return join(homedir(), '.lokma', 'projects');
+}
+
+/**
+ * Locate the on-disk session dir holding `<sessionId>.jsonl` (REQ-087).
+ * Scans every project dir by filename — never by `hash(cwd)` — so legacy
+ * slash-variant dirs (`/x/proj/` vs `/x/proj`) resolve too. Returns the
+ * meta-stamped cwd (as written at create time) plus the dir, or null.
+ */
+export async function locateSession(
+  sessionId: string,
+): Promise<{ cwd: string | null; dir: string } | null> {
+  if (!SESSION_ID_PATTERN.test(sessionId)) return null;
+  let entries;
+  try {
+    entries = await readdir(projectsRoot(), { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const dir = join(projectsRoot(), entry.name, 'sessions');
+    const transcript = join(dir, `${sessionId}.jsonl`);
+    try {
+      await stat(transcript);
+    } catch {
+      continue;
+    }
+    let cwd: string | null = null;
+    try {
+      const meta = JSON.parse(await readFile(join(dir, `${sessionId}.meta.json`), 'utf-8')) as {
+        cwd?: unknown;
+      };
+      if (typeof meta.cwd === 'string' && meta.cwd) cwd = meta.cwd;
+    } catch {
+      // Meta-less transcript — the dir still identifies the session.
+    }
+    return { cwd, dir };
+  }
+  return null;
+}
+
+/**
+ * Summaries for EVERY session across all project dirs, newest first
+ * (REQ-087). Powers the unscoped `GET /api/sessions` so a session created
+ * in a new project's cwd is visible in the default list instead of
+ * silently living in a dir the sidebar never reads.
+ */
+export async function listAllSummaries(): Promise<SessionSummary[]> {
+  let entries;
+  try {
+    entries = await readdir(projectsRoot(), { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const seen = new Set<string>();
+  const out: SessionSummary[] = [];
+  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    if (!entry.isDirectory()) continue;
+    const dir = join(projectsRoot(), entry.name, 'sessions');
+    let files: string[];
+    try {
+      files = await readdir(dir);
+    } catch {
+      continue;
+    }
+    for (const file of files) {
+      if (!file.endsWith('.jsonl') || file.endsWith('.archive.jsonl')) continue;
+      const id = file.replace(/\.jsonl$/, '');
+      if (!SESSION_ID_PATTERN.test(id) || seen.has(id)) continue;
+      seen.add(id);
+      let cwd: string | null = null;
+      try {
+        const meta = JSON.parse(await readFile(join(dir, `${id}.meta.json`), 'utf-8')) as {
+          cwd?: unknown;
+        };
+        if (typeof meta.cwd === 'string' && meta.cwd) cwd = meta.cwd;
+      } catch {
+        // Meta-less: group under the server default rather than dropping.
+      }
+      // The meta cwd reproduces this dir's hash exactly (it was written
+      // from the same string), so no slash-variant miss is possible here.
+      const store = new SessionStore(cwd ?? process.cwd());
+      // Guard against a cwd whose hash points elsewhere (moved homes):
+      // fall back to reading the found dir's files directly is overkill —
+      // summary() degrades to stat/now, never throws.
+      out.push(await store.summary(id));
+    }
+  }
+  out.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+  return out;
+}
+
 export class SessionStore {
   constructor(private cwd: string) {}
 

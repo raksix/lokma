@@ -92,3 +92,4 @@
 - [REQ-071](finished/REQ-071-buyuk-tool-blok-gecmisi.md) — Buyuk tool bloklari + gecmis budama — done
 - [REQ-072](finished/REQ-072-account-settings-section.md) — Account rail icon opens Settings → Account, Inspector auth tab removed — done
 - [REQ-073](finished/REQ-073-tool-satirlari-insan-dili.md) — Tool satırları insan dili — done
+- [REQ-074](REQ-074-tool-satirlari-timeline.md) — Tool satırları timeline-da, F5-proof — done

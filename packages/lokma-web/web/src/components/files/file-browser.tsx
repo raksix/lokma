@@ -220,6 +220,21 @@ export function FileBrowser({ sessionId }: { sessionId: string }) {
     [cwd],
   );
 
+  const openFileInNewPane = React.useCallback(
+    async (path: string) => {
+      if (!cwd) return;
+      // REQ-075: files as first-class panes — split a fresh pane and drop
+      // the file tab in (same open-or-focus tab, own pane).
+      if (!isMobileViewport()) {
+        const panes = usePaneStore.getState();
+        if (!panes.tiling) panes.setTiling(true);
+        panes.requestFilePane(path, sessionId);
+      }
+      setSelected(path);
+    },
+    [cwd],
+  );
+
   const refreshParent = React.useCallback(
     (path: string) => {
       if (cwd) void loadDir(cwd, parentDir(path));
@@ -605,6 +620,7 @@ export function FileBrowser({ sessionId }: { sessionId: string }) {
           path={menu.path}
           onClose={() => setMenu(null)}
           onOpenFile={(p) => void openFile(p)}
+          onOpenPane={(p) => void openFileInNewPane(p)}
         />
       ) : null}
     </div>
@@ -623,12 +639,14 @@ function FileContextMenu({
   path,
   onClose,
   onOpenFile,
+  onOpenPane,
 }: {
   x: number;
   y: number;
   path: string;
   onClose: () => void;
   onOpenFile: (p: string) => void;
+  onOpenPane: (p: string) => void;
 }) {
   const items: ContextMenuEntry[] = [
     { type: 'header', label: path },
@@ -656,6 +674,12 @@ function FileContextMenu({
       label: 'Open file',
       icon: FileIcon,
       onSelect: () => onOpenFile(path),
+    },
+    {
+      type: 'item',
+      label: 'Open in new pane',
+      icon: FileIcon,
+      onSelect: () => onOpenPane(path),
     },
   ];
   return <ContextMenu x={x} y={y} items={items} onClose={onClose} label="File actions menu" />;

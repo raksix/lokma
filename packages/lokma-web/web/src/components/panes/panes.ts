@@ -147,6 +147,17 @@ export function makeFileTab(filePath: string, sessionId: string): PaneTab {
   return { id: makeTabId('tab-file'), title: base, kind: 'file', filePath, sessionId };
 }
 
+/** Preview family by extension (REQ-075) — pure so probes cover it. */
+export type FilePreviewKind = 'markdown' | 'html' | 'pdf' | 'image' | 'text';
+export function filePreviewKind(path: string): FilePreviewKind {
+  const ext = path.toLowerCase().split('.').pop() ?? '';
+  if (ext === 'md' || ext === 'markdown') return 'markdown';
+  if (ext === 'html' || ext === 'htm') return 'html';
+  if (ext === 'pdf') return 'pdf';
+  if (ext === 'png' || ext === 'jpg' || ext === 'jpeg' || ext === 'gif' || ext === 'webp' || ext === 'svg') return 'image';
+  return 'text';
+}
+
 /**
  * Open-or-focus a file tab in a pane state (REQ-002): the same path owned by
  * the same session focuses its existing tab instead of duplicating it;

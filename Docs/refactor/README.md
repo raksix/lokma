@@ -93,3 +93,4 @@
 - [REQ-072](finished/REQ-072-account-settings-section.md) — Account rail icon opens Settings → Account, Inspector auth tab removed — done
 - [REQ-073](finished/REQ-073-tool-satirlari-insan-dili.md) — Tool satırları insan dili — done
 - [REQ-074](REQ-074-tool-satirlari-timeline.md) — Tool satırları timeline-da, F5-proof — done
+- [REQ-075](finished/REQ-075-dosya-pane-preview.md) — Dosyalar pane olarak + md/html/pdf/img preview — done

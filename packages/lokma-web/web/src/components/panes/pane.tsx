@@ -4,6 +4,7 @@ import {
   AtSign,
   Columns2,
   Copy,
+  Eye,
   FileText,
   GitFork,
   GitMerge,
@@ -27,6 +28,7 @@ import type { UseWs } from '@/hooks/use-ws';
 import { useKnownSession, useSessionStore } from '@/stores/session';
 import { emitToast, PaneErrorBoundary } from '@/components/shell';
 import { ChatWithSocket } from '@/components/chat';
+import { AssistantBody } from '@/components/chat/lokma-message';
 import { FILE_DRAG_MIME, emitInsertMention } from '@/components/files';
 import {
   INSPECTOR_DRAG_MIME,
@@ -36,6 +38,7 @@ import {
   dropEffectFor,
   dropZoneFor,
   encodeTabMove,
+  filePreviewKind,
   isValidRelPath,
   makeFileTab,
   makeInspectorTab,
@@ -46,6 +49,7 @@ import {
   parseTabMove,
   splitForZone,
   type DropZone,
+  type FilePreviewKind,
   type InspectorTabId,
   type PaneTab,
 } from './panes';
@@ -60,6 +64,11 @@ import { TAB_ICONS } from './tab-icons';
 // FileBrowser. Dirty state reports up via onDirtyChange so the tab strip
 // can show an unsaved dot. Known limit: the draft lives while the tab is
 // active (inactive tabs unmount); closing a dirty tab asks first.
+//
+// REQ-075: preview mode for markdown/html/pdf/images — rendered output
+// instead of raw bytes, with an Edit toggle back to source. Markdown reuses
+// the chat renderer; html is scriptless (`sandbox=""`); pdf/images load raw
+// bytes as an object URL (never decoded as text).
 export function PaneFilePreview({
   sessionId,
   path,
@@ -84,6 +93,11 @@ export function PaneFilePreview({
     size: number;
     truncated: boolean;
   } | null>(null);
+  // REQ-075: preview-first for renderable types, source editor otherwise.
+  const kind = filePreviewKind(path);
+  const previewable = kind !== 'text';
+  const [mode, setMode] = React.useState<'preview' | 'source'>(previewable ? 'preview' : 'source');
+  const [blobUrl, setBlobUrl] = React.useState<string | null>(null);
 
   const dirty = editing && status === 'ok' && draft !== content;
   const dirtyKey = tabId ?? `${sessionId}:${path}`;
@@ -103,10 +117,28 @@ export function PaneFilePreview({
     setEditing(false);
     setDraft('');
     setConflict(null);
+    setBlobUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
     if (known === 'loading') return;
     if (!known) {
       setError('Session has no workspace yet');
       setStatus('error');
+      return;
+    }
+    // REQ-075: binary previews never touch the text endpoint (it 400s on
+    // binary) — raw bytes become an object URL instead.
+    if (kind === 'pdf' || kind === 'image') {
+      try {
+        const blob = await api.readWorkspaceFileRaw(known.cwd ?? '', path);
+        setBlobUrl(URL.createObjectURL(blob));
+        setMeta({ sha: '', size: blob.size, truncated: false });
+        setStatus('ok');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not load the file');
+        setStatus('error');
+      }
       return;
     }
     try {
@@ -118,11 +150,21 @@ export function PaneFilePreview({
       setError(err instanceof Error ? err.message : 'Could not load the file');
       setStatus('error');
     }
-  }, [sessionId, path, known]);
+  }, [sessionId, path, known, kind]);
 
   React.useEffect(() => {
     void load();
   }, [load]);
+
+  // Revoke the object URL when the tab unmounts or the file changes.
+  React.useEffect(() => {
+    return () => {
+      setBlobUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, []);
 
   const saveFile = React.useCallback(
     async (overwriteSha?: string) => {
@@ -198,6 +240,36 @@ export function PaneFilePreview({
         <span className="min-w-0 flex-1 truncate font-mono">{path}</span>
         {meta ? <span>{formatBytes(meta.size)}</span> : null}
         {meta?.truncated ? <span className="rounded bg-muted px-1">truncated at 256 KB</span> : null}
+        {previewable ? (
+          <div className="flex shrink-0 items-center rounded-md border border-line p-0.5" role="tablist" aria-label="Preview or source">
+            <Button
+              variant="ghost"
+              size="sm"
+              role="tab"
+              aria-selected={mode === 'preview'}
+              className={`h-6 px-1.5 text-[11px] ${mode === 'preview' ? 'bg-muted font-medium' : ''}`}
+              title="Rendered preview"
+              onClick={() => setMode('preview')}
+            >
+              <Eye className="h-3 w-3" />
+              Preview
+            </Button>
+            {(kind === 'markdown' || kind === 'html') && (
+              <Button
+                variant="ghost"
+                size="sm"
+                role="tab"
+                aria-selected={mode === 'source'}
+                className={`h-6 px-1.5 text-[11px] ${mode === 'source' ? 'bg-muted font-medium' : ''}`}
+                title="Source and edit"
+                onClick={() => setMode('source')}
+              >
+                <Pencil className="h-3 w-3" />
+                Edit
+              </Button>
+            )}
+          </div>
+        ) : null}
         {editing ? (
           <>
             <Button
@@ -228,20 +300,22 @@ export function PaneFilePreview({
           </>
         ) : (
           <>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-1.5 text-[11px]"
-              title={meta?.truncated ? 'Reload the file to edit large previews' : 'Edit this file'}
-              disabled={meta?.truncated}
-              onClick={() => {
-                setDraft(content);
-                setEditing(true);
-              }}
-            >
-              <Pencil className="h-3 w-3" />
-              Edit
-            </Button>
+            {(kind === 'text' || kind === 'markdown' || kind === 'html') && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-1.5 text-[11px]"
+                title={meta?.truncated ? 'Reload the file to edit large previews' : 'Edit this file'}
+                disabled={meta?.truncated}
+                onClick={() => {
+                  setDraft(content);
+                  setEditing(true);
+                }}
+              >
+                <Pencil className="h-3 w-3" />
+                Edit
+              </Button>
+            )}
             <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[11px]" title="Copy the file path" onClick={() => void copyPath()}>
               <Copy className="h-3 w-3" />
               Copy
@@ -279,7 +353,37 @@ export function PaneFilePreview({
           </div>
         </div>
       ) : null}
-      {editing ? (
+      {mode === 'preview' && previewable ? (
+        kind === 'markdown' ? (
+          <div className="min-h-0 flex-1 overflow-auto p-3 text-[13.5px] leading-[1.6]">
+            <AssistantBody
+              content={content}
+              onCopy={(t) => {
+                try {
+                  void navigator.clipboard.writeText(t);
+                  emitToast('Copied');
+                } catch {
+                  emitToast('Copy failed');
+                }
+              }}
+            />
+          </div>
+        ) : kind === 'html' ? (
+          <iframe sandbox="" srcDoc={content} title={`Preview of ${path}`} className="min-h-0 flex-1 border-0 bg-white" />
+        ) : kind === 'pdf' ? (
+          blobUrl ? (
+            <iframe src={blobUrl} title={`Preview of ${path}`} className="min-h-0 flex-1 border-0 bg-white" />
+          ) : (
+            <div className="grid min-h-0 flex-1 place-items-center p-6 text-xs text-muted-foreground">Loading preview…</div>
+          )
+        ) : blobUrl ? (
+          <div className="grid min-h-0 flex-1 place-items-center overflow-auto bg-muted/30 p-4">
+            <img src={blobUrl} alt={path} className="max-h-full max-w-full object-contain" />
+          </div>
+        ) : (
+          <div className="grid min-h-0 flex-1 place-items-center p-6 text-xs text-muted-foreground">Loading preview…</div>
+        )
+      ) : editing ? (
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

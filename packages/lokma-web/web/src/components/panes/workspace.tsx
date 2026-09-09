@@ -13,6 +13,7 @@ import {
   collectPaneIds,
   countPanes,
   isPaneTab,
+  makeFileTab,
   makePaneId,
   makeSessionTab,
   parseTabStates,
@@ -49,6 +50,8 @@ export function TilingWorkspace({
   const resetStoreLayout = usePaneStore((s) => s.resetLayout);
   const pendingFileTab = usePaneStore((s) => s.pendingFileTab);
   const consumeFileTab = usePaneStore((s) => s.consumeFileTab);
+  const pendingFilePane = usePaneStore((s) => s.pendingFilePane);
+  const consumeFilePane = usePaneStore((s) => s.consumeFilePane);
   const pendingSessionTab = usePaneStore((s) => s.pendingSessionTab);
   const consumeSessionTab = usePaneStore((s) => s.consumeSessionTab);
   const pendingInspectorTab = usePaneStore((s) => s.pendingInspectorTab);
@@ -142,6 +145,19 @@ export function TilingWorkspace({
     }
     consumeSessionTab();
   }, [pendingSessionTab, paneIds, focusedPaneId, focusPane, consumeSessionTab]);
+
+  // REQ-075: "open in new pane" — split the focused pane and drop a live
+  // file tab into the fresh pane (files as first-class panes, like
+  // sessions). One-shot: consumed even when no pane exists.
+  React.useEffect(() => {
+    if (!pendingFilePane) return;
+    const target = paneIds.includes(focusedPaneId) ? focusedPaneId : paneIds[0];
+    if (target) {
+      const { path, sessionId: ownerId } = pendingFilePane;
+      split(target, 'col', 'after', makeFileTab(path, ownerId));
+    }
+    consumeFilePane();
+  }, [pendingFilePane, paneIds, focusedPaneId, consumeFilePane]);
 
   // REQ-057: agent UI actions ("open the browser/terminal for me") land here
   // as a tab in the last-focused pane (same inspector focuses instead of

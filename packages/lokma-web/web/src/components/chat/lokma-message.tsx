@@ -368,7 +368,7 @@ function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
 }
 
 /** One markdown block token → element (headers/lists/quotes/rules/paragraphs). */
-function renderMdBlock(block: MdBlock, keyPrefix: string): React.ReactNode {
+export function renderMdBlock(block: MdBlock, keyPrefix: string): React.ReactNode {
   switch (block.kind) {
     case 'h': {
       const cls =

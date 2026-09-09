@@ -16,6 +16,7 @@ import {
   dropZoneFor,
   encodeInspectorDrag,
   encodeTabMove,
+  filePreviewKind,
   inspectorLabel,
   isInspectorTabId,
   isPaneTab,
@@ -245,4 +246,23 @@ check("dropEffect all allows move", dropEffectFor("all") === "move");
 check("dropEffect uninitialized allows move", dropEffectFor("uninitialized") === "move");
 
 console.log(`panes: ${passed} passed, ${failed} failed`);
+if (failed > 0) process.exit(1);
+
+/* REQ-075 — filePreviewKind: preview family by extension. */
+check("md is markdown", filePreviewKind("Docs/a.md") === "markdown");
+check("markdown ext is markdown", filePreviewKind("a.markdown") === "markdown");
+check("uppercase MD is markdown", filePreviewKind("A.MD") === "markdown");
+check("html is html", filePreviewKind("x.html") === "html");
+check("htm is html", filePreviewKind("x.htm") === "html");
+check("pdf is pdf", filePreviewKind("doc.pdf") === "pdf");
+check("png is image", filePreviewKind("shot.png") === "image");
+check("jpg is image", filePreviewKind("a.jpg") === "image");
+check("jpeg is image", filePreviewKind("a.jpeg") === "image");
+check("gif is image", filePreviewKind("a.gif") === "image");
+check("webp is image", filePreviewKind("a.webp") === "image");
+check("svg is image", filePreviewKind("a.svg") === "image");
+check("ts is text", filePreviewKind("src/a.ts") === "text");
+check("no ext is text", filePreviewKind("Makefile") === "text");
+
+console.log(`panes-075: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

@@ -32,6 +32,12 @@ export type PendingSessionTab = {
   title: string;
 };
 
+/** One-shot file-in-new-pane request (REQ-075, consumed by TilingWorkspace, never persisted). */
+export type PendingFilePane = {
+  path: string;
+  sessionId: string;
+};
+
 /** One-shot inspector-open request from agent UI actions (REQ-057, consumed by TilingWorkspace, never persisted). */
 export type PendingInspectorTab = {
   inspectorId: 'browser' | 'terminal';
@@ -47,6 +53,7 @@ type PaneState = {
   focusedPaneId: string;
   activeSessionId: string | null;
   pendingFileTab: PendingFileTab | null;
+  pendingFilePane: PendingFilePane | null;
   pendingSessionTab: PendingSessionTab | null;
   pendingInspectorTab: PendingInspectorTab | null;
   setLayout: (layout: LayoutNode) => void;
@@ -59,6 +66,8 @@ type PaneState = {
   setActiveSession: (id: string | null) => void;
   requestFileTab: (path: string, sessionId: string) => void;
   consumeFileTab: () => void;
+  requestFilePane: (path: string, sessionId: string) => void;
+  consumeFilePane: () => void;
   requestSessionTab: (sessionId: string, title: string) => void;
   consumeSessionTab: () => void;
   requestInspectorTab: (inspectorId: 'browser' | 'terminal') => void;
@@ -76,6 +85,7 @@ const initial = {
   focusedPaneId: 'a',
   activeSessionId: null as string | null,
   pendingFileTab: null as PendingFileTab | null,
+  pendingFilePane: null as PendingFilePane | null,
   pendingSessionTab: null as PendingSessionTab | null,
   pendingInspectorTab: null as PendingInspectorTab | null,
 };
@@ -114,6 +124,9 @@ export const usePaneStore = create<PaneState>()(
 
       requestFileTab: (path: string, sessionId: string) => set({ pendingFileTab: { path, sessionId } }),
       consumeFileTab: () => set({ pendingFileTab: null }),
+
+      requestFilePane: (path: string, sessionId: string) => set({ pendingFilePane: { path, sessionId } }),
+      consumeFilePane: () => set({ pendingFilePane: null }),
 
       requestSessionTab: (sessionId: string, title: string) => set({ pendingSessionTab: { sessionId, title } }),
       consumeSessionTab: () => set({ pendingSessionTab: null }),

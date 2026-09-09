@@ -1,30 +1,14 @@
 import * as React from 'react';
-import {
-  ArrowDownToLine,
-  Copy,
-  Plus,
-  RefreshCw,
-  Search,
-  Square,
-  Terminal as TerminalIcon,
-  Trash2,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { ContextMenu, useContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
 import { api, type TerminalInfo } from '@/lib/api';
 import type { UseWs } from '@/hooks/use-ws';
 import { emitToast } from '@/components/shell';
-import { useAgentStore, useKnownSession } from '@/stores';
+import { useKnownSession } from '@/stores';
 import {
   appendCapped,
-  copyText,
   exitSummary,
-  filterLines,
   keyToBytes,
   resolveTerminalCwd,
-  statusLabel,
   stripAnsi,
-  terminalLabel,
 } from './terminal';
 
 /**
@@ -37,39 +21,33 @@ import {
  * REQ-059: no command box — the scrollback itself is the terminal. Click
  * it and type: printable keys, Enter, Backspace, Tab, arrows (shell
  * history), Ctrl+C (interrupt), Ctrl+D (EOF) all reach the server PTY.
+ * REQ-079: chrome-free — no header/tab/action bars, the scrollback fills
+ * the whole pane. A running shell auto-starts on mount when none exists
+ * (an empty pane used to look broken — typing went nowhere); clicking an
+ * empty/dead pane starts a fresh shell. `exit` ends the real process.
  */
-
-function shortId(id: string): string {
-  return id.length > 14 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;
-}
 
 export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }) {
   const [terminals, setTerminals] = React.useState<TerminalInfo[]>([]);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [buffers, setBuffers] = React.useState<Record<string, string>>({});
   const [cwd, setCwd] = React.useState('');
-  const [search, setSearch] = React.useState('');
-  const [follow, setFollow] = React.useState(true);
-  const [loading, setLoading] = React.useState(false);
-  const [creating, setCreating] = React.useState(false);
-  const [newAgent, setNewAgent] = React.useState('');
-  const [armedKill, setArmedKill] = React.useState<string | null>(null);
-  const [lastError, setLastError] = React.useState<string | null>(null);
+  const [starting, setStarting] = React.useState(false);
 
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const processedRef = React.useRef(0);
   const refreshRef = React.useRef(() => {});
   const selectRef = React.useRef<(id: string) => void>(() => {});
-  const agents = useAgentStore((s) => s.agents);
-  const refreshAgents = useAgentStore((s) => s.refresh);
+  // REQ-079: auto-start guard — one attempt per session so a failing create
+  // never loops (the error toast explains, click retries manually).
+  const autoStartedRef = React.useRef<string | null>(null);
 
   const refresh = React.useCallback(async () => {
     try {
       const res = await api.listTerminals();
       setTerminals(res.terminals);
-      setLastError(null);
-    } catch (e) {
-      setLastError(e instanceof Error ? e.message : 'terminal list failed');
+    } catch {
+      // List failures surface via the start toast, never a dead pane.
     }
   }, []);
   refreshRef.current = refresh;
@@ -92,7 +70,6 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
       prevSessionRef.current = sessionId;
       setBuffers({});
       setSelectedId(null);
-      setArmedKill(null);
       processedRef.current = 0;
       cwdAdoptedRef.current = false;
     }
@@ -106,9 +83,8 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
     if (next.cwd !== cwd) setCwd(next.cwd);
     if (sessionChanged) {
       void refresh();
-      void refreshAgents();
     }
-  }, [sessionId, refresh, refreshAgents, known, cwd]);
+  }, [sessionId, refresh, known, cwd]);
 
   // Fold WS terminal frames into per-terminal scrollback (incremental, capped).
   React.useEffect(() => {
@@ -130,7 +106,6 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
   const select = React.useCallback(
     (id: string) => {
       setSelectedId(id);
-      setArmedKill(null);
       // Late-join catch-up: seed the buffer from the server tail when empty.
       setBuffers((prev) => {
         if (prev[id] !== undefined) return prev;
@@ -151,45 +126,59 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
   selectRef.current = select;
 
   // Auto-select the first running terminal once the list lands.
+  // Session-scoped: another session's shell is never hijacked.
+  const mine = React.useMemo(
+    () => terminals.filter((t) => !t.sessionId || t.sessionId === sessionId),
+    [terminals, sessionId],
+  );
   React.useEffect(() => {
-    if (selectedId || terminals.length === 0) return;
-    const first = terminals.find((t) => t.status === 'running') ?? terminals[0];
+    if (selectedId || mine.length === 0) return;
+    const first = mine.find((t) => t.status === 'running') ?? mine[0];
     if (first) selectRef.current(first.id);
-  }, [terminals, selectedId]);
+  }, [mine, selectedId]);
 
-  // Auto-scroll on new output when Follow is on.
-  const selected = terminals.find((t) => t.id === selectedId) ?? null;
+  // Auto-scroll on new output (always follow — the pane is the terminal).
+  const selected = mine.find((t) => t.id === selectedId) ?? null;
+  const selectedRunning = selected?.status === 'running';
   const rawBuffer = selectedId ? (buffers[selectedId] ?? '') : '';
-  const lines = React.useMemo(() => filterLines(rawBuffer, search), [rawBuffer, search]);
+  const lines = React.useMemo(() => rawBuffer.split('\n'), [rawBuffer]);
   React.useEffect(() => {
-    if (follow && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [lines, follow]);
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [lines]);
 
   const create = React.useCallback(async () => {
-    if (!cwd) {
-      emitToast('Session cwd is still loading — retry in a second');
+    if (!cwd || starting) {
+      if (!cwd) emitToast('Session cwd is still loading — retry in a second');
       return;
     }
-    setLoading(true);
+    setStarting(true);
     try {
-      const res = await api.createTerminal({
-        cwd,
-        sessionId,
-        ...(newAgent ? { agentId: newAgent } : {}),
-      });
+      const res = await api.createTerminal({ cwd, sessionId });
       await refresh();
       select(res.terminal.id);
-      setCreating(false);
-      setNewAgent('');
-      emitToast(`Terminal ${shortId(res.terminal.id)} started (pid ${res.terminal.pid ?? '?'})`);
       // REQ-059: hand focus to the scrollback so typing starts immediately.
       window.setTimeout(() => scrollRef.current?.focus({ preventScroll: true }), 50);
     } catch (e) {
       emitToast(e instanceof Error ? e.message : 'terminal create failed');
     } finally {
-      setLoading(false);
+      setStarting(false);
     }
-  }, [cwd, newAgent, sessionId, refresh, select]);
+  }, [cwd, starting, sessionId, refresh, select]);
+
+  // REQ-079: a running shell auto-starts when the pane has none (one attempt
+  // per session — failures toast and wait for a click instead of looping).
+  React.useEffect(() => {
+    if (autoStartedRef.current === sessionId || !cwd || starting) return;
+    if (mine.some((t) => t.status === 'running')) return;
+    if (mine.length > 0) {
+      // Dead records only — mark attempted so we don't respawn on every
+      // refresh; the user starts a fresh shell with a click.
+      autoStartedRef.current = sessionId;
+      return;
+    }
+    autoStartedRef.current = sessionId;
+    void create();
+  }, [sessionId, cwd, mine, starting, create]);
 
   const sendRaw = React.useCallback(
     (data: string) => {
@@ -225,355 +214,60 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
     [selectedId, selected, sendRaw],
   );
 
-  const kill = React.useCallback(
-    async (id: string) => {
-      if (armedKill !== id) {
-        setArmedKill(id);
-        return;
-      }
-      setArmedKill(null);
-      if (ws.status === 'open') {
-        ws.killTerminal(id);
-        emitToast(`Kill sent to ${shortId(id)}`);
-      } else {
-        // Socket down — REST path still ends the real process.
-        try {
-          await api.deleteTerminal(id);
-          await refresh();
-          emitToast(`Terminal ${shortId(id)} killed (REST fallback)`);
-        } catch (e) {
-          emitToast(e instanceof Error ? e.message : 'terminal kill failed');
-        }
-      }
-    },
-    [armedKill, ws, refresh],
-  );
-
-  const forget = React.useCallback(
-    async (id: string) => {
-      try {
-        await api.deleteTerminal(id);
-        setBuffers((prev) => {
-          const next = { ...prev };
-          delete next[id];
-          return next;
-        });
-        setTerminals((prev) => {
-          const rest = prev.filter((t) => t.id !== id);
-          if (selectedId === id) {
-            const next = rest.find((t) => t.status === 'running') ?? rest[0] ?? null;
-            setSelectedId(next ? next.id : null);
-          }
-          return rest;
-        });
-      } catch (e) {
-        emitToast(e instanceof Error ? e.message : 'terminal delete failed');
-      }
-    },
-    [selectedId],
-  );
-
-  const clear = React.useCallback(() => {
-    if (!selectedId) return;
-    setBuffers((prev) => ({ ...prev, [selectedId]: '' }));
-  }, [selectedId]);
-
-  const copy = React.useCallback(async () => {
-    if (!selectedId) return;
-    const ok = await copyText(rawBuffer || '(empty scrollback)');
-    emitToast(ok ? 'Scrollback copied' : 'Copy failed');
-  }, [selectedId, rawBuffer]);
-
   const exitNote = selected ? exitSummary(selected) : null;
 
-  // REQ-056 — right-click a terminal tab for its lifecycle menu on the
-  // shared ContextMenu primitive. Kill keeps its two-click arm: the
-  // first menu click arms, the second (re-opened) menu click confirms.
-  const termCtx = useContextMenu<string>();
-  const openTermMenu = termCtx.menu;
-  const ctxTerm: TerminalInfo | null = openTermMenu
-    ? (terminals.find((t) => t.id === openTermMenu.key) ?? null)
-    : null;
-  const copyTermId = (id: string) => {
-    try {
-      void navigator.clipboard.writeText(id).then(
-        () => emitToast('Terminal id copied'),
-        () => emitToast('Copy failed'),
-      );
-    } catch {
-      emitToast('Copy failed');
-    }
-  };
-  const ctxItems: ContextMenuEntry[] = ctxTerm
-    ? [
-        { type: 'header', label: `${terminalLabel(ctxTerm)} · ${statusLabel(ctxTerm)}` },
-        {
-          type: 'item',
-          label: 'Open terminal',
-          icon: TerminalIcon,
-          onSelect: () => select(ctxTerm.id),
-        },
-        {
-          type: 'item',
-          label: armedKill === ctxTerm.id ? 'Confirm kill' : 'Kill process',
-          icon: Square,
-          danger: true,
-          disabled: ctxTerm.status !== 'running',
-          onSelect: () => void kill(ctxTerm.id),
-        },
-        {
-          type: 'item',
-          label: 'Forget record',
-          icon: Trash2,
-          danger: true,
-          disabled: ctxTerm.status === 'running',
-          hint: ctxTerm.status === 'running' ? 'kill first' : undefined,
-          onSelect: () => void forget(ctxTerm.id),
-        },
-        { type: 'separator' },
-        {
-          type: 'item',
-          label: 'Copy terminal id',
-          icon: Copy,
-          onSelect: () => copyTermId(ctxTerm.id),
-        },
-      ]
-    : [];
-
   return (
-    <div className="flex h-[420px] flex-col overflow-hidden rounded-lg border border-[#232326] bg-[#0F0F11] text-[#EDE9E2]">
-      <div className="flex h-7 shrink-0 items-center gap-1 overflow-x-auto border-b border-white/10 bg-[#1E1E21] px-2">
-        <TerminalIcon className="h-3 w-3 shrink-0 text-emerald-400" />
-        <span className="whitespace-nowrap text-xs font-medium">Terminal</span>
-        <span className="ml-2 flex shrink-0 gap-1">
-          {terminals.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => select(t.id)}
-              onContextMenu={(e) => {
-                select(t.id);
-                termCtx.open(e, t.id);
-              }}
-              title={`${terminalLabel(t)} — ${statusLabel(t)}`}
-              className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${
-                t.id === selectedId
-                  ? 'border-white bg-white text-black'
-                  : 'border-white/10 bg-white/5 text-white/60 hover:bg-white/10'
-              }`}
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  t.status === 'running' ? 'animate-pulse bg-emerald-500' : 'bg-zinc-500'
-                }`}
-              />
-              {terminalLabel(t)}
-            </button>
-          ))}
-        </span>
-        <span className="ml-auto flex shrink-0 items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 text-white/60 hover:bg-white/10 hover:text-white"
-            title="New terminal"
-            onClick={() => setCreating((v) => !v)}
-           aria-label="New terminal">
-            <Plus className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 text-white/60 hover:bg-white/10 hover:text-white"
-            title="Refresh list"
-            onClick={() => void refresh()}
-           aria-label="Refresh list">
-            <RefreshCw className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 text-white/60 hover:bg-white/10 hover:text-white"
-            title="Copy scrollback"
-            onClick={() => void copy()}
-           aria-label="Copy scrollback">
-            <Copy className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 text-white/60 hover:bg-white/10 hover:text-white"
-            title="Clear scrollback (local only)"
-            onClick={clear}
-           aria-label="Clear scrollback (local only)">
-            <Trash2 className="h-3 w-3" />
-          </Button>
-        </span>
-      </div>
-
-      {creating ? (
-        <div className="grid shrink-0 grid-cols-1 gap-2 border-b border-white/5 bg-[#161618] p-2 @min-[420px]:grid-cols-2">
-          <div>
-            <label htmlFor="terminal-cwd" className="mb-1 block text-[10px] uppercase tracking-wide text-white/40">
-              Working directory
-            </label>
-            <input
-              id="terminal-cwd"
-              value={cwd}
-              onChange={(e) => setCwd(e.target.value)}
-              className="h-7 w-full rounded border border-white/10 bg-white/5 px-2 font-mono text-[11px] text-white focus:border-white/20 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label htmlFor="terminal-agent" className="mb-1 block text-[10px] uppercase tracking-wide text-white/40">
-              Agent (optional)
-            </label>
-            <select
-              id="terminal-agent"
-              value={newAgent}
-              onChange={(e) => setNewAgent(e.target.value)}
-              className="h-7 w-full rounded border border-white/10 bg-white/5 px-1 text-[11px] text-white focus:border-white/20 focus:outline-none"
-            >
-              <option value="">No agent</option>
-              {agents.map((a) => (
-                <option key={String(a.id)} value={String(a.id)}>
-                  {String(a.id)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="col-span-2 flex gap-2">
-            <Button size="sm" className="h-6 flex-1 text-[11px]" disabled={loading || !cwd} onClick={() => void create()}>
-              {loading ? 'Starting…' : 'Start shell'}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 text-[11px] text-white/60 hover:bg-white/10 hover:text-white"
-              onClick={() => setCreating(false)}
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="flex h-6 shrink-0 items-center gap-1.5 overflow-x-auto border-b border-white/5 bg-[#161618] px-2 text-[11px]">
-        <span className="truncate font-mono text-white/90" title={selected ? selected.cwd : 'no terminal'}>{selected ? selected.cwd : 'no terminal'}</span>
-        {selected ? (
-          <span className="shrink-0 text-white/40" title={statusLabel(selected)}>
-            · {statusLabel(selected)}
-          </span>
-        ) : null}
-        <span className="ml-auto flex shrink-0 items-center gap-1">
-          <div className="relative hidden items-center md:flex">
-            <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-white/30" />
-            <label htmlFor="terminal-filter" className="sr-only">
-              Filter scrollback
-            </label>
-            <input
-              id="terminal-filter"
-              placeholder="Filter..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-6 w-[110px] rounded-full border border-white/10 bg-white/5 pl-6 pr-2 text-xs text-white placeholder:text-white/30 focus:border-white/20 focus:outline-none"
-            />
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={`h-5 gap-1 text-[11px] ${follow ? 'text-emerald-400' : 'text-white/60'} hover:bg-white/10 hover:text-white`}
-            title="Follow new output"
-            onClick={() => setFollow((v) => !v)}
-          >
-            <ArrowDownToLine className="h-3 w-3" />
-            {follow ? 'Following' : 'Follow'}
-          </Button>
-          {selected && selected.status === 'running' ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`h-5 gap-1 text-[11px] ${armedKill === selected.id ? 'bg-red-500/20 text-red-300' : 'text-white/60'} hover:bg-white/10 hover:text-white`}
-              title={armedKill === selected.id ? 'Click again to confirm kill' : 'Kill the real process'}
-              onClick={() => void kill(selected.id)}
-            >
-              <Square className="h-3 w-3" />
-              {armedKill === selected.id ? 'Confirm?' : 'Kill'}
-            </Button>
-          ) : null}
-          {selected && selected.status !== 'running' ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 gap-1 text-[11px] text-white/60 hover:bg-white/10 hover:text-white"
-              title="Forget this record"
-              onClick={() => void forget(selected.id)}
-            >
-              <Trash2 className="h-3 w-3" />
-              Forget
-            </Button>
-          ) : null}
-        </span>
-      </div>
-
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#0F0F11] text-[#EDE9E2]">
       <div
         ref={scrollRef}
-        tabIndex={selected?.status === 'running' ? 0 : -1}
+        tabIndex={selectedRunning ? 0 : -1}
         role="application"
         aria-label={
-          selected?.status === 'running'
+          selectedRunning
             ? 'Terminal — click and type directly, arrows for history, Control C interrupts'
             : 'Terminal scrollback'
         }
         onKeyDown={onTermKeyDown}
         onPaste={onTermPaste}
+        onClick={() => {
+          // REQ-079: an empty/dead pane starts a fresh shell on click — no
+          // menus, no buttons, just click and type.
+          if (!selectedRunning && !starting && cwd) void create();
+          else scrollRef.current?.focus({ preventScroll: true });
+        }}
         className="flex-1 cursor-text space-y-0.5 overflow-auto p-3 font-mono text-xs leading-5 focus:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500/40"
       >
-        {lastError && terminals.length === 0 ? (
-          <div className="text-red-400">{lastError}</div>
+        {starting && terminals.length === 0 ? (
+          <div className="text-white/40">Starting shell…</div>
         ) : !selected ? (
-          <div className="text-white/40">
-            No shells yet — press <Plus className="inline h-3 w-3" /> to start a real shell in this session&apos;s
-            workspace.
-          </div>
+          <div className="text-white/40">Click to start a shell in this session&apos;s workspace.</div>
         ) : (
           <>
             {lines.map((line, i) => (
               <div key={i} className="whitespace-pre-wrap break-all text-zinc-300">
-                {line || ' '}
+                {line || ' '}
               </div>
             ))}
             {exitNote ? <div className="pt-1 text-[11px] text-white/40">— {exitNote}</div> : null}
-            {selected.status === 'running' ? (
+            {selectedRunning ? (
               <div className="flex items-center gap-1 text-white">
                 <span className="text-emerald-400">$</span>
                 <span className="h-4 w-2 animate-pulse bg-white/80" />
               </div>
-            ) : null}
+            ) : (
+              <button
+                className="mt-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/60 hover:bg-white/10 hover:text-white"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!starting && cwd) void create();
+                }}
+              >
+                Shell ended — click for a fresh one
+              </button>
+            )}
           </>
         )}
       </div>
-
-      <div className="flex h-6 shrink-0 items-center gap-1 overflow-x-auto border-t border-white/5 bg-[#161618] px-2 text-[10px]">
-        <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5">
-          {selected ? (selected.pty ? 'shell · pty' : 'shell · pipes') : 'shell'}
-        </span>
-        <span className="hidden text-white/30 @min-[320px]:inline">
-          {terminals.filter((t) => t.status === 'running').length}/{terminals.length} live ·{' '}
-          {selected?.status === 'running'
-            ? 'click the output and type — arrows history, ctrl+c interrupts, ctrl+d exits'
-            : 'start a shell to type'}
-        </span>
-        <span className="ml-auto hidden text-white/30 lg:inline">ws {ws.status}</span>
-      </div>
-      {openTermMenu && ctxTerm ? (
-        <ContextMenu
-          x={openTermMenu.x}
-          y={openTermMenu.y}
-          items={ctxItems}
-          onClose={termCtx.close}
-          label="Terminal actions menu"
-        />
-      ) : null}
     </div>
   );
 }

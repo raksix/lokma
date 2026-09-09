@@ -54,7 +54,9 @@ const shell = read(join('components', 'app-shell.tsx'));
 check('shell renders MobileSingleView', shell.includes('<MobileSingleView'));
 check('shell forces tiling off on mobile', shell.includes('setTiling(false)'));
 check('shell forces windowed off on mobile', shell.includes('setWindowed(false)'));
-check('shell hides drawer chrome on mobile', shell.includes('hideSideToggles'));
+check('mobile header shows side toggles (REQ-091)', !shell.includes('hideSideToggles'));
+check('mobile header has no noop toggles (REQ-091)', !shell.includes('onToggleLeft={noop}'));
+check('mobile branch renders drawers (REQ-091)', shell.split('<MobileDrawer').length - 1 >= 4);
 check('tiling toggle hides on mobile', shell.includes('if (isMobile) return null'));
 check('shell has a dedicated mobile branch', shell.includes('if (isMobile) {'));
 

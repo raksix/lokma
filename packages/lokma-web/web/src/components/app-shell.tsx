@@ -455,11 +455,14 @@ export function AppShell({ sessionId }: { sessionId: string }) {
 
   // REQ-024 — mobile single-view branch: below the breakpoint the harness
   // renders a separate simple mode (one surface + bottom tab bar) instead
-  // of the desktop frame. No activity/inspector rails, no sidebar drawers,
-  // no tiling toggle or workspace — every feature lives in the tabbed
-  // single surface, settings/search stay header modals as on desktop.
+  // of the desktop frame. No activity/inspector rails, no tiling toggle or
+  // workspace — every feature lives in the tabbed single surface,
+  // settings/search stay header modals as on desktop.
+  // REQ-091 — the header keeps the left/right sidebar toggles: they open
+  // the Explorer/Inspector panels as exclusive slide-over drawers (same
+  // `toggleSidebar` + `MobileDrawer` as desktop, swap-aware titles). The
+  // swap button stays hidden (no `onSwapSides`) — there is no room for it.
   if (isMobile) {
-    const noop = (): void => undefined;
     return (
       <div className="flex h-screen flex-col bg-background text-foreground">
         <a
@@ -475,10 +478,9 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           wsStatus={ws.status}
           onSearch={() => setSearchOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
-          onToggleLeft={noop}
-          onToggleRight={noop}
+          onToggleLeft={() => toggleSidebar('left')}
+          onToggleRight={() => toggleSidebar('right')}
           explorerSide={explorerSide}
-          hideSideToggles
         />
         <OfflineBanner status={ws.status} onRetry={ws.reconnect} />
         <div id="lokma-chat" className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -491,6 +493,24 @@ export function AppShell({ sessionId }: { sessionId: string }) {
             />
           </PaneErrorBoundary>
         </div>
+        {sidebars.left ? (
+          <MobileDrawer side="left" label={`${leftPanel} panel`} onClose={closeDrawers}>
+            <PaneErrorBoundary paneName={leftPanel}>
+              <Sidebar side="left" title={leftPanel} hideHeader className="h-full w-full">
+                {leftContent}
+              </Sidebar>
+            </PaneErrorBoundary>
+          </MobileDrawer>
+        ) : null}
+        {sidebars.right ? (
+          <MobileDrawer side="right" label={`${rightPanel} panel`} onClose={closeDrawers}>
+            <PaneErrorBoundary paneName={rightPanel}>
+              <Sidebar side="right" title={rightPanel} hideHeader className="h-full w-full">
+                {rightContent}
+              </Sidebar>
+            </PaneErrorBoundary>
+          </MobileDrawer>
+        ) : null}
         <FooterBar
           serverUp={serverUp}
           latencyMs={latencyMs}

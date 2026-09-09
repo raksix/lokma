@@ -6,12 +6,14 @@ import { api } from '@/lib/api';
 import './index.css';
 
 /**
- * App boot gate (REQ-062 Parça A, REQ-063 + REQ-066 onboarding): fresh
- * instances (unbootstrapped, onboarding not done) boot into the
- * full-screen onboarding wizard; bootstrapped AND `requireLogin` on
- * hides the shell behind login until `/api/auth/me` 200s. Gate-off (or
+ * App boot gate (REQ-062 Parça A, REQ-063 + REQ-066 onboarding, REQ-076
+ * fail-closed): fresh instances (unbootstrapped, onboarding not done) boot
+ * into the full-screen onboarding wizard; bootstrapped AND `requireLogin`
+ * on hides the shell behind login until `/api/auth/me` 200s. Gate-off (or
  * fresh-but-onboarded-open) instances boot straight into the shell —
- * legacy behavior, untouched.
+ * legacy behavior, untouched. When the settings check itself fails
+ * (server down / network error) the shell NEVER opens — the login screen
+ * shows instead, so a backend outage cannot silently expose the harness.
  */
 
 type GateState = { phase: 'loading' } | { phase: 'open' } | { phase: 'onboarding' } | { phase: 'gated'; mode: 'login' | 'register' };
@@ -57,9 +59,10 @@ function useGate(): { gate: GateState; refresh: () => void } {
           setGate({ phase: 'gated', mode: 'login' });
         }
       } catch {
-        // Settings unreadable (server down?) — show the shell so the
-        // failure is visible instead of a dead splash screen.
-        setGate({ phase: 'open' });
+        // Settings unreadable (server down?) — fail CLOSED (REQ-076): show
+        // the login screen, never the shell. A failed login surfaces the
+        // outage honestly instead of exposing the harness.
+        setGate({ phase: 'gated', mode: 'login' });
       }
     })();
   }, []);

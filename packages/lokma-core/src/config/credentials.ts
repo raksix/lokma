@@ -89,3 +89,46 @@ export async function removeCredentials(provider: string): Promise<boolean> {
   await writeAtomic(CRED_PATH, payload, 0o600);
   return true;
 }
+
+/**
+ * Store an OAuth token for a provider (TUI `/login` device flow).
+ * Preserves any stored API key — the chat key resolver prefers apiKey,
+ * then OAuth (Bearer providers only), then env. Persists 0600 like save.
+ */
+export async function saveOAuthToken(provider: string, token: unknown): Promise<void> {
+  const cur = await loadCredentials();
+  const prev = (cur.providers[provider] ?? {}) as { apiKey?: string };
+  const next: Credentials = {
+    ...cur,
+    providers: {
+      ...cur.providers,
+      [provider]: { apiKey: prev.apiKey, oauth: token },
+    },
+  };
+  const json = JSON.stringify(CredentialsSchema.parse(next), null, 2);
+  const key = getEncryptionKey();
+  const payload = key ? encrypt(json, key) : json;
+  await writeAtomic(CRED_PATH, payload, 0o600);
+}
+
+/**
+ * Remove a stored OAuth token (TUI `/logout`). Keeps any API key.
+ * Returns false when there was no OAuth token to remove.
+ */
+export async function removeOAuthToken(provider: string): Promise<boolean> {
+  const cur = await loadCredentials();
+  const prev = cur.providers[provider] as { apiKey?: string; oauth?: unknown } | undefined;
+  if (!prev || prev.oauth == null) return false;
+  const next: Credentials = {
+    ...cur,
+    providers: {
+      ...cur.providers,
+      [provider]: { apiKey: prev.apiKey, oauth: null },
+    },
+  };
+  const json = JSON.stringify(CredentialsSchema.parse(next), null, 2);
+  const key = getEncryptionKey();
+  const payload = key ? encrypt(json, key) : json;
+  await writeAtomic(CRED_PATH, payload, 0o600);
+  return true;
+}

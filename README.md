@@ -48,9 +48,11 @@ bun run dev:web      # Vite dev server
 CLI (after build):
 
 ```bash
-lokma                          # terminal TUI (interactive)
+lokma                          # terminal TUI (interactive, Claude-Code UX)
 lokma tui --model openai/gpt-4o
 lokma tui -p "list the workspace files"
+# Inside the TUI: /login /logout /providers /models /model /theme /status
+# /compact /export /permissions + Tab-completion for /commands and @files
 ./bin/lokma --help
 ./bin/lokma config get | ./bin/lokma config set theme omp
 ./bin/lokma config set permissions.defaultMode plan

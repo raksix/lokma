@@ -15,6 +15,10 @@ export * from './session/index.js';
 // Config & credentials (layered, AES-GCM 0600)
 export * from './config/index.js';
 
+// Providers (registry views, upstream resolution, live probes — shared by
+// Web server and terminal TUI)
+export * from './providers/index.js';
+
 // Skills (Hermes-inspired auto-discovery)
 export * from './skills/index.js';
 

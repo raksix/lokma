@@ -1,11 +1,13 @@
 import { randomBytes } from 'node:crypto';
-import { readFile, stat } from 'node:fs/promises';
+import { readdirSync } from 'node:fs';
+import { readFile, stat, writeFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { createInterface, type Interface } from 'node:readline/promises';
 import { stream as aiStream, type ProviderMessage } from 'lokma-ai';
 import { loadConfig, saveGlobal } from '../config/loader.js';
-import { loadCredentials } from '../config/credentials.js';
+import { RepoGit } from '../git/git.js';
 import { SessionStore } from '../session/store.js';
+import { compactSession, compactionStatus, transcriptChars } from '../session/compaction.js';
 import type { SessionMessage } from '../session/types.js';
 import { ToolRegistry } from '../tools/registry.js';
 import { buildBuiltinTools } from '../tools/builtins.js';
@@ -15,18 +17,37 @@ import { executeToolCall, mintCallId, runApprovedCall } from '../tools/executor.
 import { describeToolCall } from '../tools/gate.js';
 import { estimateCost, estimateTokens } from '../usage/pricing.js';
 import { UsageLedger } from '../usage/ledger.js';
+import { listThemes } from '../themes/themes.js';
 import { resolveInRoot } from '../files/files.js';
+import { listProviderViews, providerNeedsKey, resolveProviderUpstream } from '../providers/providers.js';
+import { createPaint, type Paint } from './tui-paint.js';
+import {
+  addCustomProvider,
+  getMergedCatalogTui,
+  hiddenInput,
+  loginFlow,
+  logoutFlow,
+  removeCustomProvider,
+  renderProviderTable,
+  resolveChatKey,
+  setModelEnabled,
+  setProviderEnabled,
+  testProvider,
+} from './tui-providers.js';
 
 /**
- * Lokma TUI — Claude-Code-style terminal chat over the real harness.
+ * Lokma TUI — Claude-Code UX over the real harness loop.
  *
- * Same building blocks as the Web WS loop
- * (`packages/lokma-web/server/src/agent-loop.ts`): `lokma-ai stream()`,
- * core tool registry + gated executor, `<tool>`/`<ask>` text blocks,
- * JSONL SessionStore (same files the Web harness reads), usage ledger.
- * No UI-control tools (browser/shell/session panes are Web-only).
- * Zero TUI dependencies — `node:readline/promises` + ANSI only, so it
- * works in PowerShell, cmd, and POSIX terminals alike.
+ * Layout mirrors Claude Code (welcome box, `>` prompt, tool cards,
+ * numbered permission/question cards, status line) while every color
+ * comes from the active Lokma theme (OMP indigo by default — same
+ * `chalk` tokens as `themes/*.json`). The agent engine is the shared
+ * harness path: `lokma-ai stream()`, core tool registry + gated
+ * executor, `<tool>`/`<ask>` blocks, JSONL sessions the Web harness
+ * reads. Provider registry, login, and model catalog are the terminal
+ * twins of the Web Providers/Models tabs (one core implementation).
+ * Zero TUI dependencies — readline + ANSI only (PowerShell/cmd/POSIX).
+ * See Docs/10 §slash-commands + Docs/11 §TUI-kimliği.
  */
 
 export type TuiOpts = {
@@ -37,96 +58,21 @@ export type TuiOpts = {
   prompt?: string;
 };
 
+const VERSION = '0.0.1';
 const MAX_TURNS = 15;
 const TURN_TIMEOUT_MS = 180_000;
 const MAX_CONTEXT_FILES = 5;
 const MAX_CONTEXT_BYTES = 20 * 1024;
-
-/** Built-in base URLs mirror the server provider views (single copy here). */
-const BUILTIN_BASE_URLS: Record<string, string> = {
-  anthropic: 'https://api.anthropic.com',
-  openai: 'https://api.openai.com/v1',
-  deepseek: 'https://api.deepseek.com/v1',
-  google: 'https://generativelanguage.googleapis.com',
-  openrouter: 'https://openrouter.ai/api/v1',
-  ollama: 'http://localhost:11434/v1',
-};
-
-const ENV_KEYS: Record<string, string[]> = {
-  anthropic: ['ANTHROPIC_API_KEY'],
-  openai: ['OPENAI_API_KEY'],
-  deepseek: ['DEEPSEEK_API_KEY'],
-  google: ['GOOGLE_GENERATIVE_AI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'],
-  openrouter: ['OPENROUTER_API_KEY'],
-};
-
-// ── ANSI (disabled when piped or NO_COLOR) ────────────────────────────────────
-
-const USE_COLOR = !!process.stdout.isTTY && !process.env.NO_COLOR;
-const c = {
-  bold: (s: string): string => (USE_COLOR ? `\x1b[1m${s}\x1b[0m` : s),
-  dim: (s: string): string => (USE_COLOR ? `\x1b[2m${s}\x1b[0m` : s),
-  cyan: (s: string): string => (USE_COLOR ? `\x1b[36m${s}\x1b[0m` : s),
-  green: (s: string): string => (USE_COLOR ? `\x1b[32m${s}\x1b[0m` : s),
-  yellow: (s: string): string => (USE_COLOR ? `\x1b[33m${s}\x1b[0m` : s),
-  red: (s: string): string => (USE_COLOR ? `\x1b[31m${s}\x1b[0m` : s),
-  gray: (s: string): string => (USE_COLOR ? `\x1b[90m${s}\x1b[0m` : s),
-};
-
-// ── Model / provider resolution ──────────────────────────────────────────────
 
 /** Canonical harness id: adapters strip `provider/`, so `::` becomes `/`. */
 export function canonicalModelId(model: string): string {
   return model.replace(/::/g, '/');
 }
 
-export function providerOf(model: string): string {
+function providerOf(model: string): string {
   const canon = canonicalModelId(model);
   const slash = canon.indexOf('/');
   return slash >= 0 ? canon.slice(0, slash) : canon;
-}
-
-async function resolveApiKey(id: string): Promise<string | null> {
-  try {
-    const creds = await loadCredentials();
-    const fileKey = (creds.providers[id] as { apiKey?: string } | undefined)?.apiKey;
-    if (fileKey) return fileKey;
-  } catch {
-    // No credentials file — fall through to env.
-  }
-  for (const envName of ENV_KEYS[id] ?? []) {
-    const envKey = process.env[envName];
-    if (envKey) return envKey;
-  }
-  return null;
-}
-
-async function resolveBaseUrl(cwd: string, id: string): Promise<string> {
-  try {
-    const cfg = await loadConfig(cwd);
-    const override = (cfg.providers ?? []).find((p) => p.id === id)?.baseUrl;
-    if (override) return override;
-  } catch {
-    // Config unreadable — fall through to built-ins.
-  }
-  return BUILTIN_BASE_URLS[id] ?? '';
-}
-
-type Upstream = { provider: 'anthropic' | 'openai'; baseUrl: string; apiKey: string | null };
-
-async function resolveUpstream(cwd: string, model: string): Promise<Upstream> {
-  const provider = providerOf(model);
-  const apiKey = await resolveApiKey(provider);
-  const baseUrl = await resolveBaseUrl(cwd, provider);
-  if (provider === 'anthropic') {
-    return { provider: 'anthropic', baseUrl: baseUrl || BUILTIN_BASE_URLS.anthropic, apiKey };
-  }
-  if (provider === 'openai' || provider === 'deepseek' || provider === 'openrouter' || provider === 'ollama' || baseUrl) {
-    return { provider: 'openai', baseUrl: baseUrl || BUILTIN_BASE_URLS.openai, apiKey };
-  }
-  throw new Error(
-    `Provider "${provider}" is not wired for chat (wired: anthropic, openai, deepseek, openrouter, ollama, custom OpenAI-compatible) — configure it in the Web Providers tab or ~/.lokma/config.json.`,
-  );
 }
 
 // ── History + @file context (mirrors the WS loop) ────────────────────────────
@@ -168,7 +114,7 @@ function buildHistory(messages: SessionMessage[]): ProviderMessage[] {
 }
 
 async function readContextBlocks(cwd: string, prompt: string): Promise<{ prefix: string; files: string[] }> {
-  const mentions = [...prompt.matchAll(/@([^\s@][^\s]*)/g)].map((m) => m[1]).filter((p): p is string => !!p);
+  const mentions = [...prompt.matchAll(/@([^\s@][^\s]*)/g)].map((m) => m[1]).filter((part): part is string => !!part);
   if (mentions.length === 0) return { prefix: '', files: [] };
   const root = resolve(cwd);
   const blocks: string[] = [];
@@ -196,13 +142,6 @@ async function readContextBlocks(cwd: string, prompt: string): Promise<{ prefix:
 
 // ── Prompt helpers ───────────────────────────────────────────────────────────
 
-class TurnAborted extends Error {
-  constructor() {
-    super('turn aborted');
-    this.name = 'TurnAborted';
-  }
-}
-
 async function askLine(rl: Interface, prompt: string, signal?: AbortSignal): Promise<string | null> {
   try {
     const answer = signal ? await rl.question(prompt, { signal }) : await rl.question(prompt);
@@ -212,11 +151,29 @@ async function askLine(rl: Interface, prompt: string, signal?: AbortSignal): Pro
   }
 }
 
+/** Numbered pick list (Claude-Code card style) — returns the chosen item or null. */
+async function pickNumbered<T>(
+  rl: Interface,
+  p: Paint,
+  title: string,
+  items: { label: string; value: T }[],
+  signal?: AbortSignal,
+): Promise<T | null> {
+  console.log(`\n${p.box(items.map((item, i) => `  ${p.info(String(i + 1))}) ${item.label}`), title, p.primary)}`);
+  const raw = await askLine(rl, p.muted('  choice (number): '), signal);
+  if (raw === null) return null;
+  const n = Number(raw.trim());
+  if (!Number.isInteger(n) || n < 1 || n > items.length) return null;
+  return items[n - 1]?.value ?? null;
+}
+
 // ── One agent turn-loop for a single user prompt ─────────────────────────────
 
+type Upstream = { provider: 'anthropic' | 'openai'; baseUrl: string; apiKey: string | null };
 type LoopResult = { inputChars: number; outputChars: number; turns: number; aborted: boolean };
 
 async function runPrompt(opts: {
+  p: Paint;
   rl: Interface | null;
   cwd: string;
   sessionId: string;
@@ -226,7 +183,7 @@ async function runPrompt(opts: {
   prompt: string;
   signal: AbortSignal;
 }): Promise<LoopResult> {
-  const { cwd, sessionId, model, upstream, store } = opts;
+  const { p, cwd, sessionId, model, upstream, store } = opts;
   const cfg = await loadConfig(cwd).catch(() => null);
   const permissions = cfg?.permissions;
 
@@ -236,7 +193,7 @@ async function runPrompt(opts: {
   const toolSystem = buildToolSystemPrompt(registry.list().map((t) => ({ name: t.name, description: t.description })));
 
   const { prefix, files } = await readContextBlocks(cwd, opts.prompt);
-  if (files.length > 0) console.log(c.gray(`  context: ${files.join(', ')}`));
+  if (files.length > 0) console.log(p.muted(`  context: ${files.join(', ')}`));
   const effectivePrompt = prefix ? `${prefix}${opts.prompt}` : opts.prompt;
 
   const historyMessages = await store.read(sessionId).catch(() => []);
@@ -253,31 +210,37 @@ async function runPrompt(opts: {
 
   const askUser = async (question: string, choices?: string[]): Promise<string | null> => {
     if (!opts.rl) return null;
-    console.log(`\n${c.yellow('?')} ${c.bold(question)}`);
     if (choices && choices.length > 0) {
-      choices.forEach((ch, i) => console.log(`  ${c.cyan(String(i + 1))}) ${ch}`));
-      const raw = await askLine(opts.rl, c.dim('  answer (number or text): '), opts.signal);
-      if (raw === null) return null;
-      const n = Number(raw.trim());
-      if (Number.isInteger(n) && n >= 1 && n <= choices.length) return choices[n - 1] as string;
+      const picked = await pickNumbered(
+        opts.rl,
+        p,
+        question || '(the model asked an empty question)',
+        choices.map((ch) => ({ label: ch, value: ch })),
+        opts.signal,
+      );
+      if (picked !== null) return picked;
+      const raw = await askLine(opts.rl, p.muted('  answer (free text): '), opts.signal);
       return raw;
     }
-    const raw = await askLine(opts.rl, c.dim('  answer: '), opts.signal);
+    console.log(`\n${p.warn('?')} ${p.bold(question)}`);
+    const raw = await askLine(opts.rl, p.muted('  answer: '), opts.signal);
     return raw;
   };
 
   const askApproval = async (tool: string, description: string): Promise<'allow' | 'deny' | 'always' | null> => {
     if (!opts.rl) return null;
-    const raw = await askLine(
+    const picked = await pickNumbered<{ v: 'allow' | 'deny' | 'always' }>(
       opts.rl,
-      `\n${c.yellow('!')} ${c.bold(description)} ${c.dim(`[${tool}] — (a)llow / (d)eny / al(w)ays: `)}`,
+      p,
+      `${description}  ${p.muted(`[${tool}]`)}`,
+      [
+        { label: 'Yes, run it', value: { v: 'allow' } },
+        { label: 'Yes, and remember for this tool', value: { v: 'always' } },
+        { label: 'No, deny', value: { v: 'deny' } },
+      ],
       opts.signal,
     );
-    if (raw === null) return null;
-    const v = raw.trim().toLowerCase();
-    if (v === 'w' || v === 'always' || v === 'alw') return 'always';
-    if (v === 'a' || v === 'allow' || v === 'y' || v === 'yes' || v === '') return 'allow';
-    return 'deny';
+    return picked?.v ?? null;
   };
 
   for (let turn = 1; turn <= MAX_TURNS; turn++) {
@@ -297,6 +260,7 @@ async function runPrompt(opts: {
     const filter = createBlockFilter();
     let clean = '';
     let streamFailed: unknown = null;
+    console.log('');
     try {
       for await (const chunk of aiStream({
         provider: upstream.provider,
@@ -311,10 +275,10 @@ async function runPrompt(opts: {
           const visible = filter.push(chunk.delta);
           if (visible) {
             clean += visible;
-            process.stdout.write(visible);
+            process.stdout.write(p.text(visible));
           }
         } else if (chunk.type === 'thinking_delta') {
-          if (chunk.delta) process.stdout.write(c.gray(chunk.delta));
+          if (chunk.delta) process.stdout.write(p.dim(chunk.delta));
         } else if (chunk.type === 'done') {
           break;
         }
@@ -332,11 +296,11 @@ async function runPrompt(opts: {
           await store.append(sessionId, { role: 'assistant', content: clean, timestamp: new Date().toISOString() }).catch(() => {});
         }
         process.stdout.write('\n');
-        console.log(c.yellow('[aborted]'));
+        console.log(p.warn('[aborted]'));
         return { inputChars, outputChars: outputChars + clean.length, turns: turn, aborted: true };
       }
       const reason = streamFailed instanceof Error ? streamFailed.message : String(streamFailed);
-      console.log(`\n${c.red('[run failed]')} ${reason.slice(0, 300)}`);
+      console.log(`\n${p.err('[run failed]')} ${reason.slice(0, 300)}`);
       await store
         .append(sessionId, { role: 'assistant', content: `[run failed: ${reason.slice(0, 300)}]`, timestamp: new Date().toISOString() })
         .catch(() => {});
@@ -346,10 +310,10 @@ async function runPrompt(opts: {
     const end = filter.finish();
     if (end.tail) {
       clean += end.tail;
-      process.stdout.write(end.tail);
+      process.stdout.write(p.text(end.tail));
     }
     if (turn === 1 && !clean.trim() && end.toolCalls.length === 0 && end.asks.length === 0) {
-      console.log(`\n${c.red('[run failed]')} model returned an empty response — please retry the prompt`);
+      console.log(`\n${p.err('[run failed]')} model returned an empty response — please retry the prompt`);
       return { inputChars, outputChars, turns: turn, aborted: false };
     }
     outputChars += clean.length;
@@ -364,18 +328,19 @@ async function runPrompt(opts: {
       const callId = mintCallId();
       if (!call.tool || call.input === undefined) {
         const message = !call.tool ? 'Model emitted a <tool> block without a name' : `Model emitted invalid tool JSON: ${call.parseError ?? 'parse error'}`;
-        console.log(`\n${c.red('✗')} ${c.dim(message)}`);
+        console.log(`\n${p.err(`${p.symbols.fail} ${call.tool || 'unknown'}`)} ${p.muted(message)}`);
         followUps.push(`<tool_result tool="${call.tool || 'unknown'}" id="${callId}">ERROR bad_tool_block: ${message}</tool_result>`);
         continue;
       }
-      console.log(`\n${c.cyan('◌')} ${c.bold(call.tool)} ${c.dim(JSON.stringify(call.input).slice(0, 200))}`);
+      const argPreview = JSON.stringify(call.input);
+      console.log(`\n${p.primary(p.symbols.dot)} ${p.bold(call.tool)} ${p.muted(argPreview.length > 160 ? argPreview.slice(0, 160) + '…' : argPreview)}`);
       const outcome = await executeToolCall(registry, { tool: call.tool, input: call.input, permissions, callId });
       if (outcome.outcome === 'needs_approval') {
-        const decision = await askApproval(outcome.tool, outcome.description);
+        const decision = await askApproval(outcome.tool, describeToolCall(outcome.tool, call.input));
         if (decision === null) return { inputChars, outputChars, turns: turn, aborted: true };
         if (decision === 'deny') {
           const message = `Denied by user: ${outcome.tool}`;
-          console.log(`${c.red('✗')} denied`);
+          console.log(`  ${p.err(`${p.symbols.fail} denied`)}`);
           await store
             .append(sessionId, { role: 'tool', content: JSON.stringify({ callId, ok: false, code: 'denied', message }), timestamp: new Date().toISOString(), toolCallId: callId, toolName: outcome.tool })
             .catch(() => {});
@@ -386,18 +351,19 @@ async function runPrompt(opts: {
             if (!allow.includes(outcome.tool)) {
               allow.push(outcome.tool);
               await saveGlobal({ permissions: { allow, deny: permissions?.deny ?? [], defaultMode: permissions?.defaultMode ?? 'auto' } }).catch(() => {});
-              console.log(c.gray('  remembered: always allow ' + outcome.tool));
+              console.log(p.muted('  remembered: always allow ' + outcome.tool));
             }
           }
           const ran = await runApprovedCall(registry, { tool: outcome.tool, input: call.input, callId });
           if (ran.outcome === 'ok') {
-            console.log(`${c.green('✓')} ${c.dim(JSON.stringify(ran.result).slice(0, 300))}`);
+            const preview = JSON.stringify(ran.result);
+            console.log(`  ${p.ok(`${p.symbols.ok}`)} ${p.muted(preview.length > 240 ? preview.slice(0, 240) + '…' : preview)}`);
             await store
               .append(sessionId, { role: 'tool', content: JSON.stringify({ callId, ok: true, result: ran.result }), timestamp: new Date().toISOString(), toolCallId: callId, toolName: outcome.tool })
               .catch(() => {});
             followUps.push(`<tool_result tool="${outcome.tool}" id="${callId}">${JSON.stringify(ran.result)}</tool_result>`);
           } else {
-            console.log(`${c.red('✗')} ${ran.code}: ${ran.message}`);
+            console.log(`  ${p.err(`${p.symbols.fail} ${ran.code}`)} ${p.muted(ran.message.slice(0, 200))}`);
             await store
               .append(sessionId, { role: 'tool', content: JSON.stringify({ callId, ok: false, code: ran.code, message: ran.message }), timestamp: new Date().toISOString(), toolCallId: callId, toolName: outcome.tool })
               .catch(() => {});
@@ -406,19 +372,20 @@ async function runPrompt(opts: {
         }
       } else if (outcome.outcome === 'denied') {
         const message = `Denied by permissions: ${outcome.tool}`;
-        console.log(`${c.red('✗')} denied by permissions`);
+        console.log(`  ${p.err(`${p.symbols.fail} denied by permissions`)}`);
         await store
           .append(sessionId, { role: 'tool', content: JSON.stringify({ callId, ok: false, code: 'denied', message }), timestamp: new Date().toISOString(), toolCallId: callId, toolName: outcome.tool })
           .catch(() => {});
         followUps.push(`<tool_result tool="${outcome.tool}" id="${callId}">ERROR denied: ${message}</tool_result>`);
       } else if (outcome.outcome === 'ok') {
-        console.log(`${c.green('✓')} ${c.dim(JSON.stringify(outcome.result).slice(0, 300))}`);
+        const preview = JSON.stringify(outcome.result);
+        console.log(`  ${p.ok(`${p.symbols.ok}`)} ${p.muted(preview.length > 240 ? preview.slice(0, 240) + '…' : preview)}`);
         await store
           .append(sessionId, { role: 'tool', content: JSON.stringify({ callId, ok: true, result: outcome.result }), timestamp: new Date().toISOString(), toolCallId: callId, toolName: call.tool })
           .catch(() => {});
         followUps.push(`<tool_result tool="${call.tool}" id="${callId}">${JSON.stringify(outcome.result)}</tool_result>`);
       } else {
-        console.log(`${c.red('✗')} ${outcome.code}: ${outcome.message}`);
+        console.log(`  ${p.err(`${p.symbols.fail} ${outcome.code}`)} ${p.muted(outcome.message.slice(0, 200))}`);
         await store
           .append(sessionId, { role: 'tool', content: JSON.stringify({ callId, ok: false, code: outcome.code, message: outcome.message }), timestamp: new Date().toISOString(), toolCallId: callId, toolName: call.tool })
           .catch(() => {});
@@ -450,52 +417,86 @@ async function runPrompt(opts: {
     messages.push({ role: 'user', content: followUp });
   }
 
-  console.log(c.yellow(`\n[paused after ${MAX_TURNS} tool turns with work still queued — say "continue"]`));
+  console.log(p.warn(`\n[paused after ${MAX_TURNS} tool turns with work still queued — say "continue"]`));
   return { inputChars, outputChars, turns: MAX_TURNS, aborted: false };
 }
 
-// ── REPL ─────────────────────────────────────────────────────────────────────
+// ── Slash commands ───────────────────────────────────────────────────────────
 
-function printTuiHelp(): void {
-  console.log(`
-${c.bold('lokma tui')} — terminal agent chat (same harness as the Web UI)
+type SlashDef = { name: string; hint: string; desc: string };
 
-${c.bold('Slash commands:')}
-  /model [id]     show or switch model (e.g. /model openai/gpt-4o)
-  /provider       show resolved provider, base URL, key status
-  /session        show current session id
-  /new            start a fresh session
-  /resume <id>    switch to a saved session (same files as Web)
-  /list           list sessions for this project
-  /usage          session token/cost totals
-  /doctor         run the 8 subsystem checks
-  /clear          clear the screen
-  /help           this help
-  /quit           exit (Ctrl+C aborts the running turn, twice exits)
+const SLASH_COMMANDS: SlashDef[] = [
+  { name: '/model', hint: '[id]', desc: 'Show or switch model (live catalog picker)' },
+  { name: '/models', hint: '[on|off <id>|refresh]', desc: 'Refresh + enable/disable models' },
+  { name: '/providers', hint: '[on|off|test|add|rm …]', desc: 'Multi-provider management (Web Providers twin)' },
+  { name: '/login', hint: '[provider]', desc: 'Log in: API key (verified) or OAuth device flow' },
+  { name: '/logout', hint: '<provider>', desc: 'Remove stored credential' },
+  { name: '/theme', hint: '[id]', desc: 'List or switch theme (omp/claude/midnight/paper)' },
+  { name: '/status', hint: '', desc: 'Version, model, account, connection, git' },
+  { name: '/cost', hint: '', desc: 'Session token/cost totals (alias: /usage)' },
+  { name: '/context', hint: '', desc: 'Transcript size vs history window' },
+  { name: '/compact', hint: '', desc: 'Compact transcript (hygiene + summary tiers)' },
+  { name: '/export', hint: '[file]', desc: 'Export transcript to markdown' },
+  { name: '/permissions', hint: '[mode|allow|deny …]', desc: 'Show/edit tool permission rules' },
+  { name: '/session', hint: '', desc: 'Show current session id' },
+  { name: '/new', hint: '', desc: 'Start a fresh session (alias: /reset, /clear)' },
+  { name: '/resume', hint: '<id> (alias: /continue)', desc: 'Switch to a saved session' },
+  { name: '/list', hint: '', desc: 'List sessions for this project' },
+  { name: '/doctor', hint: '', desc: 'Run the 8 subsystem checks' },
+  { name: '/config', hint: '', desc: 'Show effective config (alias: /settings)' },
+  { name: '/help', hint: '', desc: 'This help' },
+  { name: '/quit', hint: '', desc: 'Exit (alias: /exit, /q)' },
+];
 
-${c.bold('Tips:')} @path/to/file adds file context · write tools ask approval (allow/deny/always)
-`);
+function printSlashHelp(p: Paint): void {
+  const rows = SLASH_COMMANDS.map((c) => `  ${p.info(c.name.padEnd(13))} ${p.muted(c.hint.padEnd(22))} ${c.desc}`);
+  console.log(`\n${p.box(rows, 'lokma tui — slash commands', p.primary)}`);
+  console.log(p.muted('\nTips: Tab completes commands · @path adds file context · Ctrl+C aborts the running turn.'));
 }
 
 function newSessionId(): string {
   return `tui-${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`;
 }
 
+async function gitSegment(cwd: string): Promise<string> {
+  try {
+    const st = await new RepoGit(cwd).status();
+    if (!st.repo) return '';
+    const dirty = st.counts.changed + st.counts.unstaged + st.counts.staged;
+    return `${st.branch}${dirty > 0 ? `*${dirty}` : ''}`;
+  } catch {
+    return '';
+  }
+}
+
+function shortCwd(cwd: string): string {
+  const home = process.env.USERPROFILE ?? process.env.HOME ?? '';
+  if (home && cwd.startsWith(home)) return '~' + cwd.slice(home.length);
+  const parts = cwd.split(/[/\\]/).filter(Boolean);
+  return parts.length > 3 ? '…/' + parts.slice(-3).join('/') : cwd;
+}
+
 export async function runTui(opts: TuiOpts): Promise<void> {
   const cwd = resolve(opts.cwd ?? process.cwd());
   const store = new SessionStore(cwd);
-  const cfg = await loadConfig(cwd).catch(() => null);
+  let cfg = await loadConfig(cwd).catch(() => null);
+  let p = createPaint(cfg?.theme ?? 'omp');
 
   let model = canonicalModelId(opts.model?.trim() || cfg?.defaultModel || 'anthropic/claude-sonnet-4-5');
+  const resolveUpstreamFor = async (modelId: string): Promise<Upstream> => {
+    const base = await resolveProviderUpstream(providerOf(modelId));
+    const chatKey = await resolveChatKey(providerOf(modelId));
+    return { ...base, apiKey: chatKey };
+  };
   let upstream: Upstream;
   try {
-    upstream = await resolveUpstream(cwd, model);
+    upstream = await resolveUpstreamFor(model);
   } catch (e) {
-    console.error(`${c.red('[lokma]')} ${e instanceof Error ? e.message : String(e)}`);
+    console.error(`${p.err('[lokma]')} ${e instanceof Error ? e.message : String(e)}`);
     process.exit(1);
   }
-  if (!upstream.apiKey && providerOf(model) !== 'ollama') {
-    console.log(c.yellow(`[lokma] no API key for '${providerOf(model)}' — set it via the Web Providers tab, ~/.lokma/credentials.json, or env.`));
+  if (!upstream.apiKey && providerNeedsKey(providerOf(model))) {
+    console.log(p.warn(`[lokma] no credential for '${providerOf(model)}' — run /login ${providerOf(model)} to authenticate.`));
   }
 
   let sessionId = opts.sessionId?.trim() || newSessionId();
@@ -503,9 +504,60 @@ export async function runTui(opts: TuiOpts): Promise<void> {
 
   let totalIn = 0;
   let totalOut = 0;
+  let sessionCache: string[] = await store.list().catch(() => []);
+  let modelCache: string[] = [];
+  let providerCache: string[] = [];
 
-  console.log(`${c.bold('◆ lokma')} ${c.dim(`tui · ${model} · session ${sessionId}`)}`);
-  console.log(c.dim('Type /help for commands, /quit to exit. @file adds context.\n'));
+  const refreshModelCache = async (): Promise<void> => {
+    try {
+      modelCache = (await getMergedCatalogTui()).filter((m) => m.enabled).map((m) => m.id);
+    } catch {
+      modelCache = [];
+    }
+    try {
+      providerCache = (await listProviderViews()).map((v) => v.id);
+    } catch {
+      providerCache = [];
+    }
+  };
+  await refreshModelCache();
+
+  const usageLine = (inChars: number, outChars: number): string => {
+    const inTok = estimateTokens(inChars);
+    const outTok = estimateTokens(outChars);
+    const { costUsd, priced } = estimateCost(model, inTok, outTok);
+    return `${inTok} in / ${outTok} out · ${priced ? `$${costUsd.toFixed(4)}` : 'unpriced'}`;
+  };
+
+  const statusLine = async (): Promise<void> => {
+    const git = await gitSegment(cwd);
+    console.log(
+      p.status([
+        `${p.primary(p.symbols.diamond)} ${p.bold(model)}`,
+        p.muted(shortCwd(cwd)),
+        git ? p.info(git) : '',
+        p.muted(usageLine(totalIn, totalOut)),
+      ]),
+    );
+  };
+
+  const showWelcome = (): void => {
+    console.log(
+      p.box(
+        [
+          `${p.bold(`◆ lokma v${VERSION}`)}  ${p.muted('terminal harness — Claude-Code UX, OMP theme')}`,
+          ``,
+          `  model    ${p.primary(model)}${upstream.apiKey ? '' : p.warn('  (no credential — /login)')}`,
+          `  session  ${p.muted(sessionId)}`,
+          `  cwd      ${p.muted(shortCwd(cwd))}`,
+          ``,
+          `  ${p.muted('Type /help for commands · /login to authenticate · /quit to exit.')}`,
+        ],
+        undefined,
+        p.primary,
+      ),
+    );
+  };
 
   // One-shot (piped/scripted) mode — no readline, approvals auto-deny honestly.
   if (opts.prompt !== undefined) {
@@ -513,13 +565,10 @@ export async function runTui(opts: TuiOpts): Promise<void> {
     const onSigint = (): void => ctrl.abort();
     process.on('SIGINT', onSigint);
     try {
-      const result = await runPrompt({ rl: null, cwd, sessionId, model, upstream, store, prompt: opts.prompt, signal: ctrl.signal });
+      const result = await runPrompt({ p, rl: null, cwd, sessionId, model, upstream, store, prompt: opts.prompt, signal: ctrl.signal });
       totalIn += result.inputChars;
       totalOut += result.outputChars;
-      const inTok = estimateTokens(totalIn);
-      const outTok = estimateTokens(totalOut);
-      const { costUsd, priced } = estimateCost(model, inTok, outTok);
-      console.log(c.dim(`\n[${inTok} in / ${outTok} out · ${priced ? `$${costUsd.toFixed(4)}` : 'unpriced'}]`));
+      console.log(p.muted(`\n[${usageLine(totalIn, totalOut)}]`));
     } finally {
       process.off('SIGINT', onSigint);
     }
@@ -531,7 +580,57 @@ export async function runTui(opts: TuiOpts): Promise<void> {
     process.exit(1);
   }
 
-  const rl: Interface = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+  showWelcome();
+
+  const completeSlash = (line: string): [string[], string] => {
+    if (line.startsWith('/')) {
+      const spaceAt = line.indexOf(' ');
+      if (spaceAt === -1) {
+        const frag = line;
+        const hits = SLASH_COMMANDS.map((c) => c.name).filter((n) => n.startsWith(frag));
+        return [hits, frag];
+      }
+      const cmd = line.slice(0, spaceAt);
+      const frag = line.slice(spaceAt + 1);
+      if (cmd === '/model' || cmd === '/models') {
+        const pool = [...modelCache, 'on ', 'off ', 'refresh'];
+        return [pool.filter((m) => m.startsWith(frag)), frag];
+      }
+      if (cmd === '/resume') return [sessionCache.filter((s) => s.startsWith(frag)), frag];
+      if (cmd === '/theme') return [listThemes().map((t) => t.id).filter((t) => t.startsWith(frag)), frag];
+      if (cmd === '/login' || cmd === '/logout') {
+        return [providerCache.filter((id) => id.startsWith(frag)), frag];
+      }
+      if (cmd === '/providers') {
+        const pool = ['on ', 'off ', 'test ', 'add ', 'rm ', ...providerCache];
+        return [pool.filter((s) => s.startsWith(frag)), frag];
+      }
+      return [[], frag];
+    }
+    const atAt = line.lastIndexOf('@');
+    if (atAt >= 0) {
+      const frag = line.slice(atAt + 1);
+      const dirPart = frag.includes('/') ? frag.slice(0, frag.lastIndexOf('/') + 1) : '';
+      try {
+        const dir = resolve(cwd, dirPart || '.');
+        const names = readdirSync(dir, { withFileTypes: true })
+          .map((e) => (e.isDirectory() ? e.name + '/' : e.name))
+          .filter((n) => n.startsWith(frag.slice(dirPart.length)))
+          .map((n) => '@' + dirPart + n);
+        return [names, '@' + frag];
+      } catch {
+        return [[], line];
+      }
+    }
+    return [[], line];
+  };
+
+  const rl: Interface = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    terminal: true,
+    completer: completeSlash,
+  });
   let turnCtrl: AbortController | null = null;
   let lastSigint = 0;
   rl.on('SIGINT', () => {
@@ -541,26 +640,30 @@ export async function runTui(opts: TuiOpts): Promise<void> {
     }
     const now = Date.now();
     if (now - lastSigint < 1500) {
-      console.log(c.dim('\nbye.'));
+      console.log(p.muted('\nbye.'));
       rl.close();
       process.exit(0);
     }
     lastSigint = now;
-    console.log(c.dim('\n(press Ctrl+C again to exit)'));
+    console.log(p.muted('\n(press Ctrl+C again to exit)'));
     rl.prompt(true);
   });
 
-  const showUsage = (): void => {
-    const inTok = estimateTokens(totalIn);
-    const outTok = estimateTokens(totalOut);
-    const { costUsd, priced } = estimateCost(model, inTok, outTok);
-    console.log(c.dim(`session usage: ~${inTok} in / ~${outTok} out · ${priced ? `~$${costUsd.toFixed(4)}` : 'unpriced model'}`));
+  const recordUsage = async (inChars: number, outChars: number): Promise<void> => {
+    try {
+      const inTok = estimateTokens(inChars);
+      const outTok = estimateTokens(outChars);
+      const { costUsd, priced } = estimateCost(model, inTok, outTok);
+      await new UsageLedger(cwd).record({ sessionId, provider: providerOf(model), model, inputTokens: inTok, outputTokens: outTok, costUsd, priced });
+    } catch {
+      // Accounting must never break chat.
+    }
   };
 
   for (;;) {
     let line: string | null;
     try {
-      line = await rl.question(c.bold('› '));
+      line = await rl.question(p.primary('> '));
     } catch {
       break; // closed
     }
@@ -569,110 +672,313 @@ export async function runTui(opts: TuiOpts): Promise<void> {
 
     // ── Slash commands ──
     if (input.startsWith('/')) {
-      const [cmd, ...rest] = input.slice(1).split(/\s+/);
+      const [rawCmd, ...rest] = input.slice(1).split(/\s+/);
+      const cmd = (rawCmd ?? '').toLowerCase();
       const arg = rest.join(' ').trim();
-      switch (cmd) {
-        case 'help':
-          printTuiHelp();
-          continue;
-        case 'quit':
-        case 'exit':
-        case 'q':
-          console.log(c.dim('bye.'));
-          rl.close();
-          return;
-        case 'clear':
-          console.clear();
-          continue;
-        case 'model':
-          if (!arg) {
-            console.log(`  model: ${c.bold(model)}`);
-          } else {
-            model = canonicalModelId(arg);
-            try {
-              upstream = await resolveUpstream(cwd, model);
-            } catch (e) {
-              console.log(`${c.red('[model]')} ${e instanceof Error ? e.message : String(e)}`);
-              continue;
-            }
+      try {
+        switch (cmd) {
+          case 'help':
+            printSlashHelp(p);
+            continue;
+          case 'quit':
+          case 'exit':
+          case 'q':
+            console.log(p.muted('bye.'));
+            rl.close();
+            return;
+          case 'clear':
+          case 'reset':
+          case 'new': {
+            sessionId = newSessionId();
+            totalIn = 0;
+            totalOut = 0;
             await store.writeMeta(sessionId, { model }).catch(() => {});
-            console.log(`  model → ${c.bold(model)}`);
-          }
-          continue;
-        case 'provider': {
-          const pid = providerOf(model);
-          const key = await resolveApiKey(pid);
-          console.log(`  provider: ${c.bold(pid)}`);
-          console.log(`  baseUrl:  ${upstream.baseUrl}`);
-          console.log(`  key:      ${key ? `set (…${key.slice(-4)})` : c.yellow('missing')}`);
-          continue;
-        }
-        case 'session':
-          console.log(`  session: ${sessionId}`);
-          continue;
-        case 'new':
-          sessionId = newSessionId();
-          totalIn = 0;
-          totalOut = 0;
-          await store.writeMeta(sessionId, { model }).catch(() => {});
-          console.log(`  new session: ${sessionId}`);
-          continue;
-        case 'resume': {
-          if (!arg) {
-            console.log('  usage: /resume <session-id>');
+            sessionCache = await store.list().catch(() => []);
+            console.log(p.muted(`  new session: ${sessionId}`));
             continue;
           }
-          const messages = await store.read(arg).catch(() => []);
-          if (messages.length === 0) {
-            const meta = await store.readMeta(arg).catch(() => null);
-            if (!meta) {
-              console.log(`  ${c.red('unknown session:')} ${arg}`);
+          case 'model': {
+            if (!arg) {
+              const enabled = modelCache.filter((m) => m.startsWith(providerOf(model) + '/')).slice(0, 20);
+              console.log(`  model: ${p.bold(model)}`);
+              if (enabled.length > 0) {
+                console.log(p.muted('  enabled for this provider:'));
+                enabled.forEach((m, i) => console.log(`    ${p.info(String(i + 1))}) ${m}`));
+                console.log(p.muted('  /model <number|id> to switch'));
+              } else {
+                console.log(p.muted('  (catalog empty — /models refresh to probe providers)'));
+              }
               continue;
             }
-          }
-          sessionId = arg;
-          totalIn = 0;
-          totalOut = 0;
-          const meta = await store.readMeta(sessionId).catch(() => null);
-          if (meta?.model) {
-            model = canonicalModelId(meta.model);
-            try {
-              upstream = await resolveUpstream(cwd, model);
-            } catch {
-              // Keep the previous upstream; the run will fail honestly.
-            }
-          }
-          console.log(`  resumed: ${sessionId} (${messages.length} messages)`);
-          continue;
-        }
-        case 'list': {
-          const ids = await store.list().catch(() => []);
-          if (ids.length === 0) {
-            console.log('  no sessions for this project yet');
+            const n = Number(arg);
+            const picked = Number.isInteger(n) && n >= 1 ? modelCache.filter((m) => m.startsWith(providerOf(model) + '/'))[n - 1] : undefined;
+            const next = canonicalModelId(picked ?? arg);
+            const nextUpstream = await resolveUpstreamFor(next);
+            model = next;
+            upstream = nextUpstream;
+            await store.writeMeta(sessionId, { model }).catch(() => {});
+            console.log(`  model → ${p.bold(model)}${upstream.apiKey ? '' : p.warn('  (no credential — /login)')}`);
             continue;
           }
-          for (const id of ids.slice(-20)) {
-            const mark = id === sessionId ? c.green('* ') : '  ';
-            console.log(`${mark}${id}`);
+          case 'models': {
+            const parts = arg.split(/\s+/).filter(Boolean);
+            if (parts[0] === 'refresh' || parts.length === 0) {
+              console.log(p.muted('  refreshing catalog (live probes, ~6s each)…'));
+              const { invalidateCatalog } = await import('lokma-ai');
+              invalidateCatalog();
+              await refreshModelCache();
+            }
+            if (parts[0] === 'on' || parts[0] === 'off') {
+              const id = canonicalModelId(parts.slice(1).join(' '));
+              if (!id) {
+                console.log('  usage: /models on|off <id>');
+                continue;
+              }
+              await setModelEnabled(id, parts[0] === 'on');
+              await refreshModelCache();
+              console.log(`  ${id} → ${parts[0] === 'on' ? p.ok('enabled') : p.muted('disabled')}`);
+              continue;
+            }
+            const catalog = await getMergedCatalogTui();
+            const mine = catalog.filter((m) => m.provider === providerOf(model));
+            console.log(`  ${p.bold('models')} ${p.muted(`(${catalog.length} total, ${catalog.filter((m) => m.enabled).length} enabled)`)}`);
+            for (const m of mine.slice(0, 30)) {
+              const mark = m.id === model ? p.primary('→ ') : '  ';
+              const state = m.enabled ? '' : p.muted(' [off]');
+              console.log(`${mark}${m.id}${state}`);
+            }
+            if (mine.length > 30) console.log(p.muted(`  … +${mine.length - 30} more for this provider`));
+            continue;
           }
-          continue;
+          case 'providers': {
+            const parts = arg.split(/\s+/).filter(Boolean);
+            const sub = (parts[0] ?? '').toLowerCase();
+            if (!sub) {
+              console.log(await renderProviderTable(p));
+              continue;
+            }
+            if ((sub === 'on' || sub === 'off') && parts[1]) {
+              const updated = await setProviderEnabled(parts[1], sub === 'on');
+              console.log(`  ${updated.id} → ${updated.enabled ? p.ok('enabled') : p.muted('disabled')}`);
+              await refreshModelCache();
+              continue;
+            }
+            if (sub === 'test' && parts[1]) {
+              console.log(p.muted(`  probing ${parts[1]}…`));
+              const res = await testProvider(parts[1]);
+              console.log(res.ok ? `  ${p.ok('ok')} ${res.detail}` : `  ${p.err('fail')} ${res.detail}`);
+              continue;
+            }
+            if (sub === 'add') {
+              const [id, name, baseUrl] = parts.slice(1);
+              if (!id || !name || !baseUrl) {
+                console.log('  usage: /providers add <id> <name> <baseUrl>');
+                continue;
+              }
+              const key = await hiddenInput(rl, p.muted('  api key (empty to skip): '));
+              const created = await addCustomProvider({ id, name, baseUrl, apiKey: key?.trim() ? key.trim() : undefined });
+              console.log(`  ${p.ok('added')} ${created.id} → ${created.baseUrl}`);
+              await refreshModelCache();
+              continue;
+            }
+            if ((sub === 'rm' || sub === 'remove') && parts[1]) {
+              await removeCustomProvider(parts[1]);
+              console.log(`  ${p.muted('removed')} ${parts[1]}`);
+              await refreshModelCache();
+              continue;
+            }
+            console.log('  usage: /providers [on|off|test <id> | add <id> <name> <baseUrl> | rm <id>]');
+            continue;
+          }
+          case 'login': {
+            const res = await loginFlow(rl, p, arg || undefined);
+            upstream = await resolveUpstreamFor(model);
+            console.log(`\n  ${p.ok(`${p.symbols.ok} logged in`)} ${p.bold(res.providerId)} ${p.muted(`(${res.via === 'oauth' ? 'OAuth' : 'API key'} · ${res.detail})`)}`);
+            continue;
+          }
+          case 'logout': {
+            console.log(`  ${await logoutFlow(arg || undefined)}`);
+            upstream = await resolveUpstreamFor(model).catch(() => upstream);
+            continue;
+          }
+          case 'theme': {
+            if (!arg) {
+              console.log(`  theme: ${p.bold(cfg?.theme ?? 'omp')}`);
+              for (const t of listThemes()) console.log(`    ${p.info(t.id)} — ${t.label}`);
+              continue;
+            }
+            const found = listThemes().find((t) => t.id === arg);
+            if (!found) {
+              console.log(`  unknown theme: ${arg} (${listThemes().map((t) => t.id).join(', ')})`);
+              continue;
+            }
+            await saveGlobal({ theme: found.id as 'omp' | 'claude' | 'midnight' | 'paper' });
+            cfg = await loadConfig(cwd).catch(() => cfg);
+            p = createPaint(found.id);
+            console.log(`  theme → ${p.bold(found.id)} ${p.muted(found.label)}`);
+            continue;
+          }
+          case 'status': {
+            const git = await gitSegment(cwd);
+            const views = await listProviderViews();
+            const view = views.find((v) => v.id === providerOf(model));
+            const msgs = await store.read(sessionId).catch(() => []);
+            console.log(
+              p.box(
+                [
+                  `lokma v${VERSION} · ${p.bold(model)}`,
+                  `provider  ${view ? `${view.name} (${view.enabled ? p.ok('on') : p.err('off')})` : p.err('unknown')} · ${upstream.apiKey ? p.ok('credential set') : p.warn('no credential')}`,
+                  `session   ${p.muted(sessionId)} · ${msgs.length} messages`,
+                  `cwd       ${p.muted(shortCwd(cwd))}${git ? ` · ${p.info(git)}` : ''}`,
+                  `theme     ${cfg?.theme ?? 'omp'} · usage ${usageLine(totalIn, totalOut)}`,
+                ],
+                'status',
+                p.primary,
+              ),
+            );
+            continue;
+          }
+          case 'cost':
+          case 'usage': {
+            console.log(p.muted(`  session usage: ~${usageLine(totalIn, totalOut)}`));
+            continue;
+          }
+          case 'context': {
+            const msgs = await store.read(sessionId).catch(() => []);
+            const chars = transcriptChars(msgs);
+            console.log(
+              `  transcript: ${msgs.length} messages · ~${chars.toLocaleString()} chars (~${estimateTokens(chars).toLocaleString()} tokens) · window 30 msgs / 48k chars`,
+            );
+            continue;
+          }
+          case 'compact': {
+            console.log(p.muted('  compacting transcript…'));
+            try {
+              const before = await compactionStatus(cwd, sessionId);
+              const report = await compactSession(cwd, sessionId, { mode: 'full' });
+              console.log(
+                report.compacted
+                  ? `  ${p.ok('compacted')}: ${before.messages} → ${report.afterMessages} msgs · ${before.chars.toLocaleString()} → ${report.afterChars.toLocaleString()} chars`
+                  : `  ${p.muted('below thresholds — nothing to compact')}`,
+              );
+            } catch (e) {
+              console.log(`  ${p.err('compact failed:')} ${e instanceof Error ? e.message : String(e)}`);
+            }
+            continue;
+          }
+          case 'export': {
+            const msgs = await store.read(sessionId).catch(() => []);
+            const file = arg || `session-${sessionId}.md`;
+            const abs = resolve(cwd, file);
+            if (resolveInRoot(resolve(cwd), file) !== abs) {
+              console.log(`  ${p.err('refusing path outside workspace')}`);
+              continue;
+            }
+            const md = [`# lokma session ${sessionId}`, ``, `model: ${model} · exported ${new Date().toISOString()}`, ``];
+            for (const m of msgs) {
+              const who = m.role === 'user' ? 'user' : m.role === 'assistant' ? 'assistant' : `tool:${m.toolName ?? '?'}`;
+              md.push(`## ${who}`, ``, m.content, ``);
+            }
+            await writeFile(abs, md.join('\n'), 'utf-8');
+            console.log(`  ${p.ok('exported')} ${msgs.length} messages → ${file}`);
+            continue;
+          }
+          case 'permissions':
+          case 'allowed-tools': {
+            const parts = arg.split(/\s+/).filter(Boolean);
+            const live = await loadConfig(cwd).catch(() => null);
+            const perms = live?.permissions ?? { allow: [], deny: [], defaultMode: 'auto' as const };
+            if (parts.length === 0) {
+              console.log(`  mode: ${p.bold(perms.defaultMode)} · allow: [${perms.allow.join(', ') || '—'}] · deny: [${perms.deny.join(', ') || '—'}]`);
+              console.log(p.muted('  /permissions mode <auto|manual|plan|acceptEdits|bypass> · allow|deny|unallow|undeny <tool>'));
+              continue;
+            }
+            if (parts[0] === 'mode' && parts[1]) {
+              const modes = ['auto', 'manual', 'plan', 'acceptEdits', 'bypass'] as const;
+              if (!(modes as readonly string[]).includes(parts[1])) {
+                console.log(`  unknown mode: ${parts[1]}`);
+                continue;
+              }
+              await saveGlobal({ permissions: { ...perms, defaultMode: parts[1] as (typeof modes)[number] } });
+              console.log(`  defaultMode → ${p.bold(parts[1])}`);
+              continue;
+            }
+            if ((parts[0] === 'allow' || parts[0] === 'deny') && parts[1]) {
+              const key = parts[0] as 'allow' | 'deny';
+              const list = [...perms[key]];
+              if (!list.includes(parts[1])) list.push(parts[1]);
+              await saveGlobal({ permissions: { ...perms, [key]: list } });
+              console.log(`  ${key} +${parts[1]}`);
+              continue;
+            }
+            if ((parts[0] === 'unallow' || parts[0] === 'undeny') && parts[1]) {
+              const key = parts[0] === 'unallow' ? 'allow' : 'deny';
+              await saveGlobal({ permissions: { ...perms, [key]: perms[key].filter((t) => t !== parts[1]) } });
+              console.log(`  ${key} −${parts[1]}`);
+              continue;
+            }
+            console.log('  usage: /permissions [mode <m> | allow|deny|unallow|undeny <tool>]');
+            continue;
+          }
+          case 'session':
+            console.log(`  session: ${sessionId}`);
+            continue;
+          case 'resume':
+          case 'continue': {
+            if (!arg) {
+              console.log('  usage: /resume <session-id>');
+              continue;
+            }
+            const messages = await store.read(arg).catch(() => []);
+            const meta = await store.readMeta(arg).catch(() => null);
+            if (messages.length === 0 && !meta) {
+              console.log(`  ${p.err('unknown session:')} ${arg}`);
+              continue;
+            }
+            sessionId = arg;
+            totalIn = 0;
+            totalOut = 0;
+            if (meta?.model) {
+              model = canonicalModelId(meta.model);
+              try {
+                upstream = await resolveUpstreamFor(model);
+              } catch {
+                // Keep the previous upstream; the run will fail honestly.
+              }
+            }
+            console.log(`  resumed: ${sessionId} (${messages.length} messages)`);
+            continue;
+          }
+          case 'list': {
+            sessionCache = await store.list().catch(() => []);
+            if (sessionCache.length === 0) {
+              console.log('  no sessions for this project yet');
+              continue;
+            }
+            for (const id of sessionCache.slice(-20)) {
+              const mark = id === sessionId ? p.primary('* ') : '  ';
+              console.log(`${mark}${id}`);
+            }
+            continue;
+          }
+          case 'doctor': {
+            const { runDoctor } = await import('./doctor.js');
+            await runDoctor();
+            continue;
+          }
+          case 'config':
+          case 'settings': {
+            const live = await loadConfig(cwd).catch(() => null);
+            console.log(JSON.stringify({ model, theme: live?.theme, defaultMode: live?.permissions.defaultMode }, null, 2));
+            continue;
+          }
+          default:
+            console.log(`  unknown command /${cmd} — try /help`);
+            continue;
         }
-        case 'usage':
-          showUsage();
-          continue;
-        case 'doctor': {
-          const { runDoctor } = await import('./doctor.js');
-          await runDoctor();
-          continue;
-        }
-        case 'config': {
-          const live = await loadConfig(cwd).catch(() => null);
-          console.log(JSON.stringify({ model, theme: live?.theme, defaultMode: live?.permissions.defaultMode }, null, 2));
-          continue;
-        }
-        default:
-          console.log(`  unknown command /${cmd} — try /help`);
-          continue;
+      } catch (e) {
+        console.log(`  ${p.err('error:')} ${e instanceof Error ? e.message : String(e)}`);
+        continue;
       }
     }
 
@@ -680,35 +986,19 @@ export async function runTui(opts: TuiOpts): Promise<void> {
     turnCtrl = new AbortController();
     try {
       const meta = await store.readMeta(sessionId).catch(() => null);
-      if (!meta) await store.writeMeta(sessionId, { model }).catch(() => {});
-      else if (!meta.model) await store.writeMeta(sessionId, { model }).catch(() => {});
-      else {
+      if (!meta || !meta.model) {
+        await store.writeMeta(sessionId, { model }).catch(() => {});
+      } else {
         const existing = await store.read(sessionId).catch(() => []);
         if (existing.length === 0) await store.writeMeta(sessionId, { title: input.slice(0, 60) }).catch(() => {});
       }
-      const result = await runPrompt({ rl, cwd, sessionId, model, upstream, store, prompt: input, signal: turnCtrl.signal });
+      const result = await runPrompt({ p, rl, cwd, sessionId, model, upstream, store, prompt: input, signal: turnCtrl.signal });
       totalIn += result.inputChars;
       totalOut += result.outputChars;
-      const inTok = estimateTokens(result.inputChars);
-      const outTok = estimateTokens(result.outputChars);
-      const { costUsd, priced } = estimateCost(model, inTok, outTok);
-      console.log(c.dim(`\n[${inTok} in / ${outTok} out · ${priced ? `$${costUsd.toFixed(4)}` : 'unpriced'} · turn ${result.turns}]`));
-      try {
-        await new UsageLedger(cwd).record({
-          sessionId,
-          provider: providerOf(model),
-          model,
-          inputTokens: inTok,
-          outputTokens: outTok,
-          costUsd,
-          priced,
-        });
-      } catch {
-        // Accounting must never break chat.
-      }
+      await recordUsage(result.inputChars, result.outputChars);
+      await statusLine();
     } catch (e) {
-      if (e instanceof TurnAborted) console.log(c.yellow('\n[aborted]'));
-      else console.log(`\n${c.red('[error]')} ${e instanceof Error ? e.message : String(e)}`);
+      console.log(`\n${p.err('[error]')} ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       turnCtrl = null;
     }

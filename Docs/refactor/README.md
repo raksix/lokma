@@ -107,3 +107,4 @@
 - [REQ-086](finished/REQ-086-terminal-cift-yazma.md) — Terminal çift yazma dedup — done
 - [REQ-087](finished/REQ-087-yeni-projede-session.md) — Yeni projede session açılmıyor / yanlış projede — done
 - [REQ-088](finished/REQ-088-modal-otomatik-doldurma.md) — Modalda alanlar birbirini otomatik doldursun — done
+- [REQ-089](REQ-089-pane-fullscreen-modal.md) — Pane fullscreen: header butonu + modal + split — pending

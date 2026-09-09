@@ -1,6 +1,8 @@
 import * as React from 'react';
 import {
   Check,
+  ChevronDown,
+  ChevronRight,
   Clock,
   Columns2,
   FolderPlus,
@@ -43,6 +45,9 @@ import {
  */
 
 const RENDER_CAP = 120;
+
+/** Collapsed project groups show the 5 most recent sessions (REQ-078). */
+const PROJECT_COLLAPSED_COUNT = 5;
 
 type RowAction = 'rename' | 'merge' | 'delete-confirm' | null;
 
@@ -385,6 +390,197 @@ function DeleteConfirmButtons({ sessionId, onDone }: { sessionId: string; onDone
   );
 }
 
+/**
+ * ProjectGroup (REQ-078) — one cwd group in "By project" mode. Collapsed
+ * shows the 5 most recent sessions; the name toggles expand (all sessions).
+ * Far right `+` opens a new session in the project's cwd; `...` left of it
+ * holds project actions (new session here, copy cwd, delete ALL sessions in
+ * this project with confirm). NOTE: a group is a cwd grouping, NOT an
+ * AuthProject entity — the menu never deletes project entities.
+ */
+function ProjectGroup({
+  label,
+  items,
+  expanded,
+  activeId,
+  openAction,
+  sessions,
+  onToggle,
+  onNewSession,
+  onDeleteProject,
+  rowProps,
+}: {
+  label: string;
+  items: SessionSummary[];
+  expanded: boolean;
+  activeId: string;
+  openAction: { id: string; action: RowAction } | null;
+  sessions: SessionSummary[];
+  onToggle: () => void;
+  onNewSession: () => void;
+  onDeleteProject: () => void;
+  rowProps: (s: SessionSummary) => {
+    onAction: (a: Exclude<RowAction, null>) => void;
+    onResume: () => void;
+    onOpenAsPane: () => void;
+    onFork: () => void;
+    onSubmitRename: (title: string) => void;
+    onCancelAction: () => void;
+    onSubmitMerge: (intoId: string) => void;
+  };
+}) {
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [confirmingDelete, setConfirmingDelete] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
+  const cwd = items[0]?.cwd || '';
+  const visible = expanded ? items : items.slice(0, PROJECT_COLLAPSED_COUNT);
+  return (
+    <div>
+      <div className="px-1 py-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-400 flex items-center gap-1">
+        <button
+          className="min-w-0 flex-1 truncate text-left hover:text-terracotta flex items-center gap-0.5"
+          onClick={onToggle}
+          title={expanded ? 'Collapse — show recent 5' : `Show all ${items.length} sessions in ${label}`}
+          aria-expanded={expanded}
+        >
+          {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />} {label}
+        </button>
+        <span className="text-[10px] font-normal normal-case tracking-normal shrink-0">
+          {items.length}
+        </span>
+        <div className="relative shrink-0" ref={menuRef}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            title="Project actions"
+            onClick={() => {
+              setConfirmingDelete(false);
+              setMenuOpen((v) => !v);
+            }}
+            aria-label={`Project actions for ${label}`}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+          >
+            <MoreVertical className="w-3 h-3" />
+          </Button>
+          {menuOpen ? (
+            <div
+              role="menu"
+              aria-label={`Project actions for ${label}`}
+              className="absolute right-0 top-7 z-50 min-w-52 overflow-hidden rounded-md border border-line bg-white shadow-lg dark:bg-[#1E1E21]"
+            >
+              <button
+                role="menuitem"
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onNewSession();
+                }}
+              >
+                <Plus className="w-3 h-3 shrink-0" /> New session here
+              </button>
+              <button
+                role="menuitem"
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                onClick={() => {
+                  setMenuOpen(false);
+                  try {
+                    void navigator.clipboard.writeText(cwd);
+                    emitToast('Project path copied');
+                  } catch {
+                    emitToast('Copy failed');
+                  }
+                }}
+              >
+                <Check className="w-3 h-3 shrink-0" /> Copy project path
+              </button>
+              {confirmingDelete ? (
+                <div className="flex items-center gap-1 px-2.5 py-1.5">
+                  <span className="text-[11px] text-red-600 flex-1">Delete all {items.length}?</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-[11px]"
+                    onClick={() => setConfirmingDelete(false)}
+                  >
+                    Keep
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="h-6 text-[11px] bg-red-600 hover:bg-red-700"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setConfirmingDelete(false);
+                      onDeleteProject();
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  role="menuitem"
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                  onClick={() => setConfirmingDelete(true)}
+                >
+                  <Trash2 className="w-3 h-3 shrink-0" /> Delete all sessions…
+                </button>
+              )}
+            </div>
+          ) : null}
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 shrink-0"
+          title={`New session in ${label}`}
+          onClick={onNewSession}
+          aria-label={`New session in ${label}`}
+        >
+          <Plus className="w-3 h-3" />
+        </Button>
+      </div>
+      <div className="space-y-1">
+        {visible.map((s) => (
+          <SessionRow
+            key={s.id}
+            session={s}
+            active={s.id === activeId}
+            action={openAction?.id === s.id ? openAction.action : null}
+            mergeTargets={sessions.filter((t) => t.id !== s.id)}
+            {...rowProps(s)}
+          />
+        ))}
+      </div>
+      {!expanded && items.length > PROJECT_COLLAPSED_COUNT ? (
+        <button
+          className="mt-0.5 w-full text-center text-[11px] text-zinc-400 underline underline-offset-2 hover:text-terracotta"
+          onClick={onToggle}
+        >
+          +{items.length - PROJECT_COLLAPSED_COUNT} more
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export function SessionsSidebar({
   activeId,
   onSelect,
@@ -397,6 +593,7 @@ export function SessionsSidebar({
   const lastError = useSessionStore((s) => s.lastError);
   const refreshSessions = useSessionStore((s) => s.refreshSessions);
   const createSession = useSessionStore((s) => s.createSession);
+  const deleteSession = useSessionStore((s) => s.deleteSession);
   const forkSession = useSessionStore((s) => s.forkSession);
   const renameSession = useSessionStore((s) => s.renameSession);
   const mergeSessions = useSessionStore((s) => s.mergeSessions);
@@ -406,6 +603,10 @@ export function SessionsSidebar({
   const [openAction, setOpenAction] = React.useState<{ id: string; action: RowAction } | null>(null);
   const [showAll, setShowAll] = React.useState(false);
   const [creating, setCreating] = React.useState(false);
+  // REQ-078 — expanded project groups (key = group key). Reset with the
+  // other list state so a new search/grouping starts collapsed.
+  const [expandedProjects, setExpandedProjects] = React.useState<Set<string>>(new Set());
+  const [creatingProjectCwd, setCreatingProjectCwd] = React.useState<string | null>(null);
   // REQ-058 — visible "New Project" affordance in the Explorer header:
   // inline name + cwd + visibility form over POST /api/projects.
   const [showProjectForm, setShowProjectForm] = React.useState(false);
@@ -416,6 +617,7 @@ export function SessionsSidebar({
   React.useEffect(() => {
     setShowAll(false);
     setOpenAction(null);
+    setExpandedProjects(new Set());
   }, [query, groupBy]);
 
   const filtered = React.useMemo(() => filterSessions(sessions, query), [sessions, query]);
@@ -487,10 +689,40 @@ export function SessionsSidebar({
     [forkSession, onSelect],
   );
 
-  // REQ-005: explicit affordance that needs no drag — opens/focuses the
-  // session as a tab in the last-focused pane (tiling auto-enabled).
-  // REQ-024: mobile single-view has no pane system — the row button is
-  // hidden below the breakpoint, and this handler no-ops as a backstop.
+  // REQ-078 — new session inside a project group (same cwd as the group).
+  const handleCreateInProject = React.useCallback((cwd: string) => {
+    if (!cwd || creatingProjectCwd) return;
+    setCreatingProjectCwd(cwd);
+    void createSession({ cwd }).then((id) => {
+      setCreatingProjectCwd(null);
+      if (id) {
+        onSelect(id);
+        emitToast('New session created');
+      } else {
+        emitToast('Create failed — is the server up?');
+      }
+    });
+  }, [createSession, creatingProjectCwd, onSelect]);
+
+  // REQ-078 — delete every session in a project group (confirmed in the
+  // group menu first). Sequential so the store refresh settles per row.
+  const handleDeleteProject = React.useCallback((ids: string[]) => {
+    if (ids.length === 0) return;
+    void (async () => {
+      let ok = 0;
+      for (const id of ids) {
+        try {
+          if (await deleteSession(id)) ok++;
+        } catch {
+          // Keep going — report the count at the end.
+        }
+      }
+      emitToast(ok === ids.length ? `${ok} sessions deleted` : `${ok}/${ids.length} deleted`);
+      void refreshSessions();
+    })();
+  }, [deleteSession, refreshSessions]);
+  // Shared SessionRow props for both group modes (REQ-078 reuses them in
+  // ProjectGroup so rows behave identically collapsed/expanded/by-time).
   const handleOpenAsPane = React.useCallback((s: SessionSummary) => {
     if (isMobileViewport()) return;
     const pane = usePaneStore.getState();
@@ -499,6 +731,47 @@ export function SessionsSidebar({
       emitToast('Tiling workspace enabled — session opened as a pane tab');
     }
     pane.requestSessionTab(s.id, displayTitle(s));
+  }, []);
+
+  // Shared SessionRow props for both group modes (REQ-078 reuses them in
+  // ProjectGroup so rows behave identically collapsed/expanded/by-time).
+  const makeRowProps = React.useCallback((s: SessionSummary) => ({
+    onAction: (a: Exclude<RowAction, null>) => setOpenAction({ id: s.id, action: a }),
+    onResume: () => onSelect(s.id),
+    onOpenAsPane: () => handleOpenAsPane(s),
+    onFork: () => handleFork(s.id),
+    onSubmitRename: (title: string) => {
+      const trimmed = title.trim();
+      if (!trimmed || trimmed === displayTitle(s)) {
+        setOpenAction(null);
+        return;
+      }
+      void renameSession(s.id, trimmed).then((ok) => {
+        emitToast(ok ? 'Session renamed' : 'Rename failed');
+        setOpenAction(null);
+      });
+    },
+    onCancelAction: () => setOpenAction(null),
+    onSubmitMerge: (intoId: string) => {
+      void mergeSessions(intoId, s.id).then((appended) => {
+        emitToast(
+          appended !== null
+            ? `Merged ${appended} message${appended === 1 ? '' : 's'}`
+            : 'Merge failed',
+        );
+        setOpenAction(null);
+        if (appended !== null) onSelect(intoId);
+      });
+    },
+  }), [handleFork, handleOpenAsPane, mergeSessions, onSelect, renameSession]);
+
+  const toggleProject = React.useCallback((key: string) => {
+    setExpandedProjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   }, []);
 
   return (
@@ -641,7 +914,26 @@ export function SessionsSidebar({
             {lastError}
           </div>
         ) : null}
-        {groups.map(({ key, label, items }) => (
+        {groups.map(({ key, label, items }) =>
+          groupBy === 'project' ? (
+            <ProjectGroup
+              key={key}
+              label={label}
+              items={items}
+              expanded={expandedProjects.has(key)}
+              activeId={activeId}
+              openAction={openAction}
+              sessions={sessions}
+              onToggle={() => toggleProject(key)}
+              onNewSession={() => {
+                const cwd = items[0]?.cwd || '';
+                if (cwd) handleCreateInProject(cwd);
+                else emitToast('Project has no working directory');
+              }}
+              onDeleteProject={() => handleDeleteProject(items.map((s) => s.id))}
+              rowProps={makeRowProps}
+            />
+          ) : (
           <div key={key}>
             <div className="px-1 py-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-400 flex items-center gap-1">
               {label}
@@ -656,39 +948,14 @@ export function SessionsSidebar({
                   session={s}
                   active={s.id === activeId}
                   action={openAction?.id === s.id ? openAction.action : null}
-                  onAction={(a) => setOpenAction({ id: s.id, action: a })}
-                  onResume={() => onSelect(s.id)}
-                  onOpenAsPane={() => handleOpenAsPane(s)}
-                  onFork={() => handleFork(s.id)}
-                  onSubmitRename={(title) => {
-                    const trimmed = title.trim();
-                    if (!trimmed || trimmed === displayTitle(s)) {
-                      setOpenAction(null);
-                      return;
-                    }
-                    void renameSession(s.id, trimmed).then((ok) => {
-                      emitToast(ok ? 'Session renamed' : 'Rename failed');
-                      setOpenAction(null);
-                    });
-                  }}
-                  onCancelAction={() => setOpenAction(null)}
                   mergeTargets={sessions.filter((t) => t.id !== s.id)}
-                  onSubmitMerge={(intoId) => {
-                    void mergeSessions(intoId, s.id).then((appended) => {
-                      emitToast(
-                        appended !== null
-                          ? `Merged ${appended} message${appended === 1 ? '' : 's'}`
-                          : 'Merge failed',
-                      );
-                      setOpenAction(null);
-                      if (appended !== null) onSelect(intoId);
-                    });
-                  }}
+                  {...makeRowProps(s)}
                 />
               ))}
             </div>
           </div>
-        ))}
+          ),
+        )}
         {filtered.length === 0 && !(loading && sessions.length === 0) ? (
           <div className="p-4 text-center text-xs text-zinc-400">
             {query ? 'No matching sessions' : 'No sessions yet — create one above.'}

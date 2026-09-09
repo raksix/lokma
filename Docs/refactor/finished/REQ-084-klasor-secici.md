@@ -1,6 +1,6 @@
 # REQ-084 — Yol alanına arayüzden klasör seçici (file picker)
 
-- **Status:** done (canlıda — 2026-09-09)
+- **Status:** done (canlıda — 2026-09-09, commit c9efdba; modal half: bfa72fa)
 - **Asked:** 2026-09-09 — "istersek yol girelim istersek de windows'ta ya da mac'te dosya yolu seçiyoruz ya o şekilde arayüzden de seçme olsun".
 - **Interpretation:** New Project modalındaki Working directory alanı iki yollu olacak: elle yazma (REQ-083 ile yoksa oluşturulur) + "Gözat/Seç" butonu ile sunucudaki klasörleri arayüzden seçme (Windows/Mac dosya seçici deneyimi). Sunucu tarafında güvenli bir dizin listeleme endpoint'i gerekir (`GET /api/fs/list?path=` — HOME bazlı, jail'li, gizli/auth dosyaları filtreli) + modalda ağaç/dropdown seçici. 'yap' denmeden kod YOK.
 - **Touched:** `packages/lokma-web/server/src/routes/fs.ts` (new), `packages/lokma-web/server/src/routes/fs.test.ts` (new), `packages/lokma-web/server/src/app.ts`, `packages/lokma-web/server/src/plugins/auth-gate-policy.test.ts`, `packages/lokma-web/web/src/lib/api.ts`, `packages/lokma-web/web/src/components/sessions/project-modal.tsx`, `packages/lokma-web/web/src/stores/session.ts`, `packages/lokma-web/web/src/components/sessions/sessions-sidebar.tsx`.

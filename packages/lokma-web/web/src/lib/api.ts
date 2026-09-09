@@ -1208,6 +1208,12 @@ export const api = {
     get<FilesRes>(`/api/files?cwd=${encodeURIComponent(cwd)}&path=${encodeURIComponent(path)}`),
   readWorkspaceFile: (cwd: string, path: string) =>
     get<FileContentRes>(`/api/files/read?cwd=${encodeURIComponent(cwd)}&path=${encodeURIComponent(path)}`),
+  /** REQ-075: binary bytes for preview (pdf/images/html) — auth via authedFetch. */
+  readWorkspaceFileRaw: async (cwd: string, path: string): Promise<Blob> => {
+    const res = await authedFetch(`/api/files/raw?cwd=${encodeURIComponent(cwd)}&path=${encodeURIComponent(path)}`);
+    if (!res.ok) throw await toApiError(res);
+    return res.blob();
+  },
   searchWorkspaceFiles: (cwd: string, q: string, max = 50) =>
     get<FileSearchRes>(
       `/api/files/search?cwd=${encodeURIComponent(cwd)}&q=${encodeURIComponent(q)}&max=${max}`,

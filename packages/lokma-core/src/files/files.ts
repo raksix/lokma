@@ -290,6 +290,28 @@ export class WorkspaceFiles {
   }
 
   /**
+   * Raw bytes for binary preview (REQ-075: pdf/images). Jailed + capped;
+   * no text decoding, no binary rejection — the caller sets the MIME.
+   */
+  async readRaw(rel: string, maxBytes = 10 * 1024 * 1024): Promise<{ path: string; bytes: Buffer; size: number }> {
+    const abs = resolveInRoot(this.root, rel);
+    let s;
+    try {
+      s = await stat(abs);
+    } catch {
+      throw new FileError('file_not_found', `No such file: ${rel}`, 404);
+    }
+    if (!s.isFile()) {
+      throw new FileError('not_a_file', `Not a file: ${rel}`, 400);
+    }
+    if (s.size > maxBytes) {
+      throw new FileError('too_large', `File exceeds the preview limit: ${rel}`, 400);
+    }
+    const bytes = await readFile(abs);
+    return { path: toRel(this.root, abs), bytes, size: s.size };
+  }
+
+  /**
    * Write content (atomic). `expectedSha` guards against lost updates:
    * mismatch (or sha given for a missing file) → 409 `stale_file`.
    * Missing path + no sha creates the file (parents included).

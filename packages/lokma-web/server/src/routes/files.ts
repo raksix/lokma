@@ -44,6 +44,39 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
+  app.get('/api/files/raw', async (req, reply) => {
+    // REQ-075: raw bytes for binary preview (pdf/images) + sandboxed html.
+    // Jailed to ?cwd=, 10MB cap, MIME from a fixed extension map (never
+    // probed content). Auth model matches /read (open instance: open).
+    const query = req.query as { cwd?: unknown; path?: unknown };
+    if (typeof query.path !== 'string' || !query.path.trim()) {
+      return reply.status(400).send({ code: 'bad_path', message: 'raw needs ?path=<workspace file>' });
+    }
+    const ext = query.path.toLowerCase().split('.').pop() ?? '';
+    const mime: Record<string, string> = {
+      pdf: 'application/pdf',
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      gif: 'image/gif',
+      webp: 'image/webp',
+      svg: 'image/svg+xml',
+      html: 'text/html; charset=utf-8',
+      htm: 'text/html; charset=utf-8',
+    };
+    const type = mime[ext];
+    if (!type) {
+      return reply.status(415).send({ code: 'no_preview', message: `No binary preview for .${ext || '?'} files` });
+    }
+    try {
+      const raw = await files(query.cwd).readRaw(query.path);
+      return reply.type(type).send(raw.bytes);
+    } catch (e) {
+      if (e instanceof FileError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      throw e;
+    }
+  });
+
   app.get('/api/files/search', async (req, reply) => {
     const query = req.query as { cwd?: unknown; q?: unknown; max?: unknown };
     try {

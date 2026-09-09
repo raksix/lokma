@@ -169,6 +169,34 @@ export function validateProjectForm(form: ProjectForm): string | null {
   return null;
 }
 
+/**
+ * REQ-088 — bidirectional New-Project modal autofill (pure, unit-tested).
+ * `suggestProjectName` derives a display name from the last segment of a
+ * working-directory path (`/mnt/apopic/my-app/` -> `my-app`).
+ * `suggestProjectCwd` proposes a server path for a typed name
+ * (`My App` -> `/mnt/apopic/my-app`). Both return '' when nothing
+ * sensible can be derived; the modal only fills EMPTY fields, never
+ * overwriting what the user typed.
+ */
+export function suggestProjectName(cwd: string): string {
+  const trimmed = cwd.trim().replace(/\/+$/, '');
+  if (!trimmed) return '';
+  const last = trimmed.slice(trimmed.lastIndexOf('/') + 1).trim();
+  return last;
+}
+
+export function suggestProjectCwd(name: string): string {
+  const slug = name
+    .trim()
+    .toLocaleLowerCase('en-US')
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
+  if (!slug) return '';
+  return `/mnt/apopic/${slug}`;
+}
+
 /** Human "last active" label (null-safe — invited users never logged in). */
 export function formatLastActive(lastActiveAt: string | null): string {
   if (!lastActiveAt) return 'never';

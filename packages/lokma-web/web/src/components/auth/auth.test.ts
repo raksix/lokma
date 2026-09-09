@@ -27,6 +27,8 @@ import {
   validateLoginForm,
   validateProjectForm,
   validateRegisterForm,
+  suggestProjectCwd,
+  suggestProjectName,
   type LoginForm,
 } from './auth';
 import type { AuthProject, AuthUser } from '@/lib/api';
@@ -152,6 +154,15 @@ check(
   'valid project passes',
   validateProjectForm({ name: 'lokma', cwd: '', visibility: 'private' }) === null,
 );
+
+// REQ-088 — bidirectional modal autofill suggestions.
+check('name from cwd last segment', suggestProjectName('/mnt/apopic/my-app') === 'my-app');
+check('name ignores trailing slash', suggestProjectName('/mnt/apopic/my-app/') === 'my-app');
+check('name from bare folder', suggestProjectName('my-app') === 'my-app');
+check('name empty on blank cwd', suggestProjectName('   ') === '');
+check('cwd from simple name', suggestProjectCwd('My App') === '/mnt/apopic/my-app');
+check('cwd slug collapses punctuation', suggestProjectCwd('  Cool_Project!! v2 ') === '/mnt/apopic/cool-project-v2');
+check('cwd empty on blank name', suggestProjectCwd('---') === '');
 
 // ─── misc ──────────────────────────────────────────────────────────
 check('never active label', formatLastActive(null) === 'never');

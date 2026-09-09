@@ -106,4 +106,4 @@
 - [REQ-085](finished/REQ-085-terminal-double-keypress-dedup.md) — Terminal double-keypress dedup (REQ-059 follow-up) — done
 - [REQ-086](finished/REQ-086-terminal-cift-yazma.md) — Terminal çift yazma dedup — done
 - [REQ-087](finished/REQ-087-yeni-projede-session.md) — Yeni projede session açılmıyor / yanlış projede — done
-- [REQ-088](REQ-088-modal-otomatik-doldurma.md) — Modalda alanlar birbirini otomatik doldursun — pending
+- [REQ-088](finished/REQ-088-modal-otomatik-doldurma.md) — Modalda alanlar birbirini otomatik doldursun — done

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api, type FsListRes, type ProjectVisibility } from '@/lib/api';
 import { emitToast, useFocusTrap } from '@/components/shell';
-import { emptyProjectForm, validateProjectForm } from '../auth/auth';
+import { emptyProjectForm, suggestProjectCwd, suggestProjectName, validateProjectForm } from '../auth/auth';
 
 /**
  * ProjectModal (REQ-080) — Settings-style centered modal for creating a
@@ -126,7 +126,16 @@ export function ProjectModal({
               id="project-name"
               value={form.name}
               maxLength={60}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              onChange={(e) => {
+                const name = e.target.value;
+                setForm((f) => {
+                  // REQ-088: name typed while cwd is empty -> propose a server path.
+                  // A filled cwd is never overwritten.
+                  if (f.cwd.trim() !== '') return { ...f, name };
+                  const proposal = suggestProjectCwd(name);
+                  return { ...f, name, cwd: proposal ? proposal : f.cwd };
+                });
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') void submit();
                 if (e.key === 'Escape') onClose();
@@ -145,7 +154,16 @@ export function ProjectModal({
                 id="project-cwd"
                 value={form.cwd}
                 maxLength={500}
-                onChange={(e) => setForm((f) => ({ ...f, cwd: e.target.value }))}
+                onChange={(e) => {
+                  const cwd = e.target.value;
+                  setForm((f) => {
+                    // REQ-088: cwd typed while name is empty -> derive the name
+                    // from the last path segment. A filled name is never overwritten.
+                    if (f.name.trim() !== '') return { ...f, cwd };
+                    const proposal = suggestProjectName(cwd);
+                    return { ...f, cwd, name: proposal ? proposal : f.name };
+                  });
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void submit();
                   if (e.key === 'Escape') onClose();
@@ -221,7 +239,13 @@ export function ProjectModal({
                     disabled={!pickerData || pickerBusy}
                     onClick={() => {
                       if (pickerData) {
-                        setForm((f) => ({ ...f, cwd: pickerData.path }));
+                        const picked = pickerData.path;
+                        setForm((f) => {
+                          // REQ-088: folder picked while name is empty -> derive it.
+                          if (f.name.trim() !== '') return { ...f, cwd: picked };
+                          const proposal = suggestProjectName(picked);
+                          return { ...f, cwd: picked, name: proposal ? proposal : f.name };
+                        });
                         setPickerOpen(false);
                       }
                     }}

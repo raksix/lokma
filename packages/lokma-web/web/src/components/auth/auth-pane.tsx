@@ -1,6 +1,7 @@
 import * as React from 'react';
 import {
   Check,
+  ChevronDown,
   Copy,
   Crown,
   Eye,
@@ -17,7 +18,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ApiError, api, type AuthProject, type AuthRole, type AuthSettings, type AuthUser } from '@/lib/api';
+import { ApiError, api, type AuthProject, type AuthRole, type AuthSettings, type AuthUser, type ProjectMember } from '@/lib/api';
 import {
   canDo,
   canEditProject,
@@ -110,6 +111,14 @@ export function AuthPane() {
   const [confirmDeleteUser, setConfirmDeleteUser] = React.useState<string | null>(null);
   const [confirmDeleteProject, setConfirmDeleteProject] = React.useState<string | null>(null);
   const [tempPassword, setTempPassword] = React.useState<{ email: string; password: string } | null>(null);
+  // REQ-093 — per-user project assignment (expandable membership panel).
+  const [expandedUserId, setExpandedUserId] = React.useState<string | null>(null);
+  const [userMemberships, setUserMemberships] = React.useState<{
+    userId: string;
+    rows: { projectId: string; projectName: string; role: ProjectMember['role'] }[];
+  } | null>(null);
+  const [userMembershipsBusy, setUserMembershipsBusy] = React.useState(false);
+  const [assignProjectId, setAssignProjectId] = React.useState('');
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -271,7 +280,7 @@ export function AuthPane() {
       const res = await api.inviteUser({
         email: inviteForm.email.trim(),
         role: inviteForm.role,
-        projectIds: selectedId && inviteForm.projectIds.includes(selectedId) ? [selectedId] : [],
+        projectIds: inviteForm.projectIds,
       });
       setLastInviteLink(res.inviteLink);
       setInviteForm({ ...emptyInviteForm });
@@ -419,6 +428,65 @@ export function AuthPane() {
     try {
       await api.removeMember(projectId, userId);
       if (me) await loadTables(me);
+    } catch (e) {
+      toast(errMessage(e));
+    }
+  };
+
+  // REQ-093 — per-user project assignment: expand a user row to see every
+  // project they belong to, assign more, or remove them. Uses the existing
+  // listMembers/addMember/removeMember endpoints (no new API).
+  const loadUserMemberships = async (userId: string) => {
+    setUserMembershipsBusy(true);
+    try {
+      const settled = await Promise.all(
+        projects.map((p) =>
+          api.listMembers(p.id).then(
+            (res) => ({ project: p, members: res.members }),
+            () => ({ project: p, members: [] as ProjectMember[] }),
+          ),
+        ),
+      );
+      const rows = settled.flatMap(({ project, members }) =>
+        members
+          .filter((m) => m.userId === userId)
+          .map((m) => ({ projectId: project.id, projectName: project.name, role: m.role })),
+      );
+      setUserMemberships({ userId, rows });
+    } finally {
+      setUserMembershipsBusy(false);
+    }
+  };
+
+  const toggleUserProjects = (target: AuthUser) => {
+    if (expandedUserId === target.id) {
+      setExpandedUserId(null);
+      setUserMemberships(null);
+      return;
+    }
+    setExpandedUserId(target.id);
+    setAssignProjectId('');
+    void loadUserMemberships(target.id);
+  };
+
+  const assignUserToProject = async (target: AuthUser) => {
+    if (!assignProjectId) return;
+    try {
+      await api.addMember(assignProjectId, { userId: target.id, role: 'member' });
+      if (me) await loadTables(me);
+      await loadUserMemberships(target.id);
+      toast(`Added ${target.email} to project`);
+    } catch (e) {
+      toast(errMessage(e));
+    }
+  };
+
+  const unassignUserFromProject = async (target: AuthUser, projectId: string) => {
+    try {
+      await api.removeMember(projectId, target.id);
+      if (me) await loadTables(me);
+      await loadUserMemberships(target.id);
+      toast(`Removed ${target.email} from project`);
     } catch (e) {
       toast(errMessage(e));
     }
@@ -890,7 +958,19 @@ export function AuthPane() {
             </div>
             <div className="divide-y divide-line/50">
               {shownUsers.map((u) => (
-                <div key={u.id} className="flex items-center gap-2 px-3 py-2">
+                <div key={u.id}>
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 shrink-0"
+                    onClick={() => toggleUserProjects(u)}
+                    title={expandedUserId === u.id ? 'Hide projects' : 'Show projects'}
+                    aria-label={`Projects for ${u.email}`}
+                    aria-expanded={expandedUserId === u.id}
+                  >
+                    <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${expandedUserId === u.id ? 'rotate-180' : ''}`} />
+                  </Button>
                   <span className="w-7 h-7 rounded-full bg-[#262624] text-white grid place-items-center text-[10px] font-semibold shrink-0">
                     {initials(u.name, u.email)}
                   </span>
@@ -937,6 +1017,59 @@ export function AuthPane() {
                     {confirmDeleteUser === u.id ? 'Confirm?' : ''}
                   </Button>
                 </div>
+                {expandedUserId === u.id && (
+                  <div className="px-3 pb-2 pl-11">
+                    {userMembershipsBusy && (!userMemberships || userMemberships.userId !== u.id) ? (
+                      <p className="text-[11px] text-zinc-400">Loading projects…</p>
+                    ) : (
+                      <>
+                        <div className="space-y-1">
+                          {(userMemberships && userMemberships.userId === u.id ? userMemberships.rows : []).map((row) => (
+                            <div key={row.projectId} className="flex items-center gap-2 rounded border border-line/60 px-2 py-1 text-[11px]">
+                              <span className="font-mono font-medium text-xs">{row.projectName}</span>
+                              <span className="px-1 py-0 rounded border border-line text-[10px] bg-white dark:bg-[#1E1E21]">{row.role}</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="ml-auto h-5 text-[11px] text-red-600"
+                                onClick={() => unassignUserFromProject(u, row.projectId)}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          ))}
+                          {userMemberships && userMemberships.userId === u.id && userMemberships.rows.length === 0 && (
+                            <p className="text-[11px] text-zinc-400">No projects yet — assign the first one below.</p>
+                          )}
+                        </div>
+                        <div className="mt-1 flex gap-1">
+                          <select
+                            value={assignProjectId}
+                            onChange={(e) => setAssignProjectId(e.target.value)}
+                            className="h-6 flex-1 rounded-md border border-line bg-white dark:bg-[#1E1E21] text-[11px] px-1"
+                            aria-label={`Assign ${u.email} to project`}
+                          >
+                            <option value="">Assign to project…</option>
+                            {projects
+                              .filter(
+                                (p) =>
+                                  !(userMemberships && userMemberships.userId === u.id && userMemberships.rows.some((r) => r.projectId === p.id)),
+                              )
+                              .map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name}
+                                </option>
+                              ))}
+                          </select>
+                          <Button size="sm" className="h-6 text-[11px] gap-1" disabled={!assignProjectId} onClick={() => assignUserToProject(u)}>
+                            <Plus className="w-3 h-3" /> Assign
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+                </div>
               ))}
             </div>
             <div className="p-2 border-t border-line/50 bg-muted/20 space-y-1">
@@ -961,20 +1094,32 @@ export function AuthPane() {
                   <UserPlus className="w-3 h-3" /> Invite
                 </Button>
               </div>
-              {selected && (
-                <label className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-                  <input
-                    type="checkbox"
-                    checked={selectedId !== null && inviteForm.projectIds.includes(selectedId)}
-                    onChange={(e) =>
-                      setInviteForm({
-                        ...inviteForm,
-                        projectIds: e.target.checked && selectedId ? [selectedId] : [],
-                      })
-                    }
-                  />
-                  Add to selected project ({selected.name})
-                </label>
+              {projects.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-[11px] text-zinc-500">
+                    Add invite to projects ({inviteForm.projectIds.length} selected):
+                  </p>
+                  <div className="max-h-24 overflow-auto space-y-1 rounded border border-line/60 p-1.5">
+                    {projects.map((p) => (
+                      <label key={p.id} className="flex items-center gap-1.5 text-[11px] text-zinc-600 dark:text-zinc-300">
+                        <input
+                          type="checkbox"
+                          checked={inviteForm.projectIds.includes(p.id)}
+                          onChange={(e) =>
+                            setInviteForm({
+                              ...inviteForm,
+                              projectIds: e.target.checked
+                                ? [...inviteForm.projectIds, p.id]
+                                : inviteForm.projectIds.filter((id) => id !== p.id),
+                            })
+                          }
+                          className="h-3 w-3 accent-[#C96442]"
+                        />
+                        <span className="font-mono">{p.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               )}
               {lastInviteLink && (
                 <p className="text-[11px] text-zinc-500 flex items-center gap-1">

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { loginGateActive, userFromToken } from 'lokma-core';
+import { loginGateActive, userFromToken } from '@lokma/core';
 import { requestToken } from '../routes/auth.js';
 import { isAuthGateJudged, isAuthGatePublic } from './auth-gate-policy.js';
 

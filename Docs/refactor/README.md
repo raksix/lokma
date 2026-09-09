@@ -96,3 +96,4 @@
 - [REQ-075](finished/REQ-075-dosya-pane-preview.md) — Dosyalar pane olarak + md/html/pdf/img preview — done
 - [REQ-076](finished/REQ-076-login-gate-tum-api.md) — Login olmadan hiçbir sisteme erişilemesin (global auth gate) — done
 - [REQ-077](finished/REQ-077-otomatik-retry-backoff.md) — Otomatik retry + backoff (ayarlanabilir) — done
+- [REQ-078](REQ-078-proje-grubu-5li-expand.md) — By-Projects 5li + expand + proje satırı — done

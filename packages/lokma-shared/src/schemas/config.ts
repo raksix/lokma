@@ -56,6 +56,20 @@ export const AgentsConfigSchema = z.object({
 export type AgentsConfig = z.infer<typeof AgentsConfigSchema>;
 
 /**
+ * Auto-retry on upstream failure (REQ-077) — error backoff for dead
+ * upstreams (500s, timeouts, network blips). `maxAttempts` counts RETRIES
+ * after the first try (default 10); `delaysSec[i]` waits before retry i+1
+ * (default 3,10,15,20,30,40,50, then 60,90,120 — past the end the last
+ * value repeats). User aborts never retry.
+ */
+export const RetryConfigSchema = z.object({
+  maxAttempts: z.number().int().min(0).max(50).default(10),
+  delaysSec: z.array(z.number().min(0).max(3600)).max(50).default([3, 10, 15, 20, 30, 40, 50, 60, 90, 120]),
+});
+
+export type RetryConfig = z.infer<typeof RetryConfigSchema>;
+
+/**
  * Session defaults — where new sessions land when the caller passes no
  * explicit cwd (`POST /api/sessions`, REQ-009 session-defaults piece).
  * Empty string = server default (its own working dir).
@@ -93,6 +107,7 @@ export const GlobalConfigSchema = z.object({
     budgets: { tokens: 500_000, usd: 10 },
   }),
   sessions: SessionsConfigSchema.default({ defaultCwd: '' }),
+  retry: RetryConfigSchema.default({ maxAttempts: 10, delaysSec: [3, 10, 15, 20, 30, 40, 50, 60, 90, 120] }),
   locks: z
     .object({ heartbeatMs: z.number().default(30_000), leaseMs: z.number().default(60_000), dir: z.string().default('.agentlocks/locks') })
     .default({ heartbeatMs: 30_000, leaseMs: 60_000, dir: '.agentlocks/locks' }),

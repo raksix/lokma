@@ -46,6 +46,16 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('text_delta'), delta: z.string(), sessionId: z.string() }),
   // REQ-050: live reasoning stream (Claude-Code style thinking block).
   z.object({ type: z.literal('thinking_delta'), delta: z.string(), sessionId: z.string() }),
+  // REQ-077: auto-retry notice — stream died, waiting waitMs then trying
+  // again (attempt of maxAttempts). Never persisted; toast/badge only.
+  z.object({
+    type: z.literal('retry_notice'),
+    attempt: z.number().int().min(1),
+    maxAttempts: z.number().int().min(1),
+    waitMs: z.number().int().min(0),
+    message: z.string().max(300),
+    sessionId: z.string(),
+  }),
   z.object({ type: z.literal('tool_start'), tool: z.string(), input: z.unknown(), callId: z.string(), sessionId: z.string() }),
   z.object({ type: z.literal('tool_result'), callId: z.string(), result: z.unknown(), isError: z.boolean().default(false), sessionId: z.string() }),
   z.object({ type: z.literal('permission_request'), requestId: z.string(), tool: z.string(), description: z.string(), sessionId: z.string() }),

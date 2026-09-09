@@ -19,10 +19,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { api, type SessionSummary } from '@/lib/api';
-import { emptyProjectForm, validateProjectForm } from '../auth/auth';
+import { api, type AuthProject, type SessionSummary } from '@/lib/api';
 import { usePaneStore, useSessionStore } from '@/stores';
 import { emitToast, isMobileViewport, useIsMobile } from '@/components/shell';
+import { ProjectModal } from './project-modal';
 import {
   activityBadge,
   displayTitle,
@@ -408,6 +408,7 @@ function ProjectGroup({
   onToggle,
   onNewSession,
   onDeleteProject,
+  onDeleteEntity,
   rowProps,
 }: {
   label: string;
@@ -419,6 +420,8 @@ function ProjectGroup({
   onToggle: () => void;
   onNewSession: () => void;
   onDeleteProject: () => void;
+  /** REQ-080: entity delete (project records only — cwd groups pass nothing). */
+  onDeleteEntity?: () => void;
   rowProps: (s: SessionSummary) => {
     onAction: (a: Exclude<RowAction, null>) => void;
     onResume: () => void;
@@ -535,13 +538,27 @@ function ProjectGroup({
                   </Button>
                 </div>
               ) : (
-                <button
-                  role="menuitem"
-                  className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
-                  onClick={() => setConfirmingDelete(true)}
-                >
-                  <Trash2 className="w-3 h-3 shrink-0" /> Delete all sessions…
-                </button>
+                <>
+                  <button
+                    role="menuitem"
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                    onClick={() => setConfirmingDelete(true)}
+                  >
+                    <Trash2 className="w-3 h-3 shrink-0" /> Delete all sessions…
+                  </button>
+                  {onDeleteEntity ? (
+                    <button
+                      role="menuitem"
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onDeleteEntity();
+                      }}
+                    >
+                      <Trash2 className="w-3 h-3 shrink-0" /> Delete project
+                    </button>
+                  ) : null}
+                </>
               )}
             </div>
           ) : null}
@@ -607,12 +624,50 @@ export function SessionsSidebar({
   // other list state so a new search/grouping starts collapsed.
   const [expandedProjects, setExpandedProjects] = React.useState<Set<string>>(new Set());
   const [creatingProjectCwd, setCreatingProjectCwd] = React.useState<string | null>(null);
+  // REQ-080 — project records (visible even with zero sessions) + modal.
+  // Replaces the REQ-058 inline form (its silent failures read as "does
+  // nothing" — the modal surfaces the server error instead).
+  const [projects, setProjects] = React.useState<AuthProject[]>([]);
+  const [showProjectModal, setShowProjectModal] = React.useState(false);
   // REQ-058 — visible "New Project" affordance in the Explorer header:
   // inline name + cwd + visibility form over POST /api/projects.
-  const [showProjectForm, setShowProjectForm] = React.useState(false);
-  const [projectForm, setProjectForm] = React.useState({ ...emptyProjectForm });
-  const [projectBusy, setProjectBusy] = React.useState(false);
-  const [projectError, setProjectError] = React.useState<string | null>(null);
+  // REQ-080: the inline form is retired — ProjectModal replaces it.
+  const loadProjects = React.useCallback(() => {
+    void api
+      .listProjects()
+      .then((res) => setProjects(res.projects ?? []))
+      .catch(() => {
+        // Logged-out / forbidden: the session list still works.
+      });
+  }, []);
+
+  React.useEffect(() => {
+    loadProjects();
+  }, [loadProjects]);
+
+  // REQ-080 — the modal reports the new project: refresh the list, then
+  // open its first session (in the chosen cwd) so it is usable at once.
+  const handleProjectCreated = React.useCallback((project: { id: string; name: string; cwd: string }) => {
+    loadProjects();
+    if (project.cwd) {
+      void createSession({ cwd: project.cwd }).then((id) => {
+        if (id) onSelect(id);
+      });
+    }
+  }, [createSession, loadProjects, onSelect]);
+
+  // REQ-080 — delete the project record (entity), then refresh the list.
+  const handleDeleteEntity = React.useCallback((id: string, name: string) => {
+    void api
+      .deleteProject(id)
+      .then(() => {
+        emitToast(`Project "${name}" deleted`);
+        loadProjects();
+      })
+      .catch((e: unknown) => {
+        emitToast(e instanceof Error ? e.message : 'Project delete failed');
+      });
+  }, [loadProjects]);
 
   React.useEffect(() => {
     setShowAll(false);
@@ -636,44 +691,6 @@ export function SessionsSidebar({
       }
     });
   }, [createSession, onSelect]);
-
-  // REQ-058 — create the project, then open its first session (in the
-  // chosen cwd when one was given) so the new project is usable at once.
-  const handleCreateProject = React.useCallback(() => {
-    const problem = validateProjectForm(projectForm);
-    if (problem) {
-      setProjectError(problem);
-      return;
-    }
-    setProjectBusy(true);
-    setProjectError(null);
-    const cwd = projectForm.cwd.trim();
-    void api
-      .createProject({
-        name: projectForm.name.trim(),
-        ...(cwd ? { cwd } : {}),
-        visibility: projectForm.visibility,
-      })
-      .then((res) => {
-        setProjectForm({ ...emptyProjectForm });
-        setShowProjectForm(false);
-        emitToast(`Project "${res.project.name}" created`);
-        if (cwd) {
-          return createSession({ cwd }).then((id) => {
-            if (id) onSelect(id);
-          });
-        }
-        return undefined;
-      })
-      .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : 'Project create failed';
-        setProjectError(message);
-        emitToast(message);
-      })
-      .finally(() => {
-        setProjectBusy(false);
-      });
-  }, [projectForm, createSession, onSelect]);
 
   const handleFork = React.useCallback(
     (id: string) => {
@@ -786,90 +803,23 @@ export function SessionsSidebar({
         >
           <Plus className="w-3 h-3" /> {creating ? 'Creating…' : 'New Session'}
         </Button>
-        {/* REQ-058 — visible New Project button: expands the inline
-            name + cwd + visibility form below (POST /api/projects). */}
+        {/* REQ-080 — New Project opens the Settings-style modal (the
+            retired inline form's silent failures read as "does nothing"). */}
         <Button
           variant="outline"
           size="sm"
           className="w-full h-7 text-xs gap-1.5 justify-center"
-          onClick={() => {
-            setProjectError(null);
-            setShowProjectForm((v) => !v);
-          }}
-          aria-expanded={showProjectForm}
+          onClick={() => setShowProjectModal(true)}
           aria-label="New project"
           title="Create a new project (name + working directory)"
         >
           <FolderPlus className="w-3 h-3" /> New Project
         </Button>
-        {showProjectForm ? (
-          <form
-            className="space-y-1.5 rounded-md border border-line bg-zinc-50 p-2 dark:bg-zinc-900"
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleCreateProject();
-            }}
-          >
-            <Input
-              autoFocus
-              placeholder="Project name"
-              value={projectForm.name}
-              maxLength={60}
-              onChange={(e) => setProjectForm((f) => ({ ...f, name: e.target.value }))}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') setShowProjectForm(false);
-              }}
-              className="h-7 text-xs"
-              aria-label="Project name"
-            />
-            <Input
-              placeholder="Working directory (optional, must exist)"
-              value={projectForm.cwd}
-              maxLength={500}
-              onChange={(e) => setProjectForm((f) => ({ ...f, cwd: e.target.value }))}
-              className="h-7 text-xs"
-              aria-label="Project working directory"
-            />
-            <div className="flex items-center gap-1">
-              <select
-                value={projectForm.visibility}
-                onChange={(e) =>
-                  setProjectForm((f) => ({
-                    ...f,
-                    visibility: e.target.value as 'private' | 'public',
-                  }))
-                }
-                className="h-7 flex-1 min-w-0 rounded-md border border-line bg-white dark:bg-[#1E1E21] px-2 text-xs"
-                aria-label="Project visibility"
-              >
-                <option value="private">Private</option>
-                <option value="public">Public</option>
-              </select>
-              <Button
-                variant="default"
-                size="sm"
-                className="h-7 text-xs shrink-0 bg-terracotta text-white hover:bg-terracotta-hover"
-                disabled={projectBusy}
-              >
-                {projectBusy ? 'Creating…' : 'Create'}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 shrink-0"
-                title="Cancel"
-                type="button"
-                onClick={() => setShowProjectForm(false)}
-                aria-label="Cancel"
-              >
-                <X className="w-3 h-3" />
-              </Button>
-            </div>
-            {projectError ? (
-              <div className="text-[11px] text-red-600">{projectError}</div>
-            ) : null}
-          </form>
-        ) : null}
+        <ProjectModal
+          open={showProjectModal}
+          onClose={() => setShowProjectModal(false)}
+          onCreated={handleProjectCreated}
+        />
         <div className="flex items-center gap-1">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-400" />
@@ -912,6 +862,38 @@ export function SessionsSidebar({
         {lastError ? (
           <div className="p-2 rounded-md border border-red-200 bg-red-50 text-[11px] text-red-700">
             {lastError}
+          </div>
+        ) : null}
+        {projects.length > 0 ? (
+          <div>
+            <div className="px-1 py-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-400 flex items-center gap-1">
+              Projects
+              <span className="ml-auto text-[10px] font-normal normal-case tracking-normal">
+                {projects.length}
+              </span>
+            </div>
+            {projects.map((p) => {
+              const inProject = sessions.filter((s) => (s.cwd ?? '') === (p.cwd ?? ''));
+              return (
+                <ProjectGroup
+                  key={p.id}
+                  label={p.name}
+                  items={inProject}
+                  expanded={expandedProjects.has(`entity:${p.id}`)}
+                  activeId={activeId}
+                  openAction={openAction}
+                  sessions={sessions}
+                  onToggle={() => toggleProject(`entity:${p.id}`)}
+                  onNewSession={() => {
+                    if (p.cwd) handleCreateInProject(p.cwd);
+                    else emitToast('Project has no working directory');
+                  }}
+                  onDeleteProject={() => handleDeleteProject(inProject.map((s) => s.id))}
+                  onDeleteEntity={() => handleDeleteEntity(p.id, p.name)}
+                  rowProps={makeRowProps}
+                />
+              );
+            })}
           </div>
         ) : null}
         {groups.map(({ key, label, items }) =>

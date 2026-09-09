@@ -189,6 +189,13 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
     [selectedId, ws],
   );
 
+  // REQ-085 dedup: the same physical keypress must never reach the PTY
+  // twice (double keydown delivery shows every key doubled). Held-key
+  // auto-repeat (e.repeat) always passes; only non-repeat duplicates of
+  // the identical byte within the window are dropped — a human cannot
+  // re-press the same key in <50ms.
+  const lastKeyRef = React.useRef<{ bytes: string; at: number }>({ bytes: '', at: 0 });
+
   // REQ-059 direct typing: the scrollback is the terminal. Every handled
   // key becomes raw PTY bytes; unmapped keys (Cmd-combos, F-keys) fall
   // through to the browser.
@@ -198,6 +205,11 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
       const bytes = keyToBytes({ key: e.key, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey });
       if (bytes === null) return;
       e.preventDefault();
+      if (!e.repeat) {
+        const now = Date.now();
+        if (lastKeyRef.current.bytes === bytes && now - lastKeyRef.current.at < 50) return;
+        lastKeyRef.current = { bytes, at: now };
+      }
       sendRaw(bytes);
     },
     [selectedId, selected, sendRaw],
@@ -224,7 +236,7 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
         role="application"
         aria-label={
           selectedRunning
-            ? 'Terminal — click and type directly, arrows for history, Control C interrupts'
+            ? `Terminal — click and type directly, arrows for history, Control C interrupts (ws ${ws.status})`
             : 'Terminal scrollback'
         }
         onKeyDown={onTermKeyDown}

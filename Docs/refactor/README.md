@@ -103,3 +103,4 @@
 - [REQ-082](finished/REQ-082-projeler-modal-invite-kayit.md) — Projeler sidebar + modal + invite kayıt — done
 - [REQ-083](finished/REQ-083-cwd-yoksa-olustur.md) — "cwd does not exist": yoksa oluştur — done
 - [REQ-084](finished/REQ-084-klasor-secici.md) — Yol alanına arayüzden klasör seçici — done
+- [REQ-085](finished/REQ-085-terminal-double-keypress-dedup.md) — Terminal double-keypress dedup (REQ-059 follow-up) — done

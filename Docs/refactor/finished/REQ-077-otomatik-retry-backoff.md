@@ -1,6 +1,6 @@
 # REQ-077 — Hata alınca otomatik tekrar (ayarlanabilir backoff)
 
-- **Status:** done (canlıda — 2026-09-09)
+- **Status:** done (canlıda — 2026-09-09; impl 9ce6056+e2960c5+708a506, close 0e53e01, filing this tick — REQ-073/074 precedent)
 - **Asked:** "hata falan alınca ... default 10 kez tekrar desin; ilkinde 3sn, sonra 10, 15, 20, 30, 40, 50 diye gitsin. Ayarlarda da olsun."
 - **Did:**
   - shared `RetryConfigSchema` (`maxAttempts` default 10, `delaysSec` default [3,10,15,20,30,40,50,60,90,120]) → `GlobalConfig.retry` (PATCH /api/config).

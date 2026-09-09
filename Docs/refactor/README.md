@@ -95,4 +95,4 @@
 - [REQ-074](finished/REQ-074-tool-satirlari-timeline.md) — Tool satırları timeline-da, F5-proof — done
 - [REQ-075](finished/REQ-075-dosya-pane-preview.md) — Dosyalar pane olarak + md/html/pdf/img preview — done
 - [REQ-076](finished/REQ-076-login-gate-tum-api.md) — Login olmadan hiçbir sisteme erişilemesin (global auth gate) — done
-- [REQ-077](REQ-077-otomatik-retry-backoff.md) — Otomatik retry + backoff (ayarlanabilir) — done
+- [REQ-077](finished/REQ-077-otomatik-retry-backoff.md) — Otomatik retry + backoff (ayarlanabilir) — done

@@ -138,10 +138,13 @@ export function buildLoopHistory(messages: SessionMessage[]): ProviderMessage[] 
   return out;
 }
 
-function toolRecord(callId: string, tool: string, record: unknown): SessionMessage {
+function toolRecord(callId: string, tool: string, record: Record<string, unknown>, input?: unknown): SessionMessage {
+  // REQ-074: persist the input beside the outcome — transcript tool rows
+  // render full human sentences (Hermes-desktop parity: the row survives
+  // refresh with the same detail as the live trace).
   return {
     role: 'tool',
-    content: JSON.stringify(record),
+    content: JSON.stringify(input === undefined ? record : { ...record, input }),
     timestamp: new Date().toISOString(),
     toolCallId: callId,
     toolName: tool,
@@ -325,7 +328,7 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
         const message = !call.tool ? 'Model emitted a <tool> block without a name' : `Model emitted invalid tool JSON: ${call.parseError ?? 'parse error'}`;
         opts.send({ type: 'tool_start', tool: call.tool || 'unknown', input: null, callId, sessionId: opts.sessionId });
         opts.send({ type: 'tool_result', callId, result: { code: 'bad_tool_block', message }, isError: true, sessionId: opts.sessionId });
-        await opts.store.append(opts.sessionId, toolRecord(callId, call.tool || 'unknown', { callId, ok: false, code: 'bad_tool_block', message }));
+        await opts.store.append(opts.sessionId, toolRecord(callId, call.tool || 'unknown', { callId, ok: false, code: 'bad_tool_block', message }, call.input));
         followUps.push(`<tool_result tool="${call.tool || 'unknown'}" id="${callId}">ERROR bad_tool_block: ${message}</tool_result>`);
         continue;
       }
@@ -354,15 +357,15 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
         if (decision === 'deny') {
           const result = { code: 'denied', message: `Denied by permissions: ${outcome.tool}` };
           opts.send({ type: 'tool_result', callId, result, isError: true, sessionId: opts.sessionId });
-          await opts.store.append(opts.sessionId, toolRecord(callId, outcome.tool, { callId, ok: false, ...result }));
+          await opts.store.append(opts.sessionId, toolRecord(callId, outcome.tool, { callId, ok: false, ...result }, call.input));
           followUps.push(`<tool_result tool="${outcome.tool}" id="${callId}">ERROR denied: ${result.message}</tool_result>`);
         } else {
           const ran = await runApprovedCall(registry, { tool: outcome.tool, input: call.input, callId, onEvent: forwardEvent });
           if (ran.outcome === 'ok') {
-            await opts.store.append(opts.sessionId, toolRecord(callId, outcome.tool, { callId, ok: true, result: ran.result }));
+            await opts.store.append(opts.sessionId, toolRecord(callId, outcome.tool, { callId, ok: true, result: ran.result }, call.input));
             followUps.push(`<tool_result tool="${outcome.tool}" id="${callId}">${JSON.stringify(ran.result)}</tool_result>`);
           } else {
-            await opts.store.append(opts.sessionId, toolRecord(callId, outcome.tool, { callId, ok: false, code: ran.code, message: ran.message }));
+            await opts.store.append(opts.sessionId, toolRecord(callId, outcome.tool, { callId, ok: false, code: ran.code, message: ran.message }, call.input));
             followUps.push(`<tool_result tool="${outcome.tool}" id="${callId}">ERROR ${ran.code}: ${ran.message}</tool_result>`);
           }
         }
@@ -370,13 +373,13 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
         // Gate refusal — no events, no execution (executor contract).
         const result = { code: 'denied', message: `Denied by permissions: ${outcome.tool}` };
         opts.send({ type: 'tool_result', callId, result, isError: true, sessionId: opts.sessionId });
-        await opts.store.append(opts.sessionId, toolRecord(callId, outcome.tool, { callId, ok: false, ...result }));
+        await opts.store.append(opts.sessionId, toolRecord(callId, outcome.tool, { callId, ok: false, ...result }, call.input));
         followUps.push(`<tool_result tool="${outcome.tool}" id="${callId}">ERROR denied: ${result.message}</tool_result>`);
       } else if (outcome.outcome === 'ok') {
-        await opts.store.append(opts.sessionId, toolRecord(callId, call.tool, { callId, ok: true, result: outcome.result }));
+        await opts.store.append(opts.sessionId, toolRecord(callId, call.tool, { callId, ok: true, result: outcome.result }, call.input));
         followUps.push(`<tool_result tool="${call.tool}" id="${callId}">${JSON.stringify(outcome.result)}</tool_result>`);
       } else {
-        await opts.store.append(opts.sessionId, toolRecord(callId, call.tool, { callId, ok: false, code: outcome.code, message: outcome.message }));
+        await opts.store.append(opts.sessionId, toolRecord(callId, call.tool, { callId, ok: false, code: outcome.code, message: outcome.message }, call.input));
         followUps.push(`<tool_result tool="${call.tool}" id="${callId}">ERROR ${outcome.code}: ${outcome.message}</tool_result>`);
       }
     }

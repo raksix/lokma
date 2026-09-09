@@ -5,7 +5,7 @@
  * Not imported by app code, so the Vite bundle ignores it.
  */
 import { applyServerFrame, dropRequest, initialWsUiState, permissionAnswer, questionAnswer } from '@/lib/ws';
-import { describeToolCall, formatBytes, parseMarkdownBlocks, sanitizeMdUrl, splitCodeFences, summarizeInput, summarizeResult } from './lokma-message';
+import { describeToolCall, formatBytes, parseMarkdownBlocks, sanitizeMdUrl, splitCodeFences, summarizeInput, summarizeResult, transcriptToolEntry } from './lokma-message';
 
 function assert(cond: boolean, label: string): void {
   if (!cond) throw new Error(`FAIL: ${label}`);
@@ -93,5 +93,20 @@ assert(summarizeResult('write_file', { ok: true, result: { path: 'b.html' } }) =
 assert(summarizeResult('read_file', { ok: false, code: 'denied', message: 'Denied by permissions: read_file' }).startsWith('Denied by'), 'error message shown, no dump');
 assert(summarizeResult('read_file', { ok: true, result: {} }) === '', 'quiet success stays quiet');
 assert(summarizeResult('x', undefined) === '', 'missing result is empty');
+
+// 9. REQ-074: transcript tool rows become trace entries (Hermes parity).
+const tEntry = transcriptToolEntry({
+  role: 'tool',
+  content: JSON.stringify({ callId: 't1', ok: true, result: { path: 'Docs', entries: [1, 2] }, input: { path: 'Docs' } }),
+  toolName: 'list_files',
+  toolCallId: 't1',
+});
+assert(tEntry !== null && tEntry.tool === 'list_files', 'tool row parses with name');
+assert(tEntry !== null && describeToolCall(tEntry.tool, tEntry.input) === 'Listed Docs', 'transcript input renders human sentence');
+assert(tEntry !== null && summarizeResult(tEntry.tool, tEntry.result) === '2 entries', 'transcript outcome summarized');
+const tOld = transcriptToolEntry({ role: 'tool', content: JSON.stringify({ callId: 't2', ok: true, result: {} }), toolName: 'run_command' });
+assert(tOld !== null && describeToolCall(tOld.tool, tOld.input) === 'Ran command', 'old rows without input fall back');
+assert(transcriptToolEntry({ role: 'assistant', content: 'hi' }) === null, 'non-tool rows ignored');
+assert(transcriptToolEntry({ role: 'tool', content: 'not-json' }) === null, 'broken rows ignored');
 
 console.log('lokma-message.test.ts: all W1-2 checks passed');

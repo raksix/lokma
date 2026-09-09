@@ -443,48 +443,81 @@ export function AssistantBody({
 
 // ─── Thought trace (real tool_start / tool_result frames) ────────────────────
 
+/** One tool row — shared by the live trace and transcript tool rows (REQ-074). */
+export function ToolCallRow({ entry }: { entry: ToolCallEntry }) {
+  const e = entry;
+  const running = e.result === undefined;
+  const ToolIcon = TOOL_ICONS[e.tool] ?? Wrench;
+  const outcome = summarizeResult(e.tool, e.result);
+  return (
+    <div
+      className={`flex items-start gap-2 rounded-lg border px-2.5 py-1.5 text-xs leading-[1.6] ${
+        e.isError
+          ? 'border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950/30'
+          : 'border-line bg-muted/30 dark:bg-[#1E1E21]/50'
+      }`}
+    >
+      {running ? (
+        <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-terracotta" />
+      ) : e.isError ? (
+        <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-red-100 text-[10px] text-red-600">
+          !
+        </span>
+      ) : (
+        <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+      )}
+      <div className="min-w-0 flex-1">
+        <span className="inline-flex items-center gap-1.5 text-[13px] text-zinc-700 dark:text-zinc-200">
+          <ToolIcon className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+          <span className="truncate font-medium">{describeToolCall(e.tool, e.input)}</span>
+          {running && <span className="shrink-0 text-[11px] text-zinc-400">Running…</span>}
+        </span>
+        {!running && outcome && (
+          <div className={`mt-0.5 truncate text-[11px] ${e.isError ? 'text-red-600 dark:text-red-400' : 'text-zinc-400'}`}>
+            {outcome}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Transcript `role: 'tool'` row → trace entry (REQ-074, Hermes parity: the
+ * row survives refresh with live-trace detail). New rows carry `input`
+ * (server persists it); old rows fall back to the outcome-only sentence.
+ * Returns null when the row is not a tool record.
+ */
+export function transcriptToolEntry(m: { role: string; content: string; toolName?: string; toolCallId?: string }): ToolCallEntry | null {
+  if (m.role !== 'tool') return null;
+  let body: Record<string, unknown> | null = null;
+  try {
+    const parsed: unknown = JSON.parse(m.content);
+    if (parsed && typeof parsed === 'object') body = parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  if (!body) return null;
+  const tool = m.toolName ?? (typeof body.tool === 'string' ? body.tool : 'unknown');
+  const ok = body.ok !== false;
+  return {
+    tool,
+    input: (body as Record<string, unknown>).input,
+    result: body,
+    isError: !ok,
+  };
+}
+
 export function ThoughtTrace({ toolCalls }: { toolCalls: Record<string, ToolCallEntry> }) {
   const entries = Object.entries(toolCalls);
   if (entries.length === 0) return null;
   return (
     <div className="mt-2 space-y-1.5">
-      {entries.map(([callId, e]) => {
-        const running = e.result === undefined;
-        const ToolIcon = TOOL_ICONS[e.tool] ?? Wrench;
-        const outcome = summarizeResult(e.tool, e.result);
-        return (
-          <div
-            key={callId}
-            className={`flex items-start gap-2 rounded-lg border px-2.5 py-1.5 text-xs leading-[1.6] ${
-              e.isError
-                ? 'border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950/30'
-                : 'border-line bg-muted/30 dark:bg-[#1E1E21]/50'
-            }`}
-          >
-            {running ? (
-              <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-terracotta" />
-            ) : e.isError ? (
-              <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-red-100 text-[10px] text-red-600">
-                !
-              </span>
-            ) : (
-              <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
-            )}
-            <div className="min-w-0 flex-1">
-              <span className="inline-flex items-center gap-1.5 text-[13px] text-zinc-700 dark:text-zinc-200">
-                <ToolIcon className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-                <span className="truncate font-medium">{describeToolCall(e.tool, e.input)}</span>
-                {running && <span className="shrink-0 text-[11px] text-zinc-400">Running…</span>}
-              </span>
-              {!running && outcome && (
-                <div className={`mt-0.5 truncate text-[11px] ${e.isError ? 'text-red-600 dark:text-red-400' : 'text-zinc-400'}`}>
-                  {outcome}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
+      {entries.map(([callId, e]) => (
+        <div key={callId}>
+          <ToolCallRow entry={e} />
+        </div>
+      ))}
     </div>
   );
 }

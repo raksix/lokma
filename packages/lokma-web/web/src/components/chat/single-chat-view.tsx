@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ChevronUp, Copy, GitFork, History, Pencil, User } from 'lucide-react';
+import { ChevronUp, Copy, GitFork, History, Pencil, User, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { HeroSection } from './hero-section';
@@ -16,6 +16,8 @@ import {
   RunErrorCard,
   ThinkingTrace,
   ThoughtTrace,
+  ToolCallRow,
+  transcriptToolEntry,
 } from './lokma-message';
 import type { PermissionRequest, QuestionRequest, ToolCallEntry } from '@/lib/ws';
 import { prefersReducedMotion } from '@/components/shell/use-prefers-reduced-motion';
@@ -32,7 +34,7 @@ function scrollBehavior(): ScrollBehavior {
  * on disk, and the hero cards each create a real session.
  */
 
-export type TranscriptMessage = { role: string; content: string; timestamp?: string };
+export type TranscriptMessage = { role: string; content: string; timestamp?: string; toolName?: string; toolCallId?: string };
 export type PendingMessage = { key: number; text: string };
 
 function formatTime(iso: string | undefined): string {
@@ -276,6 +278,22 @@ export function SingleChatView({
             )}
             {transcript.slice(window.start).map((m, k) => {
               const i = window.start + k;
+              if (m.role === 'tool') {
+                // REQ-074: tool rows render as tool rows in the timeline
+                // (never raw JSON) — the live trace detail survives refresh.
+                const entry = transcriptToolEntry(m);
+                if (!entry) return null;
+                return (
+                  <div key={`${i}-${m.timestamp ?? ''}`} className="flex gap-3">
+                    <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full border border-line bg-muted shadow-sm">
+                      <Wrench className="h-4 w-4 text-zinc-500" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <ToolCallRow entry={entry} />
+                    </div>
+                  </div>
+                );
+              }
               return m.role === 'user' ? (
                 <UserRow key={`${i}-${m.timestamp ?? ''}`} index={i} message={m} onEditSave={onEditSave} onRewindTo={onRewindTo} onCopy={onCopy} />
               ) : (

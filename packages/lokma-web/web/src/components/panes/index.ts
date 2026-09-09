@@ -18,9 +18,12 @@ export {
   dropZoneFor,
   encodeInspectorDrag,
   encodeTabMove,
+  findLayoutNode,
+  findParentNode,
   inspectorLabel,
   isInspectorTabId,
   isPaneTab,
+  isPaneUnder,
   isRailDropId,
   isValidRelPath,
   isValidSessionId,
@@ -46,6 +49,7 @@ export {
   type RailDropId,
 } from './panes';
 export { WorkspacePane, PaneFilePreview, PaneTabPicker, SessionDropChooser, formatBytes, type PaneCtx } from './pane';
+export { FullscreenPlaceholder, PaneFullscreenModal } from './fullscreen-modal';
 export { SplitTree } from './split-tree';
 export { WindowedCanvas, parseWindowedPos, WINDOWED_POS_KEY, WINDOWED_MIN_W, WINDOWED_MIN_H, type WindowPos } from './windowed-canvas';
 export { TAB_ICONS } from './tab-icons';

@@ -107,7 +107,7 @@
 - [REQ-086](finished/REQ-086-terminal-cift-yazma.md) — Terminal çift yazma dedup — done
 - [REQ-087](finished/REQ-087-yeni-projede-session.md) — Yeni projede session açılmıyor / yanlış projede — done
 - [REQ-088](finished/REQ-088-modal-otomatik-doldurma.md) — Modalda alanlar birbirini otomatik doldursun — done
-- [REQ-089](REQ-089-pane-fullscreen-modal.md) — Pane fullscreen: header butonu + modal + split — pending
+- [REQ-089](finished/REQ-089-pane-fullscreen-modal.md) — Pane fullscreen: header butonu + modal + split — done
 - [REQ-090](finished/REQ-090-single-windowed-reset-kaldir.md) — Pane üstü Single/Windowed/Reset kalksın — done
 - [REQ-091](REQ-091-mobil-navbar-menu-tuslari.md) — Mobil üst navbar'da sol/sağ menü tuşları — pending
 - [REQ-092](REQ-092-kullanici-yonetimi-bolumu.md) — Settings'e admin kullanıcı yönetimi bölümü — pending

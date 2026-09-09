@@ -394,6 +394,46 @@ export function collectPaneIds(layout: LayoutNode): string[] {
   return layout.children.flatMap(collectPaneIds);
 }
 
+// ─── Fullscreen modal subtree ops (REQ-089) ────
+//
+// The fullscreen modal is a LIVE VIEW of one layout subtree, never a copy:
+// the modal resolves `rootId` against the current tree on every render, the
+// background renders a placeholder for panes under that root (geometry stays
+// put, nothing mounts twice), and splits inside the modal widen the root to
+// the fresh parent so the new sibling appears inside the modal. Closing the
+// modal changes nothing — the live layout was underneath all along.
+
+/** Find any node (pane or split) by id; null when collapsed/closed away. */
+export function findLayoutNode(layout: LayoutNode, id: string): LayoutNode | null {
+  if (layout.id === id) return layout;
+  if (layout.type === 'split') {
+    for (const child of layout.children) {
+      const found = findLayoutNode(child, id);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+/** Parent split of a pane; null for a root-level pane or an unknown id. */
+export function findParentNode(layout: LayoutNode, paneId: string): LayoutNode | null {
+  if (layout.type === 'pane') return null;
+  for (const child of layout.children) {
+    if (child.type === 'pane' && child.id === paneId) return layout;
+    const deeper = findParentNode(child, paneId);
+    if (deeper) return deeper;
+  }
+  return null;
+}
+
+/** True when `paneId` lives inside the subtree rooted at `rootId`. */
+export function isPaneUnder(layout: LayoutNode, rootId: string, paneId: string): boolean {
+  if (rootId === paneId) return true;
+  const root = findLayoutNode(layout, rootId);
+  if (!root) return false;
+  return collectPaneIds(root).includes(paneId);
+}
+
 export function countPanes(layout: LayoutNode): number {
   return collectPaneIds(layout).length;
 }

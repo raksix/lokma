@@ -17,9 +17,12 @@ import {
   encodeInspectorDrag,
   encodeTabMove,
   filePreviewKind,
+  findLayoutNode,
+  findParentNode,
   inspectorLabel,
   isInspectorTabId,
   isPaneTab,
+  isPaneUnder,
   isRailDropId,
   isValidRelPath,
   isValidSessionId,
@@ -265,4 +268,55 @@ check("ts is text", filePreviewKind("src/a.ts") === "text");
 check("no ext is text", filePreviewKind("Makefile") === "text");
 
 console.log(`panes-075: ${passed} passed, ${failed} failed`);
+if (failed > 0) process.exit(1);
+
+/* 11 — REQ-089: fullscreen modal subtree helpers (live view, never a copy). */
+const tLayout: LayoutNode = {
+  type: "split",
+  id: "root",
+  dir: "row",
+  sizes: [50, 50],
+  children: [
+    { type: "pane", id: "a" },
+    {
+      type: "split",
+      id: "s1",
+      dir: "col",
+      sizes: [50, 50],
+      children: [
+        { type: "pane", id: "b" },
+        { type: "pane", id: "c" },
+      ],
+    },
+  ],
+};
+check("find root node", findLayoutNode(tLayout, "root") === tLayout);
+check("find nested split", findLayoutNode(tLayout, "s1")?.type === "split");
+check("find nested pane", findLayoutNode(tLayout, "c")?.type === "pane");
+check("find missing is null", findLayoutNode(tLayout, "zzz") === null);
+check("parent of nested pane", findParentNode(tLayout, "b")?.id === "s1");
+check("parent of top pane", findParentNode(tLayout, "a")?.id === "root");
+check("parent of solo root pane is null", findParentNode({ type: "pane", id: "solo" }, "solo") === null);
+check("parent of unknown is null", findParentNode(tLayout, "zzz") === null);
+check("pane under itself", isPaneUnder(tLayout, "b", "b") === true);
+check("pane under its split", isPaneUnder(tLayout, "s1", "c") === true);
+check("pane not under sibling subtree", isPaneUnder(tLayout, "s1", "a") === false);
+check("pane under root", isPaneUnder(tLayout, "root", "c") === true);
+check("unknown root is false", isPaneUnder(tLayout, "zzz", "a") === false);
+// Widen flow: splitting pane b wraps it in a fresh parent holding both.
+const widened = splitLayout(tLayout, "b", "row", "after", "d");
+const bParent = findParentNode(widened, "b");
+check("split wraps target in a fresh parent", bParent !== null && bParent.id !== "s1");
+check(
+  "fresh parent holds target+sibling",
+  bParent !== null && sameJson(collectPaneIds(bParent).sort(), ["b", "d"]),
+);
+check("origin still under fresh parent", bParent !== null && isPaneUnder(widened, bParent.id, "b"));
+// Collapse flow: closing the sibling dissolves the fresh parent again.
+const parentId = bParent ? bParent.id : "";
+const narrowed = closeLayoutPane(widened, "d");
+check("closing sibling collapses fresh parent", narrowed !== null && findLayoutNode(narrowed, parentId) === null);
+check("origin pane survives collapse", narrowed !== null && collectPaneIds(narrowed).includes("b"));
+
+console.log(`panes-089: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

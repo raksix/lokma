@@ -1,10 +1,12 @@
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import { usePaneStore } from '@/stores/pane';
 import { useSessionStore } from '@/stores/session';
 import type { UseWs } from '@/hooks/use-ws';
 import { emitToast } from '@/components/shell';
 import { SplitTree } from './split-tree';
 import { WindowedCanvas, parseWindowedPos, WINDOWED_POS_KEY, type WindowPos } from './windowed-canvas';
+import { FullscreenPlaceholder, PaneFullscreenModal } from './fullscreen-modal';
 import { WorkspacePane } from './pane';
 import {
   RESET_LAYOUT_EVENT,
@@ -12,7 +14,10 @@ import {
   closeLayoutPane,
   collectPaneIds,
   countPanes,
+  findLayoutNode,
+  findParentNode,
   isPaneTab,
+  isPaneUnder,
   makeFileTab,
   makePaneId,
   makeSessionTab,
@@ -60,6 +65,11 @@ export function TilingWorkspace({
   const [tabStates, setTabStates] = React.useState<Record<string, PaneTabState>>(loadTabStates);
   // REQ-042: floating window positions+sizes persist across reloads.
   const [winPos, setWinPos] = React.useState<Record<string, WindowPos>>(loadWindowedPos);
+  // REQ-089: fullscreen modal shows a LIVE view of one layout subtree
+  // (`root` node id; `origin` pane id for narrowing back after collapses).
+  // Not persisted — a reload lands on the plain layout, never a stale modal.
+  const [fullscreen, setFullscreen] = React.useState<{ root: string; origin: string } | null>(null);
+  const closeFullscreen = React.useCallback(() => setFullscreen(null), []);
   const dragWin = React.useRef<{ id: string; startX: number; startY: number; origX: number; origY: number } | null>(null);
 
   const paneIds = React.useMemo(() => collectPaneIds(layout), [layout]);
@@ -182,18 +192,34 @@ export function TilingWorkspace({
 
   const split = (targetPaneId: string, dir: 'row' | 'col', pos: 'before' | 'after', tab: PaneTab) => {
     const newPaneId = makePaneId();
-    setLayout(splitLayout(layout, targetPaneId, dir, pos, newPaneId));
+    const next = splitLayout(layout, targetPaneId, dir, pos, newPaneId);
+    setLayout(next);
     setTabStates((prev) => ({ ...prev, [newPaneId]: { tabs: [tab], active: tab.id } }));
     focusPane(newPaneId);
+    // REQ-089: a split inside the fullscreen modal widens the modal root to
+    // the fresh parent, so the new sibling appears INSIDE the modal (same
+    // handlers serve the modal and the background — no forked logic).
+    setFullscreen((f) => {
+      if (!f || !isPaneUnder(next, f.root, targetPaneId)) return f;
+      const parent = findParentNode(next, targetPaneId);
+      return parent ? { ...f, root: parent.id } : f;
+    });
   };
 
   // REQ-033 (concept parity): split buttons split IMMEDIATELY into an empty
   // pane whose picker offers live content — no arm-then-pick two-step.
   const splitEmpty = (targetPaneId: string, dir: 'row' | 'col') => {
     const newPaneId = makePaneId();
-    setLayout(splitLayout(layout, targetPaneId, dir, 'after', newPaneId));
+    const next = splitLayout(layout, targetPaneId, dir, 'after', newPaneId);
+    setLayout(next);
     setTabStates((prev) => ({ ...prev, [newPaneId]: { tabs: [], active: null } }));
     focusPane(newPaneId);
+    // REQ-089: the strip split buttons inside the modal widen like split().
+    setFullscreen((f) => {
+      if (!f || !isPaneUnder(next, f.root, targetPaneId)) return f;
+      const parent = findParentNode(next, targetPaneId);
+      return parent ? { ...f, root: parent.id } : f;
+    });
   };
 
   const closePane = (paneId: string) => {
@@ -227,18 +253,25 @@ export function TilingWorkspace({
     if (!isPaneTab(tab)) return;
     if (edge) {
       const newPaneId = makePaneId();
-      setLayout(splitLayout(layout, toPaneId, edge.dir, edge.pos, newPaneId));
+      const next = splitLayout(layout, toPaneId, edge.dir, edge.pos, newPaneId);
+      setLayout(next);
       setTabStates((prev) => {
-        const next = { ...prev };
-        const src = next[fromPaneId];
+        const nextStates = { ...prev };
+        const src = nextStates[fromPaneId];
         if (src) {
           const kept = src.tabs.filter((t) => t.id !== tab.id);
-          next[fromPaneId] = { tabs: kept, active: src.active === tab.id ? (kept[kept.length - 1]?.id ?? null) : src.active };
+          nextStates[fromPaneId] = { tabs: kept, active: src.active === tab.id ? (kept[kept.length - 1]?.id ?? null) : src.active };
         }
-        next[newPaneId] = { tabs: [tab], active: tab.id };
-        return next;
+        nextStates[newPaneId] = { tabs: [tab], active: tab.id };
+        return nextStates;
       });
       focusPane(newPaneId);
+      // REQ-089: an edge-drop split inside the modal widens like split().
+      setFullscreen((f) => {
+        if (!f || !isPaneUnder(next, f.root, toPaneId)) return f;
+        const parent = findParentNode(next, newPaneId);
+        return parent ? { ...f, root: parent.id } : f;
+      });
       return;
     }
     setTabStates((prev) => {
@@ -274,6 +307,26 @@ export function TilingWorkspace({
     }
   };
 
+  // REQ-089 — per-pane fullscreen: the strip button roots the modal at this
+  // pane. Already fullscreen → re-root (narrows back to one pane).
+  const openFullscreen = (paneId: string) => {
+    focusPane(paneId);
+    setFullscreen({ root: paneId, origin: paneId });
+  };
+
+  // REQ-089: a collapsed root narrows back to the origin pane; a closed
+  // origin closes the modal. The layout itself is never touched here.
+  React.useEffect(() => {
+    if (!fullscreen) return;
+    if (!findLayoutNode(layout, fullscreen.root)) {
+      if (collectPaneIds(layout).includes(fullscreen.origin)) {
+        setFullscreen({ root: fullscreen.origin, origin: fullscreen.origin });
+      } else {
+        setFullscreen(null);
+      }
+    }
+  }, [layout, fullscreen]);
+
   // REQ-045 — the TilingBar Reset button moved to the AppShell mode
   // cluster; the handler stays here where the tab/window state lives.
   // Dispatched as RESET_LAYOUT_EVENT, same pattern as FOCUS_FILES_EVENT.
@@ -282,6 +335,7 @@ export function TilingWorkspace({
       resetStoreLayout();
       setTabStates({});
       setWinPos({});
+      setFullscreen(null);
       try {
         localStorage.removeItem(TILING_TABS_KEY);
         localStorage.removeItem(WINDOWED_POS_KEY);
@@ -294,7 +348,7 @@ export function TilingWorkspace({
     return () => window.removeEventListener(RESET_LAYOUT_EVENT, onReset);
   }, [resetStoreLayout]);
 
-  const renderPane = (paneId: string) => {
+  const renderPaneLive = (paneId: string) => {
     const st = states[paneId] ?? { tabs: [], active: null };
     return (
       <WorkspacePane
@@ -311,8 +365,23 @@ export function TilingWorkspace({
         onMoveTab={moveTab}
         onOpenSession={onOpenSession}
         onPopout={popoutPane}
+        onFullscreen={openFullscreen}
       />
     );
+  };
+
+  // REQ-089: panes under the fullscreen root render as placeholders in the
+  // background (same slot, no geometry shift, nothing mounted twice). The
+  // live pane renders only inside the modal. Mount boundary contract matches
+  // tab switches: tab/layout state persists (workspace state + localStorage),
+  // in-tab drafts are ephemeral.
+  const renderPane = (paneId: string) => {
+    if (fullscreen && isPaneUnder(layout, fullscreen.root, paneId)) {
+      const st = states[paneId];
+      const current = st?.tabs.find((t) => t.id === st.active) ?? st?.tabs[0];
+      return <FullscreenPlaceholder title={current ? current.title : 'Empty pane'} onExit={closeFullscreen} />;
+    }
+    return renderPaneLive(paneId);
   };
 
   const paneTitles = paneIds.map((pid) => {
@@ -340,6 +409,16 @@ export function TilingWorkspace({
     window.addEventListener('pointerup', up);
   };
 
+  // REQ-089: the modal is a live view of the root subtree, resolved fresh on
+  // every render (splits widen the root via split()/moveTab; collapses
+  // narrow it via the effect above — an unresolvable root renders nothing
+  // until the effect narrows/closes). Portaled to body so no ancestor
+  // transform/overflow can clip the viewport overlay.
+  const fullscreenSub = fullscreen ? findLayoutNode(layout, fullscreen.root) : null;
+  const fullscreenTitle = fullscreen
+    ? (paneTitles.find((p) => p.id === fullscreen.origin)?.title ?? 'Pane')
+    : '';
+
   // REQ-045 — the TilingBar strip is gone (tool buttons live on the rail,
   // splits on the pane strip). The workspace renders only the live layout.
   return (
@@ -364,6 +443,22 @@ export function TilingWorkspace({
           <SplitTree node={layout} renderPane={renderPane} onResize={(nodeId, sizes) => setLayout(resizeLayoutNode(layout, nodeId, sizes))} />
         )}
       </div>
+      {fullscreen && fullscreenSub
+        ? createPortal(
+            <PaneFullscreenModal title={fullscreenTitle} onClose={closeFullscreen}>
+              {fullscreenSub.type === 'pane' ? (
+                <div className="flex min-h-0 min-w-0 flex-1">{renderPaneLive(fullscreenSub.id)}</div>
+              ) : (
+                <SplitTree
+                  node={fullscreenSub}
+                  renderPane={renderPaneLive}
+                  onResize={(nodeId, sizes) => setLayout(resizeLayoutNode(layout, nodeId, sizes))}
+                />
+              )}
+            </PaneFullscreenModal>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

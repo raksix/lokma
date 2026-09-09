@@ -98,3 +98,4 @@
 - [REQ-077](finished/REQ-077-otomatik-retry-backoff.md) — Otomatik retry + backoff (ayarlanabilir) — done
 - [REQ-078](finished/REQ-078-proje-grubu-5li-expand.md) — By-Projects 5li + expand + proje satırı — done
 - [REQ-079](finished/REQ-079-terminal-sade-full-panel.md) — Terminal sade: full-panel icerik, bar yok, otomatik shell — done
+- [REQ-080](finished/REQ-080-gate-e2e-token.md) — Gate E2E token minter (flag ellemeden test) — done

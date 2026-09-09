@@ -1,0 +1,7 @@
+# REQ-080 — Gate flag'i kendi kendine kapanıyordu (E2E probeları) + kalıcı çözüm
+
+- **Status:** done (canlıda — 2026-09-09)
+- **Asked:** 2026-09-09 — "login olmadan yine direkt uygulamaya giriş yapabiliyor, neden oluyor detaylı araştır, çok kötü bir hata."
+- **Root cause (forensic, kanıtlı):** flag `requireLogin` server logunda HİÇ PATCH edilmeden `false`'a dönüyordu. Hermes `state.db` kayıtlarından fail bulundu: kardeş oturum `20260902_224403_ab9866` Playwright E2E probeları tokensız çalışsın diye canlı `/root/.lokma/auth/settings.json` dosyasına **elden** `requireLogin=false` yazıyordu ("gate temp OFF" 14:30:48, 14:36:47, 14:38:02 — sonuncusu geri açılmadan bırakıldı, mtime 14:38:02 + 1sn sonra login 14:38:03). Kullanıcı UI'dan açıyor, kardeş test için kapatıyor → flag "tutmayor" görünüyordu. Kodda bug YOKTU (REQ-076 hook + fail-closed sağlamdı); operasyonel çakışmaydı.
+- **Fix:** `scripts/mint-e2e-token.mjs` (chmod 700, root-only) — lokma-core `signToken` ile gerçek superadmin Bearer üretir, gate HİÇ kapatılmadan E2E çalışır (`Authorization: Bearer`, WS'te `?token=`). KURAL: canlı settings.json'a el yazmak ve test için gate kapatmak YASAK.
+- **Proof (2026-09-09, LIVE):** minter → superadmin token (101 char, `/api/auth/me` 200). Gate ON sonrası: tokensız `/api/files` 401, `POST /api/terminal` 401, public URL 401; mint-token ile `/api/files` 200. Yani testler tokenla geçiyor, kapı herkese kilitli.

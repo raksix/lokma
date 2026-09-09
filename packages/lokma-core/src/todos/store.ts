@@ -1,7 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { TODO_CLAIM_LEASE_MS, TodoSchema, type Todo } from 'lokma-shared';
+import { TODO_CLAIM_LEASE_MS, TodoSchema, type Todo } from '@lokma/shared';
 import { readJson, writeAtomic } from '../utils/fs.js';
 
 /**

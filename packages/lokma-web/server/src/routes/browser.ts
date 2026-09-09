@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { BrowserError, browserTabs } from 'lokma-core';
+import { BrowserError, browserTabs } from '@lokma/core';
 
 /**
  * Browser tabs — per-agent tab registry for the BrowserPane (W3-12).

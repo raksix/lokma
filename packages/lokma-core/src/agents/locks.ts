@@ -1,7 +1,7 @@
 import { readdir, readFile, writeFile, rm, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { sha1HexSync } from 'lokma-shared';
-import type { Lock } from 'lokma-shared';
+import { sha1HexSync } from '@lokma/shared';
+import type { Lock } from '@lokma/shared';
 import { expandHome, ensureDir } from '../utils/fs.js';
 
 /**

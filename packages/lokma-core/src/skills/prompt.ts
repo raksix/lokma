@@ -1,4 +1,4 @@
-import type { Skill } from 'lokma-shared';
+import type { Skill } from '@lokma/shared';
 
 /**
  * Build <available_skills> prompt block — injected every turn.

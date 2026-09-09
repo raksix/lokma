@@ -1,5 +1,5 @@
 {
-  "name": "lokma-shared",
+  "name": "@lokma/shared",
   "version": "0.1.0",
   "type": "module",
   "description": "Shared Zod schemas and WS protocol - single source of truth for the Lokma harness",
@@ -9,11 +9,17 @@
     "url": "https://github.com/raksix/lokma.git",
     "directory": "packages/lokma-shared"
   },
-  "keywords": ["lokma", "schemas", "protocol"],
+  "keywords": [
+    "lokma",
+    "schemas",
+    "protocol"
+  ],
   "engines": {
     "node": ">=22.0.0"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },

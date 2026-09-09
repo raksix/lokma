@@ -1,4 +1,4 @@
-import { GlobalConfigSchema, ProjectSettingsSchema, type GlobalConfig } from 'lokma-shared';
+import { GlobalConfigSchema, ProjectSettingsSchema, type GlobalConfig } from '@lokma/shared';
 import { expandHome, readJson } from '../utils/fs.js';
 
 /**

@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { Permissions } from 'lokma-shared';
+import type { Permissions } from '@lokma/shared';
 import { decideToolCall, describeToolCall } from './gate.js';
 import type { ToolRegistry } from './registry.js';
 

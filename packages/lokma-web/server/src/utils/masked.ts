@@ -1,5 +1,5 @@
-import { loadConfig } from 'lokma-core';
-import { getMaskedCredentials } from 'lokma-core';
+import { loadConfig } from '@lokma/core';
+import { getMaskedCredentials } from '@lokma/core';
 
 /**
  * Masked config for GET /api/config — never leaks raw apiKey.

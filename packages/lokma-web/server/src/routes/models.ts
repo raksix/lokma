@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
-import { applyModelFlags, getCatalog, invalidateCatalog, providerOfId, type CatalogModel } from 'lokma-ai';
-import { loadConfig, saveGlobal } from 'lokma-core';
+import { applyModelFlags, getCatalog, invalidateCatalog, providerOfId, type CatalogModel } from '@lokma/ai';
+import { loadConfig, saveGlobal } from '@lokma/core';
 import { listProviderViews, probeProvider, providerNeedsKey, resolveApiKey } from './providers.js';
 
 /**

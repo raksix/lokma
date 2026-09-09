@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { GitError, RepoGit, listLocks } from 'lokma-core';
+import { GitError, RepoGit, listLocks } from '@lokma/core';
 import { relative, resolve, sep } from 'node:path';
 
 /**

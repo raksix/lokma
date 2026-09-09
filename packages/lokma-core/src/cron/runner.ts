@@ -1,6 +1,6 @@
 import { appendFile, readFile, writeFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
-import type { CronJob } from 'lokma-shared';
+import type { CronJob } from '@lokma/shared';
 import { dayMatches, expandField, splitSchedule } from './cron.js';
 import { ensureDir, expandHome } from '../utils/fs.js';
 

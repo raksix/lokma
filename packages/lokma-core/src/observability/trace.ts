@@ -1,7 +1,7 @@
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import type { Agent } from 'lokma-shared';
+import type { Agent } from '@lokma/shared';
 import { listLocks } from '../agents/locks.js';
 import { requireAgent } from '../agents/registry.js';
 

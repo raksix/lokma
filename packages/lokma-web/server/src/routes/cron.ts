@@ -11,7 +11,7 @@ import {
   listCronJobs,
   listRunRecords,
   updateCronJob,
-} from 'lokma-core';
+} from '@lokma/core';
 import { fireCronJob } from '../cron-runner.js';
 
 /**

@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { SkillUsageMapSchema, type SkillUsageMap } from 'lokma-shared';
+import { SkillUsageMapSchema, type SkillUsageMap } from '@lokma/shared';
 import { expandHome, writeAtomic } from '../utils/fs.js';
 
 /**

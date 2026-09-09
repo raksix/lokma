@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { CredentialsSchema, type Credentials } from 'lokma-shared';
+import { CredentialsSchema, type Credentials } from '@lokma/shared';
 import { expandHome, writeAtomic } from '../utils/fs.js';
 import { decrypt, encrypt, getEncryptionKey, isEncrypted } from '../utils/crypto.js';
 

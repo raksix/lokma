@@ -13,12 +13,12 @@ import {
   type ProjectVisibility,
   type Role,
   type UserStatus,
-} from 'lokma-shared';
-import type { User } from 'lokma-shared';
+} from '@lokma/shared';
+import type { User } from '@lokma/shared';
 import { readJson, writeAtomic } from '../utils/fs.js';
 
 /** Re-export the public user type so server routes import from one place. */
-export type { User } from 'lokma-shared';
+export type { User } from '@lokma/shared';
 
 /**
  * Auth store — users, projects, memberships, invites + RBAC `can()`

@@ -12,7 +12,7 @@ import {
   listDiagrams,
   updateDiagram,
   validateIr,
-} from 'lokma-core';
+} from '@lokma/core';
 
 /**
  * Archify — typed IR → validated deterministic HTML/SVG (W5-17, Docs/31).

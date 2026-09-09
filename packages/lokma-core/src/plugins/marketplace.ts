@@ -1,4 +1,4 @@
-import { MarketplaceItemSchema, type MarketplaceItem } from 'lokma-shared';
+import { MarketplaceItemSchema, type MarketplaceItem } from '@lokma/shared';
 
 /**
  * Remote plugin marketplace — GitHub `lokma-plugin` topic search

@@ -1,4 +1,4 @@
-import type { Permissions } from 'lokma-shared';
+import type { Permissions } from '@lokma/shared';
 
 /**
  * Permission gate — one decision function behind every tool call.

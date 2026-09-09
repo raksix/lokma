@@ -1,7 +1,7 @@
 import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, normalize, relative, resolve } from 'node:path';
 import { expandHome } from '../utils/fs.js';
-import type { Skill } from 'lokma-shared';
+import type { Skill } from '@lokma/shared';
 
 /**
  * Skills registry — scans SKILL.md files, caches snapshot by mtime.

@@ -3,7 +3,7 @@ import { rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { promisify } from 'node:util';
-import { MarketplaceItemSchema, type MarketplaceItem } from 'lokma-shared';
+import { MarketplaceItemSchema, type MarketplaceItem } from '@lokma/shared';
 import {
   MarketplaceError,
   normalizeMarketplaceQuery,

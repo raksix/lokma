@@ -10,7 +10,7 @@ import {
   patchBot,
   publishBot,
   runBotAsAgent,
-} from 'lokma-core';
+} from '@lokma/core';
 
 /**
  * Bots — shareable `bot.json` packages for the BotsPane (W5-20, Docs/35).

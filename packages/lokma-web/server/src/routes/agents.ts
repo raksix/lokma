@@ -18,7 +18,7 @@ import {
   resumeAgent,
   updateAgent,
   writeAgentDoc,
-} from 'lokma-core';
+} from '@lokma/core';
 
 /**
  * Agents — registry CRUD + lifecycle for the AgentHub pane (W4-13).

@@ -12,7 +12,7 @@ import {
   ServerMessageSchema,
   type ClientMessage,
   type ServerMessage,
-} from 'lokma-shared/protocol/ws';
+} from '@lokma/shared/protocol/ws';
 
 export type { ClientMessage, ServerMessage };
 

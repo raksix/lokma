@@ -1,7 +1,7 @@
 import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { AgentSchema, PersonaSchema, type Agent, type AgentState } from 'lokma-shared';
+import { AgentSchema, PersonaSchema, type Agent, type AgentState } from '@lokma/shared';
 import { emitAgentEvent } from './events.js';
 import { ensureDir, expandHome, readJson, writeAtomic } from '../utils/fs.js';
 

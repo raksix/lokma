@@ -6,7 +6,7 @@
  */
 import { create } from 'zustand';
 import { api, ApiError, type AuthProject, type SessionSummary } from '@/lib/api';
-import type { ServerMessage } from 'lokma-shared/protocol/ws';
+import type { ServerMessage } from '@lokma/shared/protocol/ws';
 
 export type SessionStore = {
   sessions: SessionSummary[];

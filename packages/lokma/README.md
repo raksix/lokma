@@ -3,7 +3,7 @@
 Agentic coding harness CLI — terminal TUI, multi-provider login, config, doctor.
 
 ```sh
-npm i -g lokma
+npm i -g @lokma/cli
 lokma              # terminal TUI (interactive)
 lokma tui -p "..." # one-shot prompt
 lokma doctor       # subsystem checks

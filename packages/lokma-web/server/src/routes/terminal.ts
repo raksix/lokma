@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { TerminalError, terminalManager } from 'lokma-core';
+import { TerminalError, terminalManager } from '@lokma/core';
 
 /**
  * Terminals — live shell processes for the TerminalPane (W3-10).

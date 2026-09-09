@@ -9,7 +9,7 @@ import {
   searchMarketplace,
   setPluginEnabled,
   suspendedPrefixes,
-} from 'lokma-core';
+} from '@lokma/core';
 
 /**
  * Plugins — kernel registry for the Plugins pane (W6-23, Docs/23).

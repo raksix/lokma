@@ -1,5 +1,5 @@
 {
-  "name": "lokma-ai",
+  "name": "@lokma/ai",
   "version": "0.1.0",
   "type": "module",
   "description": "Multi-provider abstraction for Lokma - streaming chat over Anthropic and OpenAI-compatible APIs",
@@ -9,11 +9,18 @@
     "url": "https://github.com/raksix/lokma.git",
     "directory": "packages/lokma-ai"
   },
-  "keywords": ["lokma", "llm", "providers", "streaming"],
+  "keywords": [
+    "lokma",
+    "llm",
+    "providers",
+    "streaming"
+  ],
   "engines": {
     "node": ">=22.0.0"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },
@@ -33,8 +40,8 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "lokma-shared": "workspace:*",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "@lokma/shared": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.3",

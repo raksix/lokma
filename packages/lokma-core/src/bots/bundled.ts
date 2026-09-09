@@ -1,4 +1,4 @@
-import { BotSchema, type Bot } from 'lokma-shared';
+import { BotSchema, type Bot } from '@lokma/shared';
 
 /**
  * Bundled bot templates — real specs, not sample data.

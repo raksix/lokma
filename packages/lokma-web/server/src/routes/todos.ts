@@ -13,7 +13,7 @@ import {
   releaseTodo,
   userFromToken,
   type User,
-} from 'lokma-core';
+} from '@lokma/core';
 import { requestToken } from './auth.js';
 
 /**

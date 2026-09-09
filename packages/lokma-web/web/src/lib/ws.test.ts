@@ -4,7 +4,7 @@
  * No test framework — plain asserts so `tsc -b` stays dependency-free.
  * Not imported by app code, so the Vite bundle ignores it.
  */
-import { ClientMessageSchema } from 'lokma-shared/protocol/ws';
+import { ClientMessageSchema } from '@lokma/shared/protocol/ws';
 import {
   abortMessage,
   applyServerFrame,

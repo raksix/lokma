@@ -6,7 +6,7 @@ import {
   listRuns,
   readJunit,
   runTestRun,
-} from 'lokma-core';
+} from '@lokma/core';
 
 /**
  * Testing Lab — TestSprite-inspired self-hosted runs (W5-19, Docs/33).

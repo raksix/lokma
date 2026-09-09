@@ -12,14 +12,14 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "lokma-shared": "workspace:*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "zod": "^3.23.8",
     "zustand": "^5.0.2",
     "lucide-react": "^0.469.0",
     "clsx": "^2.1.1",
-    "tailwind-merge": "^2.5.4"
+    "tailwind-merge": "^2.5.4",
+    "@lokma/shared": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.3",

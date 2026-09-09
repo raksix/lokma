@@ -20,7 +20,7 @@ import {
   joinKnowledgeSections,
   readBotKnowledge,
 } from './chat-context.js';
-import type { Bot } from 'lokma-shared';
+import type { Bot } from '@lokma/shared';
 
 const home = homedir();
 if (!home.startsWith('/tmp/')) {

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
-import { loadConfig, saveGlobal } from 'lokma-core';
-import { getMaskedCredentials } from 'lokma-core';
-import { GlobalConfigSchema } from 'lokma-shared';
+import { loadConfig, saveGlobal } from '@lokma/core';
+import { getMaskedCredentials } from '@lokma/core';
+import { GlobalConfigSchema } from '@lokma/shared';
 
 /**
  * Config routes — masked, same files as CLI.

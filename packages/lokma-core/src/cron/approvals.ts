@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { appendFile, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { ApprovalDecision } from 'lokma-shared';
+import type { ApprovalDecision } from '@lokma/shared';
 import { ensureDir } from '../utils/fs.js';
 
 /**

@@ -9,7 +9,7 @@ import {
   getShare,
   listShares,
   renderShareHtml,
-} from 'lokma-core';
+} from '@lokma/core';
 
 /**
  * Observability — agent trace timeline + frozen share snapshots (W6-24)

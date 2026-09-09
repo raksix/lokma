@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { PluginRecordSchema, type PluginCategory, type PluginRecord } from 'lokma-shared';
+import { PluginRecordSchema, type PluginCategory, type PluginRecord } from '@lokma/shared';
 import { ensureDir, fileExists, writeAtomic } from '../utils/fs.js';
 
 /**

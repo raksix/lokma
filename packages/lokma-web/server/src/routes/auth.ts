@@ -25,7 +25,7 @@ import {
   userFromToken,
   visibleProjects,
   type User,
-} from 'lokma-core';
+} from '@lokma/core';
 
 /**
  * Auth + users + projects (Docs/36-AUTH-and-PERMISSIONS §8).

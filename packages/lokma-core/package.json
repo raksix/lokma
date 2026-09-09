@@ -1,5 +1,5 @@
 {
-  "name": "lokma-core",
+  "name": "@lokma/core",
   "version": "0.1.0",
   "type": "module",
   "description": "Lokma harness kernel - agent loop, tools, sessions, providers, config, skills, memory",
@@ -9,11 +9,18 @@
     "url": "https://github.com/raksix/lokma.git",
     "directory": "packages/lokma-core"
   },
-  "keywords": ["lokma", "agent", "harness", "tools"],
+  "keywords": [
+    "lokma",
+    "agent",
+    "harness",
+    "tools"
+  ],
   "engines": {
     "node": ">=22.0.0"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },
@@ -43,9 +50,9 @@
   },
   "dependencies": {
     "chokidar": "^5.0.0",
-    "lokma-shared": "workspace:*",
-    "lokma-ai": "workspace:*",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "@lokma/shared": "workspace:*",
+    "@lokma/ai": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.3",

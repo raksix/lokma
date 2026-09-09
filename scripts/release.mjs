@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Lokma release helper (npm + bun share the npm registry, so one publish
- * covers `npm i -g lokma` and `bun install -g lokma` / `bunx lokma`).
+ * covers `npm i -g @lokma/cli` and `bun install -g @lokma/cli` / `bunx @lokma/cli`).
  *
  *   bun scripts/release.mjs pack     → tarballs into release/
  *   bun scripts/release.mjs publish  → pack + npm publish in dep order
@@ -18,12 +18,12 @@ import { promisify } from 'node:util';
 const exec = promisify(execFile);
 const SHELL = process.platform === 'win32';
 const ROOT = resolve(import.meta.dir, '..');
-const PKGS = ['lokma-shared', 'lokma-ai', 'lokma-core', 'lokma'];
+const PKGS = ['@lokma/shared', '@lokma/ai', '@lokma/core', '@lokma/cli'];
 const DIRS = {
-  'lokma-shared': 'packages/lokma-shared',
-  'lokma-ai': 'packages/lokma-ai',
-  'lokma-core': 'packages/lokma-core',
-  lokma: 'packages/lokma',
+  '@lokma/shared': 'packages/lokma-shared',
+  '@lokma/ai': 'packages/lokma-ai',
+  '@lokma/core': 'packages/lokma-core',
+  '@lokma/cli': 'packages/lokma',
 };
 
 async function rewritePkg(pkgDir, version) {
@@ -36,7 +36,7 @@ async function rewritePkg(pkgDir, version) {
       if (v === 'workspace:*') deps[k] = `^${version}`;
     }
   }
-  if (raw.name === 'lokma-core') delete raw.bin;
+  if (raw.name === '@lokma/core') delete raw.bin;
   await writeFile(path, JSON.stringify(raw, null, 2) + '\n');
 }
 
@@ -50,7 +50,7 @@ async function buildPublishables() {
   await exec('bun', ['run', 'build:shared'], { cwd: ROOT });
   await exec('bun', ['run', 'build:ai'], { cwd: ROOT });
   await exec('bun', ['run', 'build:core'], { cwd: ROOT });
-  await exec('bun', ['--filter=lokma', 'run', 'build'], { cwd: ROOT });
+  await exec('bun', ['--filter=@lokma/cli', 'run', 'build'], { cwd: ROOT });
 }
 
 async function pack() {
@@ -87,7 +87,8 @@ async function publish() {
   await pack();
   const out = join(ROOT, 'release');
   const files = (await readdir(out)).filter((f) => f.endsWith('.tgz'));
-  const rank = (f) => PKGS.findIndex((n) => f.startsWith(`${n}-`));
+  const norm = (s) => s.replace(/^@/, '').replace('/', '-');
+  const rank = (f) => PKGS.findIndex((n) => norm(f).startsWith(norm(n) + '-'));
   files.sort((a, b) => rank(a) - rank(b));
   for (const f of files) {
     console.log('publishing', f);

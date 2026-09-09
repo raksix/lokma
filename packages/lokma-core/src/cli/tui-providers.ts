@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import type { Interface } from 'node:readline/promises';
-import { applyModelFlags, getCatalog, invalidateCatalog, type CatalogModel } from 'lokma-ai';
+import { applyModelFlags, getCatalog, invalidateCatalog, type CatalogModel } from '@lokma/ai';
 import {
   isValidBaseUrl,
   isValidProviderId,

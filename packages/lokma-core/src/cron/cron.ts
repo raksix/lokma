@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { CronJob } from 'lokma-shared';
+import type { CronJob } from '@lokma/shared';
 import { getAgent } from '../agents/registry.js';
 import { ensureDir, readJson, writeAtomic } from '../utils/fs.js';
 

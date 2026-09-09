@@ -12,9 +12,9 @@ import {
   ToolRegistry,
   type SessionMessage,
   type ToolEvent,
-} from 'lokma-core';
-import { stream as aiStream, type ProviderMessage } from 'lokma-ai';
-import type { Permissions, ServerMessage } from 'lokma-shared';
+} from '@lokma/core';
+import { stream as aiStream, type ProviderMessage } from '@lokma/ai';
+import type { Permissions, ServerMessage } from '@lokma/shared';
 
 /**
  * Agent tool loop — the WS `prompt` path with real tool/permission/ask

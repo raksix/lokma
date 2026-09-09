@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import type { Bot } from 'lokma-shared';
+import type { Bot } from '@lokma/shared';
 import { getBot } from './store.js';
 
 /**

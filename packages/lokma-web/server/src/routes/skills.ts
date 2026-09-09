@@ -10,7 +10,7 @@ import {
   scan,
   searchSkillMarketplace,
   SkillError,
-} from 'lokma-core';
+} from '@lokma/core';
 
 /**
  * Skills — registry.scan() same as CLI (progressive disclosure) + web

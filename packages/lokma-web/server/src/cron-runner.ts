@@ -16,9 +16,9 @@ import {
   UsageLedger,
   type CronRunRecord,
   type CronTrigger,
-} from 'lokma-core';
-import type { CronJob } from 'lokma-shared';
-import { stream as aiStream } from 'lokma-ai';
+} from '@lokma/core';
+import type { CronJob } from '@lokma/shared';
+import { stream as aiStream } from '@lokma/ai';
 import { resolveProviderUpstream } from './routes/providers.js';
 
 /**

@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import { stat } from 'node:fs/promises';
 import { loadConfig, saveGlobal } from '../config/loader.js';
 import { ensureDir, fileExists, writeAtomic } from '../utils/fs.js';
-import { ProjectSettingsSchema } from 'lokma-shared';
+import { ProjectSettingsSchema } from '@lokma/shared';
 
 /**
  * Optional-stack setup — the server side of `lokma init` / `lokma setup`

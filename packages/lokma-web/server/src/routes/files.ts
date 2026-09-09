@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { FileError, WorkspaceFiles } from 'lokma-core';
+import { FileError, WorkspaceFiles } from '@lokma/core';
 
 /**
  * Workspace files — real file-system access for the FileBrowser pane (W3-9).

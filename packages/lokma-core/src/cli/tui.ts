@@ -3,7 +3,7 @@ import { readdirSync } from 'node:fs';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { createInterface, type Interface } from 'node:readline/promises';
-import { stream as aiStream, type ProviderMessage } from 'lokma-ai';
+import { stream as aiStream, type ProviderMessage } from '@lokma/ai';
 import { loadConfig, saveGlobal } from '../config/loader.js';
 import { RepoGit } from '../git/git.js';
 import { SessionStore } from '../session/store.js';
@@ -972,7 +972,7 @@ const showWelcome = async (): Promise<void> => {
             const parts = arg.split(/\s+/).filter(Boolean);
             if (parts[0] === 'refresh' || parts.length === 0) {
               console.log(p.muted('  refreshing catalog (live probes, ~6s each)…'));
-              const { invalidateCatalog } = await import('lokma-ai');
+              const { invalidateCatalog } = await import('@lokma/ai');
               invalidateCatalog();
               await refreshModelCache();
             }

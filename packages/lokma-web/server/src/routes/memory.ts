@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { MemoryError, memoryAdd, memoryRemove, memoryReplace, readMemoryEntries } from 'lokma-core';
+import { MemoryError, memoryAdd, memoryRemove, memoryReplace, readMemoryEntries } from '@lokma/core';
 
 /**
  * Global memory — the §-delimited MEMORY.md / USER.md store behind the

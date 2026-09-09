@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { VaultError, buildGraph, deleteNote, ingestNote, readNote, readTree, searchNotesDetailed } from 'lokma-core';
+import { VaultError, buildGraph, deleteNote, ingestNote, readNote, readTree, searchNotesDetailed } from '@lokma/core';
 
 /**
  * File vault — real markdown notes under `~/.lokma/vault/` for the VaultPane (W4-15).

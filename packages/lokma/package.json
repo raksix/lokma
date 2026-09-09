@@ -1,5 +1,5 @@
 {
-  "name": "lokma",
+  "name": "@lokma/cli",
   "version": "0.1.0",
   "type": "module",
   "description": "Lokma - agentic coding harness CLI: terminal TUI, multi-provider login, config, doctor",
@@ -9,11 +9,20 @@
     "url": "https://github.com/raksix/lokma.git",
     "directory": "packages/lokma"
   },
-  "keywords": ["lokma", "ai", "agent", "coding", "cli", "tui"],
+  "keywords": [
+    "lokma",
+    "ai",
+    "agent",
+    "coding",
+    "cli",
+    "tui"
+  ],
   "engines": {
     "node": ">=22.0.0"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },
@@ -27,9 +36,9 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "lokma-ai": "workspace:*",
-    "lokma-core": "workspace:*",
-    "lokma-shared": "workspace:*"
+    "@lokma/ai": "workspace:*",
+    "@lokma/core": "workspace:*",
+    "@lokma/shared": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.3",

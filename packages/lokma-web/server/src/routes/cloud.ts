@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { CLOUD_MAX_UPLOAD_BYTES, CloudError, exportState, importState } from 'lokma-core';
+import { CLOUD_MAX_UPLOAD_BYTES, CloudError, exportState, importState } from '@lokma/core';
 
 /**
  * Portable cloud transfer — the server side of the move-to-cloud story

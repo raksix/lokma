@@ -1,7 +1,7 @@
 import { cp, mkdir, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
-import { BotSchema, type Agent, type Bot } from 'lokma-shared';
+import { BotSchema, type Agent, type Bot } from '@lokma/shared';
 import { createAgent, slugifyName } from '../agents/registry.js';
 import { SessionStore } from '../session/index.js';
 import { writeAtomic } from '../utils/fs.js';

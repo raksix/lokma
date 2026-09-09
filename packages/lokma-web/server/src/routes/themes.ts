@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { getThemeDef, isThemeId, listThemes, toThemeView } from 'lokma-core';
+import { getThemeDef, isThemeId, listThemes, toThemeView } from '@lokma/core';
 
 /**
  * Named themes — the server side of the Appearance tab (Phase 3 themes

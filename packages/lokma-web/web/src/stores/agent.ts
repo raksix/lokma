@@ -6,7 +6,7 @@
  */
 import { create } from 'zustand';
 import { api, type AgentCaps, type AgentInfo, type CreateAgentBody, type PatchAgentBody } from '@/lib/api';
-import type { ServerMessage } from 'lokma-shared/protocol/ws';
+import type { ServerMessage } from '@lokma/shared/protocol/ws';
 
 export type AgentLock = { owner: string; path?: string; since?: string };
 

@@ -144,7 +144,7 @@ for slash commands. Non-interactive shells require -p.
         node[parts[parts.length - 1]] = value;
         // Guard against silent drops: the schema strips unknown fields, so
         // verify the value survives a parse round-trip before persisting.
-        const { GlobalConfigSchema } = await import('lokma-shared');
+        const { GlobalConfigSchema } = await import('@lokma/shared');
         const parsed = GlobalConfigSchema.parse(merged) as Record<string, unknown>;
         let check: unknown = parsed;
         for (const seg of parts) check = (check as Record<string, unknown> | null)?.[seg];

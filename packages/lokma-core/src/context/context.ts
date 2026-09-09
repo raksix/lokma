@@ -1,4 +1,4 @@
-import type { GlobalConfig } from 'lokma-shared';
+import type { GlobalConfig } from '@lokma/shared';
 
 /**
  * Context — the kernel (~300 lines stub for Phase 0).

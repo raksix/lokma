@@ -10,7 +10,7 @@ import {
   resolveApiKey,
   saveCredentials,
   saveGlobal,
-} from 'lokma-core';
+} from '@lokma/core';
 
 /**
  * Provider routes — registry list + custom provider CRUD + live connection test.
@@ -33,8 +33,8 @@ export {
   providerNeedsKey,
   resolveApiKey,
   resolveProviderUpstream,
-} from 'lokma-core';
-export type { ProviderView } from 'lokma-core';
+} from '@lokma/core';
+export type { ProviderView } from '@lokma/core';
 
 export async function providerRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/providers', async () => {

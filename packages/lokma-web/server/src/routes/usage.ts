@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { SessionStore, UsageLedger } from 'lokma-core';
+import { SessionStore, UsageLedger } from '@lokma/core';
 
 /**
  * Usage — real token/cost accounting for the Usage pane (W2-7).

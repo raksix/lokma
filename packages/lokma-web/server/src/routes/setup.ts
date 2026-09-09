@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { stat } from 'node:fs/promises';
-import { applyModelFlags, getCatalog } from 'lokma-ai';
+import { applyModelFlags, getCatalog } from '@lokma/ai';
 import {
   SessionStore,
   applySetupFeatures,
@@ -14,8 +14,8 @@ import {
   runSetupInit,
   scan,
   SetupError,
-} from 'lokma-core';
-import type { Lock } from 'lokma-shared';
+} from '@lokma/core';
+import type { Lock } from '@lokma/shared';
 import { listProviderViews } from './providers.js';
 
 /**

@@ -16,8 +16,8 @@ import {
   saveGlobal,
   terminalManager,
   userFromToken,
-} from 'lokma-core';
-import { decodeClientMessage, encodeServerMessage } from 'lokma-shared';
+} from '@lokma/core';
+import { decodeClientMessage, encodeServerMessage } from '@lokma/shared';
 import { LoopAborted, buildLoopHistory, runAgentLoop, type ApprovalDecision } from '../agent-loop.js';
 import {
   broadcast,

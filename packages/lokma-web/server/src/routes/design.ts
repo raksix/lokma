@@ -12,7 +12,7 @@ import {
   listArtifacts,
   readDesignGuard,
   updateArtifactHtml,
-} from 'lokma-core';
+} from '@lokma/core';
 
 /**
  * Design Studio — 6 artifact types over bundled systems (W5-18, Docs/34).

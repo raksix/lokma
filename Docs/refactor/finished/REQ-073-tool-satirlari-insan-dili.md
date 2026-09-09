@@ -1,6 +1,6 @@
 # REQ-073 — Tool satırları insan diliyle görünsün (ham JSON yok)
 
-- **Status:** done (canlıda — kullanıcı "bu tool calları düzgün şekilde yapsın bu ne amk, 2. SS'deki gibi gözüksün" dedi, implemente edildi; SS'lere bakılamadı — görüntü servisi 500 — canlı DOM'dan teşhis kondu)
+- **Status:** done (2026-09-09 — impl `31c3253`, close-out `97e83d8`, filed to `finished/` by refactor-scan; canlıda — kullanıcı "bu tool calları düzgün şekilde yapsın bu ne amk, 2. SS'deki gibi gözüksün" dedi, implemente edildi; SS'lere bakılamadı — görüntü servisi 500 — canlı DOM'dan teşhis kondu)
 - **Asked:** 2026-09-09.
 - **Gap:** ThoughtTrace satırları `tool_adı` (mono) + ham JSON input (`list_files{"path":"."}`) basıyordu; sonuçlar obje geldiğinde hiç görünmüyordu (render sadece string result gösteriyordu).
 - **Fix (`lokma-message.tsx`):**

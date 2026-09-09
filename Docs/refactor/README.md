@@ -99,4 +99,5 @@
 - [REQ-078](finished/REQ-078-proje-grubu-5li-expand.md) — By-Projects 5li + expand + proje satırı — done
 - [REQ-079](finished/REQ-079-terminal-sade-full-panel.md) — Terminal sade: full-panel icerik, bar yok, otomatik shell — done
 - [REQ-080](finished/REQ-080-gate-e2e-token.md) — Gate E2E token minter (flag ellemeden test) — done
-- [REQ-081](REQ-081-proje-olusturma-calismiyor.md) — Proje oluşturma uçtan uca çalışsın (REQ-080 takibi) — pending
+- [REQ-081](finished/REQ-081-proje-olusturma-calismiyor.md) — Proje oluşturma uçtan uca çalışsın — done
+- [REQ-082](REQ-082-projeler-modal-invite-kayit.md) — Projeler sidebar + modal + invite kayıt — done

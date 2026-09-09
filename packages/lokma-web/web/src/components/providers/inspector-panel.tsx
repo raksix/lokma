@@ -5,7 +5,6 @@ import type { UseWs } from '@/hooks/use-ws';
 import {
   LazyAgentsPane,
   LazyArchifyPane,
-  LazyAuthPane,
   LazyBotsPane,
   LazyBrowserPane,
   LazyCronApprovalsPane,
@@ -111,7 +110,6 @@ export type InspectorTab =
   | 'design'
   | 'testing'
   | 'bots'
-  | 'auth'
   | 'setup'
   | 'plugins'
   | 'observability'
@@ -166,8 +164,6 @@ export function InspectorPanel({
         <LazyPluginsPane />
       ) : tab === 'setup' ? (
         <LazySetupPane />
-      ) : tab === 'auth' ? (
-        <LazyAuthPane />
       ) : tab === 'bots' ? (
         <LazyBotsPane onOpenSession={onOpenSession} />
       ) : tab === 'testing' ? (

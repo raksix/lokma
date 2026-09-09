@@ -74,7 +74,9 @@ export function activityInspectorTab(key: ActivityKey): InspectorTab | null {
     case 'settings':
       return 'settings';
     case 'account':
-      return 'auth';
+      // REQ-072: account opens the Settings modal (Account section), never
+      // an Inspector tab — null keeps the drag fallback on sessions.
+      return null;
   }
 }
 

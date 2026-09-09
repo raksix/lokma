@@ -26,7 +26,7 @@ check('vault opens vault tab', activityInspectorTab('vault') === 'vault');
 check('testing opens testing tab', activityInspectorTab('testing') === 'testing');
 check('bots opens bots tab', activityInspectorTab('bots') === 'bots');
 check('settings opens settings tab', activityInspectorTab('settings') === 'settings');
-check('account opens auth tab', activityInspectorTab('account') === 'auth');
+check('account opens no inspector tab (settings modal)', activityInspectorTab('account') === null);
 
 const keys = ACTIVITY_ITEMS.map((item) => item.key);
 check('nine rail items', keys.length === 9);
@@ -52,7 +52,7 @@ check(
   ),
 );
 check('REQ-026 sessions drags as the sessions surface', activityDragId('sessions') === 'sessions');
-check('REQ-026 mapped keys drag as their inspector tab', activityDragId('git') === 'git' && activityDragId('account') === 'auth');
+check('REQ-026 mapped keys drag as their inspector tab', activityDragId('git') === 'git' && activityDragId('account') === 'sessions');
 
 console.log(`activity-bar.test.ts: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

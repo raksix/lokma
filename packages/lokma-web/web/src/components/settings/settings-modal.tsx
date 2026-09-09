@@ -2,6 +2,7 @@ import * as React from 'react';
 import {
   Boxes,
   Brain,
+  CircleUserRound,
   Clock3,
   Info,
   Keyboard,
@@ -23,6 +24,7 @@ import {
   type ExplorerSide,
 } from '@/components/shell';
 import {
+  LazyAuthPane,
   LazyCronApprovalsPane,
   LazyMemoryPane,
   LazyModelsPane,
@@ -57,6 +59,7 @@ import { McpPane } from './mcp-pane';
 
 const SECTION_ICONS: Record<SettingsSectionId, typeof Settings> = {
   'general': Settings,
+  'account': CircleUserRound,
   'appearance': Palette,
   'providers': Plug2,
   'models': Layers,
@@ -73,10 +76,13 @@ export function SettingsModal({
   open,
   onClose,
   explorerSide = 'right',
+  initialSection = DEFAULT_SETTINGS_SECTION,
 }: {
   open: boolean;
   onClose: () => void;
   explorerSide?: ExplorerSide;
+  /** REQ-072: which section to land on (account icon opens Account directly). */
+  initialSection?: SettingsSectionId;
 }) {
   const [section, setSection] = React.useState<SettingsSectionId>(DEFAULT_SETTINGS_SECTION);
   const [config, setConfig] = React.useState<NormalizedConfig | null>(null);
@@ -98,12 +104,12 @@ export function SettingsModal({
     }
   }, []);
 
-  // Fresh server config on every open; always land on General.
+  // Fresh server config on every open; land on the requested section.
   React.useEffect(() => {
     if (!open) return;
-    setSection(DEFAULT_SETTINGS_SECTION);
+    setSection(isSettingsSection(initialSection) ? initialSection : DEFAULT_SETTINGS_SECTION);
     void load();
-  }, [open, load]);
+  }, [open, load, initialSection]);
 
   // Body scroll lock while the large modal is up (same as MobileDrawer).
   React.useEffect(() => {
@@ -184,6 +190,8 @@ export function SettingsModal({
                 <ShortcutsSection explorerSide={explorerSide} />
               ) : section === 'about' ? (
                 <AboutSection />
+              ) : section === 'account' ? (
+                <LazyAuthPane />
               ) : section === 'providers' ? (
                 <LazyProvidersPane />
               ) : section === 'models' ? (

@@ -21,8 +21,9 @@ function check(name: string, cond: boolean): void {
 }
 
 // Registry shape — OpenCode-style categories in display order.
-check('eleven sections', SETTINGS_SECTIONS.length === 11);
+check('twelve sections', SETTINGS_SECTIONS.length === 12);
 check('general first', SETTINGS_SECTIONS[0].id === 'general');
+check('account second (profile/admin/users/projects)', SETTINGS_SECTIONS[1].id === 'account');
 check('about last', SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1].id === 'about');
 check('ids unique', new Set(SETTINGS_SECTIONS.map((s) => s.id)).size === SETTINGS_SECTIONS.length);
 check('labels non-empty', SETTINGS_SECTIONS.every((s) => s.label.length > 0));

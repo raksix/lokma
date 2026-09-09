@@ -47,6 +47,7 @@ import {
   type SidebarVisibility,
 } from '@/components/shell';
 import { useFocusTrap } from '@/components/shell/use-focus-trap';
+import type { SettingsSectionId } from '@/components/settings/settings';
 
 /**
  * SettingsModal ships as its own chunk (lazy) — the settings dialog loads
@@ -106,6 +107,8 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   // REQ-022 — settings open as an OpenCode-style large modal (not a
   // sidebar tab): header gear, activity/rail gear and Ctrl+, all land here.
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  // REQ-072: account rail icon opens the modal on the Account section.
+  const [settingsSection, setSettingsSection] = React.useState<SettingsSectionId>('general');
   const [serverUp, setServerUp] = React.useState<boolean | null>(null);
   // REQ-018 — status-bar numbers: gateway round-trip, host metrics, stream rate.
   const [latencyMs, setLatencyMs] = React.useState<number | null>(null);
@@ -138,6 +141,13 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     (key: ActivityKey) => {
       setActivity(key);
       if (key === 'settings') {
+        setSettingsSection('general');
+        setSettingsOpen(true);
+        return;
+      }
+      if (key === 'account') {
+        // REQ-072: profile/admin/users/projects live in Settings → Account.
+        setSettingsSection('account');
         setSettingsOpen(true);
         return;
       }
@@ -506,6 +516,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
               open={settingsOpen}
               onClose={() => setSettingsOpen(false)}
               explorerSide={explorerSide}
+              initialSection={settingsSection}
             />
           </React.Suspense>
         ) : null}
@@ -641,6 +652,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
             open={settingsOpen}
             onClose={() => setSettingsOpen(false)}
             explorerSide={explorerSide}
+            initialSection={settingsSection}
           />
         </React.Suspense>
       ) : null}

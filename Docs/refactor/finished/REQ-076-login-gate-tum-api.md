@@ -1,6 +1,6 @@
 # REQ-076 — Login olmadan hiçbir sisteme erişilemesin (global auth gate)
 
-- **Status:** in-progress (2026-09-09)
+- **Status:** done (canlıda — 2026-09-09, server global gate + web fail-closed + live 401 matrix)
 - **Asked:** 2026-09-09 — "login olmadan ana sayfaya erişilebiliyor, ben login sistemini açtım. login olmadan hiçbir şekilde lokmanın hiçbir sistemine erişilmemesi lazım, çok büyük güvenlik sorunu. auth sistemi açık bende. kimse login olmadan hiçbir sisteme erişemesin."
 - **Gap (confirmed live 2026-09-09):**
   - Live `GET /api/auth/settings` returns `requireLogin: false` while the user sees auth ON in the UI — the toggle state does not match the server (under investigation; the fix below makes the server the single source of truth).
@@ -12,4 +12,4 @@
   - C. Live: deploy both, flip `requireLogin: true` on the server, prove with tokenless curl matrix (all `/api/*` → 401 except allowlist) + public URL check.
 - **Touched (plan):** server `plugins/auth-gate-policy.ts` (new), `plugins/auth-gate.ts` (new), `plugins/auth-gate-policy.test.ts` (new), `app.ts` (wire hook); web `App.tsx` (fail-closed).
 - **Verify (plan):** policy unit test green (`bun`), server `tsc` 0, web `tsc` + `vite build` green, single-proc pm2 restarts, tokenless curl matrix live (401s + allowlist 200s), `/api/auth/me` 401 without token.
-- **Proof:** _filled on close._
+- **Proof (2026-09-09, LIVE):** global `onRequest` hook (`plugins/auth-gate.ts` + pure allowlist `auth-gate-policy.ts`, 53 asserts green) deployed via single-proc `pm2 restart lokma-server`; web fail-closed (`App.tsx`) deployed via rebuilt `dist` + `pm2 restart lokma-web`. Tokenless live matrix: 20/20 `/api/*` families → `401 { code: 'unauthenticated' }` (files, files/raw, providers, models, config, agents, skills, memory, cron, git, bots, sessions, todos, users, commands, themes, usage, auth/me, share-list, metrics) incl. `POST /api/terminal` (RCE closed); allowlist `GET /health`, `/api/health`, `/api/auth/settings` → 200, share bogus token → handler 400 (public by design). Same 401s through public `https://lokma.fermag.com.tr/api/*`. Login endpoint healthy (bad creds → clean `bad_credentials`, no 500). Server flag now `requireLogin: true`, superadmin `furkan@fermag.com.tr` active (logged in today, no lockout). Commits: `afea914` (server gate) + `04ac27a` (web fail-closed).

@@ -435,6 +435,10 @@ export function FileBrowser({ sessionId }: { sessionId: string }) {
             <button
               key={hit.path}
               onClick={() => openSearchHit(hit)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setMenu({ x: e.clientX, y: e.clientY, path: hit.path });
+              }}
               title={hit.path}
               className="flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-left text-xs hover:bg-white dark:hover:bg-[#1E1E21]"
             >
@@ -454,6 +458,10 @@ export function FileBrowser({ sessionId }: { sessionId: string }) {
               <button
                 key={`loaded-${entry.path}`}
                 onClick={() => (entry.type === 'dir' ? toggleDir(entry.path) : void openFile(entry.path))}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setMenu({ x: e.clientX, y: e.clientY, path: entry.path });
+                }}
                 className="flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-left text-xs text-muted-foreground hover:bg-white dark:hover:bg-[#1E1E21]"
               >
                 <span className="flex-1 truncate">{entry.path}</span>

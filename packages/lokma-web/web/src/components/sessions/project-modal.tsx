@@ -120,7 +120,7 @@ export function ProjectModal({
                 if (e.key === 'Enter') void submit();
                 if (e.key === 'Escape') onClose();
               }}
-              placeholder="/mnt/apopic/my-project (must exist)"
+              placeholder="/mnt/apopic/my-project (created if missing)"
               className="h-8 font-mono text-xs"
             />
           </div>

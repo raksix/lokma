@@ -1,5 +1,5 @@
 import { randomBytes, scryptSync, createHmac, timingSafeEqual } from 'node:crypto';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import {
@@ -496,17 +496,21 @@ function assertVisibility(v: unknown): asserts v is ProjectVisibility {
   }
 }
 
-async function assertCwd(cwd: unknown): Promise<void> {
-  if (cwd === undefined || cwd === '') return;
+async function resolveCwd(cwd: unknown): Promise<string> {
+  if (cwd === undefined || cwd === '') return '';
   if (typeof cwd !== 'string' || !cwd.trim() || cwd.length > 500) {
-    throw new AuthError('bad_cwd', 'cwd must be an existing directory path', 400);
+    throw new AuthError('bad_cwd', 'cwd must be a directory path (created if missing)', 400);
   }
+  const raw = cwd.trim();
+  const resolved = raw === '~' ? homedir() : raw.startsWith('~/') ? join(homedir(), raw.slice(2)) : raw;
   try {
-    const st = await stat(cwd);
-    if (!st.isDirectory()) throw new AuthError('bad_cwd', 'cwd is not a directory', 400);
+    await mkdir(resolved, { recursive: true });
+    const st = await stat(resolved);
+    if (!st.isDirectory()) throw new AuthError('bad_cwd', `cwd is not a directory: ${resolved}`, 400);
+    return resolved;
   } catch (e) {
     if (e instanceof AuthError) throw e;
-    throw new AuthError('bad_cwd', 'cwd does not exist', 400);
+    throw new AuthError('bad_cwd', `cannot use cwd: ${resolved}`, 400);
   }
 }
 
@@ -515,14 +519,14 @@ export async function createProject(
   input: { name: string; cwd?: string; visibility?: ProjectVisibility },
 ): Promise<Project> {
   assertProjectName(input.name);
-  await assertCwd(input.cwd);
+  const cwd = await resolveCwd(input.cwd);
   const settings = await getAuthSettings();
   const visibility = input.visibility ?? settings.projectVisibilityDefault;
   assertVisibility(visibility);
   const row: Project = {
     id: `p_${slugifyProject(input.name)}-${randomBytes(2).toString('hex')}`,
     name: input.name.trim(),
-    cwd: typeof input.cwd === 'string' ? input.cwd : '',
+    cwd,
     visibility,
     ownerId: owner.id,
     createdAt: nowIso(),
@@ -550,8 +554,7 @@ export async function patchProject(
     next.name = (patch.name as string).trim();
   }
   if (patch.cwd !== undefined) {
-    await assertCwd(patch.cwd);
-    next.cwd = patch.cwd as string;
+    next.cwd = await resolveCwd(patch.cwd);
   }
   if (patch.visibility !== undefined) {
     assertVisibility(patch.visibility);

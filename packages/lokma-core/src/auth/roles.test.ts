@@ -109,4 +109,14 @@ assert((await loginGateActive()) === true, 'gate activates once flipped');
 await saveAuthSettings({ requireLogin: false });
 assert((await loginGateActive()) === false, 'gate deactivates when flipped back');
 
+// REQ-083: missing cwd is created (nested), '~' expands to server HOME.
+const nested = `${HOME}/req083/a/b`;
+const p1 = await createProject(superadmin, { name: 'Cwd Probe', cwd: nested });
+assert(p1.cwd === nested, 'missing nested cwd resolves + stores');
+const { stat: fstat } = await import('node:fs/promises');
+assert((await fstat(nested)).isDirectory(), 'nested cwd created on disk');
+const p2 = await createProject(superadmin, { name: 'Home Probe', cwd: '~' });
+assert(p2.cwd === HOME, '~ expands to server HOME');
+await expectCode(() => createProject(superadmin, { name: 'Bad Cwd', cwd: 'x'.repeat(501) }), 'bad_cwd', 'over-long cwd still 400s');
+
 console.log(`\n${passed} checks passed`);

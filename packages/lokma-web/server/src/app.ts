@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import { registerCors, registerWebsocket } from './plugins/index.js';
+import { registerAuthGate } from './plugins/auth-gate.js';
 import { healthRoutes } from './routes/health.js';
 import { configRoutes } from './routes/config.js';
 import { providerRoutes } from './routes/providers.js';
@@ -38,6 +39,10 @@ export async function createApp(): Promise<ReturnType<typeof Fastify>> {
 
   await registerCors(app);
   await registerWebsocket(app);
+  // REQ-076: global login gate BEFORE all routes — every `/api/*` route
+  // (present + future) needs a token while the gate is active. Public
+  // allowlist lives in `plugins/auth-gate-policy.ts`.
+  await registerAuthGate(app);
 
   await healthRoutes(app);
   await configRoutes(app);

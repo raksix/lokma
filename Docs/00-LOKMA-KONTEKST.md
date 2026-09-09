@@ -22,6 +22,7 @@
 9. **DRY functions:** Before writing a function, search if a similar one exists — reuse it
 10. **Clean code:** Small functions, single responsibility, meaningful names, early returns
 11. **English comments:** All code comments and JSDoc in English
+12. **Refactor inbox:** her dediğim Docs/refactor/'a ayrı REQ-XXX dosyası olarak eklenir (önceki formatla, pending, write-only); 'tamam mı' denince o ana kadar birikenler dosyalanır, 'yap' denmeden kod YOK
 
 ## Proje Hakkında Ne Biliyoruz
 - **Lokma nedir:** Innovative agentic coding harness — **open-source, multi-provider, themeable** — CLI + Web share the same loop

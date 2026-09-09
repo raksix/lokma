@@ -109,3 +109,4 @@
 - [REQ-088](finished/REQ-088-modal-otomatik-doldurma.md) — Modalda alanlar birbirini otomatik doldursun — done
 - [REQ-089](REQ-089-pane-fullscreen-modal.md) — Pane fullscreen: header butonu + modal + split — pending
 - [REQ-090](finished/REQ-090-single-windowed-reset-kaldir.md) — Pane üstü Single/Windowed/Reset kalksın — done
+- [REQ-091](REQ-091-mobil-navbar-menu-tuslari.md) — Mobil üst navbar'da sol/sağ menü tuşları — pending

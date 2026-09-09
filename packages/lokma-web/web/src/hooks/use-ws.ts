@@ -50,6 +50,8 @@ export type UseWs = {
   questions: QuestionRequest[];
   /** Agent UI-control queue (REQ-057) — the shell opens panes per entry. */
   uiActions: UiActionRequest[];
+  /** Latest auto-retry notice (REQ-077) — toast/badge only. */
+  retry: { attempt: number; maxAttempts: number; waitMs: number; message: string } | null;
   done: boolean;
   lastError: string | null;
   sendText: (prompt: string, opts?: SendOpts) => void;
@@ -198,7 +200,7 @@ export function useWs(sessionId: string): UseWs {
     const text = prompt.trim();
     if (!text) return;
     // A new prompt starts a new run — clear the previous run's trace with it.
-    setUi((prev) => ({ ...prev, stream: '', thinking: '', done: false, doneReason: null, lastError: null, toolCalls: {} }));
+    setUi((prev) => ({ ...prev, stream: '', thinking: '', done: false, doneReason: null, lastError: null, toolCalls: {}, retry: null }));
     socketSend(wsRef.current, promptMessage(text, sessionRef.current, opts));
   }, []);
 
@@ -250,6 +252,7 @@ export function useWs(sessionId: string): UseWs {
     permissions: ui.permissions,
     questions: ui.questions,
     uiActions: ui.uiActions,
+    retry: ui.retry,
     done: ui.done,
     lastError: ui.lastError,
     sendText,

@@ -74,7 +74,7 @@ export function Chat({
   const storeModels = useProviderStore((s) => s.models);
   const refreshProviders = useProviderStore((s) => s.refresh);
 
-  const { status, stream, thinking, cost, done, lastError, toolCalls, permissions, questions, sendText, interrupt, answerPermission, answerQuestion } = ws;
+  const { status, stream, thinking, cost, done, lastError, retry, toolCalls, permissions, questions, sendText, interrupt, answerPermission, answerQuestion } = ws;
   const socketOpen = status === 'open';
   // REQ-070: a backend run outlives refresh — the badge stays on while the
   // server reports running/queued even with no live stream on this socket.
@@ -186,6 +186,16 @@ export function Chat({
     lastToastedError.current = lastError;
     emitToast(`Send failed: ${lastError}`);
   }, [lastError]);
+
+  // REQ-077: auto-retry is visible — one toast per attempt with the backoff
+  // wait, so "hata alınca bekliyor" never looks like a hang.
+  const lastToastedRetry = React.useRef<number>(0);
+  React.useEffect(() => {
+    if (!retry || lastToastedRetry.current >= retry.attempt) return;
+    lastToastedRetry.current = retry.attempt;
+    const waitS = Math.round(retry.waitMs / 1000);
+    emitToast(`Tekrar deneniyor (${retry.attempt}/${retry.maxAttempts}, ${waitS}sn sonra)`);
+  }, [retry]);
 
   // Starter cards / `/new <prompt>` hand a first prompt to the fresh session.
   React.useEffect(() => {

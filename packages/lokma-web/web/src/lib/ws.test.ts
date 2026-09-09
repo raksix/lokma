@@ -132,5 +132,10 @@ assert(state.thinking === 'hmm' && !state.done, 'thinking accumulates without en
 // 9. No stored token → URL passes through untouched.
 assert(withAuthToken('ws://127.0.0.1:3457/ws/abc') === 'ws://127.0.0.1:3457/ws/abc', 'no token leaves the URL alone');
 
+// 10. REQ-077: retry_notice surfaces without touching stream/done.
+state = applyServerFrame(state, { type: 'retry_notice', attempt: 2, maxAttempts: 10, waitMs: 10000, message: 'boom', sessionId: 's' });
+assert(state.retry !== null && state.retry.attempt === 2 && state.retry.waitMs === 10000, 'retry notice stored');
+assert(!state.done, 'retry does not end the run');
+
 delete (globalThis as unknown as Record<string, unknown>).window;
 console.log('ws.test.ts: all WS-client checks passed');

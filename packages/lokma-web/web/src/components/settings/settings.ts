@@ -183,6 +183,8 @@ export type NormalizedConfig = {
   agentDefaultModel: string;
   agentBudgets: { tokens: number | null; usd: number | null };
   sessionDefaultCwd: string;
+  retryMaxAttempts: number | null;
+  retryDelaysSec: number[];
   vaultHost: string | null;
   coordinatorMode: string;
   credentials: Record<string, { keySet: boolean; last4: string | null }>;
@@ -202,6 +204,8 @@ export function normalizeConfig(raw: unknown): NormalizedConfig {
   const vault = asRecord(cfg.vault);
   const mcp = asRecord(cfg.mcp);
   const sessions = asRecord(cfg.sessions);
+  const retry = asRecord(cfg.retry);
+  const retryDelays = Array.isArray(retry.delaysSec) ? retry.delaysSec.filter((n): n is number => typeof n === 'number' && Number.isFinite(n)) : [];
   return {
     defaultModel: typeof cfg.defaultModel === 'string' ? cfg.defaultModel : '',
     defaultProvider: typeof cfg.defaultProvider === 'string' ? cfg.defaultProvider : '',
@@ -222,6 +226,8 @@ export function normalizeConfig(raw: unknown): NormalizedConfig {
       usd: typeof budgets.usd === 'number' && Number.isFinite(budgets.usd) ? budgets.usd : null,
     },
     sessionDefaultCwd: typeof sessions.defaultCwd === 'string' ? sessions.defaultCwd : '',
+    retryMaxAttempts: typeof retry.maxAttempts === 'number' && Number.isInteger(retry.maxAttempts) ? retry.maxAttempts : null,
+    retryDelaysSec: retryDelays,
     vaultHost: typeof vault.host === 'string' ? vault.host : null,
     coordinatorMode: typeof coord.mode === 'string' ? coord.mode : '',
     credentials: asRecord(root.credentials) as NormalizedConfig['credentials'],
@@ -372,6 +378,46 @@ export function validateAgentsBudgets(input: AgentsBudgetsInput): Record<string,
     errors.usd = 'USD cap, 0 or more.';
   }
   return errors;
+}
+
+/**
+ * Retry edit form (REQ-077): max attempts 0–50 (0 = fail fast, no retry);
+ * delays as comma/space-separated seconds (each 0–3600, max 50 entries).
+ * Empty delays = no wait between retries. Returns per-field errors.
+ */
+export function validateRetryForm(input: { maxAttempts: unknown; delaysSec: unknown }): Record<string, string> {
+  const errors: Record<string, string> = {};
+  const attempts = typeof input.maxAttempts === 'string' && input.maxAttempts.trim() !== '' ? Number(input.maxAttempts) : typeof input.maxAttempts === 'number' ? input.maxAttempts : NaN;
+  if (!Number.isInteger(attempts) || attempts < 0 || attempts > 50) {
+    errors.maxAttempts = 'Whole number, 0–50 (0 = no retry).';
+  }
+  if (typeof input.delaysSec === 'string' && input.delaysSec.trim() !== '') {
+    const parts = input.delaysSec.split(/[,\s]+/).filter(Boolean);
+    if (parts.length > 50) {
+      errors.delaysSec = 'Max 50 entries.';
+    } else if (parts.some((p) => !Number.isFinite(Number(p)) || Number(p) < 0 || Number(p) > 3600)) {
+      errors.delaysSec = 'Seconds, each 0–3600 (e.g. 3, 10, 15, 20, 30, 40, 50).';
+    }
+  }
+  return errors;
+}
+
+/** Parse the delays text into seconds (validated first — garbage becomes 0-wait entries, never NaN). */
+export function parseRetryDelays(text: string): number[] {
+  if (!text.trim()) return [];
+  return text
+    .split(/[,\s]+/)
+    .filter(Boolean)
+    .map((p) => {
+      const n = Number(p);
+      return Number.isFinite(n) && n >= 0 ? Math.min(n, 3600) : 0;
+    })
+    .slice(0, 50);
+}
+
+/** Build a PATCH body for the retry object (own top-level key — never wipes siblings). */
+export function buildRetryPatch(maxAttempts: number, delaysSec: number[]): Record<string, unknown> {
+  return { retry: { maxAttempts, delaysSec } };
 }
 
 /**

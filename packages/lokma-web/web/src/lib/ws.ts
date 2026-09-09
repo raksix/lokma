@@ -45,6 +45,8 @@ export type WsUiState = {
   questions: QuestionRequest[];
   /** Agent UI-control queue (REQ-057) — the shell opens panes per entry. */
   uiActions: UiActionRequest[];
+  /** Latest auto-retry notice (REQ-077) — toast/badge only, never persisted. */
+  retry: { attempt: number; maxAttempts: number; waitMs: number; message: string } | null;
   done: boolean;
   doneReason: string | null;
   lastError: string | null;
@@ -173,6 +175,7 @@ export function initialWsUiState(): WsUiState {
     permissions: [],
     questions: [],
     uiActions: [],
+    retry: null,
     done: false,
     doneReason: null,
     lastError: null,
@@ -220,6 +223,13 @@ export function applyServerFrame(state: WsUiState, msg: ServerMessage): WsUiStat
       return { ...state, questions: [...state.questions, msg] };
     case 'ui_action':
       return { ...state, uiActions: [...state.uiActions, msg] };
+    case 'retry_notice':
+      // REQ-077: stream died, backing off — surface as toast/badge; the run
+      // continues, so stream/done stay untouched.
+      return {
+        ...state,
+        retry: { attempt: msg.attempt, maxAttempts: msg.maxAttempts, waitMs: msg.waitMs, message: msg.message },
+      };
     case 'cost':
       return { ...state, cost: addCost(state.cost, msg) };
     case 'agent_state':

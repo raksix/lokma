@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { emitToast } from '@/components/shell';
 import type { NormalizedConfig } from './settings';
-import { buildAgentsPatch, buildSessionsPatch, isValidAgentDefaultModel, isValidSessionDefaultCwd, validateAgentsBudgets, validateAgentsCaps } from './settings';
+import { buildAgentsPatch, buildRetryPatch, buildSessionsPatch, isValidAgentDefaultModel, isValidSessionDefaultCwd, parseRetryDelays, validateAgentsBudgets, validateAgentsCaps, validateRetryForm } from './settings';
 
 /**
  * ConfigPane — the effective (merged) harness config, read live from
@@ -35,6 +35,10 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
   const [sessionCwd, setSessionCwd] = React.useState(config.sessionDefaultCwd);
   const [sessionCwdError, setSessionCwdError] = React.useState('');
   const [savingSessionCwd, setSavingSessionCwd] = React.useState(false);
+  const [retryAttempts, setRetryAttempts] = React.useState(config.retryMaxAttempts === null ? '' : String(config.retryMaxAttempts));
+  const [retryDelays, setRetryDelays] = React.useState(config.retryDelaysSec.join(', '));
+  const [retryErrors, setRetryErrors] = React.useState<Record<string, string>>({});
+  const [savingRetry, setSavingRetry] = React.useState(false);
 
   async function handleSaveModel(): Promise<void> {
     const next = model.trim();
@@ -98,6 +102,23 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
     }
   }
 
+  async function handleSaveRetry(): Promise<void> {
+    const errors = validateRetryForm({ maxAttempts: retryAttempts, delaysSec: retryDelays });
+    setRetryErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+    setSavingRetry(true);
+    try {
+      // Own top-level key — never wipes agents/permissions/mcp siblings.
+      await api.patchConfig(buildRetryPatch(Number(retryAttempts), parseRetryDelays(retryDelays)));
+      emitToast('Retry settings saved');
+      await onReload();
+    } catch (e) {
+      emitToast(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setSavingRetry(false);
+    }
+  }
+
   const capsFields: Array<{ key: 'maxAgents' | 'maxConcurrent' | 'maxQueue'; label: string; hint: string }> = [
     { key: 'maxAgents', label: 'Max agents', hint: 'Registry slots (1–100)' },
     { key: 'maxConcurrent', label: 'Max concurrent', hint: 'Running at once (1–20)' },
@@ -140,6 +161,12 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
             <span className="shrink-0 font-semibold">sessions</span>
             <span className="truncate text-zinc-500" title={config.sessionDefaultCwd || undefined}>
               defaultCwd {config.sessionDefaultCwd || '(server default)'}
+            </span>
+          </div>
+          <div className="flex gap-2 rounded border border-line/50 bg-muted/50 p-1.5">
+            <span className="shrink-0 font-semibold">retry</span>
+            <span className="truncate text-zinc-500" title={`${config.retryMaxAttempts ?? '—'} attempts · ${config.retryDelaysSec.join(', ') || 'no wait'}s`}>
+              {config.retryMaxAttempts ?? '—'} attempts · {config.retryDelaysSec.join(', ') || 'no wait'}s
             </span>
           </div>
           <div className="flex gap-2 rounded border border-line/50 bg-muted/50 p-1.5">
@@ -258,6 +285,51 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
         ) : (
           <div className="mt-1 text-[11px] text-zinc-500">New sessions land here unless a cwd is given. Persists via PATCH /api/config.</div>
         )}
+      </div>
+
+      <div className="rounded-lg border border-line bg-white p-2.5 dark:bg-[#1E1E21]">
+        <div className="font-semibold">Auto-retry on error</div>
+        <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+          <div className="min-w-0">
+            <label htmlFor="settings-retry-attempts" className="text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
+              Max retries
+            </label>
+            <Input
+              id="settings-retry-attempts"
+              inputMode="numeric"
+              value={retryAttempts}
+              onChange={(e) => setRetryAttempts(e.target.value)}
+              placeholder="10 (0 = no retry)"
+              className="mt-0.5 h-7 font-mono text-xs min-w-0"
+            />
+            {retryErrors.maxAttempts ? (
+              <div className="mt-0.5 text-[10px] text-red-600">{retryErrors.maxAttempts}</div>
+            ) : (
+              <div className="mt-0.5 text-[10px] text-zinc-500">Retries after the first try (0–50).</div>
+            )}
+          </div>
+          <div className="min-w-0">
+            <label htmlFor="settings-retry-delays" className="text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
+              Backoff (seconds)
+            </label>
+            <Input
+              id="settings-retry-delays"
+              value={retryDelays}
+              onChange={(e) => setRetryDelays(e.target.value)}
+              placeholder="3, 10, 15, 20, 30, 40, 50"
+              className="mt-0.5 h-7 font-mono text-xs min-w-0"
+            />
+            {retryErrors.delaysSec ? (
+              <div className="mt-0.5 text-[10px] text-red-600">{retryErrors.delaysSec}</div>
+            ) : (
+              <div className="mt-0.5 text-[10px] text-zinc-500">Wait before each retry; last value repeats.</div>
+            )}
+          </div>
+        </div>
+        <Button size="sm" className="mt-1.5 h-7 text-xs" disabled={savingRetry} onClick={handleSaveRetry}>
+          {savingRetry ? 'Saving…' : 'Save retry'}
+        </Button>
+        <div className="mt-1 text-[11px] text-zinc-500">Dead upstreams retry automatically; stopping a run never retries. Persists via PATCH /api/config.</div>
       </div>
 
       <div className="rounded-lg border border-[#F2D5C2] bg-[#FDF0E6] p-2.5 dark:bg-[#2A1E15]">

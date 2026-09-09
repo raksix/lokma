@@ -1,15 +1,15 @@
 {
-  "name": "lokma-ai",
+  "name": "lokma",
   "version": "0.1.0",
   "type": "module",
-  "description": "Multi-provider abstraction for Lokma - streaming chat over Anthropic and OpenAI-compatible APIs",
+  "description": "Lokma - agentic coding harness CLI: terminal TUI, multi-provider login, config, doctor",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/raksix/lokma.git",
-    "directory": "packages/lokma-ai"
+    "directory": "packages/lokma"
   },
-  "keywords": ["lokma", "llm", "providers", "streaming"],
+  "keywords": ["lokma", "ai", "agent", "coding", "cli", "tui"],
   "engines": {
     "node": ">=22.0.0"
   },
@@ -17,24 +17,19 @@
   "publishConfig": {
     "access": "public"
   },
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
+  "bin": {
+    "lokma": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "tsc -p tsconfig.json --watch",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "lokma-shared": "workspace:*",
-    "zod": "^3.23.8"
+    "lokma-ai": "workspace:*",
+    "lokma-core": "workspace:*",
+    "lokma-shared": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.3",

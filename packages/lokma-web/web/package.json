@@ -1,9 +1,9 @@
 {
   "name": "lokma-web",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Lokma web harness \u2014 Vite 6 + React 19 + Tailwind v4 + shadcn/ui + WS (shares lokma-shared)",
+  "description": "Lokma web harness — Vite 6 + React 19 + Tailwind v4 + shadcn/ui + WS (shares lokma-shared)",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 3457",
     "build": "tsc -b && vite build",

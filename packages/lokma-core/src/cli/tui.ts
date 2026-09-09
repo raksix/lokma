@@ -58,7 +58,7 @@ export type TuiOpts = {
   prompt?: string;
 };
 
-const VERSION = '0.0.1';
+const VERSION = '0.1.0';
 const MAX_TURNS = 15;
 const TURN_TIMEOUT_MS = 180_000;
 const MAX_CONTEXT_FILES = 5;
@@ -426,7 +426,7 @@ async function runPrompt(opts: {
 type SlashDef = { name: string; hint: string; desc: string; aliases?: string[] };
 
 export const SLASH_COMMANDS: SlashDef[] = [
-  { name: '/model', hint: '[id]', desc: 'Show or switch model (live catalog picker)' },
+  { name: '/model', hint: '[provider|id]', desc: 'Pick a model directly (numbered list)' },
   { name: '/models', hint: '[on|off <id>|refresh]', desc: 'Refresh + enable/disable models' },
   { name: '/providers', hint: '[on|off|test|add|rm …]', desc: 'Multi-provider management (Web Providers twin)' },
   { name: '/login', hint: '[provider]', desc: 'Log in: API key (verified) or OAuth device flow' },
@@ -842,6 +842,16 @@ const showWelcome = async (): Promise<void> => {
     rl.prompt(true);
   });
 
+  /** Switch model now (shared by /model and /models pickers). */
+  const switchModel = async (id: string): Promise<void> => {
+    const next = canonicalModelId(id);
+    const nextUpstream = await resolveUpstreamFor(next);
+    model = next;
+    upstream = nextUpstream;
+    await store.writeMeta(sessionId, { model }).catch(() => {});
+    console.log(`  model → ${p.bold(model)}${upstream.apiKey ? '' : p.warn('  (no credential — /login)')}`);
+  };
+
   const recordUsage = async (inChars: number, outChars: number): Promise<void> => {
     try {
       const inTok = estimateTokens(inChars);
@@ -912,26 +922,50 @@ const showWelcome = async (): Promise<void> => {
             continue;
           }
           case 'model': {
-            if (!arg) {
-              const enabled = modelCache.filter((m) => m.startsWith(providerOf(model) + '/')).slice(0, 20);
-              console.log(`  model: ${p.bold(model)}`);
-              if (enabled.length > 0) {
-                console.log(p.muted('  enabled for this provider:'));
-                enabled.forEach((m, i) => console.log(`    ${p.info(String(i + 1))}) ${m}`));
-                console.log(p.muted('  /model <number|id> to switch'));
-              } else {
-                console.log(p.muted('  (catalog empty — /models refresh to probe providers)'));
+            // /model <provider> → pick from that provider's models directly.
+            const views = await listProviderViews().catch(() => []);
+            if (arg && !arg.includes('/') && views.some((v) => v.id === arg)) {
+              const mine = modelCache.filter((m) => m.startsWith(arg + '/'));
+              if (mine.length === 0) {
+                console.log(`  no enabled models for ${arg} — /models refresh to probe providers`);
+                continue;
               }
+              const picked = await pickNumbered(
+                rl,
+                p,
+                `model — ${arg}`,
+                mine.map((m) => ({ label: `${m}${m === model ? ' (current)' : ''}`, value: m })),
+              );
+              if (!picked) {
+                console.log(p.muted('  cancelled'));
+                continue;
+              }
+              await switchModel(picked);
+              continue;
+            }
+            if (!arg) {
+              const mine = modelCache.filter((m) => m.startsWith(providerOf(model) + '/')).slice(0, 30);
+              console.log(`  model: ${p.bold(model)}`);
+              if (mine.length === 0) {
+                console.log(p.muted('  (catalog empty — /models refresh to probe providers)'));
+                continue;
+              }
+              const picked = await pickNumbered(
+                rl,
+                p,
+                `model — ${providerOf(model)}`,
+                mine.map((m) => ({ label: `${m}${m === model ? ' (current)' : ''}`, value: m })),
+              );
+              if (!picked) {
+                console.log(p.muted('  cancelled'));
+                continue;
+              }
+              await switchModel(picked);
               continue;
             }
             const n = Number(arg);
             const picked = Number.isInteger(n) && n >= 1 ? modelCache.filter((m) => m.startsWith(providerOf(model) + '/'))[n - 1] : undefined;
-            const next = canonicalModelId(picked ?? arg);
-            const nextUpstream = await resolveUpstreamFor(next);
-            model = next;
-            upstream = nextUpstream;
-            await store.writeMeta(sessionId, { model }).catch(() => {});
-            console.log(`  model → ${p.bold(model)}${upstream.apiKey ? '' : p.warn('  (no credential — /login)')}`);
+            await switchModel(picked ?? arg);
             continue;
           }
           case 'models': {
@@ -962,6 +996,17 @@ const showWelcome = async (): Promise<void> => {
               console.log(`${mark}${m.id}${state}`);
             }
             if (mine.length > 30) console.log(p.muted(`  … +${mine.length - 30} more for this provider`));
+            const enabled = mine.filter((m) => m.enabled);
+            if (enabled.length > 0) {
+              const picked = await pickNumbered(
+                rl,
+                p,
+                'switch model',
+                enabled.slice(0, 30).map((m) => ({ label: `${m.id}${m.id === model ? ' (current)' : ''}`, value: m.id })),
+              );
+              if (picked && picked !== model) await switchModel(picked);
+              else console.log(p.muted('  kept current model'));
+            }
             continue;
           }
           case 'providers': {

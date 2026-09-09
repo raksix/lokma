@@ -25,7 +25,9 @@
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,css,md}\"",
     "typecheck": "tsc --noEmit",
-    "doctor": "bun --filter=lokma-core run doctor"
+    "doctor": "bun --filter=lokma-core run doctor",
+    "release:pack": "bun scripts/release.mjs pack",
+    "release:publish": "bun scripts/release.mjs publish"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

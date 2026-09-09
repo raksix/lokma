@@ -28,12 +28,14 @@ export const BUILTINS: Record<string, { name: string; baseUrl: string; needsKey:
   deepseek: { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', needsKey: true },
   google: { name: 'Google', baseUrl: 'https://generativelanguage.googleapis.com', needsKey: true },
   openrouter: { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', needsKey: true },
-  /** OpenCode Zen — OpenAI-compatible gateway (Go `:go/v1` via baseUrl override). */
+  /** OpenCode Zen — OpenAI-compatible gateway (pay-per-use). */
   opencode: { name: 'OpenCode Zen', baseUrl: 'https://opencode.ai/zen/v1', needsKey: true },
+  /** OpenCode Go — fixed-subscription gateway (same API key as Zen). */
+  'opencode-go': { name: 'OpenCode Go', baseUrl: 'https://opencode.ai/zen/go/v1', needsKey: true },
   ollama: { name: 'Ollama (local)', baseUrl: 'http://localhost:11434/v1', needsKey: false },
 };
 
-export const BUILTIN_ORDER = ['anthropic', 'openai', 'deepseek', 'google', 'openrouter', 'opencode', 'ollama'];
+export const BUILTIN_ORDER = ['anthropic', 'openai', 'deepseek', 'google', 'openrouter', 'opencode', 'opencode-go', 'ollama'];
 
 /** Conventional env names per provider (file credentials win over env). */
 export const ENV_KEYS: Record<string, string[]> = {
@@ -43,6 +45,7 @@ export const ENV_KEYS: Record<string, string[]> = {
   google: ['GOOGLE_GENERATIVE_AI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'],
   openrouter: ['OPENROUTER_API_KEY'],
   opencode: ['OPENCODE_API_KEY', 'OPENCODE_ZEN_API_KEY'],
+  'opencode-go': ['OPENCODE_API_KEY', 'OPENCODE_ZEN_API_KEY'],
 };
 
 const ID_RE = /^[a-z0-9][a-z0-9-]{1,40}$/;
@@ -134,11 +137,11 @@ export async function resolveProviderUpstream(
   if (id === 'anthropic') {
     return { provider: 'anthropic', baseUrl: view?.baseUrl ?? BUILTINS.anthropic.baseUrl, apiKey };
   }
-  if (id === 'openai' || id === 'deepseek' || id === 'openrouter' || id === 'opencode' || id === 'ollama' || (view && view.baseUrl)) {
+  if (id === 'openai' || id === 'deepseek' || id === 'openrouter' || id === 'opencode' || id === 'opencode-go' || id === 'ollama' || (view && view.baseUrl)) {
     return { provider: 'openai', baseUrl: view?.baseUrl ?? BUILTINS.openai.baseUrl, apiKey };
   }
   const err = new Error(
-    `Provider "${id}" is not wired for chat yet (wired: anthropic, openai, deepseek, openrouter, opencode, ollama, custom OpenAI-compatible) — configure it in Settings → Providers.`,
+    `Provider "${id}" is not wired for chat yet (wired: anthropic, openai, deepseek, openrouter, opencode, opencode-go, ollama, custom OpenAI-compatible) — configure it in Settings → Providers.`,
   );
   (err as Error & { code?: string }).code = 'provider_not_wired';
   throw err;

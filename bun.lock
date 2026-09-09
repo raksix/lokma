@@ -11,9 +11,25 @@
         "typescript": "^5.7.3",
       },
     },
+    "packages/lokma": {
+      "name": "lokma",
+      "version": "0.1.0",
+      "bin": {
+        "lokma": "./dist/cli.js",
+      },
+      "dependencies": {
+        "lokma-ai": "workspace:*",
+        "lokma-core": "workspace:*",
+        "lokma-shared": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "^22.0.0",
+        "typescript": "^5.7.3",
+      },
+    },
     "packages/lokma-ai": {
       "name": "lokma-ai",
-      "version": "0.0.1",
+      "version": "0.1.0",
       "dependencies": {
         "lokma-shared": "workspace:*",
         "zod": "^3.23.8",
@@ -25,7 +41,7 @@
     },
     "packages/lokma-core": {
       "name": "lokma-core",
-      "version": "0.0.1",
+      "version": "0.1.0",
       "bin": {
         "lokma": "./dist/cli/index.js",
       },
@@ -42,7 +58,7 @@
     },
     "packages/lokma-shared": {
       "name": "lokma-shared",
-      "version": "0.0.1",
+      "version": "0.1.0",
       "dependencies": {
         "zod": "^3.23.8",
       },
@@ -52,7 +68,7 @@
     },
     "packages/lokma-web/server": {
       "name": "lokma-server",
-      "version": "0.0.1",
+      "version": "0.1.0",
       "dependencies": {
         "@fastify/cors": "^11.0.1",
         "@fastify/websocket": "^11.0.1",
@@ -69,7 +85,7 @@
     },
     "packages/lokma-web/web": {
       "name": "lokma-web",
-      "version": "0.0.1",
+      "version": "0.1.0",
       "dependencies": {
         "clsx": "^2.1.1",
         "lokma-shared": "workspace:*",
@@ -453,6 +469,8 @@
 
     "lightningcss-win32-x64-msvc": ["lightningcss-win32-x64-msvc@1.32.0", "", { "os": "win32", "cpu": "x64" }, "sha512-Amq9B/SoZYdDi1kFrojnoqPLxYhQ4Wo5XiL8EVJrVsB8ARoC1PWW6VGtT0WKCemjy8aC+louJnjS7U18x3b06Q=="],
 
+    "lokma": ["lokma@workspace:packages/lokma"],
+
     "lokma-ai": ["lokma-ai@workspace:packages/lokma-ai"],
 
     "lokma-core": ["lokma-core@workspace:packages/lokma-core"],
@@ -625,6 +643,8 @@
 
     "light-my-request/process-warning": ["process-warning@4.0.1", "", {}, "sha512-3c2LzQ3rY9d0hc1emcsHhfT9Jwz0cChib/QN89oME2R451w5fy3f0afAhERFZAwrbDU43wk12d0ORBpDVME50Q=="],
 
+    "lokma/@types/node": ["@types/node@22.20.1", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-EANqOCF9QFyra+4pfxUcX9STKJpCLjMbObVzljIJomAWSnuSIEAvyzEU53GaajbXJEgdh0iEcPL+DGvpUd4k1Q=="],
+
     "lokma-ai/@types/node": ["@types/node@22.20.1", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-EANqOCF9QFyra+4pfxUcX9STKJpCLjMbObVzljIJomAWSnuSIEAvyzEU53GaajbXJEgdh0iEcPL+DGvpUd4k1Q=="],
 
     "lokma-core/@types/node": ["@types/node@22.20.1", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-EANqOCF9QFyra+4pfxUcX9STKJpCLjMbObVzljIJomAWSnuSIEAvyzEU53GaajbXJEgdh0iEcPL+DGvpUd4k1Q=="],
@@ -660,6 +680,8 @@
     "lokma-server/@types/node/undici-types": ["undici-types@6.21.0", "", {}, "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="],
 
     "lokma-web/@types/node/undici-types": ["undici-types@6.21.0", "", {}, "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="],
+
+    "lokma/@types/node/undici-types": ["undici-types@6.21.0", "", {}, "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="],
 
     "vite/esbuild/@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.25.12", "", { "os": "aix", "cpu": "ppc64" }, "sha512-Hhmwd6CInZ3dwpuGTF8fJG6yoWmsToE+vYgD4nytZVxcu1ulHpUQRAB1UJ8+N1Am3Mz4+xOByoQoSZf4D+CpkA=="],
 

@@ -1,9 +1,22 @@
 {
   "name": "lokma-shared",
-  "version": "0.0.1",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
-  "description": "Shared Zod schemas and WS protocol \u2014 single source of truth for CLI + Web",
+  "description": "Shared Zod schemas and WS protocol - single source of truth for the Lokma harness",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/raksix/lokma.git",
+    "directory": "packages/lokma-shared"
+  },
+  "keywords": ["lokma", "schemas", "protocol"],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "files": ["dist"],
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -20,7 +33,8 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "zod": "^3.23.8"

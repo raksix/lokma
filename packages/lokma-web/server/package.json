@@ -1,9 +1,9 @@
 {
   "name": "lokma-server",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Lokma web server \u2014 Fastify 5 + @fastify/websocket + REST + WS (shares SessionStore with CLI)",
+  "description": "Lokma web server — Fastify 5 + @fastify/websocket + REST + WS (shares SessionStore with CLI)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

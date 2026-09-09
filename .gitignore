@@ -11,6 +11,8 @@ pnpm-lock.yaml
 dist/
 build/
 out/
+.release-stage/
+release/
 .next/
 .turbo/
 .nuxt/

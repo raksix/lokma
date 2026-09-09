@@ -1,15 +1,32 @@
 {
   "name": "lokma-core",
-  "version": "0.0.1",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
-  "description": "Agent loop kernel — Context, ToolRegistry, SessionStore (JSONL), config, skills, memory",
+  "description": "Lokma harness kernel - agent loop, tools, sessions, providers, config, skills, memory",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/raksix/lokma.git",
+    "directory": "packages/lokma-core"
+  },
+  "keywords": ["lokma", "agent", "harness", "tools"],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "files": ["dist"],
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./cli": {
+      "types": "./dist/cli/index.d.ts",
+      "default": "./dist/cli/index.js"
     }
   },
   "bin": {
@@ -21,7 +38,8 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "cli": "bun run dist/cli/index.js",
-    "doctor": "bun run dist/cli/doctor.js"
+    "doctor": "bun run dist/cli/doctor.js",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "chokidar": "^5.0.0",

@@ -11,7 +11,7 @@ import { cpus, freemem, totalmem } from 'node:os';
  * used/total, and the server process RSS/heap. No auth, no secrets.
  */
 
-const VERSION = '0.0.1';
+const VERSION = '0.1.0';
 
 type CpuSnapshot = { idleMs: number; totalMs: number };
 

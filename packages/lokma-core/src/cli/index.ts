@@ -8,7 +8,7 @@ import { parseArgs } from 'node:util';
  * Bare `lokma` in an interactive terminal opens the TUI; piped it prints help.
  */
 
-const VERSION = '0.0.1';
+const VERSION = '0.1.0';
 
 function printHelp(): void {
   console.log(`lokma v${VERSION} — innovative agentic harness

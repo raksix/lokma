@@ -104,3 +104,4 @@
 - [REQ-083](finished/REQ-083-cwd-yoksa-olustur.md) — "cwd does not exist": yoksa oluştur — done
 - [REQ-084](finished/REQ-084-klasor-secici.md) — Yol alanına arayüzden klasör seçici — done
 - [REQ-085](finished/REQ-085-terminal-double-keypress-dedup.md) — Terminal double-keypress dedup (REQ-059 follow-up) — done
+- [REQ-086](REQ-086-terminal-cift-yazma.md) — Terminal çift yazma dedup — done

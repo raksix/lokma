@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Brain, Check, Copy, HelpCircle, Loader2, Send, ShieldAlert, Wrench } from 'lucide-react';
+import { BookOpenText, Brain, Check, Copy, FolderOpen, HelpCircle, ListTodo, Loader2, Pencil, Search, Send, ShieldAlert, SquareTerminal, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { PermissionRequest, QuestionRequest, ToolCallEntry } from '@/lib/ws';
@@ -66,6 +66,134 @@ export function summarizeInput(input: unknown, max = 120): string {
   const flat = raw.replace(/\s+/g, ' ').trim();
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 }
+
+// ─── Human tool sentences (REQ-073) ──────────────────────────────────────────
+// Tool rows read like Claude Code / OpenCode ("Wrote smallproof.html ·
+// 2.7KB"), never raw JSON (`list_files{"path":"."}`). Pure + unit-tested.
+
+function inputObj(input: unknown): Record<string, unknown> {
+  if (typeof input === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(input);
+      if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>;
+    } catch {
+      // Not JSON — no fields to describe.
+    }
+    return {};
+  }
+  if (input && typeof input === 'object') return input as Record<string, unknown>;
+  return {};
+}
+
+function strField(obj: Record<string, unknown>, key: string): string {
+  const v = obj[key];
+  return typeof v === 'string' ? v : '';
+}
+
+/** Compact byte label for write rows (2697 → "2.7KB"). */
+export function formatBytes(n: number): string {
+  if (!Number.isFinite(n) || n < 0) return '';
+  if (n < 1024) return `${n}B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)}KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)}MB`;
+}
+
+/** "Wrote smallproof.html · 2.7KB" — one human sentence per tool call. */
+export function describeToolCall(tool: string, input: unknown): string {
+  const p = inputObj(input);
+  switch (tool) {
+    case 'read_file':
+      return strField(p, 'path') ? `Read ${strField(p, 'path')}` : 'Read file';
+    case 'write_file': {
+      const size = typeof p.content === 'string' ? formatBytes(p.content.length) : '';
+      const what = strField(p, 'path') || 'file';
+      return size ? `Wrote ${what} · ${size}` : `Wrote ${what}`;
+    }
+    case 'list_files':
+      return `Listed ${strField(p, 'path') || '.'}`;
+    case 'search_files':
+      return strField(p, 'query') ? `Searched “${strField(p, 'query')}”` : 'Searched files';
+    case 'run_command': {
+      const args = Array.isArray(p.args) ? p.args.filter((a): a is string => typeof a === 'string').join(' ') : '';
+      const cmd = [strField(p, 'command'), args].filter(Boolean).join(' ');
+      return cmd ? `Ran ${cmd}` : 'Ran command';
+    }
+    case 'claim_todo':
+      return `Claimed ${strField(p, 'todoId') || 'todo'}`;
+    case 'complete_todo':
+      return `Completed ${strField(p, 'todoId') || 'todo'}`;
+    case 'list_todos':
+      return 'Listed todos';
+    case 'ask_user':
+      return strField(p, 'question') ? `Asked “${strField(p, 'question').slice(0, 80)}”` : 'Asked a question';
+    default: {
+      const s = summarizeInput(input, 60);
+      return s ? `${tool} · ${s}` : tool;
+    }
+  }
+}
+
+function resultObj(result: unknown): Record<string, unknown> | null {
+  if (typeof result === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(result);
+      if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+    return null;
+  }
+  if (result && typeof result === 'object') return result as Record<string, unknown>;
+  return null;
+}
+
+/**
+ * One-line outcome under the sentence. Errors show the message (never a
+ * JSON dump); success shows something countable when the result has it
+ * (entries listed, bytes written), otherwise nothing — the sentence is
+ * enough and the row stays quiet.
+ */
+export function summarizeResult(tool: string, result: unknown): string {
+  if (result === undefined || result === null) return '';
+  const o = resultObj(result);
+  if (!o) {
+    const s = String(result).trim();
+    return s.length > 160 ? `${s.slice(0, 159)}…` : s;
+  }
+  if (o.ok === false) {
+    const msg = typeof o.message === 'string' && o.message ? o.message : typeof o.code === 'string' ? o.code : 'failed';
+    const flat = msg.replace(/\s+/g, ' ').trim();
+    return flat.length > 160 ? `${flat.slice(0, 159)}…` : flat;
+  }
+  const inner = o.result && typeof o.result === 'object' ? (o.result as Record<string, unknown>) : null;
+  if (tool === 'list_files' && inner && Array.isArray(inner.entries)) {
+    return `${inner.entries.length} entr${inner.entries.length === 1 ? 'y' : 'ies'}`;
+  }
+  if (tool === 'read_file' && inner && typeof inner.content === 'string') {
+    return `${formatBytes(inner.content.length)} read`;
+  }
+  if (tool === 'write_file' && inner && typeof inner.path === 'string') {
+    return inner.path;
+  }
+  if (tool === 'run_command' && inner) {
+    const out = typeof inner.stdout === 'string' ? inner.stdout.trim() : typeof inner.output === 'string' ? inner.output.trim() : '';
+    if (out) return out.length > 160 ? `${out.slice(0, 159)}…` : out;
+    if (typeof inner.exitCode === 'number') return `exit ${inner.exitCode}`;
+  }
+  return '';
+}
+
+const TOOL_ICONS: Record<string, typeof Wrench> = {
+  read_file: BookOpenText,
+  write_file: Pencil,
+  list_files: FolderOpen,
+  search_files: Search,
+  run_command: SquareTerminal,
+  claim_todo: ListTodo,
+  complete_todo: ListTodo,
+  list_todos: ListTodo,
+  ask_user: HelpCircle,
+};
 
 // ─── Markdown (pure parsers, unit-tested) ────────────────────────────────────
 // REQ-069: assistant text renders markdown. No external dep, no
@@ -322,6 +450,8 @@ export function ThoughtTrace({ toolCalls }: { toolCalls: Record<string, ToolCall
     <div className="mt-2 space-y-1.5">
       {entries.map(([callId, e]) => {
         const running = e.result === undefined;
+        const ToolIcon = TOOL_ICONS[e.tool] ?? Wrench;
+        const outcome = summarizeResult(e.tool, e.result);
         return (
           <div
             key={callId}
@@ -341,18 +471,15 @@ export function ThoughtTrace({ toolCalls }: { toolCalls: Record<string, ToolCall
               <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
             )}
             <div className="min-w-0 flex-1">
-              <span className="inline-flex items-center gap-1 font-mono text-[11px] text-zinc-500">
-                <Wrench className="h-3 w-3" />
-                {e.tool}
+              <span className="inline-flex items-center gap-1.5 text-[13px] text-zinc-700 dark:text-zinc-200">
+                <ToolIcon className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                <span className="truncate font-medium">{describeToolCall(e.tool, e.input)}</span>
+                {running && <span className="shrink-0 text-[11px] text-zinc-400">Running…</span>}
               </span>
-              {summarizeInput(e.input) && (
-                <code className="ml-1.5 rounded border border-line bg-white px-1 py-0.5 text-[11px] dark:bg-[#0F0F11]">
-                  {summarizeInput(e.input)}
-                </code>
-              )}
-              {running && <span className="ml-1.5 text-[11px] text-zinc-400">Running…</span>}
-              {typeof e.result === 'string' && e.result.trim() && (
-                <div className="mt-0.5 truncate text-[11px] text-zinc-400">{e.result.slice(0, 160)}</div>
+              {!running && outcome && (
+                <div className={`mt-0.5 truncate text-[11px] ${e.isError ? 'text-red-600 dark:text-red-400' : 'text-zinc-400'}`}>
+                  {outcome}
+                </div>
               )}
             </div>
           </div>

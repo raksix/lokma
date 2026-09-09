@@ -5,7 +5,7 @@
  * Not imported by app code, so the Vite bundle ignores it.
  */
 import { applyServerFrame, dropRequest, initialWsUiState, permissionAnswer, questionAnswer } from '@/lib/ws';
-import { parseMarkdownBlocks, sanitizeMdUrl, splitCodeFences, summarizeInput } from './lokma-message';
+import { describeToolCall, formatBytes, parseMarkdownBlocks, sanitizeMdUrl, splitCodeFences, summarizeInput, summarizeResult } from './lokma-message';
 
 function assert(cond: boolean, label: string): void {
   if (!cond) throw new Error(`FAIL: ${label}`);
@@ -78,5 +78,20 @@ assert(sanitizeMdUrl('https://example.com/a') === 'https://example.com/a', 'http
 assert(sanitizeMdUrl('/docs/x') === '/docs/x', 'relative link allowed');
 assert(sanitizeMdUrl('javascript:alert(1)') === null, 'javascript: url rejected');
 assert(sanitizeMdUrl('data:text/html,<b>x</b>') === null, 'data: url rejected');
+
+// 8. REQ-073: human tool sentences (never raw JSON in the row).
+assert(describeToolCall('read_file', { path: 'src/a.ts' }) === 'Read src/a.ts', 'read sentence');
+assert(describeToolCall('write_file', { path: 'b.html', content: 'x'.repeat(2697) }) === 'Wrote b.html · 2.6KB', 'write sentence with size');
+assert(describeToolCall('list_files', { path: '.' }) === 'Listed .', 'list sentence');
+assert(describeToolCall('list_files', '{"path":"."}') === 'Listed .', 'stringified input parsed');
+assert(describeToolCall('search_files', { query: 'auth' }) === 'Searched “auth”', 'search sentence');
+assert(describeToolCall('run_command', { command: 'bun', args: ['run', 'build'] }) === 'Ran bun run build', 'run sentence');
+assert(describeToolCall('mystery_tool', { a: 1 }) === 'mystery_tool · {"a":1}', 'unknown tool falls back');
+assert(formatBytes(2697) === '2.6KB' && formatBytes(512) === '512B', 'byte labels');
+assert(summarizeResult('list_files', { ok: true, result: { entries: [1, 2, 3] } }) === '3 entries', 'list count shown');
+assert(summarizeResult('write_file', { ok: true, result: { path: 'b.html' } }) === 'b.html', 'write path shown');
+assert(summarizeResult('read_file', { ok: false, code: 'denied', message: 'Denied by permissions: read_file' }).startsWith('Denied by'), 'error message shown, no dump');
+assert(summarizeResult('read_file', { ok: true, result: {} }) === '', 'quiet success stays quiet');
+assert(summarizeResult('x', undefined) === '', 'missing result is empty');
 
 console.log('lokma-message.test.ts: all W1-2 checks passed');

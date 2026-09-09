@@ -6,6 +6,13 @@ import type { UseWs } from '@/hooks/use-ws';
 import { emitToast } from '@/components/shell';
 import { SplitTree } from './split-tree';
 import { WindowedCanvas, parseWindowedPos, WINDOWED_POS_KEY, type WindowPos } from './windowed-canvas';
+import {
+  clampWindowPos,
+  fillWindowPos,
+  snapEdgeForPoint,
+  snapWindowPos,
+  type CanvasBox,
+} from './windowed-canvas';
 import { FullscreenPlaceholder, PaneFullscreenModal } from './fullscreen-modal';
 import { WorkspacePane } from './pane';
 import {
@@ -65,6 +72,14 @@ export function TilingWorkspace({
   const [tabStates, setTabStates] = React.useState<Record<string, PaneTabState>>(loadTabStates);
   // REQ-042: floating window positions+sizes persist across reloads.
   const [winPos, setWinPos] = React.useState<Record<string, WindowPos>>(loadWindowedPos);
+  // REQ-096 — measured windowed-canvas box (ResizeObserver). Windows clamp,
+  // maximize and edge-snap against it; {w:0} until the first report.
+  const [canvasBox, setCanvasBox] = React.useState<CanvasBox>({ left: 0, top: 0, w: 0, h: 0 });
+  const handleCanvasBox = React.useCallback((b: CanvasBox) => {
+    setCanvasBox((prev) =>
+      prev.left === b.left && prev.top === b.top && prev.w === b.w && prev.h === b.h ? prev : b,
+    );
+  }, []);
   // REQ-089: fullscreen modal shows a LIVE view of one layout subtree
   // (`root` node id; `origin` pane id for narrowing back after collapses).
   // Not persisted — a reload lands on the plain layout, never a stale modal.
@@ -390,20 +405,40 @@ export function TilingWorkspace({
     return { id: pid, title: current ? current.title : 'Empty pane' };
   });
 
+  // REQ-096 — render positions clamped to the measured canvas so stale
+  // persisted geometry can never park a window outside the visible box.
+  const clampedWinPos = React.useMemo(() => {
+    const out: Record<string, WindowPos> = {};
+    for (const pid of paneIds) {
+      out[pid] = clampWindowPos(winPos[pid] ?? { x: 24, y: 24, w: 560, h: 420 }, canvasBox);
+    }
+    return out;
+  }, [winPos, canvasBox, paneIds]);
+
   const onWinDragStart = (winId: string, x: number, y: number) => {
-    const orig = winPos[winId] ?? { x: 24, y: 24, w: 560, h: 420 };
+    const box = canvasBox;
+    const orig = clampWindowPos(winPos[winId] ?? { x: 24, y: 24, w: 560, h: 420 }, box);
     dragWin.current = { id: winId, startX: x, startY: y, origX: orig.x, origY: orig.y };
     const move = (ev: PointerEvent) => {
       const drag = dragWin.current;
       if (!drag || drag.id !== winId) return;
       const nx = Math.max(0, drag.origX + ev.clientX - drag.startX);
       const ny = Math.max(0, drag.origY + ev.clientY - drag.startY);
-      setWinPos((prev) => ({ ...prev, [winId]: { ...prev[winId], x: nx, y: ny } }));
+      setWinPos((prev) => {
+        const cur = prev[winId] ?? orig;
+        return { ...prev, [winId]: clampWindowPos({ ...cur, x: nx, y: ny }, box) };
+      });
     };
-    const up = () => {
+    const up = (ev: PointerEvent) => {
       dragWin.current = null;
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
+      // REQ-096 — release near a canvas edge snaps Windows-style.
+      const edge = snapEdgeForPoint(box, ev.clientX, ev.clientY);
+      if (edge) {
+        setWinPos((prev) => ({ ...prev, [winId]: snapWindowPos(box, edge) }));
+        emitToast(edge === 'top' ? 'Window maximized' : `Window snapped ${edge}`);
+      }
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -427,16 +462,24 @@ export function TilingWorkspace({
         {windowed ? (
           <WindowedCanvas
             panes={paneTitles}
-            pos={winPos}
+            pos={clampedWinPos}
             renderPane={renderPane}
+            onBox={handleCanvasBox}
             onDragStart={onWinDragStart}
             onResize={(winId, next) =>
               setWinPos((prev) => {
                 const cur = prev[winId] ?? { 'x': 24, 'y': 24, 'w': 560, 'h': 420 };
-                return { ...prev, [winId]: { ...cur, ...next } };
+                return { ...prev, [winId]: clampWindowPos({ ...cur, ...next }, canvasBox) };
               })
             }
-            onMaximize={(winId) => setWinPos((prev) => ({ ...prev, [winId]: { x: 8, y: 8, w: 1100, h: 680 } }))}
+            onMaximize={(winId) =>
+              // REQ-096 — fill the measured canvas (was a fixed 1100x680,
+              // which left the bottom empty on tall screens).
+              setWinPos((prev) => ({
+                ...prev,
+                [winId]: canvasBox.w > 0 ? fillWindowPos(canvasBox) : { x: 8, y: 8, w: 1100, h: 680 },
+              }))
+            }
             onClose={closePane}
           />
         ) : (

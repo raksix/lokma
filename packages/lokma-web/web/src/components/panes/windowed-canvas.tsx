@@ -8,6 +8,62 @@ export const WINDOWED_POS_KEY = 'lokma:windowed-pos:v1';
 export const WINDOWED_MIN_W = 320;
 export const WINDOWED_MIN_H = 220;
 
+/** Measured canvas box (viewport coords + size) reported by the canvas. */
+export type CanvasBox = { left: number; top: number; w: number; h: number };
+
+const WIN_M = 8;
+
+/** Fill the whole canvas with an 8px margin (REQ-096 maximize). */
+export function fillWindowPos(box: { w: number; h: number }): WindowPos {
+  return {
+    x: WIN_M,
+    y: WIN_M,
+    w: Math.max(WINDOWED_MIN_W, box.w - WIN_M * 2),
+    h: Math.max(WINDOWED_MIN_H, box.h - WIN_M * 2),
+  };
+}
+
+/** Clamp a window inside the canvas (REQ-096 containment). No-op until measured. */
+export function clampWindowPos(p: WindowPos, box: { w: number; h: number }): WindowPos {
+  if (!box || box.w <= 0 || box.h <= 0) return p;
+  const w = Math.max(WINDOWED_MIN_W, Math.min(p.w, box.w - WIN_M * 2));
+  const h = Math.max(WINDOWED_MIN_H, Math.min(p.h, box.h - WIN_M * 2));
+  return {
+    x: Math.max(0, Math.min(Math.round(p.x), Math.max(0, box.w - WIN_M - w))),
+    y: Math.max(0, Math.min(Math.round(p.y), Math.max(0, box.h - WIN_M - 40))),
+    w: Math.round(w),
+    h: Math.round(h),
+  };
+}
+
+export type SnapEdge = 'left' | 'right' | 'top';
+
+/** Windows-style snap geometry (REQ-096): halves + full. */
+export function snapWindowPos(box: { w: number; h: number }, edge: SnapEdge): WindowPos {
+  const full = fillWindowPos(box);
+  if (edge === 'top') return full;
+  const w = Math.max(WINDOWED_MIN_W, Math.floor((box.w - WIN_M * 3) / 2));
+  return edge === 'left'
+    ? { x: WIN_M, y: WIN_M, w, h: full.h }
+    : { x: WIN_M * 2 + w, y: WIN_M, w: Math.max(WINDOWED_MIN_W, box.w - WIN_M * 3 - w), h: full.h };
+}
+
+/** Which edge (if any) a pointer release near the canvas border snaps to. */
+export function snapEdgeForPoint(
+  box: CanvasBox,
+  clientX: number,
+  clientY: number,
+  tol = 20,
+): SnapEdge | null {
+  if (!box || box.w <= 0 || box.h <= 0) return null;
+  const lx = clientX - box.left;
+  const ly = clientY - box.top;
+  if (ly >= -tol && ly <= tol) return 'top';
+  if (lx >= -tol && lx <= tol) return 'left';
+  if (lx >= box.w - tol && lx <= box.w + tol) return 'right';
+  return null;
+}
+
 export function parseWindowedPos(raw: unknown): Record<string, WindowPos> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
   const out: Record<string, WindowPos> = {};
@@ -37,6 +93,7 @@ export function WindowedCanvas({
   onResize,
   onMaximize,
   onClose,
+  onBox,
 }: {
   panes: { id: string; title: string }[];
   pos: Record<string, WindowPos>;
@@ -45,9 +102,31 @@ export function WindowedCanvas({
   onResize: (id: string, next: WindowPos) => void;
   onMaximize: (id: string) => void;
   onClose: (id: string) => void;
+  /** Canvas box reporter (REQ-096): measured rect for clamp/snap/maximize. */
+  onBox: (box: CanvasBox) => void;
 }) {
+  const boxEl = React.useRef<HTMLDivElement | null>(null);
+  const onBoxRef = React.useRef(onBox);
+  onBoxRef.current = onBox;
+  React.useEffect(() => {
+    const el = boxEl.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const report = () => {
+      const r = el.getBoundingClientRect();
+      onBoxRef.current({
+        left: Math.round(r.left),
+        top: Math.round(r.top),
+        w: Math.round(r.width),
+        h: Math.round(r.height),
+      });
+    };
+    report();
+    const ro = new ResizeObserver(report);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   return (
-    <div className="relative min-h-0 flex-1 overflow-hidden rounded border bg-muted/20">
+    <div ref={boxEl} className="relative min-h-0 flex-1 overflow-hidden rounded border bg-muted/20">
       {panes.length === 0 ? (
         <div className="flex h-full items-center justify-center p-6 text-center text-xs text-muted-foreground">
           No floating windows. Pop a pane out from its strip button, then drag it here.

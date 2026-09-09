@@ -75,6 +75,13 @@ export type AgentLoopOpts = {
   systemPreamble?: string;
   maxTurns?: number;
   turnTimeoutMs?: number;
+  /**
+   * REQ-077: auto-retry on upstream failure (stream errors + turn-1 empty
+   * replies). Undefined = defaults (10 retries, default backoff). 0 = the
+   * old fail-fast behavior. User aborts never retry.
+   */
+  maxRetries?: number;
+  retryDelaysMs?: number[];
 };
 
 export type AgentLoopResult = {
@@ -86,6 +93,38 @@ export type AgentLoopResult = {
 
 export const LOOP_DEFAULT_MAX_TURNS = 15;
 export const LOOP_DEFAULT_TURN_TIMEOUT_MS = 180_000;
+/** REQ-077: retries after the first try (default 10, 0 = fail fast). */
+export const LOOP_DEFAULT_MAX_RETRIES = 10;
+/** REQ-077: default backoff — 3s, 10s, 15s, 20s, 30s, 40s, 50s, then 60/90/120s. */
+export const LOOP_DEFAULT_RETRY_DELAYS_MS = [3_000, 10_000, 15_000, 20_000, 30_000, 40_000, 50_000, 60_000, 90_000, 120_000];
+
+/**
+ * REQ-077: wait before retry `attempt` (1-based). Past the end of the
+ * list the last value repeats; empty list = no wait. Pure — probe it.
+ */
+export function retryDelayMs(delaysMs: number[], attempt: number): number {
+  if (delaysMs.length === 0 || attempt < 1) return 0;
+  return delaysMs[Math.min(attempt - 1, delaysMs.length - 1)] ?? 0;
+}
+
+/** Abort-aware sleep — resolves false when the parent aborts mid-wait. */
+function sleepAbortable(ms: number, signal: AbortSignal): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (signal.aborted) {
+      resolve(false);
+      return;
+    }
+    const onAbort = (): void => {
+      clearTimeout(t);
+      resolve(false);
+    };
+    const t = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve(true);
+    }, ms);
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
 /**
  * Transcript window rebuilt as model history (newest-first cap).
  * REQ-071: per-message truncation — one giant message (a 31KB tool block
@@ -154,6 +193,8 @@ function toolRecord(callId: string, tool: string, record: Record<string, unknown
 export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult> {
   const maxTurns = opts.maxTurns ?? LOOP_DEFAULT_MAX_TURNS;
   const turnTimeoutMs = opts.turnTimeoutMs ?? LOOP_DEFAULT_TURN_TIMEOUT_MS;
+  const maxRetries = opts.maxRetries ?? LOOP_DEFAULT_MAX_RETRIES;
+  const retryDelaysMs = opts.retryDelaysMs ?? LOOP_DEFAULT_RETRY_DELAYS_MS;
 
   const registry = new ToolRegistry();
   for (const tool of buildBuiltinTools(opts.cwd)) registry.register(tool);
@@ -225,39 +266,66 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
     const filter = createBlockFilter();
     let clean = '';
     let streamFailed: unknown = null;
+    // REQ-077: retry attempts loop — a dead upstream re-tries the same turn
+    // with backoff instead of killing the run. `attempt` counts tries (1 =
+    // first); retries stop at maxRetries, aborts never retry.
+    let attempt = 0;
+    let end: ReturnType<typeof filter.finish> | null = null;
     try {
-      for await (const chunk of aiStream({
-        provider: opts.upstream.provider,
-        model: opts.model,
-        messages,
-        apiKey: opts.upstream.apiKey,
-        baseUrl: opts.upstream.baseUrl,
-        signal: turnCtrl.signal,
-        // REQ-038: session-stable routing id for upstreams that need it
-        // (OpenCode Go 400s headerless calls).
-        extraHeaders: { 'x-opencode-session': `lokma-${opts.sessionId}` },
-      })) {
-        if (chunk.type === 'text_delta') {
-          const visible = filter.push(chunk.delta);
-          if (visible) {
-            clean += visible;
-            opts.send({ type: 'text_delta', delta: visible, sessionId: opts.sessionId });
+    for (;;) {
+      attempt++;
+      // A fresh filter per attempt: a partial failed stream must not leak
+      // half-written tool blocks into the retry.
+      const attemptFilter = attempt === 1 ? filter : createBlockFilter();
+      if (attempt > 1) clean = '';
+      streamFailed = null;
+      try {
+        for await (const chunk of aiStream({
+          provider: opts.upstream.provider,
+          model: opts.model,
+          messages,
+          apiKey: opts.upstream.apiKey,
+          baseUrl: opts.upstream.baseUrl,
+          signal: turnCtrl.signal,
+          // REQ-038: session-stable routing id for upstreams that need it
+          // (OpenCode Go 400s headerless calls).
+          extraHeaders: { 'x-opencode-session': `lokma-${opts.sessionId}` },
+        })) {
+          if (chunk.type === 'text_delta') {
+            const visible = attemptFilter.push(chunk.delta);
+            if (visible) {
+              clean += visible;
+              opts.send({ type: 'text_delta', delta: visible, sessionId: opts.sessionId });
+            }
+          } else if (chunk.type === 'thinking_delta') {
+            // REQ-050: reasoning streams straight through (never filtered,
+            // never persisted as answer text).
+            if (chunk.delta) opts.send({ type: 'thinking_delta', delta: chunk.delta, sessionId: opts.sessionId });
+          } else if (chunk.type === 'done') {
+            break;
           }
-        } else if (chunk.type === 'thinking_delta') {
-          // REQ-050: reasoning streams straight through (never filtered,
-          // never persisted as answer text).
-          if (chunk.delta) opts.send({ type: 'thinking_delta', delta: chunk.delta, sessionId: opts.sessionId });
-        } else if (chunk.type === 'done') {
+        }
+      } catch (e) {
+        streamFailed = e;
+      }
+      if (streamFailed === null) {
+        const finished = attemptFilter.finish();
+        if (finished.tail) {
+          clean += finished.tail;
+          opts.send({ type: 'text_delta', delta: finished.tail, sessionId: opts.sessionId });
+        }
+        // REQ-071: a first turn with no text, no tool calls and no questions
+        // is an empty upstream reply, NOT a completed run — it retries like
+        // any other upstream failure instead of showing an empty response.
+        if (turns === 1 && !clean.trim() && finished.toolCalls.length === 0 && finished.asks.length === 0) {
+          streamFailed = new Error('Model returned an empty response');
+        } else {
+          end = finished;
           break;
         }
       }
-    } catch (e) {
-      streamFailed = e;
-    } finally {
-      clearTimeout(timer);
-      opts.signal.removeEventListener('abort', onParentAbort);
-    }
-    if (streamFailed !== null) {
+      // Failure path: abort (user stop / turn timeout) ends the turn, never
+      // retries. Anything else backs off and re-tries the same turn.
       if (opts.signal.aborted || turnCtrl.signal.aborted) {
         if (clean.trim()) {
           await opts.store.append(opts.sessionId, {
@@ -277,6 +345,25 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
         }
         return { outcome: 'aborted', inputChars, outputChars: outputChars + clean.length, turns };
       }
+      const reason = streamFailed instanceof Error ? streamFailed.message : String(streamFailed);
+      if (attempt > maxRetries) break;
+      const waitMs = retryDelayMs(retryDelaysMs, attempt);
+      opts.send({ type: 'retry_notice', attempt, maxAttempts: maxRetries, waitMs, message: reason.slice(0, 300), sessionId: opts.sessionId });
+      const waited = await sleepAbortable(waitMs, opts.signal);
+      if (!waited) {
+        await opts.store.append(opts.sessionId, {
+          role: 'assistant',
+          content: '[run aborted: stopped while waiting to retry]',
+          timestamp: new Date().toISOString(),
+        });
+        return { outcome: 'aborted', inputChars, outputChars, turns };
+      }
+    }
+    } finally {
+      clearTimeout(timer);
+      opts.signal.removeEventListener('abort', onParentAbort);
+    }
+    if (streamFailed !== null) {
       // REQ-071: a dead upstream used to vanish without a trace (no frame a
       // refresh can catch, nothing in the transcript) — the user saw "sent,
       // nothing happened". Leave a short honest note in the transcript so
@@ -284,30 +371,12 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
       const reason = streamFailed instanceof Error ? streamFailed.message : String(streamFailed);
       await opts.store.append(opts.sessionId, {
         role: 'assistant',
-        content: `[run failed: ${reason.slice(0, 300)}]`,
+        content: `[run failed after ${attempt} tries: ${reason.slice(0, 300)}]`,
         timestamp: new Date().toISOString(),
       });
       throw streamFailed;
     }
-
-    const end = filter.finish();
-    if (end.tail) {
-      clean += end.tail;
-      opts.send({ type: 'text_delta', delta: end.tail, sessionId: opts.sessionId });
-    }
-    // REQ-071: a first turn with no text, no tool calls and no questions is
-    // an empty upstream reply, NOT a completed run — completing silently
-    // shows "Response complete" with no response. Fail honestly instead
-    // (the error path leaves a transcript note + toast); later quiet turns
-    // still mean "tool work is done", preserving the tool-then-silence flow.
-    if (turns === 1 && !clean.trim() && end.toolCalls.length === 0 && end.asks.length === 0) {
-      await opts.store.append(opts.sessionId, {
-        role: 'assistant',
-        content: '[run failed: model returned an empty response — please retry the prompt]',
-        timestamp: new Date().toISOString(),
-      });
-      throw new Error('Model returned an empty response — please retry the prompt');
-    }
+    const runEnd = end ?? filter.finish();
     outputChars += clean.length;
     if (clean.trim()) {
       await opts.store.append(opts.sessionId, {
@@ -320,7 +389,7 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
     const followUps: string[] = [];
 
     // ── Tool calls (in model order, one at a time) ──────────────────────────
-    for (const call of end.toolCalls) {
+    for (const call of runEnd.toolCalls) {
       if (opts.signal.aborted) return { outcome: 'aborted', inputChars, outputChars, turns };
       const callId = mintCallId();
       if (!call.tool || call.input === undefined) {
@@ -385,7 +454,7 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
     }
 
     // ── Questions (in model order) ──────────────────────────────────────────
-    for (const ask of end.asks) {
+    for (const ask of runEnd.asks) {
       if (opts.signal.aborted) return { outcome: 'aborted', inputChars, outputChars, turns };
       const requestId = mintCallId('ask');
       opts.send({
@@ -410,7 +479,7 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
       // run, nudge it instead of calling the job complete (tool-then-silence
       // used to abandon real tasks: list_files ran, write_file never came).
       // A second quiet turn still means done — no poke loops.
-      const quietTurn = !clean.trim() && end.toolCalls.length === 0 && end.asks.length === 0;
+      const quietTurn = !clean.trim() && runEnd.toolCalls.length === 0 && runEnd.asks.length === 0;
       if (quietTurn && turns < maxTurns && !nudgedQuiet) {
         nudgedQuiet = true;
         const nudge = '<system>You stopped without responding. Continue the user task now: emit the next <tool> block or write the answer.</system>';

@@ -4,7 +4,7 @@
  * No test framework — plain asserts so the package stays dependency-free.
  * Not imported by server code, so `tsc -p` output ignores it.
  */
-import { buildLoopHistory, truncateHistoryText } from './agent-loop';
+import { buildLoopHistory, retryDelayMs, truncateHistoryText } from './agent-loop';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -51,3 +51,15 @@ assert(toolRow !== undefined && toolRow.content.length < 5_000, 'tool row trunca
 assert(toolHistory[toolHistory.length - 1].content === 'now write it', 'newest prompt whole after tool row');
 
 console.log(`\nagent-loop probe: ${passed} passed`);
+
+/* REQ-077 — retryDelayMs: 1-based backoff, last repeats, empty = 0. */
+const D = [3_000, 10_000, 15_000, 20_000, 30_000, 40_000, 50_000];
+assert(retryDelayMs(D, 1) === 3_000, 'attempt 1 waits 3s');
+assert(retryDelayMs(D, 2) === 10_000, 'attempt 2 waits 10s');
+assert(retryDelayMs(D, 7) === 50_000, 'attempt 7 waits 50s');
+assert(retryDelayMs(D, 8) === 50_000, 'past the end the last repeats');
+assert(retryDelayMs(D, 100) === 50_000, 'far past the end still repeats');
+assert(retryDelayMs([], 1) === 0, 'empty list = no wait');
+assert(retryDelayMs(D, 0) === 0, 'attempt 0 = no wait');
+
+console.log(`agent-loop-retry probe: ${passed} passed`);

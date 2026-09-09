@@ -122,6 +122,8 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
           prompt: effectivePrompt,
           systemPreamble: botCtx?.systemPreamble || undefined,
           permissions: config?.permissions,
+          maxRetries: config?.retry?.maxAttempts,
+          retryDelaysMs: config?.retry?.delaysSec ? config.retry.delaysSec.map((s) => s * 1000) : undefined,
           store,
           send,
           waitApproval: ({ requestId, tool }) =>

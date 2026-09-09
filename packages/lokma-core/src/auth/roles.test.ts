@@ -8,7 +8,8 @@
  * normalizes to `calisan`, oldest admin promotes to superadmin while
  * none exists, `can()` matrix (auth:manage superadmin-only,
  * project:create policy), superadmin edit guards, and `canViewSession`
- * isolation (calisan sees own + unattributed, never чужой).
+ * isolation (REQ-094 strict: every role sees own sessions only, admins
+ * included; unattributed legacy sessions are superadmin-only).
  * Not imported by library code; `tsconfig.json` excludes `*.test.ts`.
  */
 import {
@@ -95,12 +96,21 @@ assert(added.role === 'calisan', 'legacy member addMember normalizes to calisan'
 assert(await can(calisan, 'session:view-own', project.id), 'calisan holds session:view-own');
 assert(!(await can(viewer, 'session:view-own', project.id)), 'viewer lacks session:view-own');
 
-// Session ownership isolation.
-assert(canViewSession(superadmin, 'sess чужой'), 'superadmin sees every session');
-assert(canViewSession(promoted, 'sess чужой'), 'admin sees every session');
+// Session ownership isolation (REQ-094 strict: own sessions only, every
+// role; unattributed legacy sessions are superadmin-only cleanup).
+assert(canViewSession(superadmin, superadmin.id), 'superadmin sees own session');
+assert(!canViewSession(superadmin, 'sess чужой'), 'superadmin never sees чужой session');
+assert(canViewSession(superadmin, null), 'superadmin sees unattributed legacy sessions');
+assert(canViewSession(superadmin, undefined), 'superadmin sees missing-meta sessions');
+assert(canViewSession(promoted, promoted.id), 'admin sees own session');
+assert(!canViewSession(promoted, 'sess чужой'), 'admin never sees чужой session');
+assert(!canViewSession(promoted, null), 'admin never sees unattributed legacy sessions');
+assert(!canViewSession(promoted, ''), 'admin never sees empty-owner sessions');
 assert(canViewSession(calisan, calisan.id), 'calisan sees own session');
 assert(!canViewSession(calisan, 'sess чужой'), 'calisan never sees чужой session');
-assert(canViewSession(calisan, null), 'calisan sees unattributed legacy sessions');
+assert(!canViewSession(calisan, null), 'calisan never sees unattributed legacy sessions');
+assert(canViewSession(viewer, viewer.id), 'viewer sees own session');
+assert(!canViewSession(viewer, 'sess чужой'), 'viewer never sees чужой session');
 
 // Flipping requireLogin needs saveAuthSettings (route-gated to superadmin;
 // the store persists whatever it is given — the gate reads it back).

@@ -124,7 +124,8 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
       typeof rawCwd === 'string' && rawCwd.trim()
         ? await new SessionStore(normalizeCwd(rawCwd)).listSummaries()
         : await listAllSummaries();
-    // Calisan isolation: чужой sessions never appear in the list.
+    // REQ-094 strict isolation: only own sessions appear in the list
+    // (admins included; unattributed legacy = superadmin-only).
     const visible = user ? sessions.filter((s) => canViewSession(user, s.ownerId)) : sessions;
     return { sessions: visible, count: visible.length };
   });
@@ -137,7 +138,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     try {
       const result = await searchSessionsDetailed(cwd, q.q, { limit: q.limit });
       if (!user) return result;
-      // Calisan isolation: drop hits from чужой sessions.
+      // REQ-094 strict isolation: drop hits from sessions the caller may not see.
       const store = new SessionStore(cwd);
       const hits: typeof result.hits = [];
       for (const hit of result.hits) {
@@ -239,7 +240,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     const store = new SessionStore(cwd);
     if (user) {
       const meta = await store.readMeta(id).catch(() => null);
-      if (meta && !canViewSession(user, meta.ownerId)) {
+      if (!canViewSession(user, meta?.ownerId)) {
         return reply.status(403).send({ code: 'forbidden', message: 'forbidden: not your session' });
       }
     }
@@ -302,7 +303,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     const store = new SessionStore(cwd);
     if (user) {
       const meta = await store.readMeta(id).catch(() => null);
-      if (meta && !canViewSession(user, meta.ownerId)) {
+      if (!canViewSession(user, meta?.ownerId)) {
         return reply.status(403).send({ code: 'forbidden', message: 'forbidden: not your session' });
       }
     }
@@ -323,7 +324,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     const store = new SessionStore(cwd);
     if (user) {
       const meta = await store.readMeta(id).catch(() => null);
-      if (meta && !canViewSession(user, meta.ownerId)) {
+      if (!canViewSession(user, meta?.ownerId)) {
         return reply.status(403).send({ code: 'forbidden', message: 'forbidden: not your session' });
       }
     }
@@ -352,7 +353,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     if (user) {
       for (const sid of [id, body.from]) {
         const meta = await store.readMeta(sid).catch(() => null);
-        if (meta && !canViewSession(user, meta.ownerId)) {
+        if (!canViewSession(user, meta?.ownerId)) {
           return reply.status(403).send({ code: 'forbidden', message: 'forbidden: not your session' });
         }
       }
@@ -387,7 +388,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     const store = new SessionStore(cwd);
     if (user) {
       const meta = await store.readMeta(id).catch(() => null);
-      if (meta && !canViewSession(user, meta.ownerId)) {
+      if (!canViewSession(user, meta?.ownerId)) {
         return reply.status(403).send({ code: 'forbidden', message: 'forbidden: not your session' });
       }
     }
@@ -413,6 +414,13 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     const user = await sessionUser(req, reply);
     if (user === undefined) return reply;
     const cwd = await resolveSessionCwd((req.query as { cwd?: string })?.cwd, id);
+    if (user) {
+      // REQ-094: compaction status reads the transcript — same gate as GET /:id/run.
+      const meta = await new SessionStore(cwd).readMeta(id).catch(() => null);
+      if (!canViewSession(user, meta?.ownerId)) {
+        return reply.status(404).send({ code: 'not_found', message: 'Session not found' });
+      }
+    }
     try {
       return await compactionStatus(cwd, id);
     } catch (e) {
@@ -438,6 +446,13 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({ code: 'bad_mode', message: 'POST accepts { mode: "hygiene" | "full" }' });
     }
     const cwd = await resolveSessionCwd((req.query as { cwd?: string })?.cwd, id);
+    if (user) {
+      // REQ-094: compaction rewrites the transcript — same gate as PATCH/DELETE.
+      const meta = await new SessionStore(cwd).readMeta(id).catch(() => null);
+      if (!canViewSession(user, meta?.ownerId)) {
+        return reply.status(403).send({ code: 'forbidden', message: 'forbidden: not your session' });
+      }
+    }
     try {
       const report = await compactSession(cwd, id, { mode });
       return { ok: true, ...report };

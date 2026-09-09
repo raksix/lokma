@@ -5,6 +5,7 @@ import {
   SessionStore,
   TerminalError,
   UsageLedger,
+  canViewSession,
   estimateCost,
   estimateTokens,
   loadConfig,
@@ -279,6 +280,21 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
             // Socket already gone — just close below.
           }
           socket.close(4401, 'login required');
+        } else {
+          // REQ-094: the socket alone leaks nothing, but terminal fan-out
+          // + agent events are session-scoped — non-owners never attach.
+          // Missing meta = unattributed = superadmin-only (uniform rule).
+          const meta = await new SessionStore(await effectiveCwd()).readMeta(sessionId).catch(() => null);
+          if (!canViewSession(user, meta?.ownerId)) {
+            try {
+              socket.send(
+                encodeServerMessage({ type: 'error', message: 'forbidden: not your session', code: 'forbidden', sessionId }),
+              );
+            } catch {
+              // Socket already gone — just close below.
+            }
+            socket.close(4403, 'forbidden');
+          }
         }
       } catch {
         // Gate checks never break the socket — fail open, the prompt path
@@ -344,9 +360,21 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
         const prompt = msg.prompt.trim();
         if (!prompt) return;
         const cwd = await effectiveCwd();
-        await new SessionStore(cwd).append(sessionId, { role: 'user', content: prompt, timestamp: new Date().toISOString() });
         // Claim attribution is resolved now (the socket may be gone by turn time).
         const turnUser = await userFromToken(requestToken(req)).catch(() => null);
+        // REQ-094: per-turn ownership re-check (handshake races + the
+        // append below would otherwise mint unattributed transcripts for
+        // anyone holding the id). Gate-off stays legacy-open.
+        if (await loginGateActive()) {
+          const turnMeta = await new SessionStore(cwd).readMeta(sessionId).catch(() => null);
+          if (!turnUser || !canViewSession(turnUser, turnMeta?.ownerId)) {
+            socket.send(
+              encodeServerMessage({ type: 'error', message: 'forbidden: not your session', code: 'forbidden', sessionId }),
+            );
+            return;
+          }
+        }
+        await new SessionStore(cwd).append(sessionId, { role: 'user', content: prompt, timestamp: new Date().toISOString() });
         const depth = enqueuePrompt(sessionId, {
           prompt,
           model: msg.model?.trim() || undefined,

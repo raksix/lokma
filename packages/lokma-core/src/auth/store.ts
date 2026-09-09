@@ -801,14 +801,14 @@ export async function visibleProjects(user: User): Promise<Project[]> {
 }
 
 /**
- * Session ownership gate (REQ-062 Parça B, REQ-064): elevated roles see
- * every session; everyone else sees only their own PLUS unattributed
- * (legacy/anonymous, `ownerId` null) sessions — a calisan never sees a
- * чужой session, not even in the list.
+ * Session ownership gate (REQ-094 — strict per-user isolation): every
+ * role sees ONLY its own sessions (`ownerId === user.id`), admins
+ * included. Unattributed sessions (legacy/anonymous, `ownerId` null or
+ * empty — including a missing meta sidecar) are visible to superadmin
+ * only (cleanup), never to admins or calisan.
  */
 export function canViewSession(user: User, ownerId: string | null | undefined): boolean {
-  if (user.role === 'admin' || user.role === 'superadmin') return true;
-  if (ownerId == null || ownerId === '') return true;
+  if (ownerId == null || ownerId === '') return user.role === 'superadmin';
   return ownerId === user.id;
 }
 

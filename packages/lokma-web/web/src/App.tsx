@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { AppShell } from '@/components/app-shell';
+import { InvitePage } from '@/components/auth/invite-page';
 import { LoginGate } from '@/components/auth/login-gate';
 import { OnboardingWizard } from '@/components/auth/onboarding-wizard';
 import { api } from '@/lib/api';
@@ -75,6 +76,19 @@ function useGate(): { gate: GateState; refresh: () => void } {
 export default function App() {
   const sessionId = useSessionId();
   const { gate, refresh } = useGate();
+  // REQ-080: invite links land here BEFORE the gate — an invited user has
+  // no password yet, so the login gate would 401 them forever.
+  const inviteToken = React.useMemo(() => {
+    try {
+      if (window.location.pathname !== '/invite') return null;
+      return new URLSearchParams(window.location.search).get('token') ?? '';
+    } catch {
+      return null;
+    }
+  }, []);
+  if (inviteToken !== null) {
+    return <InvitePage token={inviteToken} onDone={refresh} />;
+  }
   if (gate.phase === 'loading') {
     return <div className="h-screen w-screen grid place-items-center bg-[#FAF9F5] dark:bg-[#161618] text-sm text-zinc-400">Loading Lokma…</div>;
   }

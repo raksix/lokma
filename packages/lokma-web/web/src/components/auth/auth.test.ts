@@ -4,6 +4,7 @@
  * Exits non-zero on the first failure (16/16 style like prior waves).
  */
 import {
+  emptyAcceptInviteForm,
   canDo,
   canEditProject,
   clearToken,
@@ -21,6 +22,7 @@ import {
   roleTone,
   statusTone,
   storeToken,
+  validateAcceptInviteForm,
   validateInviteForm,
   validateLoginForm,
   validateProjectForm,
@@ -136,6 +138,11 @@ check(
 );
 check('empty invite rejected', validateInviteForm({ ...emptyInviteForm }) !== null);
 check('admin invite rejected', validateInviteForm({ email: 'a@b.com', role: 'admin', projectIds: [] }) !== null);
+// REQ-080 — accept-invite form: name + password twice.
+check('empty accept-invite rejected', validateAcceptInviteForm({ ...emptyAcceptInviteForm }) !== null);
+check('mismatched passwords rejected', validateAcceptInviteForm({ name: 'Aylin', password: 'secret123', confirm: 'secret124' }) !== null);
+check('short accept password rejected', validateAcceptInviteForm({ name: 'Aylin', password: 'short', confirm: 'short' }) !== null);
+check('valid accept-invite passes', validateAcceptInviteForm({ name: 'Aylin', password: 'secret123', confirm: 'secret123' }) === null);
 check(
   'valid invite passes',
   validateInviteForm({ email: 'a@b.com', role: 'viewer', projectIds: [] }) === null,

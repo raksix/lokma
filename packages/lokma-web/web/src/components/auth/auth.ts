@@ -141,6 +141,17 @@ export function validateRegisterForm(form: RegisterForm): string | null {
   return null;
 }
 
+/** Accept-invite form (REQ-080): name + password entered twice. */
+export type AcceptInviteForm = { name: string; password: string; confirm: string };
+export const emptyAcceptInviteForm: AcceptInviteForm = { name: '', password: '', confirm: '' };
+
+export function validateAcceptInviteForm(form: AcceptInviteForm): string | null {
+  if (!form.name.trim() || form.name.trim().length > 40) return 'Name must be 1-40 chars';
+  if (form.password.length < 8 || form.password.length > 200) return 'Password must be 8-200 chars';
+  if (form.password !== form.confirm) return 'Passwords do not match';
+  return null;
+}
+
 export type InviteForm = { email: string; role: AuthRole; projectIds: string[] };
 export const emptyInviteForm: InviteForm = { email: '', role: 'calisan', projectIds: [] };
 

@@ -5,11 +5,15 @@
  * stale when WS events signal server-side growth.
  */
 import { create } from 'zustand';
-import { api, ApiError, type SessionSummary } from '@/lib/api';
+import { api, ApiError, type AuthProject, type SessionSummary } from '@/lib/api';
 import type { ServerMessage } from 'lokma-shared/protocol/ws';
 
 export type SessionStore = {
   sessions: SessionSummary[];
+  /** Project records (REQ-080) — visible even with zero sessions. */
+  projects: AuthProject[];
+  /** Reload the project list (called with sessions; failures keep old list). */
+  refreshProjects: () => Promise<void>;
   activeSessionId: string | null;
   transcripts: Record<string, unknown[]>;
   stale: Record<string, boolean>;
@@ -44,6 +48,7 @@ export type SessionStore = {
 
 const initial = {
   sessions: [] as SessionSummary[],
+  projects: [] as AuthProject[],
   activeSessionId: null as string | null,
   transcripts: {} as Record<string, unknown[]>,
   stale: {} as Record<string, boolean>,
@@ -69,8 +74,19 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
         loading: false,
         listLoaded: true,
       }));
+      // Project records ride along (REQ-080) — one list load refreshes both.
+      await get().refreshProjects();
     } catch (e) {
       set({ loading: false, lastError: e instanceof Error ? e.message : 'session list failed' });
+    }
+  },
+
+  refreshProjects: async () => {
+    try {
+      const res = await api.listProjects();
+      set({ projects: res.projects ?? [] });
+    } catch (e) {
+      console.error('[sessions] refreshProjects failed:', e instanceof Error ? e.message : e);
     }
   },
 

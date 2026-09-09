@@ -627,34 +627,25 @@ export function SessionsSidebar({
   // REQ-080 — project records (visible even with zero sessions) + modal.
   // Replaces the REQ-058 inline form (its silent failures read as "does
   // nothing" — the modal surfaces the server error instead).
-  const [projects, setProjects] = React.useState<AuthProject[]>([]);
   const [showProjectModal, setShowProjectModal] = React.useState(false);
   // REQ-058 — visible "New Project" affordance in the Explorer header:
   // inline name + cwd + visibility form over POST /api/projects.
-  // REQ-080: the inline form is retired — ProjectModal replaces it.
-  const loadProjects = React.useCallback(() => {
-    void api
-      .listProjects()
-      .then((res) => setProjects(res.projects ?? []))
-      .catch(() => {
-        // Logged-out / forbidden: the session list still works.
-      });
-  }, []);
-
-  React.useEffect(() => {
-    loadProjects();
-  }, [loadProjects]);
+  // REQ-080: project records live in the session store (refreshed with the
+  // session list) so they render even with zero sessions; the retired
+  // inline form's loadProjects lives on the store as refreshProjects.
+  const projects = useSessionStore((s) => s.projects);
+  const refreshProjects = useSessionStore((s) => s.refreshProjects);
 
   // REQ-080 — the modal reports the new project: refresh the list, then
   // open its first session (in the chosen cwd) so it is usable at once.
   const handleProjectCreated = React.useCallback((project: { id: string; name: string; cwd: string }) => {
-    loadProjects();
+    void refreshProjects();
     if (project.cwd) {
       void createSession({ cwd: project.cwd }).then((id) => {
         if (id) onSelect(id);
       });
     }
-  }, [createSession, loadProjects, onSelect]);
+  }, [createSession, refreshProjects, onSelect]);
 
   // REQ-080 — delete the project record (entity), then refresh the list.
   const handleDeleteEntity = React.useCallback((id: string, name: string) => {
@@ -662,12 +653,12 @@ export function SessionsSidebar({
       .deleteProject(id)
       .then(() => {
         emitToast(`Project "${name}" deleted`);
-        loadProjects();
+        void refreshProjects();
       })
       .catch((e: unknown) => {
         emitToast(e instanceof Error ? e.message : 'Project delete failed');
       });
-  }, [loadProjects]);
+  }, [refreshProjects]);
 
   React.useEffect(() => {
     setShowAll(false);

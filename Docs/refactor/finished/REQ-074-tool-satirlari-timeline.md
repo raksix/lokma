@@ -1,6 +1,6 @@
 # REQ-074 — Tool satırları timeline'da yaşasın (F5'e dayanıklı, ham JSON yok)
 
-- **Status:** done (canlıda — kullanıcı "tool calling çağrıları otomatik gözüksün, Hermes desktop nasıl yapıyorsa öyle yap" dedi, implemente edildi; SS'lere bakılamadı — görüntü servisi 500)
+- **Status:** done (impl 7e188b1 transcript tool rows + close-out 08a6da5; filing: moved to finished/ + README link fixed).
 - **Asked:** 2026-09-09.
 - **Research:** Hermes desktop (`NousResearch/hermes-agent`): her tool çağrısı kendi satırını açar, sonuç AYNI satırı günceller (`turn-activity.ts` + `inflight-turn-journal.ts`); OpenCode timeline: her şey ayrı row tipi. Bizim canlı model zaten böyleydi — eksik transcript tarafıydı.
 - **Gap:** ThoughtTrace SADECE canlı WS frame'lerinden besleniyordu; run bitince transcript reload oluyor, `role:'tool'` satırları AssistantRow'da HAM JSON basılıyordu; F5 sonrası tool satırları hiç görünmüyordu.

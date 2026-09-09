@@ -2,10 +2,10 @@
 import { parseArgs } from 'node:util';
 
 /**
- * Lokma CLI — thin terminal entry into the harness.
- * Commands: config (layered read + global write), doctor, web, agent list, --help, --version.
- * The full interactive loop lives in the Web harness; this CLI proves the
- * binary, the layered config, and the agent registry work.
+ * Lokma CLI — terminal entry into the harness.
+ * Commands: tui (interactive agent chat), config (layered read + global
+ * write), doctor, web, agent list, --help, --version.
+ * Bare `lokma` in an interactive terminal opens the TUI; piped it prints help.
  */
 
 const VERSION = '0.0.1';
@@ -13,6 +13,9 @@ const VERSION = '0.0.1';
 function printHelp(): void {
   console.log(`lokma v${VERSION} — innovative agentic harness
 Usage:
+  lokma                              Open the terminal TUI (when interactive)
+  lokma tui [--model <id>] [--session <id>] [-p "prompt"]
+                                     Terminal agent chat (Claude-Code-style)
   lokma web [--port 3456]          Start web harness (Fastify + Vite SPA)
   lokma config get <key>           Read layered config
   lokma config set <dotted.key> <value>  Write to ~/.lokma/config.json
@@ -27,6 +30,9 @@ async function main(): Promise<void> {
     args: process.argv.slice(2),
     options: {
       port: { type: 'string', default: '3456' },
+      model: { type: 'string' },
+      session: { type: 'string' },
+      prompt: { type: 'string', short: 'p' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
     },
@@ -34,6 +40,17 @@ async function main(): Promise<void> {
   });
 
   if (values.help) {
+    if (positionals[0] === 'tui' || positionals[0] === 'chat' || positionals[0] === 'run') {
+      console.log(`lokma tui — terminal agent chat over the real harness
+
+Usage:
+  lokma tui [--model <provider/model>] [--session <id>] [-p "one-shot prompt"]
+
+Sessions persist as JSONL (same files as the Web harness). Type /help inside
+for slash commands. Non-interactive shells require -p.
+`);
+      return;
+    }
     printHelp();
     return;
   }
@@ -45,7 +62,24 @@ async function main(): Promise<void> {
   const cmd = positionals[0];
 
   if (!cmd) {
+    // Bare `lokma`: interactive terminal → TUI, piped/scripted → help.
+    if (!values.prompt && process.stdin.isTTY) {
+      const { runTui } = await import('./tui.js');
+      await runTui({ cwd: process.cwd(), model: values.model, sessionId: values.session });
+      return;
+    }
+    if (values.prompt) {
+      const { runTui } = await import('./tui.js');
+      await runTui({ cwd: process.cwd(), model: values.model, sessionId: values.session, prompt: values.prompt });
+      return;
+    }
     printHelp();
+    return;
+  }
+
+  if (cmd === 'tui' || cmd === 'chat' || cmd === 'run') {
+    const { runTui } = await import('./tui.js');
+    await runTui({ cwd: process.cwd(), model: values.model, sessionId: values.session, prompt: values.prompt });
     return;
   }
 

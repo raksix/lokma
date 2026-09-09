@@ -48,6 +48,9 @@ bun run dev:web      # Vite dev server
 CLI (after build):
 
 ```bash
+lokma                          # terminal TUI (interactive)
+lokma tui --model openai/gpt-4o
+lokma tui -p "list the workspace files"
 ./bin/lokma --help
 ./bin/lokma config get | ./bin/lokma config set theme omp
 ./bin/lokma config set permissions.defaultMode plan
@@ -68,7 +71,7 @@ CLI (after build):
 
 | Surface | Status | What |
 |---------|--------|------|
-| **CLI** | Live | `./bin/lokma` — config get/set, doctor, agent list, web launcher |
+| **CLI** | Live | `./bin/lokma` — terminal TUI (`tui`), config get/set, doctor, agent list, web launcher |
 | **Web** | Live | Browser harness — chat + 23 Inspector panes, real-time WS streaming |
 | **Desktop** | Later | Native app (Tauri, Phase 3) — not built yet |
 

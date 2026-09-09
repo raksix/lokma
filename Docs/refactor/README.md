@@ -110,7 +110,7 @@
 - [REQ-089](finished/REQ-089-pane-fullscreen-modal.md) — Pane fullscreen: header butonu + modal + split — done
 - [REQ-090](finished/REQ-090-single-windowed-reset-kaldir.md) — Pane üstü Single/Windowed/Reset kalksın — done
 - [REQ-091](finished/REQ-091-mobil-navbar-menu-tuslari.md) — Mobil üst navbar'da sol/sağ menü tuşları — done
-- [REQ-092](REQ-092-kullanici-yonetimi-bolumu.md) — Settings'e admin kullanıcı yönetimi bölümü — pending
+- [REQ-092](finished/REQ-092-kullanici-yonetimi-bolumu.md) — Settings'e admin kullanıcı yönetimi bölümü — done (dedupe: shipped e3ae68e, live bundle proof)
 - [REQ-093](REQ-093-kullanici-proje-atama.md) — Kullanıcı ekleme + projeye atama + proje-açma yetkisi — pending
 - [REQ-094](REQ-094-session-izolasyonu.md) — Session'lar kullanıcıya özel (admin dahil) — pending
 - [REQ-095](REQ-095-windowed-toggle-donus.md) — Pane windowed butonu toggle: tiling'e dönüş — pending

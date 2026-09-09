@@ -56,6 +56,8 @@ export async function getMaskedCredentials(): Promise<Record<string, { keySet: b
     anthropic: process.env.ANTHROPIC_API_KEY,
     openai: process.env.OPENAI_API_KEY,
     deepseek: process.env.DEEPSEEK_API_KEY,
+    openrouter: process.env.OPENROUTER_API_KEY,
+    opencode: process.env.OPENCODE_API_KEY ?? process.env.OPENCODE_ZEN_API_KEY,
   };
   const out: Record<string, { keySet: boolean; last4: string | null }> = {};
   const allIds = new Set([...Object.keys(creds.providers), ...Object.keys(envProviders)]);
@@ -66,7 +68,7 @@ export async function getMaskedCredentials(): Promise<Record<string, { keySet: b
     out[id] = { keySet: !!key, last4: key ? key.slice(-4) : null };
   }
   // Always include known providers even if empty
-  for (const id of ['anthropic', 'openai', 'deepseek', 'google', 'ollama', 'openrouter']) {
+  for (const id of ['anthropic', 'openai', 'deepseek', 'google', 'ollama', 'openrouter', 'opencode']) {
     if (!out[id]) out[id] = { keySet: false, last4: null };
   }
   return out;

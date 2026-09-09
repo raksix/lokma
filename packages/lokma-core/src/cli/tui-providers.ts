@@ -368,7 +368,16 @@ export async function loginFlow(
   const candidate = key.trim();
   const probed = await probeProvider(view, candidate, { timeoutMs: 10_000, maxIds: 5 });
   if (!probed.ok) {
-    throw new Error(`Key verification failed: ${probed.error ?? 'probe failed'} — key NOT saved.`);
+    // Honest fallback: some gateways (custom OpenAI-compatible, Go
+    // endpoints) hide `/models` while chat works — offer to save anyway
+    // instead of hard-blocking a working key.
+    console.log(`  ${p.warn('probe failed:')} ${probed.error ?? 'probe failed'}`);
+    const raw = await rl.question(p.muted('  save this key anyway? [y/N]: '), { signal }).catch(() => null);
+    if (raw === null || !/^(y|yes)$/i.test(raw.trim())) {
+      throw new Error('Key NOT saved.');
+    }
+    await saveCredentials(providerId, candidate);
+    return { providerId, via: 'api_key', detail: 'saved 0600 (unverified — probe failed)' };
   }
   await saveCredentials(providerId, candidate);
   return { providerId, via: 'api_key', detail: `verified · ${probed.modelCount ?? 0} models · saved 0600` };

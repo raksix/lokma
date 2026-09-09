@@ -476,6 +476,165 @@ function shortCwd(cwd: string): string {
   return parts.length > 3 ? '…/' + parts.slice(-3).join('/') : cwd;
 }
 
+/** 5x5 block font for the LOKMA wordmark (OMP π-gate twin, our letters). */
+const LOGO_FONT: Record<string, string[]> = {
+  L: ['X....', 'X....', 'X....', 'X....', 'XXXXX'],
+  O: ['.XXX.', 'X...X', 'X...X', 'X...X', '.XXX.'],
+  K: ['X...X', 'X..X.', 'XXX..', 'X..X.', 'X...X'],
+  M: ['X...X', 'XX.XX', 'X.X.X', 'X...X', 'X...X'],
+  A: ['.XXX.', 'X...X', 'XXXXX', 'X...X', 'X...X'],
+};
+
+function logoLines(p: Paint): string[] {
+  const block = process.env.LOKMA_ASCII ? '#' : '█';
+  const colors = [p.primary, p.info];
+  const rows: string[] = [];
+  for (let r = 0; r < 5; r++) {
+    let row = '';
+    'LOKMA'.split('').forEach((ch, i) => {
+      const cells = ((LOGO_FONT[ch] ?? [])[r] ?? '').split('').map((c) => (c === 'X' ? block : ' ')).join('');
+      row += (colors[i % colors.length] as (s: string) => string)(cells) + ' ';
+    });
+    rows.push(row);
+  }
+  return rows;
+}
+
+const WELCOME_TIPS = [
+  'Add @path to attach file context to your prompt.',
+  'Tab completes /commands, @files and model ids.',
+  'Ctrl+C aborts the running turn — twice exits.',
+  '/compact squeezes the transcript when context runs thin.',
+  '/providers test <id> checks a provider connection live.',
+  '/models refresh pulls the live model catalog.',
+];
+
+/** Visible length (ANSI stripped) for terminal layout math. */
+function visLen(s: string): number {
+  return s.replace(/\x1b\[[0-9;]*m/g, '').length;
+}
+
+function padVis(s: string, n: number): string {
+  const len = visLen(s);
+  return len >= n ? s : s + ' '.repeat(n - len);
+}
+
+function truncPlain(s: string, n: number): string {
+  return s.length > n ? s.slice(0, Math.max(0, n - 1)) + '…' : s;
+}
+
+function ago(iso: string): string {
+  const ms = Date.now() - Date.parse(iso);
+  if (Number.isNaN(ms)) return '';
+  const m = Math.floor(ms / 60_000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+export type WelcomeData = {
+  version: string;
+  model: string;
+  sessionId: string;
+  cwdShort: string;
+  theme: string;
+  views: { id: string; keySet: boolean; last4: string | null }[];
+  summaries: { title: string; id: string; updatedAt: string }[];
+  hasCredential: boolean;
+  columns: number;
+};
+
+/**
+ * OMP-gate welcome panel (pure render — unit-tested headless).
+ * Two columns: LOKMA block wordmark + welcome + model left;
+ * tips + recent sessions right; rotating tip + connection line below.
+ */
+export function renderWelcomePanel(p: Paint, d: WelcomeData): string {
+  const out: string[] = [];
+  const W = Math.min(100, Math.max(56, d.columns - 2));
+  const ascii = !!process.env.LOKMA_ASCII;
+  const H = ascii ? '-' : '─';
+  const V = ascii ? '|' : '│';
+  const TL = ascii ? '+' : '╭';
+  const TR = ascii ? '+' : '╮';
+  const BL = ascii ? '+' : '╰';
+  const BR = ascii ? '+' : '╯';
+  const B = p.border;
+
+  if (W < 74) {
+    return p.box(
+      [
+        `${p.bold(`◆ lokma v${d.version}`)}  ${p.muted('terminal harness')}`,
+        ``,
+        `  model    ${p.primary(d.model)}${d.hasCredential ? '' : p.warn('  (no credential — /login)')}`,
+        `  session  ${p.muted(d.sessionId)}`,
+        `  cwd      ${p.muted(d.cwdShort)}`,
+        ``,
+        `  ${p.muted('Type /help for commands · /login to authenticate · /quit to exit.')}`,
+      ],
+      undefined,
+      p.primary,
+    );
+  }
+
+  const inner = W - 2;
+  const leftW = 32;
+  const rightW = inner - leftW - 5;
+  const title = ` lokma v${d.version} `;
+  out.push(B(TL + H + title + H.repeat(Math.max(0, inner - title.length - 2)) + H + TR));
+
+  const left: string[] = [
+    '',
+    ...logoLines(p),
+    '',
+    d.summaries.length > 0 ? p.bold('Welcome back!') : p.bold('Welcome!'),
+    p.primary(truncPlain(d.model, leftW)),
+    p.muted(`${d.summaries.length} session(s) · ${d.theme}`),
+  ];
+  const bullet = ascii ? '*' : '•';
+  const right: string[] = [
+    p.info('Tips'),
+    `/ for commands`,
+    `@ for file context`,
+    `Tab to complete`,
+    '',
+    p.info('Recent sessions'),
+    ...d.summaries.slice(0, 4).map((s) => {
+      const when = `(${ago(s.updatedAt)})`;
+      const title = truncPlain(s.title || s.id, Math.max(8, rightW - bullet.length - 1 - when.length - 1));
+      return `${bullet} ${title} ${p.muted(when)}`;
+    }),
+  ];
+  if (d.summaries.length === 0) right.push(p.muted('No sessions yet — say hi below.'));
+
+  const rows = Math.max(left.length, right.length);
+  for (let i = 0; i < rows; i++) {
+    out.push(`${B(V)} ${padVis(left[i] ?? '', leftW)} ${B(V)} ${padVis(right[i] ?? '', rightW)} ${B(V)}`);
+  }
+  out.push(B(BL + H.repeat(inner) + BR));
+
+  const tip = !d.hasCredential
+    ? `Run /login to authenticate a provider — keys are verified live before saving.`
+    : WELCOME_TIPS[Math.floor(Date.now() / 86_400_000) % WELCOME_TIPS.length] ?? '';
+  out.push('', `${p.warn('Tip:')} ${p.muted(truncPlain(tip, W))}`);
+
+  const connFull = d.views
+    .map((v) => `${v.id} ${v.keySet ? p.ok(`…${v.last4 ?? '????'}`) : p.muted('no key')}`)
+    .join(p.muted(' · '));
+  if (visLen(connFull) <= W) {
+    out.push(`${p.muted('Connected:')} ${connFull}`);
+  } else {
+    const keyed = d.views.filter((v) => v.keySet).map((v) => `${v.id} (…${v.last4 ?? '????'})`);
+    out.push(
+      `${p.muted('Connected:')} ${keyed.length ? keyed.join(', ') : 'none'} ${p.muted(`(+${d.views.length - keyed.length} without key)`)}`,
+    );
+  }
+  out.push('');
+  return out.join('\n');
+}
+
 export async function runTui(opts: TuiOpts): Promise<void> {
   const cwd = resolve(opts.cwd ?? process.cwd());
   const store = new SessionStore(cwd);
@@ -541,23 +700,23 @@ export async function runTui(opts: TuiOpts): Promise<void> {
     );
   };
 
-  const showWelcome = (): void => {
-    console.log(
-      p.box(
-        [
-          `${p.bold(`◆ lokma v${VERSION}`)}  ${p.muted('terminal harness — Claude-Code UX, OMP theme')}`,
-          ``,
-          `  model    ${p.primary(model)}${upstream.apiKey ? '' : p.warn('  (no credential — /login)')}`,
-          `  session  ${p.muted(sessionId)}`,
-          `  cwd      ${p.muted(shortCwd(cwd))}`,
-          ``,
-          `  ${p.muted('Type /help for commands · /login to authenticate · /quit to exit.')}`,
-        ],
-        undefined,
-        p.primary,
-      ),
-    );
-  };
+const showWelcome = async (): Promise<void> => {
+  const views = await listProviderViews().catch(() => []);
+  const summaries = await store.listSummaries().catch(() => []);
+  console.log(
+    renderWelcomePanel(p, {
+      version: VERSION,
+      model,
+      sessionId,
+      cwdShort: shortCwd(cwd),
+      theme: cfg?.theme ?? 'omp',
+      views,
+      summaries: summaries.map((s) => ({ title: s.title, id: s.id, updatedAt: s.updatedAt })),
+      hasCredential: upstream.apiKey !== null,
+      columns: process.stdout.columns ?? 80,
+    }),
+  );
+};
 
   // One-shot (piped/scripted) mode — no readline, approvals auto-deny honestly.
   if (opts.prompt !== undefined) {
@@ -580,7 +739,8 @@ export async function runTui(opts: TuiOpts): Promise<void> {
     process.exit(1);
   }
 
-  showWelcome();
+  await showWelcome();
+
 
   const completeSlash = (line: string): [string[], string] => {
     if (line.startsWith('/')) {

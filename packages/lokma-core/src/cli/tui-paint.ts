@@ -37,6 +37,8 @@ export type Paint = {
   err: (s: string) => string;
   warn: (s: string) => string;
   info: (s: string) => string;
+  /** Theme border color (for custom layouts beyond box()). */
+  border: (s: string) => string;
   /** Rounded box (OMP boxRound) with optional title; ASCII fallback. */
   box: (lines: string[], title?: string, accent?: (s: string) => string) => string;
   /** Thin separator line in the theme border color. */
@@ -77,6 +79,7 @@ export function createPaint(themeId: string): Paint {
     primary,
     text,
     muted,
+    border,
     bold: wrap('\x1b[1m'),
     dim: wrap('\x1b[2m'),
     ok: wrap('\x1b[32m'),

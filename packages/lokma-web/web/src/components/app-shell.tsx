@@ -7,8 +7,8 @@ import type { InspectorTab } from '@/components/providers';
 import { SessionsSidebar } from '@/components/sessions';
 import { FOCUS_FILES_EVENT } from '@/components/files';
 import { Chat, INITIAL_PREFIX } from '@/components/chat';
-import { RESET_LAYOUT_EVENT, TilingWorkspace } from '@/components/panes';
-import { AppWindow, LayoutGrid, RotateCcw, Square, X } from 'lucide-react';
+import { TilingWorkspace } from '@/components/panes';
+import { LayoutGrid, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePaneStore } from '@/stores/pane';
 import { DEFAULT_LEFT_WIDTH, DEFAULT_RIGHT_WIDTH } from '@/stores/layout';
@@ -721,17 +721,13 @@ function MobileDrawer({
 
 // TilingToggle — enters the W7 tiling workspace (split/windowed panes over
 // live sessions and Inspector tools); layout and tabs restore from the
-// persisted stores. REQ-045 removed the TilingBar strip, so while tiling it
-// renders a compact mode cluster instead: Single exit, Windowed toggle, and
-// layout Reset (the only exits left — tiling persists and nothing else
-// offers them; Reset dispatches RESET_LAYOUT_EVENT to the workspace).
-// REQ-024 — desktop-only: the mobile single-view never offers the pane
-// system, so the toggle stays hidden below the breakpoint.
+// persisted stores. REQ-045 removed the TilingBar strip; REQ-090 removed the
+// compact mode cluster too (Single/Windowed/Reset) — no mode buttons remain
+// while tiling. REQ-024 — desktop-only: the mobile single-view never offers
+// the pane system, so the toggle stays hidden below the breakpoint.
 function TilingToggle() {
   const tiling = usePaneStore((s) => s.tiling);
   const setTiling = usePaneStore((s) => s.setTiling);
-  const windowed = usePaneStore((s) => s.windowed);
-  const setWindowed = usePaneStore((s) => s.setWindowed);
   const isMobile = useIsMobile();
   if (isMobile) return null;
   if (!tiling) {
@@ -750,38 +746,6 @@ function TilingToggle() {
       </div>
     );
   }
-  return (
-    <div className="mb-2 flex shrink-0 items-center justify-end gap-1">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-7 gap-1.5 text-xs"
-        title="Back to the single chat view"
-        onClick={() => setTiling(false)}
-      >
-        <Square className="h-3 w-3" />
-        Single
-      </Button>
-      <Button
-        variant={windowed ? 'default' : 'outline'}
-        size="sm"
-        className="h-7 gap-1.5 text-xs"
-        title={windowed ? 'Back to split layout' : 'Float panes as windows'}
-        onClick={() => setWindowed(!windowed)}
-      >
-        <AppWindow className="h-3 w-3" />
-        Windowed
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-7 gap-1.5 text-xs"
-        title="Reset to the default 3-pane layout"
-        onClick={() => window.dispatchEvent(new CustomEvent(RESET_LAYOUT_EVENT))}
-      >
-        <RotateCcw className="h-3 w-3" />
-        Reset
-      </Button>
-    </div>
-  );
+  // REQ-090: no mode buttons while tiling — the cluster is gone.
+  return null;
 }

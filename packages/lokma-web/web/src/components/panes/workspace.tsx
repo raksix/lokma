@@ -307,18 +307,23 @@ export function TilingWorkspace({
   // REQ-046 — per-pane pop-out: the strip button floats this pane as an
   // independent window. The windowed canvas reuses the REQ-014 solid
   // surface plus the REQ-042 drag/resize handles, so entering windowed
-  // mode plus a cascaded geometry slot is the whole move. Already
-  // windowed → just focus (geometry is kept, never reset).
+  // mode plus a cascaded geometry slot is the whole move.
+  // REQ-095 — the same strip button toggles back: already windowed →
+  // setWindowed(false) so the layout returns to normal tiling. Geometry
+  // is kept, never reset, so re-floating restores the same spot.
   const popoutPane = (paneId: string) => {
     setWinPos((prev) => {
       if (prev[paneId]) return prev;
       const n = Object.keys(prev).length % 8;
-      return { ...prev, [paneId]: { x: 24 + n * 28, y: 24 + n * 28, w: 560, h: 420 } };
+      return { ...prev, [paneId]: { 'x': 24 + n * 28, 'y': 24 + n * 28, 'w': 560, 'h': 420 } };
     });
     focusPane(paneId);
     if (!windowed) {
       setWindowed(true);
       emitToast('Pane popped out — drag the title bar to move, edges to resize');
+    } else {
+      setWindowed(false);
+      emitToast('Back to tiling layout');
     }
   };
 

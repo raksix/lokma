@@ -113,5 +113,5 @@
 - [REQ-092](finished/REQ-092-kullanici-yonetimi-bolumu.md) — Settings'e admin kullanıcı yönetimi bölümü — done (dedupe: shipped e3ae68e, live bundle proof)
 - [REQ-093](finished/REQ-093-kullanici-proje-atama.md) — Kullanıcı ekleme + projeye atama + proje-açma yetkisi — done
 - [REQ-094](finished/REQ-094-session-izolasyonu.md) — Session'lar kullanıcıya özel (admin dahil) — done
-- [REQ-095](REQ-095-windowed-toggle-donus.md) — Pane windowed butonu toggle: tiling'e dönüş — pending
+- [REQ-095](finished/REQ-095-windowed-toggle-donus.md) — Pane windowed butonu toggle: tiling'e dönüş — done
 - [REQ-096](finished/REQ-096-windowed-geometri-snap.md) — Windowed geometri: full-height + taşma yok + snap — done

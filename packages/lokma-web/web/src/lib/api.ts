@@ -452,6 +452,16 @@ export type FileEntry = {
   git: GitState | null;
 };
 export type FilesRes = { ok: boolean; path: string; entries: FileEntry[] };
+/** REQ-084: server directory browser — dirs only, dot-entries hidden. */
+export type FsDirEntry = { name: string; path: string };
+export type FsListRes = {
+  ok: boolean;
+  path: string;
+  parent: string | null;
+  home: string;
+  entries: FsDirEntry[];
+  truncated: boolean;
+};
 export type FileContentRes = {
   ok: boolean;
   path: string;
@@ -1226,6 +1236,9 @@ export const api = {
       content,
       ...(expectedSha ? { expectedSha } : {}),
     }),
+  /** REQ-084: server directory browser for the project folder picker. */
+  listDirs: (path?: string) =>
+    get<FsListRes>(path === undefined ? '/api/fs/list' : `/api/fs/list?path=${encodeURIComponent(path)}`),
 
   // Terminals — live shells (W3-10). Bytes flow over WS `terminal/*` frames;
   // REST only spawns/lists/inspects/kills.

@@ -51,6 +51,7 @@ const gated: Array<[string, string]> = [
   ['GET', '/api/cron'],
   ['POST', '/api/cron'],
   ['GET', '/api/git/status'],
+  ['GET', '/api/fs/list'],
   ['GET', '/api/bots'],
   ['GET', '/api/commands'],
   ['GET', '/api/browser/state'],

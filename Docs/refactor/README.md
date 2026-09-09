@@ -101,3 +101,5 @@
 - [REQ-080](finished/REQ-080-gate-e2e-token.md) — Gate E2E token minter (flag ellemeden test) — done
 - [REQ-081](finished/REQ-081-proje-olusturma-calismiyor.md) — Proje oluşturma uçtan uca çalışsın — done
 - [REQ-082](finished/REQ-082-projeler-modal-invite-kayit.md) — Projeler sidebar + modal + invite kayıt — done
+- [REQ-083](REQ-083-cwd-yoksa-olustur.md) — "cwd does not exist": yoksa oluştur — in-progress
+- [REQ-084](REQ-084-klasor-secici.md) — Yol alanına arayüzden klasör seçici — pending

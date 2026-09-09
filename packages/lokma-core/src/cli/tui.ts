@@ -423,9 +423,9 @@ async function runPrompt(opts: {
 
 // ── Slash commands ───────────────────────────────────────────────────────────
 
-type SlashDef = { name: string; hint: string; desc: string };
+type SlashDef = { name: string; hint: string; desc: string; aliases?: string[] };
 
-const SLASH_COMMANDS: SlashDef[] = [
+export const SLASH_COMMANDS: SlashDef[] = [
   { name: '/model', hint: '[id]', desc: 'Show or switch model (live catalog picker)' },
   { name: '/models', hint: '[on|off <id>|refresh]', desc: 'Refresh + enable/disable models' },
   { name: '/providers', hint: '[on|off|test|add|rm …]', desc: 'Multi-provider management (Web Providers twin)' },
@@ -433,25 +433,58 @@ const SLASH_COMMANDS: SlashDef[] = [
   { name: '/logout', hint: '<provider>', desc: 'Remove stored credential' },
   { name: '/theme', hint: '[id]', desc: 'List or switch theme (omp/claude/midnight/paper)' },
   { name: '/status', hint: '', desc: 'Version, model, account, connection, git' },
-  { name: '/cost', hint: '', desc: 'Session token/cost totals (alias: /usage)' },
+  { name: '/cost', hint: '', desc: 'Session token/cost totals', aliases: ['usage'] },
   { name: '/context', hint: '', desc: 'Transcript size vs history window' },
   { name: '/compact', hint: '', desc: 'Compact transcript (hygiene + summary tiers)' },
   { name: '/export', hint: '[file]', desc: 'Export transcript to markdown' },
-  { name: '/permissions', hint: '[mode|allow|deny …]', desc: 'Show/edit tool permission rules' },
+  { name: '/permissions', hint: '[mode|allow|deny …]', desc: 'Show/edit tool permission rules', aliases: ['allowed-tools'] },
   { name: '/session', hint: '', desc: 'Show current session id' },
-  { name: '/new', hint: '', desc: 'Start a fresh session (alias: /reset, /clear)' },
-  { name: '/resume', hint: '<id> (alias: /continue)', desc: 'Switch to a saved session' },
+  { name: '/new', hint: '', desc: 'Start a fresh session', aliases: ['reset', 'clear'] },
+  { name: '/resume', hint: '<id>', desc: 'Switch to a saved session', aliases: ['continue'] },
   { name: '/list', hint: '', desc: 'List sessions for this project' },
   { name: '/doctor', hint: '', desc: 'Run the 8 subsystem checks' },
-  { name: '/config', hint: '', desc: 'Show effective config (alias: /settings)' },
+  { name: '/config', hint: '', desc: 'Show effective config', aliases: ['settings'] },
   { name: '/help', hint: '', desc: 'This help' },
-  { name: '/quit', hint: '', desc: 'Exit (alias: /exit, /q)' },
+  { name: '/quit', hint: '', desc: 'Exit', aliases: ['exit', 'q'] },
 ];
 
+/** Every accepted slash spelling (canonical + aliases), without the `/`. */
+const KNOWN_SLASH = new Set<string>();
+for (const c of SLASH_COMMANDS) {
+  KNOWN_SLASH.add(c.name.slice(1));
+  for (const a of c.aliases ?? []) KNOWN_SLASH.add(a);
+}
+
+/** Fuzzy rank for the `/` palette: prefix > substring > subsequence. */
+export function fuzzySlash(frag: string): SlashDef[] {
+  const f = frag.toLowerCase();
+  const scored: { def: SlashDef; score: number }[] = [];
+  for (const def of SLASH_COMMANDS) {
+    const name = def.name.slice(1).toLowerCase();
+    let score = 0;
+    if (name.startsWith(f)) score = 3;
+    else if (name.includes(f)) score = 2;
+    else {
+      let j = 0;
+      for (const ch of name) {
+        if (ch === f[j]) j++;
+        if (j === f.length) break;
+      }
+      if (j === f.length) score = 1;
+    }
+    if (score > 0) scored.push({ def, score });
+  }
+  scored.sort((a, b) => b.score - a.score || a.def.name.localeCompare(b.def.name));
+  return scored.map((s) => s.def);
+}
+
 function printSlashHelp(p: Paint): void {
-  const rows = SLASH_COMMANDS.map((c) => `  ${p.info(c.name.padEnd(13))} ${p.muted(c.hint.padEnd(22))} ${c.desc}`);
+  const rows = SLASH_COMMANDS.map((c) => {
+    const alias = c.aliases?.length ? p.muted(` (=${c.aliases.map((a) => '/' + a).join(', ')})`) : '';
+    return `  ${p.info(c.name.padEnd(13))} ${p.muted(c.hint.padEnd(20))} ${c.desc}${alias}`;
+  });
   console.log(`\n${p.box(rows, 'lokma tui — slash commands', p.primary)}`);
-  console.log(p.muted('\nTips: Tab completes commands · @path adds file context · Ctrl+C aborts the running turn.'));
+  console.log(p.muted('\nTips: type / alone for this palette · Tab completes as you type · @path adds file context.'));
 }
 
 function newSessionId(): string {
@@ -833,8 +866,29 @@ const showWelcome = async (): Promise<void> => {
     // ── Slash commands ──
     if (input.startsWith('/')) {
       const [rawCmd, ...rest] = input.slice(1).split(/\s+/);
-      const cmd = (rawCmd ?? '').toLowerCase();
+      let cmd = (rawCmd ?? '').toLowerCase();
       const arg = rest.join(' ').trim();
+      // Bare `/` opens the palette (command discovery, OMP `/` hints).
+      if (!cmd) {
+        printSlashHelp(p);
+        continue;
+      }
+      // Fuzzy palette for typos/partials (`/lg` → /login, /logout).
+      if (!KNOWN_SLASH.has(cmd)) {
+        const matches = fuzzySlash(cmd).slice(0, 8);
+        if (matches.length === 0) {
+          console.log(`  unknown command /${cmd} — try /help`);
+          continue;
+        }
+        const picked = await pickNumbered(
+          rl,
+          p,
+          `/${cmd} — did you mean`,
+          matches.map((m) => ({ label: `${m.name} — ${m.desc}`, value: m.name })),
+        );
+        if (!picked) continue;
+        cmd = picked.slice(1);
+      }
       try {
         switch (cmd) {
           case 'help':
@@ -1133,7 +1187,7 @@ const showWelcome = async (): Promise<void> => {
             continue;
           }
           default:
-            console.log(`  unknown command /${cmd} — try /help`);
+            printSlashHelp(p);
             continue;
         }
       } catch (e) {

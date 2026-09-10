@@ -301,14 +301,17 @@ export function SingleChatView({
               );
             })}
             {pending.map((p) => (
-              <div key={p.key} className="flex gap-3 opacity-70">
-                <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full border border-line bg-muted">
+              // REQ-102: the optimistic row renders exactly like a sent
+              // message (no "sending…" label, no dashed bubble) so the send
+              // feels instant; real failures still land in RunErrorCard.
+              <div key={p.key} className="flex gap-3">
+                <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full border border-line bg-muted shadow-sm">
                   <User className="h-4 w-4 text-zinc-500" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-semibold">You <span className="font-normal text-zinc-400">· sending…</span></div>
-                  <div className="mt-1.5 rounded-2xl rounded-tl-sm border border-dashed border-line bg-white p-3.5 text-[13.5px] whitespace-pre-wrap dark:bg-[#1E1E21]">
-                    {p.text}
+                  <div className="text-xs font-semibold">You</div>
+                  <div className="mt-1.5 rounded-2xl rounded-tl-sm border border-line bg-white p-3.5 shadow-sm dark:bg-[#1E1E21]">
+                    <div className="text-[13.5px] leading-[1.6] whitespace-pre-wrap">{p.text}</div>
                   </div>
                 </div>
               </div>

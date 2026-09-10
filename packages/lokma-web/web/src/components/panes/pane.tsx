@@ -2,6 +2,7 @@ import * as React from 'react';
 import {
   AlertTriangle,
   AtSign,
+  Code2,
   Columns2,
   Copy,
   Eye,
@@ -30,6 +31,7 @@ import { useKnownSession, useSessionStore } from '@/stores/session';
 import { emitToast, PaneErrorBoundary } from '@/components/shell';
 import { ChatWithSocket } from '@/components/chat';
 import { AssistantBody } from '@/components/chat/lokma-message';
+import { CodeEditor, CodeView, languageForPath } from './code-editor';
 import { FILE_DRAG_MIME, emitInsertMention } from '@/components/files';
 import {
   INSPECTOR_DRAG_MIME,
@@ -262,11 +264,11 @@ export function PaneFilePreview({
                 role="tab"
                 aria-selected={mode === 'source'}
                 className={`h-6 px-1.5 text-[11px] ${mode === 'source' ? 'bg-muted font-medium' : ''}`}
-                title="Source and edit"
+                title="Source view"
                 onClick={() => setMode('source')}
               >
-                <Pencil className="h-3 w-3" />
-                Edit
+                <Code2 className="h-3 w-3" />
+                Source
               </Button>
             )}
           </div>
@@ -354,7 +356,15 @@ export function PaneFilePreview({
           </div>
         </div>
       ) : null}
-      {mode === 'preview' && previewable ? (
+      {editing ? (
+        <CodeEditor
+          value={draft}
+          onChange={setDraft}
+          language={languageForPath(path)}
+          onSave={() => void saveFile()}
+          label={`Edit ${path}`}
+        />
+      ) : mode === 'preview' && previewable ? (
         kind === 'markdown' ? (
           <div className="min-h-0 flex-1 overflow-auto p-3 text-[13.5px] leading-[1.6]">
             <AssistantBody
@@ -384,22 +394,8 @@ export function PaneFilePreview({
         ) : (
           <div className="grid min-h-0 flex-1 place-items-center p-6 text-xs text-muted-foreground">Loading preview…</div>
         )
-      ) : editing ? (
-        <textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-              e.preventDefault();
-              void saveFile();
-            }
-          }}
-          spellCheck={false}
-          aria-label={`Edit ${path}`}
-          className="min-h-0 flex-1 resize-none overflow-auto bg-transparent p-2 font-mono text-[11px] leading-relaxed focus:outline-none"
-        />
       ) : (
-        <pre className="min-h-0 flex-1 overflow-auto p-2 font-mono text-[11px] leading-relaxed">{content}</pre>
+        <CodeView code={content} language={languageForPath(path)} />
       )}
       <div className="shrink-0 border-t px-2 py-1 text-[10px] text-muted-foreground">
         {dirty ? (

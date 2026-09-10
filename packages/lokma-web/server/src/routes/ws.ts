@@ -8,6 +8,7 @@ import {
   canViewSession,
   estimateCost,
   estimateTokens,
+  getUserById,
   loadConfig,
   locateSession,
   loginGateActive,
@@ -267,6 +268,9 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
     // cannot set WS headers, so the token rides `?token=` or the httpOnly
     // `lokma_token` cookie; CLI/SDK callers use either. Gate-off
     // instances keep the legacy open handshake.
+    // REQ-112: remember the handshake user — the prompt path re-resolves
+    // per turn via headers/cookie only, which drops `?token=` sockets.
+    let handshakeUserId: string | null = null;
     void (async () => {
       try {
         if (!(await loginGateActive())) return;
@@ -281,6 +285,7 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
           }
           socket.close(4401, 'login required');
         } else {
+          handshakeUserId = user.id;
           // REQ-094: the socket alone leaks nothing, but terminal fan-out
           // + agent events are session-scoped — non-owners never attach.
           // Missing meta = unattributed = superadmin-only (uniform rule).
@@ -361,7 +366,11 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
         if (!prompt) return;
         const cwd = await effectiveCwd();
         // Claim attribution is resolved now (the socket may be gone by turn time).
-        const turnUser = await userFromToken(requestToken(req)).catch(() => null);
+        // REQ-112: fall back to the handshake user — headers/cookies miss
+        // `?token=` sockets, which the handshake already accepted.
+        const turnUser =
+          (await userFromToken(requestToken(req)).catch(() => null)) ??
+          (handshakeUserId ? await getUserById(handshakeUserId).catch(() => null) : null);
         // REQ-094: per-turn ownership re-check (handshake races + the
         // append below would otherwise mint unattributed transcripts for
         // anyone holding the id). Gate-off stays legacy-open.

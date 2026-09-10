@@ -116,5 +116,6 @@
 - [REQ-095](finished/REQ-095-windowed-toggle-donus.md) — Pane windowed butonu toggle: tiling'e dönüş — done
 - [REQ-096](finished/REQ-096-windowed-geometri-snap.md) — Windowed geometri: full-height + taşma yok + snap — done
 - [REQ-097](finished/REQ-097-chat-paste-drop-eki.md) — Chat input'a yapıştırma + sürükle-bırak eki — done
-- [REQ-098](REQ-098-ek-limiti-20.md) — Ek dosya/resim limiti 20 olsun — pending
+- [REQ-098](finished/REQ-098-ek-limiti-20.md) — Ek dosya/resim limiti 20 olsun — done
 - [REQ-099](REQ-099-tek-pane-edge-split.md) — Tek pane'de kenara bırakınca split olmuyor — pending
+- [REQ-100](REQ-100-cift-edit-ide-editor.md) — HTML çift Edit + IDE highlight'lı editör — in-progress

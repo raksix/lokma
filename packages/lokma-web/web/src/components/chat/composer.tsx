@@ -37,7 +37,7 @@ type QueuedPrompt = { key: number; text: string };
 const MODE_KEY = 'lokma-composer-mode';
 const MAX_ATTACH_BYTES = 100 * 1024;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const MAX_ATTACH_FILES = 3;
+const MAX_ATTACH_FILES = 20;
 const TEXT_EXTENSIONS = new Set([
   '.txt', '.md', '.json', '.csv', '.ts', '.tsx', '.js', '.jsx', '.css', '.html',
   '.py', '.rs', '.go', '.yaml', '.yml', '.toml', '.sh', '.sql', '.xml', '.log',

@@ -22,7 +22,14 @@ import {
   userFromToken,
 } from '@lokma/core';
 import { decodeClientMessage, encodeServerMessage } from '@lokma/shared';
-import { LoopAborted, buildLoopHistory, runAgentLoop, type ApprovalDecision } from '../agent-loop.js';
+import { LoopAborted, LOOP_DEFAULT_MAX_TURNS, buildLoopHistory, runAgentLoop, type ApprovalDecision } from '../agent-loop.js';
+import {
+  CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS,
+  CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS,
+  CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD,
+  parseClaudeEngineModel,
+  runClaudePrint,
+} from '../engines/claude-print.js';
 import {
   broadcast,
   enqueuePrompt,
@@ -61,6 +68,86 @@ const MAX_CONTEXT_BYTES = 20 * 1024;
 const APPROVAL_TIMEOUT_MS = 10 * 60_000;
 
 /**
+ * REQ-116 FAZ B — one headless-engine turn for `claude-code/*` models.
+ * The subprocess owns tools natively (no `<tool>`-block loop); this helper
+ * only persists + accounts like the built-in path: user prompt is already
+ * in the transcript (the `prompt` handler appends it), the engine result
+ * lands as the assistant row, stop subtypes leave FAZ A markers, and the
+ * REAL reported cost hits the usage ledger. The engine already emitted its
+ * `cost` frame from the `result` event, so no second cost frame here.
+ */
+async function runClaudeEngineTurn(
+  app: FastifyInstance,
+  args: {
+    sessionId: string;
+    cwd: string;
+    store: SessionStore;
+    send: (frame: Parameters<typeof encodeServerMessage>[0]) => void;
+    state: SessionRunState;
+    model: string;
+    claudeModel: string | undefined;
+    prompt: string;
+  },
+): Promise<void> {
+  const { sessionId, cwd, store, send, state, model, prompt } = args;
+  const ctrl = new AbortController();
+  state.abort = ctrl;
+  try {
+    const summary = await runClaudePrint({
+      prompt,
+      cwd,
+      model: args.claudeModel,
+      allowedTools: [...CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS],
+      disallowedTools: [...CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS],
+      maxTurns: LOOP_DEFAULT_MAX_TURNS,
+      maxBudgetUsd: CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD,
+      sessionId,
+      signal: ctrl.signal,
+      send,
+    });
+    if (state.abort === ctrl) state.abort = null;
+    if (summary.result.trim()) {
+      await store.append(sessionId, { role: 'assistant', content: summary.result, timestamp: new Date().toISOString() });
+    }
+    if (summary.subtype === 'error_max_turns') {
+      await store.append(sessionId, {
+        role: 'assistant',
+        content: '[run stopped: max_turns=' + String(LOOP_DEFAULT_MAX_TURNS) + ']',
+        timestamp: new Date().toISOString(),
+      });
+    } else if (summary.subtype === 'error_max_budget_usd') {
+      await store.append(sessionId, {
+        role: 'assistant',
+        content: '[run stopped: max_budget_usd=' + String(CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD) + ']',
+        timestamp: new Date().toISOString(),
+      });
+    }
+    try {
+      await new UsageLedger(cwd).record({
+        sessionId,
+        provider: 'claude-code',
+        model,
+        inputTokens: estimateTokens(prompt.length),
+        outputTokens: estimateTokens(summary.result.length),
+        costUsd: summary.costUsd,
+        priced: true,
+      });
+    } catch (e) {
+      // Accounting must never break chat — log and keep streaming.
+      app.log.warn('[ws] usage record failed session=' + sessionId + ': ' + String(e));
+    }
+    send({ type: 'done', sessionId, reason: 'complete' });
+  } catch (e) {
+    if (state.abort === ctrl) state.abort = null;
+    if (e instanceof LoopAborted || ctrl.signal.aborted) {
+      send({ type: 'done', sessionId, reason: 'aborted' });
+      return;
+    }
+    send({ type: 'error', message: e instanceof Error ? e.message : String(e), sessionId });
+  }
+}
+
+/**
  * Drain one session's prompt queue (REQ-070). Reentrancy-safe: concurrent
  * callers return while a pump owns the run. Each queued prompt resolves its
  * model/upstream/history fresh (a bot edit between two prompts applies to
@@ -96,6 +183,26 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
       const provider = model.split('/')[0] ?? 'anthropic';
       const contextPrefix = await readContextBlocks(cwd, item.contextPaths);
       const effectivePrompt = contextPrefix ? `${contextPrefix}${item.prompt}` : item.prompt;
+
+      // REQ-116 FAZ B-wiring: `claude-code/...` model ids run the headless
+      // engine (the subprocess owns the tool loop natively) instead of the
+      // built-in `<tool>`-block loop below. Anything else falls through.
+      // Upstream credentials are NOT resolved here — auth comes from the
+      // host environment (`ANTHROPIC_API_KEY`), never the repo.
+      const claudeSel = parseClaudeEngineModel(model);
+      if (claudeSel !== null) {
+        await runClaudeEngineTurn(app, {
+          sessionId,
+          cwd,
+          store,
+          send,
+          state,
+          model,
+          claudeModel: claudeSel.claudeModel,
+          prompt: effectivePrompt,
+        });
+        continue;
+      }
 
       // Wire-level upstream: credentials store + provider config decide the
       // key and base URL (never a mock echo — missing keys fail honestly).

@@ -5,7 +5,7 @@
  * Not imported by server code, so `tsc -p` output ignores it.
  */
 import { spawn } from 'node:child_process';
-import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, runClaudePrint, translateClaudeLine } from './claude-print';
+import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, parseClaudeEngineModel, runClaudePrint, translateClaudeLine } from './claude-print';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -118,5 +118,22 @@ const ver = await new Promise<string>((resolve) => {
   c.on('error', () => resolve(''));
 });
 assert(ver.length > 0, 'real claude binary spawns (got: ' + ver.slice(0, 40) + ')');
+
+// 11. FAZ B-wiring: engine selection is prefix-exact, defaults match the plan.
+const bareSel = parseClaudeEngineModel('claude-code');
+assert(bareSel !== null && bareSel.claudeModel === undefined, 'bare claude-code selects binary default');
+const sonnetSel = parseClaudeEngineModel('claude-code/sonnet');
+assert(sonnetSel !== null && sonnetSel.claudeModel === 'sonnet', 'claude-code/sonnet selects sonnet');
+assert(parseClaudeEngineModel('claude-code/') !== null, 'trailing-slash prefix selects default');
+assert(parseClaudeEngineModel('  claude-code/opus  ')?.claudeModel === 'opus', 'selection trims whitespace');
+assert(parseClaudeEngineModel('anthropic/claude-sonnet-4-5') === null, 'anthropic id keeps built-in loop');
+assert(parseClaudeEngineModel('openai/gpt-5') === null, 'openai id keeps built-in loop');
+assert(parseClaudeEngineModel('claude-codex') === null, 'claude-codex is not the engine prefix');
+assert(JSON.stringify(CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS) === JSON.stringify(['Read', 'Glob', 'Grep', 'Bash']), 'default allowlist is Read/Glob/Grep/Bash');
+assert(CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS.includes('Bash(rm *)'), 'destructive bash denied by default');
+assert(CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD === 2, 'default budget matches REQ-116 section 2 example');
+const full = buildClaudeArgs({ prompt: 'hi', allowedTools: ['Read'], disallowedTools: ['Bash(rm *)'], maxBudgetUsd: 2, resumeSessionId: 's-9' });
+assert(full.includes('--disallowedTools') && full.includes('Bash(rm *)'), 'disallowlist flag carried');
+assert(full.includes('--resume') && full.includes('s-9'), 'resume handle carried');
 
 console.log('\nclaude-print probe: ' + passed + ' passed');

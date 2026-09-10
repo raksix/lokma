@@ -58,6 +58,37 @@ export type ClaudeRunSummary = {
 export const CLAUDE_BINARY_NOT_FOUND = '[run failed: claude binary not found]';
 
 /**
+ * REQ-116 FAZ B-wiring — engine selection + harness-side defaults.
+ *
+ * A model id selects the headless engine only with the `claude-code/`
+ * prefix (`claude-code/sonnet` runs Claude model `sonnet`; bare
+ * `claude-code` runs the binary default). Anything else returns null and
+ * keeps the built-in `<tool>`-block loop. Pure — probe it.
+ */
+export const CLAUDE_ENGINE_PREFIX = 'claude-code/';
+
+export type ClaudeEngineSelection = {
+  /** Claude-side `--model` value (undefined = binary default). */
+  claudeModel?: string;
+};
+
+export function parseClaudeEngineModel(model: string): ClaudeEngineSelection | null {
+  const id = model.trim();
+  if (id === 'claude-code') return {};
+  if (!id.startsWith(CLAUDE_ENGINE_PREFIX)) return null;
+  const rest = id.slice(CLAUDE_ENGINE_PREFIX.length).trim();
+  if (!rest) return {};
+  return { claudeModel: rest };
+}
+
+/** Minimal tool surface for headless runs (REQ-116 §5 plan). */
+export const CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS = ['Read', 'Glob', 'Grep', 'Bash'];
+/** Denied in every mode (REQ-116 §5 plan). */
+export const CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS = ['Bash(rm *)'];
+/** Matches the headless example in REQ-116 §2 (`--max-budget-usd 2`). */
+export const CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD = 2;
+
+/**
  * Build the exact argv for the child. Pure — probe it (no invented flags:
  * every flag below exists in `claude --help` v2.1.x).
  */

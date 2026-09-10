@@ -6,6 +6,9 @@
  */
 import {
   STARTER_PROMPTS,
+  formatImageMarker,
+  hasOsFiles,
+  isImageAttachment,
   isSlashPrefix,
   parseMentions,
   parseSlashCommand,
@@ -74,3 +77,20 @@ assert(
 );
 
 console.log('chat.test.ts: all W1-1 chat checks passed');
+
+// 7. REQ-097 paste/drop routing: images by mime or extension, OS files by
+// `Files` type (explorer @path drags carry no `Files` and stay untouched).
+assert(isImageAttachment('shot.png', 'image/png') === true, 'png mime is image');
+assert(isImageAttachment('photo.JPG', '') === true, 'jpg extension is image without mime');
+assert(isImageAttachment('notes.md', 'text/markdown') === false, 'markdown is text');
+assert(isImageAttachment('data.bin', 'application/octet-stream') === false, 'unknown binary is not image');
+assert(hasOsFiles(['Files']) === true, 'OS file drag detected');
+assert(hasOsFiles(['application/x-lokma-file', 'text/plain']) === false, 'explorer drag is not OS files');
+assert(hasOsFiles(['text/plain']) === false, 'plain text drag is not OS files');
+assert(
+  formatImageMarker('shot.png', '800x600', 120) ===
+    '[image: shot.png (800x600, 120 KB) — describe the image in text for full context]',
+  'image marker format exact',
+);
+
+console.log('chat.test.ts: REQ-097 paste/drop checks passed');

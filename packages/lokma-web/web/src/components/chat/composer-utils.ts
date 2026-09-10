@@ -55,6 +55,32 @@ export function timeGreeting(now: Date = new Date()): string {
   return 'Good evening';
 }
 
+/** Image extensions accepted as composer attachments (thumbnail + marker). */
+export const IMAGE_ATTACH_EXTENSIONS: ReadonlySet<string> = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+]);
+
+/** True when a dropped/pasted file should take the image path (not text-inline). */
+export function isImageAttachment(name: string, mime: string): boolean {
+  if (mime.startsWith('image/')) return true;
+  const dot = name.lastIndexOf('.');
+  const ext = dot === -1 ? '' : name.slice(dot).toLowerCase();
+  return IMAGE_ATTACH_EXTENSIONS.has(ext);
+}
+
+/** True when a drag event carries OS-level files (vs explorer @path/text drags). */
+export function hasOsFiles(types: ReadonlyArray<string>): boolean {
+  return types.includes('Files');
+}
+
+/** Compact `<attachment>` marker for an image (vision bytes travel as follow-up). */
+export function formatImageMarker(name: string, dims: string, sizeKb: number): string {
+  return `[image: ${name} (${dims}, ${sizeKb} KB) — describe the image in text for full context]`;
+}
 /** Starter prompts for the hero cards — each creates a real session on click. */
 export const STARTER_PROMPTS: { title: string; desc: string; prompt: string }[] = [
   {

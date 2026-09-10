@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { api, type SlashCommandInfo } from '@/lib/api';
 import { useProviderStore } from '@/stores';
 import { emitToast } from '@/components/shell';
-import { isSlashPrefix, parseMentions, parseSlashCommand, removeMention } from './composer-utils';
+import { formatImageMarker, hasOsFiles, isImageAttachment, isSlashPrefix, parseMentions, parseSlashCommand, removeMention } from './composer-utils';
 import { appendMention } from '@/components/files';
 import { enabledModels } from '@/components/providers/models';
 
@@ -26,7 +26,8 @@ import { enabledModels } from '@/components/providers/models';
  * (`GET /api/models`), `/` lists the server-owned `GET /api/commands`
  * registry, `@path` mentions travel to the server as `contextPaths`
  * (the server reads them into model context), attachments inline their
- * real content, stop fires the WS interrupt.
+ * real content (Ctrl+V paste + OS drag-drop feed the same path —
+ * images attach as thumbnail + marker), stop fires the WS interrupt.
  */
 
 export type ComposerSend = { text: string; model: string; contextPaths: string[] };
@@ -35,6 +36,7 @@ type QueuedPrompt = { key: number; text: string };
 
 const MODE_KEY = 'lokma-composer-mode';
 const MAX_ATTACH_BYTES = 100 * 1024;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_ATTACH_FILES = 3;
 const TEXT_EXTENSIONS = new Set([
   '.txt', '.md', '.json', '.csv', '.ts', '.tsx', '.js', '.jsx', '.css', '.html',
@@ -49,6 +51,18 @@ function readMode(): 'steer' | 'queue' {
   }
 }
 
+/** One file queued on the composer — text inlines content, images show a thumbnail + marker. */
+type Attachment = { name: string; content: string; kind: 'text' | 'image'; previewUrl?: string };
+
+/** Release a thumbnail object URL (no-op for text attachments). */
+function revokeAttachment(a: Attachment): void {
+  if (!a.previewUrl) return;
+  try {
+    URL.revokeObjectURL(a.previewUrl);
+  } catch {
+    // Already revoked or never created — the chip is gone either way.
+  }
+}
 /** Read a user-attached file as text (binary/oversize files are refused). */
 function readAttachment(file: File): Promise<string> {
   const ext = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
@@ -63,6 +77,38 @@ function readAttachment(file: File): Promise<string> {
     reader.onerror = () => reject(new Error(`${file.name}: could not be read`));
     reader.readAsText(file);
   });
+}
+
+/** Read a pasted/dropped image — thumbnail preview plus a compact marker (vision bytes are follow-up). */
+function readImageAttachment(file: File): Promise<Attachment> {
+  if (file.size > MAX_IMAGE_BYTES) {
+    return Promise.reject(new Error(`${file.name}: images must be under 5MB`));
+  }
+  const previewUrl = URL.createObjectURL(file);
+  const sizeKb = Math.max(1, Math.round(file.size / 1024));
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (dims: string): void => {
+      if (settled) return;
+      settled = true;
+      resolve({ name: file.name, content: formatImageMarker(file.name, dims, sizeKb), kind: 'image', previewUrl });
+    };
+    try {
+      const probe = new Image();
+      probe.onload = () => done(`${probe.naturalWidth}x${probe.naturalHeight}`);
+      probe.onerror = () => done('dimensions unknown');
+      probe.src = previewUrl;
+      window.setTimeout(() => done('dimensions unknown'), 3000);
+    } catch {
+      done('dimensions unknown');
+    }
+  });
+}
+
+/** Route one file to the text or image attachment path. */
+function readOneAttachment(file: File): Promise<Attachment> {
+  if (isImageAttachment(file.name, file.type)) return readImageAttachment(file);
+  return readAttachment(file).then((content) => ({ name: file.name, content, kind: 'text' as const }));
 }
 
 export function Composer({
@@ -95,11 +141,14 @@ export function Composer({
   const [paletteOpen, setPaletteOpen] = React.useState(false);
   const [commands, setCommands] = React.useState<SlashCommandInfo[]>([]);
   const [queued, setQueued] = React.useState<QueuedPrompt[]>([]);
-  const [attachments, setAttachments] = React.useState<{ name: string; content: string }[]>([]);
+  const [attachments, setAttachments] = React.useState<Attachment[]>([]);
+  const [dragActive, setDragActive] = React.useState(false);
   const [recording, setRecording] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
   const taRef = React.useRef<HTMLTextAreaElement>(null);
   const keySeq = React.useRef(0);
+  /** Nesting depth for the OS-file drag overlay (dragenter/leave fire per child). */
+  const dragDepth = React.useRef(0);
   /** REQ-071: double-Enter guard — setText is async, so a fast second Enter
    * re-delivers the same text before the box clears (double user rows). */
   const lastSent = React.useRef<{ text: string; at: number }>({ text: '', at: 0 });
@@ -170,10 +219,16 @@ export function Composer({
   const deliver = React.useCallback(
     (raw: string) => {
       const body = raw.trim();
-      if (!body) return;
+      let full = body;
+      if (attachments.length) {
+        full += attachments
+          .map((a) => `\n\n<attachment name="${a.name}">\n${a.content}\n</attachment>`)
+          .join('');
+      }
+      if (!full.trim()) return;
       const now = Date.now();
-      if (body === lastSent.current.text && now - lastSent.current.at < 1500) return;
-      lastSent.current = { text: body, at: now };
+      if (full === lastSent.current.text && now - lastSent.current.at < 1500) return;
+      lastSent.current = { text: full, at: now };
       const slash = parseSlashCommand(body);
       if (slash && commands.some((c) => c.id === slash.id)) {
         onSlash(slash.id, slash.args, body);
@@ -183,11 +238,8 @@ export function Composer({
         emitToast(`Unknown command /${slash.id} — try /help`);
         return;
       }
-      let full = body;
       if (attachments.length) {
-        full += attachments
-          .map((a) => `\n\n<attachment name="${a.name}">\n${a.content}\n</attachment>`)
-          .join('');
+        for (const a of attachments) revokeAttachment(a);
         setAttachments([]);
       }
       onSend({ text: full, model, contextPaths: parseMentions(body).map((m) => m.path) });
@@ -196,7 +248,7 @@ export function Composer({
   );
 
   const handleSend = (): void => {
-    if (!text.trim() || (!socketOpen && mode === 'steer')) return;
+    if ((!text.trim() && attachments.length === 0) || (!socketOpen && mode === 'steer')) return;
     if (mode === 'queue' && streaming) {
       keySeq.current += 1;
       setQueued((prev) => [...prev, { key: keySeq.current, text }]);
@@ -221,16 +273,29 @@ export function Composer({
 
   const attachFiles = (files: FileList | File[]): void => {
     const arr = Array.from(files);
+    if (arr.length === 0) return;
     if (attachments.length + arr.length > MAX_ATTACH_FILES) {
       emitToast(`At most ${MAX_ATTACH_FILES} files per message`);
       return;
     }
-    void Promise.all(arr.map(readAttachment))
-      .then((contents) => {
-        setAttachments((prev) => [...prev, ...arr.map((f, i) => ({ name: f.name, content: contents[i] ?? '' }))]);
+    void Promise.all(arr.map(readOneAttachment))
+      .then((items) => {
+        setAttachments((prev) => [...prev, ...items]);
       })
       .catch((e: Error) => emitToast(e.message));
   };
+
+  const removeAttachment = (name: string): void => {
+    setAttachments((prev) => {
+      for (const a of prev) {
+        if (a.name === name) revokeAttachment(a);
+      }
+      return prev.filter((x) => x.name !== name);
+    });
+  };
+
+  /** OS-file drag helpers — explorer @path drags (no `Files` type) stay on the parent Card. */
+  const dragHasFiles = (e: React.DragEvent): boolean => hasOsFiles(Array.from(e.dataTransfer.types));
 
   const toggleMic = (): void => {
     if (recording) {
@@ -275,10 +340,47 @@ export function Composer({
     return commands.filter((c) => !prefix || c.id.startsWith(prefix) || c.hint.toLowerCase().includes(prefix));
   }, [commands, text]);
 
-  const canSend = text.trim().length > 0 && (socketOpen || (mode === 'queue' && streaming));
+  const canSend = (text.trim().length > 0 || attachments.length > 0) && (socketOpen || (mode === 'queue' && streaming));
 
   return (
-    <div className="relative rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(38,38,36,0.06),0_4px_12px_rgba(38,38,36,0.04)] dark:bg-[#1E1E21]">
+    <div
+      className="relative rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(38,38,36,0.06),0_4px_12px_rgba(38,38,36,0.04)] dark:bg-[#1E1E21]"
+      onDragEnter={(e) => {
+        if (!dragHasFiles(e)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        dragDepth.current += 1;
+        setDragActive(true);
+      }}
+      onDragOver={(e) => {
+        if (!dragHasFiles(e)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'copy';
+      }}
+      onDragLeave={(e) => {
+        if (!dragHasFiles(e)) return;
+        e.stopPropagation();
+        dragDepth.current = Math.max(0, dragDepth.current - 1);
+        if (dragDepth.current === 0) setDragActive(false);
+      }}
+      onDrop={(e) => {
+        if (!dragHasFiles(e) || e.dataTransfer.files.length === 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        dragDepth.current = 0;
+        setDragActive(false);
+        attachFiles(e.dataTransfer.files);
+        taRef.current?.focus();
+      }}
+    >
+      {dragActive && (
+        <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-terracotta bg-[#FDF0E6]/90 dark:bg-[#2A1E15]/90">
+          <span className="flex items-center gap-2 text-[13px] font-medium text-terracotta">
+            <Paperclip className="h-4 w-4" /> Drop files to attach
+          </span>
+        </div>
+      )}
       {/* Top row — mention chips + steer/queue + model picker */}
       <div className="flex flex-wrap items-center gap-1 rounded-t-xl border-b border-line/50 bg-[#FDFCFB] px-2 py-1 dark:bg-[#161618]">
         <div className="flex flex-1 flex-wrap items-center gap-1">
@@ -444,16 +546,29 @@ export function Composer({
             }
             if (e.key === 'Escape') setPaletteOpen(false);
           }}
+          onPaste={(e) => {
+            const files = e.clipboardData?.files;
+            if (files && files.length > 0) attachFiles(files);
+          }}
           className="min-h-[28px] w-full resize-none bg-transparent px-1 py-1 text-[13px] focus:outline-none disabled:opacity-60"
         />
         {attachments.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {attachments.map((a) => (
-              <Badge key={a.name} variant="outline" className="gap-1 border-[#F2D5C2] bg-[#FDF0E6] pr-1 text-terracotta">
-                <Paperclip className="h-3 w-3" />
+              <Badge
+                key={a.name}
+                variant="outline"
+                className="gap-1 border-[#F2D5C2] bg-[#FDF0E6] pr-1 text-terracotta"
+                title={a.kind === 'image' ? a.content : undefined}
+              >
+                {a.kind === 'image' && a.previewUrl ? (
+                  <img src={a.previewUrl} alt={a.name} className="h-6 w-6 rounded object-cover" />
+                ) : (
+                  <Paperclip className="h-3 w-3" />
+                )}
                 <span className="max-w-[120px] truncate">{a.name}</span>
                 <button
-                  onClick={() => setAttachments((prev) => prev.filter((x) => x.name !== a.name))}
+                  onClick={() => removeAttachment(a.name)}
                   className="ml-1 grid h-4 w-4 place-items-center rounded-full hover:bg-black/5"
                   aria-label={`Remove attachment ${a.name}`}
                 >
@@ -489,7 +604,7 @@ export function Composer({
             type="file"
             multiple
             hidden
-            accept=".txt,.md,.json,.csv,.ts,.tsx,.js,.jsx,.css,.html,.py,.rs,.go,.yaml,.yml,.toml,.sh,.sql,.xml,.log"
+            accept=".txt,.md,.json,.csv,.ts,.tsx,.js,.jsx,.css,.html,.py,.rs,.go,.yaml,.yml,.toml,.sh,.sql,.xml,.log,.png,.jpg,.jpeg,.gif,.webp"
             onChange={(e) => {
               if (e.target.files) attachFiles(e.target.files);
               e.target.value = '';

@@ -1,6 +1,6 @@
 # REQ-104 — Default model seçimi + akıllı geri dönüş zinciri
 
-- **Status:** done (2026-09-10, commit pending)
+- **Status:** done (2026-09-10, commit 805db31)
 - **Asked:** 2026-09-10 — "default model seçme olsun ayarlarda modellerden; eğer seçilemediyse en çok kullanılan modeli, yoksa da otomatik ilk gelen modeli default model ata."
 - **Teşhis (koddan):** `defaultModel` config'de VAR ama Settings'te yalnız ham metin satırı (`config-pane.tsx:139`, elle yazılıyor); Models sekmesinde seçici yok. Kullanım verisi VAR (`GET /api/usage/summary` per-model split). İstek zincir: (1) Models sekmesinde Default model picker (etkin modellerden); (2) seçili yoksa en çok kullanılan model; (3) o da yoksa (sıfır kullanım) ilk gelen etkin model; (4) hiçbiri yoksa mevcut sabit fallback. Seçim `PATCH /api/config` (`defaultModel`) ile saklanır, composer/session açılışı bu zinciri okur. 'yap' denmeden kod YOK.
 - **Touched:** `packages/lokma-web/web/src/components/providers/models.ts` (+FALLBACK_MODEL/normalizeModelId/modelIdMatches/resolveDefaultModel: configured→most-used→first-enabled→fallback, `::`/`/` tolerant), `models.test.ts` (+19 probes), NEW `providers/default-model-picker.tsx` (enabled-models dropdown + Auto, PATCH /api/config, effective+source hint), `providers/models-pane.tsx` (top picker card), `settings/config-pane.tsx` (raw text card replaced by shared picker), `chat/index.tsx` (once-per-session chain auto-resolve on empty model + `:picked` race guard, persists localStorage + patchSession)

@@ -118,4 +118,4 @@
 - [REQ-097](finished/REQ-097-chat-paste-drop-eki.md) — Chat input'a yapıştırma + sürükle-bırak eki — done
 - [REQ-098](finished/REQ-098-ek-limiti-20.md) — Ek dosya/resim limiti 20 olsun — done
 - [REQ-099](REQ-099-tek-pane-edge-split.md) — Tek pane'de kenara bırakınca split olmuyor — pending
-- [REQ-100](REQ-100-cift-edit-ide-editor.md) — HTML çift Edit + IDE highlight'lı editör — in-progress
+- [REQ-100](finished/REQ-100-cift-edit-ide-editor.md) — HTML çift Edit + IDE highlight'lı editör — done

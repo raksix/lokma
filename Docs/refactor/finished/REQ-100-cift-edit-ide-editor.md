@@ -1,0 +1,9 @@
+# REQ-100 — HTML render'da çift Edit + IDE tarzı highlight'lı editör
+
+- **Status:** done (canlıda — 2026-09-10)
+- **Asked:** 2026-09-10 — "html renderda 2 tane edit tuşu var onu düzenle. Edit tuşları IDE gibi olacak, syntax highlighting falan olması lazım, vscode gibi" (vision 500 — koddan teşhis).
+- **Teşhis:** `PaneFilePreview` header'ında md/html için İKİ edit girişi: (1) Preview/Source sekmelerindeki "Edit" sekmesi (sadece `mode='source'` yapar), (2) bağımsız "Edit" butonu (`editing=true`). Üstelik preview modunda (2)'ye basınca textarea render'a girmez (render önceliği preview'da) — buton ölü gibi durur. Editör düz `<textarea>`, highlight yok.
+- **Fix:** (1) sekme "Edit" → "Source" (view sekmesi olduğu belli olur); TEK edit girişi kalır. (2) `editing` render'da preview'u ezer (preview'dayken Edit'e basınca editör açılır). (3) Yeni `code-editor.tsx`: transparent-textarea + altı renkli `<pre>` overlay (sıfır bağımlılık), satır numaralı gutter, Tab=2 boşluk, Ctrl+S=save; VS Code renkleri (light/dark uyumlu). Read-only source görünümü de aynı tokenizer'la renklendirilir. Dil uzantıdan (`html/css/js/ts/json/py/sh/md`).
+- **Touched:** `panes/code-editor.tsx` (yeni), `panes/code-editor.test.ts` (yeni), `panes/pane.tsx`.
+- **Verify:** typecheck 0 + test green + build green + canlı: html dosyada TEK Edit, editörde renkli kod + satır no + Tab + Ctrl+S; preview/source geçişleri; served bundle hash.
+- **Proof:** web typecheck 0 + `code-editor.test.ts` 24/24 + build green; served `index-BmzCi136.js` disk ile aynı; pm2 lokma-web online. Notlar: sekme "Edit"→"Source" (tek edit girişi), preview modunda Edit artık editörü açar (render önceliği), `code-editor.tsx` sıfır-bağımlılık overlay (textarea + renkli pre + gutter); kanal backtick bozar (`0x60→0x27`) dersi skill'e işlendi. Pane bağlantısı döngüyle ortak yazıldı (tek REQ-100 commit'i).

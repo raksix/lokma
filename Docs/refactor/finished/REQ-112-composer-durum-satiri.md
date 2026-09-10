@@ -11,3 +11,10 @@ Touched:
   - packages/lokma-web/web/src/components/chat/index.tsx (`runStatus` memo + `status` prop)
   - packages/lokma-web/web/src/components/chat/composer.tsx (`status?` prop + status row)
 Verify: `bun x tsc --noEmit` 0 errors; status row only when streaming; Turkish strings.
+Follow-up (2026-09-10, 56063c1): `?token=` sockets were accepted at
+  handshake but 403'd on prompt ("not your session") because the prompt
+  path re-resolved the user from header/cookie only — now falls back to
+  the handshake user (`server/routes/ws.ts`). Live proof: served bundle
+  carries the status strings + served chunk == disk chunk; E2E slow
+  prompt showed streaming status with Stop, fast prompt completed
+  end-to-end; probe sessions deleted.

@@ -127,3 +127,4 @@
 - [REQ-106](finished/REQ-106-session-duz-liste.md) — Session'lar kutucuktan çıksın — done
 - [REQ-107](REQ-107-terminal-ssh-hissi.md) — Terminal SSH hissi versin — pending
 - [REQ-108](finished/REQ-108-info-sekmesi-kaldir.md) — Info sekmesi (i) kalksın — done
+- [REQ-109](REQ-109-browser-hep-pane.md) — Browser her seferinde pane açılsın — pending

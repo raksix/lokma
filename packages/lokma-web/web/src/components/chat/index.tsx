@@ -87,6 +87,24 @@ export function Chat({
   const streaming = (socketOpen && !done && stream.length > 0) || runActive;
   const [answerBusy, setAnswerBusy] = React.useState<string | null>(null);
 
+  // Loading line under the composer while the AI works (REQ-112): what is
+  // happening right now — retry, approval wait, running tool, thinking,
+  // writing, or generic working. Null when idle.
+  const runStatus = React.useMemo((): string | null => {
+    if (!streaming) return null;
+    if (retry) {
+      const waitS = Math.round(retry.waitMs / 1000);
+      return `Tekrar deneniyor (${retry.attempt}/${retry.maxAttempts}, ${waitS}sn)…`;
+    }
+    if (permissions.length > 0 || questions.length > 0) return 'Onay bekliyor…';
+    const entries = Object.values(toolCalls);
+    const running = [...entries].reverse().find((t) => t.result === undefined);
+    if (running) return `Çalışıyor: ${running.tool}…`;
+    if (thinking.trim().length > 0) return 'Düşünüyor…';
+    if (stream.trim().length > 0) return 'Yazıyor…';
+    return 'Çalışıyor…';
+  }, [streaming, retry, permissions.length, questions.length, toolCalls, thinking, stream]);
+
   // REQ-070: on mount (fresh boot after F5) ask the backend whether a run is
   // still in flight; while it is, poll status + transcript so the refresh
   // catches up live instead of showing a dead "complete".
@@ -658,6 +676,7 @@ export function Chat({
         <Composer
           model={model}
           streaming={streaming}
+          status={runStatus}
           socketOpen={socketOpen}
           paletteSignal={paletteSignal}
           dropSignal={dropSignal}

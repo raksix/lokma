@@ -3,6 +3,7 @@ import {
   ChevronDown,
   LifeBuoy,
   ListTree,
+  LoaderCircle,
   Mic,
   Paperclip,
   Search,
@@ -114,6 +115,7 @@ function readOneAttachment(file: File): Promise<Attachment> {
 export function Composer({
   model,
   streaming,
+  status,
   socketOpen,
   paletteSignal,
   dropSignal,
@@ -124,6 +126,8 @@ export function Composer({
 }: {
   model: string;
   streaming: boolean;
+  /** Live run status line (REQ-112) — shown under the input while working. */
+  status?: string | null;
   socketOpen: boolean;
   /** Increment to force-open the `/` palette (the `/help` command). */
   paletteSignal: number;
@@ -646,6 +650,12 @@ export function Composer({
             )}
           </div>
         </div>
+        {streaming && status ? (
+          <div className="flex items-center gap-1.5 px-1 pt-1.5 text-[11px] text-zinc-500" role="status" aria-live="polite">
+            <LoaderCircle className="h-3 w-3 animate-spin text-[#C96442]" />
+            <span className="animate-pulse">{status}</span>
+          </div>
+        ) : null}
       </div>
     </div>
   );

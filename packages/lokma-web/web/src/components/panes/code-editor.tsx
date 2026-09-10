@@ -58,7 +58,7 @@ var ATTR_PAT = '[A-Za-z-]+(?=[ ]*=[ ]*["' + SQ + '])';
 type Spec = { src: string; cls: string };
 
 function kwSpec(): Spec {
-  return { src: '(?:^|' + NOT_WORD + ')((?:' + JS_WORDS + ')(?![A-Za-z0-9_$]))', cls: TOK_KW };
+  return { src: '(' + NOT_WORD + '?)((?:' + JS_WORDS + ')(?![A-Za-z0-9_$]))', cls: TOK_KW };
 }
 
 function specsFor(lang: string): Spec[] {

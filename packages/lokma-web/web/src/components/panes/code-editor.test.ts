@@ -60,5 +60,26 @@ check('plain still escapes', plainOut.includes('&lt;b&gt;') && plainOut.includes
 check('trailing newline padded', highlightCode('a\n', 'plain') === 'a\n ');
 check('empty input is empty', highlightCode('', 'javascript') === '');
 
+// Round-trip invariant: stripping our own spans must reproduce the input
+// (guards against tokenizers that eat prefix chars or whitespace).
+function stripSpans(html: string): string {
+  return html
+    .split('</span>').join('')
+    .replace(/<span class="[^"]*">/g, '')
+    .split('&lt;').join('<')
+    .split('&gt;').join('>')
+    .split('&amp;').join('&');
+}
+const samples: Array<[string, string]> = [
+  ['const x = "hi"; // note\nfoo(42);', 'javascript'],
+  ['  return x;\n\tif (y) { break; }', 'javascript'],
+  ['<div class="box">Hi</div>', 'markup'],
+  ['# title\nkey = "v"  # com', 'python'],
+  ['plain & simple <text>', 'plain'],
+];
+for (const [src, lang] of samples) {
+  check('round-trip ' + lang + ': ' + JSON.stringify(src.slice(0, 18)), stripSpans(highlightCode(src, lang)) === src);
+}
+
 console.log(`code-editor: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

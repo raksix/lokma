@@ -90,8 +90,10 @@ export function isPtyAvailable(): boolean {
 /** Shell command line for `script -c`: interactive (prompt, history, completion). */
 function shellCommand(shell: string): string {
   const base = shell.split('/').pop() || shell;
-  if (base === 'bash') return `${shell} --norc -i`;
-  return `${shell} -i`;
+  // REQ-087: login shell (no --norc) so profile/bashrc load and the prompt
+  // looks like SSH (root@host:path) instead of bare `bash-5.2#`.
+  if (base === 'bash') return `${shell} --login -i`;
+  return `${shell} -i -l`;
 }
 
 function newTerminalId(): string {
@@ -181,15 +183,25 @@ export class TerminalManager {
       // REQ-059: `script -qec` gives the shell a real slave PTY while our
       // stdio stays plain pipes — zero native deps. Control chars
       // (Ctrl+C = \x03, Ctrl+D = \x04) arrive as PTY input and behave.
+      // REQ-087: explicit HOME/USER/LOGNAME/LANG so the login shell always
+      // builds its SSH-style prompt even when the daemon env is thin.
+      const shellEnv = {
+        ...process.env,
+        TERM: 'xterm-256color',
+        HOME: process.env.HOME || '/root',
+        USER: process.env.USER || 'root',
+        LOGNAME: process.env.LOGNAME || process.env.USER || 'root',
+        LANG: process.env.LANG || 'C.UTF-8',
+      };
       const proc = usePty
         ? spawn('script', ['-qec', shellCommand(shell), '/dev/null'], {
             cwd,
-            env: { ...process.env, TERM: 'xterm-256color' },
+            env: shellEnv,
             stdio: ['pipe', 'pipe', 'pipe'],
           })
         : spawn(shell, [], {
             cwd,
-            env: { ...process.env, TERM: 'xterm-256color' },
+            env: shellEnv,
             stdio: ['pipe', 'pipe', 'pipe'],
           });
       entry.proc = proc;

@@ -78,7 +78,7 @@ function readAttachment(file: File): Promise<string> {
   if (!TEXT_EXTENSIONS.has(ext)) {
     return Promise.reject(
       new Error(
-        `${file.name}: binary files (pdf/doc/…) can't be inlined as text — convert to .txt/.md first`,
+        `${file.name}: binary files can't be inlined as text — convert to .txt/.md first`,
       ),
     );
   }
@@ -127,7 +127,37 @@ function readImageAttachment(file: File): Promise<Attachment> {
 /** Route one file to the text or image attachment path. */
 function readOneAttachment(file: File): Promise<Attachment> {
   if (isImageAttachment(file.name, file.type)) return readImageAttachment(file);
+  if (file.name.toLowerCase().endsWith('.pdf')) return extractPdfAttachment(file);
   return readAttachment(file).then((content) => ({ name: file.name, content, kind: 'text' as const }));
+}
+
+/** PDF attach (REQ-114) — bytes go to the server, extracted text comes back. */
+function extractPdfAttachment(file: File): Promise<Attachment> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const buf = reader.result;
+      if (!(buf instanceof ArrayBuffer)) {
+        reject(new Error(`${file.name}: could not be read`));
+        return;
+      }
+      const bytes = new Uint8Array(buf);
+      let bin = '';
+      const CHUNK = 0x8000;
+      for (let i = 0; i < bytes.length; i += CHUNK) {
+        bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+      }
+      api
+        .extractPdf({ name: file.name, dataBase64: btoa(bin) })
+        .then((r) => resolve({ name: file.name, content: r.text, kind: 'text' as const }))
+        .catch((e: unknown) => {
+          const msg = e instanceof Error ? e.message : String(e);
+          reject(new Error(`${file.name}: ${msg}`));
+        });
+    };
+    reader.onerror = () => reject(new Error(`${file.name}: could not be read`));
+    reader.readAsArrayBuffer(file);
+  });
 }
 
 export function Composer({
@@ -626,7 +656,7 @@ export function Composer({
             type="file"
             multiple
             hidden
-            accept=".txt,.md,.json,.csv,.ts,.tsx,.js,.jsx,.css,.html,.py,.rs,.go,.yaml,.yml,.toml,.sh,.sql,.xml,.log,.png,.jpg,.jpeg,.gif,.webp"
+            accept=".txt,.md,.json,.csv,.ts,.tsx,.js,.jsx,.css,.html,.py,.rs,.go,.yaml,.yml,.toml,.sh,.sql,.xml,.log,.pdf,.png,.jpg,.jpeg,.gif,.webp"
             onChange={(e) => {
               if (e.target.files) attachFiles(e.target.files);
               e.target.value = '';

@@ -115,3 +115,4 @@
 - [REQ-094](finished/REQ-094-session-izolasyonu.md) — Session'lar kullanıcıya özel (admin dahil) — done
 - [REQ-095](finished/REQ-095-windowed-toggle-donus.md) — Pane windowed butonu toggle: tiling'e dönüş — done
 - [REQ-096](finished/REQ-096-windowed-geometri-snap.md) — Windowed geometri: full-height + taşma yok + snap — done
+- [REQ-097](REQ-097-chat-paste-drop-eki.md) — Chat input'a yapıştırma + sürükle-bırak eki — pending

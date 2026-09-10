@@ -36,7 +36,10 @@ export type ComposerSend = { text: string; model: string; contextPaths: string[]
 type QueuedPrompt = { key: number; text: string };
 
 const MODE_KEY = 'lokma-composer-mode';
-const MAX_ATTACH_BYTES = 100 * 1024;
+const MAX_ATTACH_BYTES = 50 * 1024 * 1024;
+/** How much of a text file is inlined into the prompt (REQ-113) — the rest
+ *  is noted, not sent, so a 50MB attach cannot nuke the context window. */
+const INLINE_BUDGET_CHARS = 100 * 1024;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_ATTACH_FILES = 20;
 const TEXT_EXTENSIONS = new Set([
@@ -67,14 +70,29 @@ function revokeAttachment(a: Attachment): void {
 /** Read a user-attached file as text (binary/oversize files are refused). */
 function readAttachment(file: File): Promise<string> {
   const ext = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
-  if (!TEXT_EXTENSIONS.has(ext) || file.size > MAX_ATTACH_BYTES) {
+  if (file.size > MAX_ATTACH_BYTES) {
     return Promise.reject(
-      new Error(`${file.name}: only text files under 100KB can be attached`),
+      new Error(`${file.name}: files over 50MB cannot be attached`),
+    );
+  }
+  if (!TEXT_EXTENSIONS.has(ext)) {
+    return Promise.reject(
+      new Error(
+        `${file.name}: binary files (pdf/doc/…) can't be inlined as text — convert to .txt/.md first`,
+      ),
     );
   }
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onload = () => {
+      const full = typeof reader.result === 'string' ? reader.result : '';
+      // REQ-113: cap what rides into the prompt; note the remainder.
+      resolve(
+        full.length > INLINE_BUDGET_CHARS
+          ? `${full.slice(0, INLINE_BUDGET_CHARS)}\n…[file truncated: ${full.length} chars total, first ${INLINE_BUDGET_CHARS} shown]`
+          : full,
+      );
+    };
     reader.onerror = () => reject(new Error(`${file.name}: could not be read`));
     reader.readAsText(file);
   });

@@ -131,3 +131,4 @@
 - [REQ-110](finished/REQ-110-obsidian-graph-parite.md) — Obsidian tarzı memory graph paritesi — done
 - [REQ-111](finished/REQ-111-tool-akista-ara-satir.md) — Tool calling mesaj aralarında görünsün — done
 - [REQ-112](finished/REQ-112-composer-durum-satiri.md) — Composer altında canlı durum satırı — done
+- [REQ-113](finished/REQ-113-attachment-50mb.md) — Attachment limiti 50MB + inline bütçe — done

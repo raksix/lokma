@@ -1,7 +1,10 @@
 import * as React from 'react';
+import { Globe } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { FileBrowser } from '@/components/files';
 import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
+import { usePaneStore } from '@/stores/pane';
 import {
   LazyAgentsPane,
   LazyArchifyPane,
@@ -38,7 +41,9 @@ import {
  * `POST /api/terminal` + WS `terminal/*` frames), Git the real W3-11 pane
  * (branch/status/log/commit/push over `GET/POST /api/git/*` + live locks),
  * Browser the real W3-12 pane (per-agent live tabs + server-owned history
- * over `GET/POST /api/browser/*`, pages in a sandboxed iframe), Agents the
+ * over `GET/POST /api/browser/*`, pages in a sandboxed iframe — REQ-109:
+ * the live surface lives in tiling pane tabs and the mobile inline view,
+ * desktop sidebars show only a pane redirect card), Agents the
  * real W4-13 pane (registry CRUD + pause/resume/kill/fork/clone +
  * SOUL.md/MEMORY.md editors over `GET/POST/PATCH/DELETE /api/agents/*`),
  * Orchestration the real W4-14 pane (live state-grouped tree + fan-out
@@ -123,11 +128,19 @@ export function InspectorPanel({
   sessionId,
   ws,
   requestedTab,
+  browserMode = 'pane-redirect',
 }: {
   onOpenSession?: (id: string) => void;
   sessionId?: string;
   ws?: UseWs;
   requestedTab?: InspectorTab | null;
+  /**
+   * REQ-109 — where the browser surface lives. Desktop sidebars use the
+   * default 'pane-redirect' (a card pointing at the tiling pane, never the
+   * live browser); the mobile single-view has no panes (REQ-024) so it
+   * passes 'inline' and keeps the real browser here.
+   */
+  browserMode?: 'pane-redirect' | 'inline';
 }) {
   const [tab, setTab] = React.useState<InspectorTab>('files');
 
@@ -191,17 +204,26 @@ export function InspectorPanel({
       ) : tab === 'git' ? (
         <LazyGitPane key={sessionId ?? 'no-session'} sessionId={sessionId} />
       ) : tab === 'browser' ? (
-        sessionId ? (
-          // REQ-037 — the sidebar/mobile Inspector is a scrolling column with
-          // no bounded height, so BrowserPane's flex-1 collapses and the page
-          // renders cut off. This shell gives it a viewport-relative height.
-          <div className="flex h-[60vh] min-h-[320px] flex-col overflow-hidden">
-            <LazyBrowserPane key={sessionId} sessionId={sessionId} />
-          </div>
+        // REQ-109 — the desktop sidebar never renders the browser surface;
+        // a stale 'browser' state (deep-link, Extras Open button) lands on
+        // the redirect card with a one-click path to the pane. Mobile
+        // single-view (browserMode 'inline') keeps the real browser here —
+        // phones have no pane system (REQ-024).
+        browserMode === 'inline' ? (
+          sessionId ? (
+            // REQ-037 — the sidebar/mobile Inspector is a scrolling column with
+            // no bounded height, so BrowserPane's flex-1 collapses and the page
+            // renders cut off. This shell gives it a viewport-relative height.
+            <div className="flex h-[60vh] min-h-[320px] flex-col overflow-hidden">
+              <LazyBrowserPane key={sessionId} sessionId={sessionId} />
+            </div>
+          ) : (
+            <div className="rounded border border-dashed p-3 text-xs text-muted-foreground">
+              Open a session to use the browser.
+            </div>
+          )
         ) : (
-          <div className="rounded border border-dashed p-3 text-xs text-muted-foreground">
-            Open a session to use the browser.
-          </div>
+          <BrowserPaneRedirect />
         )
       ) : sessionId && ws ? (
         <LazyTerminalPane key={sessionId} sessionId={sessionId} ws={ws} />
@@ -211,6 +233,30 @@ export function InspectorPanel({
         </div>
       )}
       </React.Suspense>
+    </div>
+  );
+}
+
+/**
+ * REQ-109 — desktop sidebars never render the browser surface. This card
+ * is the only thing a sidebar 'browser' state can show: no iframe, no
+ * session binding, just a one-click path to the tiling pane tab (same
+ * upsert + focus the rails and agent actions use). Lucide icon only.
+ */
+function BrowserPaneRedirect() {
+  const setTiling = usePaneStore((s) => s.setTiling);
+  const requestBrowserTab = usePaneStore((s) => s.requestInspectorTab);
+  const open = () => {
+    setTiling(true);
+    requestBrowserTab('browser');
+  };
+  return (
+    <div className="flex flex-col items-center gap-2 rounded border border-dashed p-6 text-center">
+      <Globe className="h-5 w-5 text-muted-foreground" />
+      <p className="text-xs text-muted-foreground">The browser now opens as a pane tab, not in the sidebar.</p>
+      <Button variant="default" size="sm" className="h-7 text-xs" onClick={open}>
+        Open browser pane
+      </Button>
     </div>
   );
 }

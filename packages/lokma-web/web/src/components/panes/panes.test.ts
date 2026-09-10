@@ -21,6 +21,7 @@ import {
   findParentNode,
   inspectorLabel,
   isInspectorTabId,
+  isPaneOnlyTab,
   isPaneTab,
   isPaneUnder,
   isRailDropId,
@@ -317,6 +318,14 @@ const parentId = bParent ? bParent.id : "";
 const narrowed = closeLayoutPane(widened, "d");
 check("closing sibling collapses fresh parent", narrowed !== null && findLayoutNode(narrowed, parentId) === null);
 check("origin pane survives collapse", narrowed !== null && collectPaneIds(narrowed).includes("b"));
+
+/* REQ-109 — pane-only tabs: clicks route to panes, never the sidebar. */
+check("REQ-109 browser is pane-only", isPaneOnlyTab("browser") === true);
+check("REQ-109 terminal stays sidebar-capable", isPaneOnlyTab("terminal") === false);
+check("REQ-109 sessions stays sidebar-capable", isPaneOnlyTab("sessions") === false);
+check("REQ-109 unknown stays sidebar-capable", isPaneOnlyTab("nope") === false && isPaneOnlyTab(null) === false);
+check("REQ-109 browser keeps its pane registry id", isInspectorTabId("browser") === true);
+check("REQ-109 browser keeps its rail drop id", isRailDropId("browser") === true);
 
 console.log(`panes-089: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

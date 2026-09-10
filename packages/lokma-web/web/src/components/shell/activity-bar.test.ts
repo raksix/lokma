@@ -3,7 +3,7 @@
  * Run: `bun src/components/shell/activity-bar.test.ts` (no DOM, no server —
  * only the pure `activityInspectorTab` mapper + the static item table).
  */
-import { ACTIVITY_ITEMS, activityDragId, activityInspectorTab, type ActivityKey } from './activity-bar';
+import { ACTIVITY_ITEMS, activityDragId, activityInspectorTab, activityOpensPaneTab, type ActivityKey } from './activity-bar';
 import { isRailDropId } from '@/components/panes/panes';
 
 let passed = 0;
@@ -53,6 +53,14 @@ check(
 );
 check('REQ-026 sessions drags as the sessions surface', activityDragId('sessions') === 'sessions');
 check('REQ-026 mapped keys drag as their inspector tab', activityDragId('git') === 'git' && activityDragId('account') === 'sessions');
+check(
+  'REQ-109 only the browser key opens a pane tab on click',
+  activityOpensPaneTab('browser') === true &&
+    (['sessions', 'git', 'terminal', 'vault', 'testing', 'bots', 'settings', 'account'] as ActivityKey[]).every(
+      (key) => activityOpensPaneTab(key) === false,
+    ),
+);
+check('REQ-109 browser drag still carries the browser drop id', activityDragId('browser') === 'browser');
 
 console.log(`activity-bar.test.ts: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

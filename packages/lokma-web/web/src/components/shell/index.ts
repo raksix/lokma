@@ -7,6 +7,7 @@ export {
   ACTIVITY_ITEMS,
   ActivityBar,
   activityInspectorTab,
+  activityOpensPaneTab,
   type ActivityKey,
 } from './activity-bar';
 export {

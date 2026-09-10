@@ -1,6 +1,6 @@
 import { Bot, CircleUserRound, Database, FlaskConical, GitBranch, Globe, MessagesSquare, Settings, Terminal } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { INSPECTOR_DRAG_MIME, encodeInspectorDrag, type RailDropId } from '@/components/panes/panes';
+import { INSPECTOR_DRAG_MIME, encodeInspectorDrag, isPaneOnlyTab, type RailDropId } from '@/components/panes/panes';
 import type { InspectorTab } from '@/components/providers';
 import type { SidebarSide } from './responsive';
 
@@ -54,6 +54,10 @@ export const ACTIVITY_ITEMS: ActivityItem[] = [...TOP_ITEMS, ...PANE_ITEMS, ...B
 /**
  * Which Inspector tab an activity key opens. `null` = the key lives in
  * the Explorer panel (sessions), not the Inspector.
+ *
+ * REQ-109 — the returned tab is the DRAG identity for every key (rail
+ * drops already land in panes, so the browser drag keeps working); a
+ * browser CLICK no longer follows this map, see `activityOpensPaneTab`.
  */
 export function activityInspectorTab(key: ActivityKey): InspectorTab | null {
   switch (key) {
@@ -84,9 +88,23 @@ export function activityInspectorTab(key: ActivityKey): InspectorTab | null {
  * What an activity-icon drag carries (REQ-026): the mapped Inspector tab —
  * or 'sessions' for the Explorer sessions list, whose drop opens the pane
  * tab picker (the live sessions + tools chooser). Pure so probes cover it.
+ *
+ * REQ-109 — the browser drag id stays 'browser' (drops open a pane tab,
+ * exactly where clicks go now), so this mapper is unchanged for clicks
+ * that `activityOpensPaneTab` intercepts.
  */
 export function activityDragId(key: ActivityKey): RailDropId {
   return activityInspectorTab(key) ?? 'sessions';
+}
+
+/**
+ * REQ-109 — activity keys whose CLICK always opens a tiling pane tab,
+ * never the sidebar Inspector (mirrors `isPaneOnlyTab` in panes.ts —
+ * the single source; this wrapper keeps the shell barrel typed on
+ * `ActivityKey`). Drags are unaffected (see `activityDragId`).
+ */
+export function activityOpensPaneTab(key: ActivityKey): boolean {
+  return isPaneOnlyTab(key);
 }
 
 function ActivityButton({

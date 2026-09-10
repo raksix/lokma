@@ -94,6 +94,21 @@ export function isInspectorTabId(value: unknown): value is InspectorTabId {
   return typeof value === 'string' && (INSPECTOR_TABS as readonly { id: string }[]).some((t) => t.id === value);
 }
 
+/**
+ * REQ-109 — sidebar surfaces that always open as a tiling pane tab, never
+ * in a sidebar. The rail/activity icons stay visible (and their drags keep
+ * working — drops already land in panes), but a CLICK routes to
+ * `requestInspectorTab` instead of the sidebar Inspector. The pane registry
+ * above keeps the id so drops, the tab picker and `InspectorHost` resolve.
+ */
+export const PANE_ONLY_TABS = ['browser'] as const;
+
+export type PaneOnlyTab = (typeof PANE_ONLY_TABS)[number];
+
+export function isPaneOnlyTab(value: unknown): value is PaneOnlyTab {
+  return typeof value === 'string' && (PANE_ONLY_TABS as readonly string[]).includes(value);
+}
+
 export function inspectorLabel(id: InspectorTabId): string {
   return INSPECTOR_TABS.find((t) => t.id === id)?.label ?? id;
 }

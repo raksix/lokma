@@ -7,7 +7,7 @@ import type { InspectorTab } from '@/components/providers';
 import { SessionsSidebar } from '@/components/sessions';
 import { FOCUS_FILES_EVENT } from '@/components/files';
 import { Chat, INITIAL_PREFIX } from '@/components/chat';
-import { TilingWorkspace } from '@/components/panes';
+import { TilingWorkspace, isPaneOnlyTab } from '@/components/panes';
 import { LayoutGrid, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePaneStore } from '@/stores/pane';
@@ -28,6 +28,7 @@ import {
   SHOW_SHORTCUTS_EVENT,
   ToastHost,
   activityInspectorTab,
+  activityOpensPaneTab,
   anyDrawerOpen,
   closeAllSidebars,
   emitToast,
@@ -133,6 +134,21 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     });
   }, []);
 
+  // REQ-109 — the browser always opens as a tiling pane tab
+  // (session-style: upsert + focus in the last-focused pane, per-agent tabs
+  // intact), never in a sidebar. Desktop enables the workspace on demand;
+  // mobile has no pane system (REQ-024), so the Inspector drawer stays its
+  // browser surface there.
+  const openBrowserPane = React.useCallback(() => {
+    if (isMobile) {
+      setInspectorTab('browser');
+      setSidebars((current) => ({ ...current, [inspectorSide]: true }));
+      return;
+    }
+    setTiling(true);
+    requestInspectorTab('browser');
+  }, [inspectorSide, isMobile, requestInspectorTab, setTiling]);
+
   // REQ-008 — rail click reveals the panel that owns the key, then asks
   // the Inspector to switch tabs (prop-driven so a first click that mounts
   // the sidebar still lands on the right tab).
@@ -152,6 +168,11 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         setSettingsOpen(true);
         return;
       }
+      // REQ-109 — pane-only keys (browser) never touch the sidebar.
+      if (activityOpensPaneTab(key)) {
+        openBrowserPane();
+        return;
+      }
       const tab = activityInspectorTab(key);
       setInspectorTab(tab);
       if (tab === null) {
@@ -168,7 +189,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           : { ...current, [inspectorSide]: true },
       );
     },
-    [explorerSide, inspectorSide, isMobile],
+    [explorerSide, inspectorSide, isMobile, openBrowserPane],
   );
 
   // REQ-010 — rail click asks the Inspector for the tab (prop-driven, same
@@ -177,6 +198,11 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   // 'settings' tab itself stays reachable for deep-links).
   const handleInspectorRailSelect = React.useCallback(
     (tab: InspectorTab) => {
+      // REQ-109 — the rail browser entry opens a pane tab, never the sidebar.
+      if (isPaneOnlyTab(tab)) {
+        openBrowserPane();
+        return;
+      }
       if (tab === 'settings') {
         setSettingsOpen(true);
         return;
@@ -188,7 +214,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           : { ...current, [inspectorSide]: true },
       );
     },
-    [inspectorSide, isMobile],
+    [inspectorSide, isMobile, openBrowserPane],
   );
 
   const ws = useWs(activeId);
@@ -322,25 +348,30 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   );
 
   // REQ-057 — agent UI actions: the loop drives the Web UI surface through
-  // `ui_action` frames. Browser/terminal open as a pane tab when tiling
-  // (sidebar Inspector tab otherwise); a new session opens as a pane tab or
-  // switches the single chat, with the agent prompt staged so Chat
-  // auto-sends it on socket open. One-shot: every entry is dismissed after
-  // handling, toasts keep the action visible in the transcript timeline.
+  // `ui_action` frames. The terminal opens as a pane tab when tiling
+  // (sidebar Inspector tab otherwise); the browser ALWAYS opens as a pane
+  // tab (REQ-109 — the workspace is enabled on demand on desktop, the
+  // Inspector drawer stays its surface on mobile); a new session opens as
+  // a pane tab or switches the single chat, with the agent prompt staged
+  // so Chat auto-sends it on socket open. One-shot: every entry is
+  // dismissed after handling, toasts keep the action visible in the
+  // transcript timeline.
   const uiActions = ws.uiActions;
   const dismissUiAction = ws.dismissUiAction;
   React.useEffect(() => {
     if (uiActions.length === 0) return;
     for (const entry of uiActions) {
-      if (entry.action === 'open_browser' || entry.action === 'open_terminal') {
-        const tab = entry.action === 'open_browser' ? 'browser' : 'terminal';
+      if (entry.action === 'open_browser') {
+        openBrowserPane();
+        emitToast(`Agent opened browser: ${entry.url ?? ''}`);
+      } else if (entry.action === 'open_terminal') {
         if (!isMobile && tiling) {
-          requestInspectorTab(tab);
+          requestInspectorTab('terminal');
         } else {
-          setInspectorTab(tab);
+          setInspectorTab('terminal');
           setSidebars((current) => ({ ...current, [inspectorSide]: true }));
         }
-        emitToast(entry.action === 'open_browser' ? `Agent opened browser: ${entry.url ?? ''}` : 'Agent opened a terminal');
+        emitToast('Agent opened a terminal');
       } else if (entry.action === 'open_session' && entry.targetSessionId) {
         const id = entry.targetSessionId;
         if (entry.prompt) {
@@ -361,7 +392,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       }
       dismissUiAction(entry.actionId);
     }
-  }, [uiActions, dismissUiAction, isMobile, tiling, inspectorSide, requestInspectorTab, requestSessionTab, refreshSessions, selectSession]);
+  }, [uiActions, dismissUiAction, isMobile, tiling, inspectorSide, openBrowserPane, requestInspectorTab, requestSessionTab, refreshSessions, selectSession]);
 
   // Global shortcuts — every combo is listed in the SHORTCUTS registry so
   // the help dialog (`?`) can never drift from what the keys actually do.
@@ -444,7 +475,13 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   // scope is unchanged (`key` remounts per session, exactly as before).
   const inspectorContent = (
     <div className="space-y-4">
-      <InspectorPanel onOpenSession={switchSession} sessionId={activeId} ws={ws} requestedTab={inspectorTab} />
+      <InspectorPanel
+        onOpenSession={switchSession}
+        sessionId={activeId}
+        ws={ws}
+        requestedTab={inspectorTab}
+        browserMode={isMobile ? 'inline' : 'pane-redirect'}
+      />
     </div>
   );
 

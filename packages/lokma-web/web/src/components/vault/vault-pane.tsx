@@ -1,13 +1,17 @@
 import * as React from 'react';
-import { FilePlus2, Folder, GitBranch, Link2, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { FilePlus2, Folder, GitBranch, Link2, RefreshCw, RotateCcw, Search, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { formatSize } from '@/components/files';
 import { VaultGraph3D } from './vault-graph-3d';
 import {
   clampDepth,
+  clampZoom,
   emptyIngestForm,
+  folderList,
+  folderOf,
   layoutGraph,
+  neighborIds,
   NODE_PALETTE,
   normalizeNodes,
   paletteIndex,
@@ -35,7 +39,9 @@ import {
  * the graph on success.
  * NOT ported: the concept's hardcoded NOTES/EDGES rows and the mock
  * barnesHut constants strip (ours is a deterministic circle layout in 2D
- * and a Fibonacci-sphere canvas star-map in 3D — the footer says so), plus
+ * with draggable nodes, cursor-anchored wheel zoom, background pan,
+ * click-to-isolate local graph plus a folder legend/filter — and a
+ * Fibonacci-sphere canvas star-map in 3D — the footer says so), plus
  * the toast-only Full button. Search is SQLite FTS5 (weighted BM25 over
  * path + title + tags + body) — graph seeds and typeaheads rank through
  * it; the footer says so.
@@ -247,12 +253,129 @@ export function VaultPane() {
     }
   }, [note, deleting, confirmDelete, loadGraph, q, folder, depth]);
 
-  const placed = React.useMemo(() => layoutGraph(nodes), [nodes]);
+  // Obsidian-parity 2D interaction (REQ-110). view is wheel zoom
+  // (cursor-anchored) plus background-drag pan, applied as one outer
+  // group transform. posOverrides holds dragged node positions by id,
+  // layered over the deterministic circle layout.
+  const [view, setView] = React.useState({ k: 1, tx: 0, ty: 0 });
+  const [posOverrides, setPosOverrides] = React.useState<Record<string, { x: number; y: number }>>({});
+  const svgRef = React.useRef<SVGSVGElement | null>(null);
+  const dragNodeRef = React.useRef<{ id: string; startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const panRef = React.useRef<{ startX: number; startY: number; origTx: number; origTy: number; moved: boolean } | null>(null);
+  const viewRef = React.useRef(view);
+  viewRef.current = view;
+
+  const placed = React.useMemo(() => {
+    const base = layoutGraph(nodes);
+    if (Object.keys(posOverrides).length === 0) return base;
+    return base.map((n) => {
+      const o = posOverrides[n.id];
+      return o ? { ...n, x: o.x, y: o.y } : n;
+    });
+  }, [nodes, posOverrides]);
   const edgeSet = React.useMemo(() => {
     const ids = new Set(nodes.map((n) => n.id));
     return links.filter((l) => ids.has(l.source) && ids.has(l.target));
   }, [nodes, links]);
   const byId = React.useMemo(() => new Map(placed.map((n) => [n.id, n])), [placed]);
+
+  // Local-graph highlight: the selected node plus its direct neighbors
+  // stay lit, everything else dims. Empty set means no selection.
+  const activeSet = React.useMemo(() => neighborIds(selected, edgeSet), [selected, edgeSet]);
+  const folders = React.useMemo(() => folderList(nodes), [nodes]);
+
+  function resetGraphView(): void {
+    setView({ k: 1, tx: 0, ty: 0 });
+    setPosOverrides({});
+  }
+
+  // Native non-passive wheel listener: React attaches wheel handlers as
+  // passive at the root, so preventDefault here would warn in the console
+  // (same reason as the 3D canvas). Cursor-anchored zoom via clampZoom.
+  React.useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg || mode !== '2d') return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = svg.getBoundingClientRect();
+      const w = Math.max(1, rect.width);
+      const h = Math.max(1, rect.height);
+      const mx = ((e.clientX - rect.left) / w) * 300;
+      const my = ((e.clientY - rect.top) / h) * 200;
+      setView((v) => {
+        const nextK = clampZoom(v.k * (e.deltaY > 0 ? 0.9 : 1.12));
+        const s = nextK / v.k;
+        return { k: nextK, tx: mx - (mx - v.tx) * s, ty: my - (my - v.ty) * s };
+      });
+    };
+    svg.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      svg.removeEventListener('wheel', onWheel);
+    };
+  }, [mode]);
+
+  function onGraphBackgroundDown(e: React.PointerEvent): void {
+    panRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      origTx: viewRef.current.tx,
+      origTy: viewRef.current.ty,
+      moved: false,
+    };
+  }
+
+  function onNodeDown(e: React.PointerEvent, id: string, x: number, y: number): void {
+    e.stopPropagation();
+    dragNodeRef.current = { id, startX: e.clientX, startY: e.clientY, origX: x, origY: y };
+  }
+
+  function onGraphMove(e: React.PointerEvent): void {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const unitX = 300 / Math.max(1, rect.width);
+    const unitY = 200 / Math.max(1, rect.height);
+    const nodeDrag = dragNodeRef.current;
+    if (nodeDrag) {
+      const k = viewRef.current.k;
+      const nx = nodeDrag.origX + ((e.clientX - nodeDrag.startX) * unitX) / k;
+      const ny = nodeDrag.origY + ((e.clientY - nodeDrag.startY) * unitY) / k;
+      if (Math.abs(e.clientX - nodeDrag.startX) + Math.abs(e.clientY - nodeDrag.startY) > 2) {
+        const id = nodeDrag.id;
+        setPosOverrides((prev) => ({ ...prev, [id]: { x: Math.round(nx * 10) / 10, y: Math.round(ny * 10) / 10 } }));
+      }
+      return;
+    }
+    const pan = panRef.current;
+    if (pan) {
+      const dx = (e.clientX - pan.startX) * unitX;
+      const dy = (e.clientY - pan.startY) * unitY;
+      if (Math.abs(e.clientX - pan.startX) + Math.abs(e.clientY - pan.startY) > 3) pan.moved = true;
+      setView((v) => ({ ...v, tx: pan.origTx + dx, ty: pan.origTy + dy }));
+    }
+  }
+
+  function onGraphUp(e: React.PointerEvent, nodeId: string | null): void {
+    if (nodeId) {
+      const drag = dragNodeRef.current;
+      dragNodeRef.current = null;
+      // A press without travel is a click: open the note, which also
+      // selects it and isolates its neighborhood in the graph.
+      if (drag && Math.abs(e.clientX - drag.startX) + Math.abs(e.clientY - drag.startY) < 4) {
+        const target = byId.get(nodeId);
+        if (target) void openNote(target.path);
+      }
+      return;
+    }
+    const pan = panRef.current;
+    panRef.current = null;
+    // A background click without travel clears the local-graph isolation.
+    if (pan && !pan.moved) {
+      setSelected(null);
+      setNote(null);
+      setConfirmDelete(null);
+    }
+  }
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-[#161618] rounded-lg overflow-hidden border border-line">
@@ -451,64 +574,149 @@ export function VaultPane() {
         </div>
 
         <div className="flex-1 flex flex-col min-w-0 bg-[#FAF9F5] dark:bg-[#0F0F11] relative overflow-hidden">
-          <div className="h-7 flex items-center gap-1 px-2 border-b border-line/50 bg-white/60 dark:bg-[#1E1E21]/60 backdrop-blur text-[11px] shrink-0">
-            Graph — {placed.length} nodes · {edgeSet.length} edges · depth {depth}
+          <div className="min-h-7 flex items-center gap-1 px-2 py-0.5 border-b border-line/50 bg-white/60 dark:bg-[#1E1E21]/60 backdrop-blur text-[11px] shrink-0 flex-wrap">
+            <span>
+              Graph — {placed.length} nodes · {edgeSet.length} edges · depth {depth}
+              {q.trim() ? ' · seed: ' + q.trim().slice(0, 24) : ''}
+              {selected ? ' · local: ' + ((byId.get(selected)?.title ?? selected).slice(0, 24)) : ''}
+            </span>
+            <span className="ml-auto flex shrink-0 gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0"
+                onClick={() => setView((v) => ({ ...v, k: clampZoom(v.k * 1.25) }))}
+                aria-label="Zoom graph in"
+                title="Zoom in"
+              >
+                <ZoomIn className="w-3 h-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0"
+                onClick={() => setView((v) => ({ ...v, k: clampZoom(v.k * 0.8) }))}
+                aria-label="Zoom graph out"
+                title="Zoom out"
+              >
+                <ZoomOut className="w-3 h-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0"
+                onClick={resetGraphView}
+                aria-label="Reset graph view"
+                title="Reset zoom, pan and dragged node positions"
+              >
+                <RotateCcw className="w-3 h-3" />
+              </Button>
+            </span>
           </div>
+          {mode === '2d' && folders.length > 1 ? (
+            <div className="flex items-center gap-1 px-2 py-1 border-b border-line/50 flex-wrap shrink-0">
+              {folders.map((f) => {
+                const color = NODE_PALETTE[paletteIndex(f, NODE_PALETTE.length)];
+                const isActive = folder.trim() === f;
+                return (
+                  <button
+                    key={f}
+                    onClick={() => setFolder(isActive ? '' : f)}
+                    title={isActive ? 'Clear folder filter' : 'Filter graph to ' + f}
+                    className={
+                      isActive
+                        ? 'flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] bg-[#FDF0E6] border-[#F2D5C2] dark:bg-[#2A1E15]'
+                        : 'flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] bg-white dark:bg-[#1E1E21] border-line hover:border-terracotta/40'
+                    }
+                  >
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                    {f}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
           <div className="flex-1 relative p-2 overflow-hidden min-h-0">
             {mode === '3d' ? (
               <VaultGraph3D nodes={nodes} links={edgeSet} selected={selected} onOpenNote={(p) => void openNote(p)} />
             ) : (
               <svg
+                ref={svgRef}
                 viewBox="0 0 300 200"
-                className="w-full h-full rounded-lg bg-white dark:bg-[#1E1E21] border border-line"
+                className="w-full h-full rounded-lg bg-white dark:bg-[#1E1E21] border border-line cursor-grab active:cursor-grabbing touch-none select-none"
                 role="img"
-                aria-label={`Vault graph, ${placed.length} notes`}
+                aria-label={'Vault graph, ' + placed.length + ' notes. Drag a node to move it, drag the background to pan, scroll to zoom.'}
+                onPointerDown={onGraphBackgroundDown}
+                onPointerMove={onGraphMove}
+                onPointerUp={(e) => onGraphUp(e, null)}
+                onPointerLeave={() => {
+                  dragNodeRef.current = null;
+                  panRef.current = null;
+                }}
               >
-                {edgeSet.map((l) => {
-                  const a = byId.get(l.source);
-                  const b = byId.get(l.target);
-                  if (!a || !b) return null;
-                  return (
-                    <line
-                      key={`${l.source}\n${l.target}`}
-                      x1={a.x}
-                      y1={a.y}
-                      x2={b.x}
-                      y2={b.y}
-                      stroke="#E8E4DE"
-                      strokeWidth="1.2"
-                    />
-                  );
-                })}
-                {placed.map((n) => {
-                  const fill = NODE_PALETTE[paletteIndex(n.path, NODE_PALETTE.length)];
-                  return (
-                    <g key={n.id} onClick={() => void openNote(n.path)} className="cursor-pointer">
-                      <circle cx={n.x} cy={n.y} r={n.r + 5} fill={fill} opacity="0.12" />
-                      <circle
-                        cx={n.x}
-                        cy={n.y}
-                        r={n.r}
-                        fill={fill}
-                        stroke={selected === n.path ? '#262624' : 'white'}
-                        strokeWidth={selected === n.path ? 2 : 1.5}
-                        className="hover:opacity-80"
+                <g transform={'translate(' + view.tx + ' ' + view.ty + ') scale(' + view.k + ')'}>
+                  {edgeSet.map((l) => {
+                    const a = byId.get(l.source);
+                    const b = byId.get(l.target);
+                    if (!a || !b) return null;
+                    const touches = selected !== null && (l.source === selected || l.target === selected);
+                    const faint =
+                      selected !== null && !touches && !(activeSet.has(l.source) && activeSet.has(l.target));
+                    return (
+                      <line
+                        key={l.source + '|' + l.target}
+                        x1={a.x}
+                        y1={a.y}
+                        x2={b.x}
+                        y2={b.y}
+                        stroke={touches ? '#C96442' : faint ? '#EFEBE6' : '#E8E4DE'}
+                        strokeWidth={touches ? 1.8 : 1.2}
+                        opacity={faint ? 0.4 : touches ? 0.95 : 0.9}
+                      />
+                    );
+                  })}
+                  {placed.map((n) => {
+                    const fill = NODE_PALETTE[paletteIndex(folderOf(n.path), NODE_PALETTE.length)];
+                    const dimmed = selected !== null && !activeSet.has(n.id);
+                    return (
+                      <g
+                        key={n.id}
+                        data-path={n.path}
+                        onPointerDown={(e) => onNodeDown(e, n.id, n.x, n.y)}
+                        onPointerMove={onGraphMove}
+                        onPointerUp={(e) => {
+                          e.stopPropagation();
+                          onGraphUp(e, n.id);
+                        }}
+                        className="cursor-pointer"
+                        opacity={dimmed ? 0.22 : 1}
                       >
-                        <title>{`${n.title} (${n.path})`}</title>
-                      </circle>
-                      <text
-                        x={n.x}
-                        y={n.y + n.r + 11}
-                        textAnchor="middle"
-                        fontSize="7"
-                        fill="#6B7280"
-                        fontFamily="Inter, sans-serif"
-                      >
-                        {n.title.length > 18 ? `${n.title.slice(0, 17)}…` : n.title}
-                      </text>
-                    </g>
-                  );
-                })}
+                        <circle cx={n.x} cy={n.y} r={n.r + 5} fill={fill} opacity="0.12" />
+                        <circle
+                          cx={n.x}
+                          cy={n.y}
+                          r={n.r}
+                          fill={fill}
+                          stroke={selected === n.path ? '#262624' : 'white'}
+                          strokeWidth={selected === n.path ? 2 : 1.5}
+                          className="hover:opacity-80"
+                        >
+                          <title>{n.title + ' (' + n.path + ')'}</title>
+                        </circle>
+                        <text
+                          x={n.x}
+                          y={n.y + n.r + 11}
+                          textAnchor="middle"
+                          fontSize="7"
+                          fill="#6B7280"
+                          fontFamily="Inter, sans-serif"
+                        >
+                          {n.title.length > 18 ? n.title.slice(0, 17) + '…' : n.title}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </g>
               </svg>
             )}
             {noteLoading ? (
@@ -535,6 +743,11 @@ export function VaultPane() {
           <div className="p-1.5 border-t border-line/50 bg-white/60 dark:bg-[#1E1E21]/60 text-[11px] text-zinc-500 flex gap-1 flex-wrap shrink-0">
             <span className="px-1.5 py-0.5 rounded bg-white border border-line">[[wikilink]] click → note</span>
             <span className="px-1.5 py-0.5 rounded bg-white border border-line">provenance: agentId</span>
+            {mode === '2d' ? (
+              <span className="px-1.5 py-0.5 rounded bg-white border border-line">
+                drag node to move · scroll to zoom · drag background to pan · click isolates neighbors
+              </span>
+            ) : null}
             <span className="ml-auto hidden @min-[320px]:inline">FTS5 full-text · {mode === '3d' ? '3D sphere' : '2D circle'}</span>
           </div>
         </div>

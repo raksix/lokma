@@ -6,12 +6,16 @@
 import {
   clampDepth,
   clampPitch,
+  clampZoom,
   emptyIngestForm,
+  folderList,
+  folderOf,
   GRAPH_3D_RADIUS,
   hitTestProjected,
   layoutGraph,
   layoutGraph3D,
   NODE_PALETTE,
+  neighborIds,
   nodeRadius,
   normalizeNode,
   normalizeNodes,
@@ -197,6 +201,27 @@ check(
     13,
     10,
   ) === 'b.md',
+);
+
+check('folder of nested path', folderOf('lokma/a.md') === 'lokma');
+check('folder of bare file is root', folderOf('note.md') === '(root)');
+check('folder list sorted unique', JSON.stringify(folderList([node(), node({ path: 'b.md', id: 'b.md' }), node({ path: 'lokma/c.md', id: 'lokma/c.md' })])) === JSON.stringify(['(root)', 'lokma']));
+check('folder list empty', folderList([]).length === 0);
+check('zoom clamps low', clampZoom(0.1) === 0.4);
+check('zoom clamps high', clampZoom(9) === 3);
+check('zoom NaN defaults 1', clampZoom(Number.NaN) === 1);
+check('zoom keeps mid', clampZoom(1.5) === 1.5);
+check('null selection is empty set', neighborIds(null, [{ source: 'a', target: 'b' }]).size === 0);
+check(
+  'neighbors include both directions',
+  (() => {
+    const set = neighborIds('a', [
+      { source: 'a', target: 'b' },
+      { source: 'c', target: 'a' },
+      { source: 'x', target: 'y' },
+    ]);
+    return set.has('a') && set.has('b') && set.has('c') && !set.has('x') && !set.has('y');
+  })(),
 );
 
 console.log(`\nPASS: ${passed} checks`);

@@ -286,6 +286,54 @@ export function hitTestProjected(
   return best;
 }
 
+/**
+ * Top-level folder of a vault path. The part before the first slash is the
+ * folder (a/b.md gives a); a bare filename has no folder and maps to
+ * the literal (root) bucket. Drives Obsidian-style per-folder node colors
+ * plus the legend/filter row. Pure so the pane and the probe share it.
+ */
+export function folderOf(path: string): string {
+  const slash = path.indexOf('/');
+  if (slash <= 0) return '(root)';
+  return path.slice(0, slash);
+}
+
+/**
+ * Distinct top-level folders present in a node list, sorted A-Z for the
+ * legend row. Empty input yields an empty list.
+ */
+export function folderList(nodes: VaultNode[]): string[] {
+  const seen: string[] = [];
+  for (const node of nodes) {
+    const folder = folderOf(node.path);
+    if (seen.indexOf(folder) === -1) seen.push(folder);
+  }
+  seen.sort();
+  return seen;
+}
+
+/** Wheel-zoom clamp for the 2D graph (0.4 whole vault, 3 one cluster). */
+export function clampZoom(raw: number): number {
+  if (!Number.isFinite(raw)) return 1;
+  return Math.min(3, Math.max(0.4, raw));
+}
+
+/**
+ * Id set of the selected node plus its direct graph neighbors: the
+ * Obsidian local-graph highlight. A null selection yields an empty set
+ * and the caller treats empty as no dimming. Links are undirected.
+ */
+export function neighborIds(selected: string | null, links: VaultLink[]): Set<string> {
+  const out = new Set<string>();
+  if (!selected) return out;
+  out.add(selected);
+  for (const link of links) {
+    if (link.source === selected) out.add(link.target);
+    else if (link.target === selected) out.add(link.source);
+  }
+  return out;
+}
+
 /** Ingest form values (path + optional provenance + markdown body). */
 export type IngestForm = { path: string; provenance: string; content: string };
 

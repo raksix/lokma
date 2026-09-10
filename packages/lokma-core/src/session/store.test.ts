@@ -63,4 +63,23 @@ assert.ok(ids.includes('sess_bbb'), 'listAllSummaries includes the slash-variant
 const sumB = all.find((s: SessionSummary) => s.id === 'sess_bbb');
 assert.equal(sumB?.messageCount, 1);
 
+// REQ-116 FAZ D-continuity: the Claude --resume handle survives meta merges.
+const storeC = new SessionStore('/tmp/req116-proj');
+await storeC.append('sess_ccc', {
+  role: 'user',
+  content: 'hi',
+  timestamp: new Date().toISOString(),
+});
+await storeC.writeMeta('sess_ccc', { model: 'claude-code/sonnet', claudeSessionId: 's-1' });
+assert.equal((await storeC.readMeta('sess_ccc'))?.claudeSessionId, 's-1');
+// Unrelated patches (model/title) keep the handle.
+await storeC.writeMeta('sess_ccc', { model: 'claude-code/opus' });
+assert.equal((await storeC.readMeta('sess_ccc'))?.claudeSessionId, 's-1');
+// Explicit empty clears back to a fresh engine run.
+await storeC.writeMeta('sess_ccc', { claudeSessionId: '' });
+assert.equal((await storeC.readMeta('sess_ccc'))?.claudeSessionId, undefined);
+// A fresh session id never inherits another session's handle (no fork leak).
+await storeC.writeMeta('sess_ddd', { model: 'claude-code/sonnet' });
+assert.equal((await storeC.readMeta('sess_ddd'))?.claudeSessionId, undefined);
+
 console.log('store probe: normalizeCwd + locateSession + listAllSummaries OK');

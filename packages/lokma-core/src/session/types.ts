@@ -34,6 +34,14 @@ export type SessionMeta = {
    * turn; clearing the binding (empty string) returns to plain chat.
    */
   botId?: string;
+  /**
+   * Headless Claude session handle for `claude-code/*` runs (REQ-116
+   * FAZ D-continuity): the engine's own `session_id` from the `result`
+   * event, mirrored here so the next turn resumes it via `--resume`.
+   * Empty clears (fresh engine session next turn); forks never inherit
+   * it (writeMeta only carries it on explicit patch).
+   */
+  claudeSessionId?: string;
 };
 
 export type Session = {

@@ -211,6 +211,11 @@ export class SessionStore {
     // to plain chat), otherwise the previous binding survives the merge.
     const botId = patch.botId !== undefined ? patch.botId : prev?.botId;
     if (typeof botId === 'string' && botId) next.botId = botId;
+    // Claude headless handle (REQ-116 FAZ D-continuity): a patch value wins
+    // (empty string clears back to a fresh engine run), otherwise the
+    // previous handle survives the merge — unrelated patches keep it.
+    const claudeSessionId = patch.claudeSessionId !== undefined ? patch.claudeSessionId : prev?.claudeSessionId;
+    if (typeof claudeSessionId === 'string' && claudeSessionId) next.claudeSessionId = claudeSessionId;
     await writeFile(metaPath(this.cwd, sessionId), JSON.stringify(next, null, 2), 'utf-8');
     return next;
   }

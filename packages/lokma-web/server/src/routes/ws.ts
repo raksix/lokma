@@ -74,6 +74,8 @@ const APPROVAL_TIMEOUT_MS = 10 * 60_000;
  * lands as the assistant row, stop subtypes leave FAZ A markers, and the
  * REAL reported cost hits the usage ledger. The engine already emitted its
  * `cost` frame from the `result` event, so no second cost frame here.
+ * FAZ D-continuity: the next turn resumes the same engine session via the
+ * meta-stored handle (`--resume <id>`).
  */
 async function runClaudeEngineTurn(
   app: FastifyInstance,
@@ -97,6 +99,15 @@ async function runClaudeEngineTurn(
   const claudePerms = resolveClaudePermissions(
     await loadConfig(cwd).then((cfg) => cfg?.permissions).catch(() => null),
   );
+  // REQ-116 FAZ D-continuity: resume the same headless Claude session
+  // across turns (`--resume <id>`). The mapping lives in the session meta
+  // sidecar; a forked session starts without a handle (writeMeta only
+  // carries it on explicit patch), so resume never leaks across forks.
+  // Missing/unreadable meta means a fresh engine run.
+  const resumeSessionId = await store
+    .readMeta(sessionId)
+    .then((meta) => (meta?.claudeSessionId?.trim() ? meta.claudeSessionId : undefined))
+    .catch(() => undefined);
   try {
     const summary = await runClaudePrint({
       prompt,
@@ -109,6 +120,7 @@ async function runClaudeEngineTurn(
       sessionId,
       signal: ctrl.signal,
       send,
+      resumeSessionId,
     });
     if (state.abort === ctrl) state.abort = null;
     if (summary.result.trim()) {
@@ -126,6 +138,18 @@ async function runClaudeEngineTurn(
         content: '[run stopped: max_budget_usd=' + String(CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD) + ']',
         timestamp: new Date().toISOString(),
       });
+    }
+    // REQ-116 FAZ D-continuity: remember a fresh engine handle for the next
+    // turn (compare-then-write avoids churning `updatedAt` when the handle
+    // did not change; an empty handle keeps the previous one — the run
+    // itself still completed and is already in the transcript).
+    if (summary.claudeSessionId.trim() && summary.claudeSessionId !== resumeSessionId) {
+      try {
+        await store.writeMeta(sessionId, { claudeSessionId: summary.claudeSessionId });
+      } catch (e) {
+        // Persistence must never break chat — log and keep streaming.
+        app.log.warn('[ws] claude handle persist failed session=' + sessionId + ': ' + String(e));
+      }
     }
     try {
       await new UsageLedger(cwd).record({

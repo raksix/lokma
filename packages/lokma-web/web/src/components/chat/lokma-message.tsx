@@ -563,6 +563,24 @@ export function ThinkingTrace({ thinking, streaming }: { thinking: string; strea
   );
 }
 
+// ─── Working indicator (REQ-103) ────────────────────────────────────────────
+// Fills the dead gap between send and first output: the run is active but no
+// thinking/tool/stream chunk arrived yet, so the transcript would otherwise
+// look frozen. Vanishes the moment any real content lands; never persists.
+export function WorkingIndicator() {
+  return (
+    <div className="flex items-center gap-2 py-1" role="status" aria-label="Lokma is working">
+      <Loader2 className="h-3.5 w-3.5 animate-spin text-terracotta motion-reduce:animate-none" />
+      <span className="text-[13px] text-zinc-500">Working</span>
+      <span className="flex items-center gap-1" aria-hidden="true">
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-terracotta motion-reduce:animate-none" style={{ animationDelay: '0ms' }} />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-terracotta motion-reduce:animate-none" style={{ animationDelay: '150ms' }} />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-terracotta motion-reduce:animate-none" style={{ animationDelay: '300ms' }} />
+      </span>
+    </div>
+  );
+}
+
 // ─── Permission card (real permission_request frame) ─────────────────────────
 
 export function PermissionCard({

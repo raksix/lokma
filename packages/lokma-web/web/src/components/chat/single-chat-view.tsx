@@ -18,6 +18,7 @@ import {
   ThoughtTrace,
   ToolCallRow,
   transcriptToolEntry,
+  WorkingIndicator,
 } from './lokma-message';
 import type { PermissionRequest, QuestionRequest, ToolCallEntry } from '@/lib/ws';
 import { prefersReducedMotion } from '@/components/shell/use-prefers-reduced-motion';
@@ -254,6 +255,18 @@ export function SingleChatView({
   }, [transcript.length]);
   const window = visibleMessageWindow(transcript.length, shownCount);
 
+  // REQ-103: run is live but nothing arrived yet (no thinking, no tool
+  // calls, no stream text, no cards awaiting input) — show an animated
+  // working indicator instead of a frozen screen. First chunk replaces it.
+  const awaitingFirstOutput =
+    streaming &&
+    !thinking &&
+    !stream &&
+    Object.keys(toolCalls).length === 0 &&
+    permissions.length === 0 &&
+    questions.length === 0 &&
+    !runError;
+
   return (
     <div className="relative flex gap-3">
       <div className="min-w-0 flex-1 space-y-5 pr-2">
@@ -340,6 +353,17 @@ export function SingleChatView({
                     {streaming && <span className="ml-1 inline-block h-4 w-0.5 animate-pulse bg-foreground align-middle" />}
                   </div>
                   )}
+                </div>
+              </div>
+            )}
+            {awaitingFirstOutput && (
+              <div className="flex gap-3">
+                <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full border border-line bg-[#262624] font-serif text-xs text-white">
+                  L
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-semibold">Lokma</div>
+                  <WorkingIndicator />
                 </div>
               </div>
             )}

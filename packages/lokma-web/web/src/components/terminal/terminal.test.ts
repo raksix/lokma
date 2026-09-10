@@ -5,6 +5,7 @@
 import {
   TERMINAL_BUFFER_CAP,
   appendCapped,
+  connectionNotice,
   exitSummary,
   filterLines,
   keyToBytes,
@@ -147,6 +148,17 @@ check(
   'adopted input ignores later server-side drift',
   JSON.stringify(rtc({ knownCwd: '/proj/b', currentCwd: '/proj/a', adopted: true })) ===
     JSON.stringify({ cwd: '/proj/a', adopted: true }),
+);
+
+// connectionNotice (REQ-107: SSH-style socket visibility)
+check('open renders no notice', connectionNotice('open') === null);
+check('idle waits on auto-retry', connectionNotice('idle')?.action === null);
+check('connecting waits on auto-retry', connectionNotice('connecting')?.action === null);
+check('closed offers reconnect', connectionNotice('closed')?.action === 'reconnect');
+check('error offers retry', connectionNotice('error')?.action === 'reconnect');
+check(
+  'notice texts are non-empty',
+  ['idle', 'connecting', 'closed', 'error'].every((s) => (connectionNotice(s as 'idle')?.text ?? '').length > 0),
 );
 
 console.log(`terminal: ${passed} passed, ${failed} failed`);

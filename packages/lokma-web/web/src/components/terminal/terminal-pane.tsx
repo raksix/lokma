@@ -1,10 +1,12 @@
 import * as React from 'react';
+import { LoaderCircle, Unplug } from 'lucide-react';
 import { api, type TerminalInfo } from '@/lib/api';
 import type { UseWs } from '@/hooks/use-ws';
 import { emitToast } from '@/components/shell';
 import { useKnownSession } from '@/stores';
 import {
   appendCapped,
+  connectionNotice,
   exitSummary,
   keyToBytes,
   resolveTerminalCwd,
@@ -227,6 +229,12 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
   );
 
   const exitNote = selected ? exitSummary(selected) : null;
+  // REQ-107: SSH feel — the socket state is a visible scrollback row, not
+  // just an aria-label. While disconnected the fake `$` cursor stays
+  // hidden (it would pretend liveness) and keystrokes keep dropping
+  // silently at sendRaw — same as a dead SSH socket, minus the beep.
+  const connNotice = connectionNotice(ws.status);
+  const wsLive = ws.status === 'open';
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#0F0F11] text-[#EDE9E2]">
@@ -261,12 +269,32 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
               </div>
             ))}
             {exitNote ? <div className="pt-1 text-[11px] text-white/40">— {exitNote}</div> : null}
-            {selectedRunning ? (
+            {connNotice ? (
+              connNotice.action === 'reconnect' ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    ws.reconnect();
+                  }}
+                  className="mt-1 flex items-center gap-1.5 rounded border border-amber-400/20 bg-amber-400/10 px-2 py-1 font-mono text-[11px] text-amber-200/90 hover:bg-amber-400/20"
+                >
+                  <Unplug className="h-3.5 w-3.5" />
+                  {connNotice.text}
+                </button>
+              ) : (
+                <div className="mt-1 flex items-center gap-1.5 py-1 font-mono text-[11px] text-white/40">
+                  <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                  {connNotice.text}
+                </div>
+              )
+            ) : null}
+            {selectedRunning && wsLive ? (
               <div className="flex items-center gap-1 text-white">
                 <span className="text-emerald-400">$</span>
                 <span className="h-4 w-2 animate-pulse bg-white/80" />
               </div>
-            ) : (
+            ) : null}
+            {!selectedRunning ? (
               <button
                 className="mt-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/60 hover:bg-white/10 hover:text-white"
                 onClick={(e) => {
@@ -276,7 +304,7 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
               >
                 Shell ended — click for a fresh one
               </button>
-            )}
+            ) : null}
           </>
         )}
       </div>

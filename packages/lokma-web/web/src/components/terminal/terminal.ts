@@ -1,4 +1,5 @@
 import type { TerminalInfo } from '@/lib/api';
+import type { WsStatus } from '@/lib/ws';
 
 /**
  * Pure TerminalPane helpers — no DOM, no server (unit-tested in
@@ -29,6 +30,31 @@ export function exitSummary(info: TerminalInfo): string | null {
   if (info.status === 'error') return 'Shell failed to start';
   if (info.signal) return `Process ended (${info.signal})`;
   return `Process exited with code ${info.exitCode ?? '?'}`;
+}
+
+/**
+ * REQ-107 — SSH-style connection notice for the scrollback.
+ * The socket is invisible in the pane today: when it drops, typing
+ * silently goes nowhere and the fake `$` cursor keeps pulsing as if
+ * live. This maps every non-open socket state to one inline notice
+ * row (null = connected, render nothing). `action: 'reconnect'`
+ * means the row is a button that calls `ws.reconnect()`; otherwise
+ * the socket is still retrying on its own (auto-backoff in use-ws).
+ */
+export type ConnectionNotice = {
+  text: string;
+  action: 'reconnect' | null;
+};
+
+export function connectionNotice(status: WsStatus): ConnectionNotice | null {
+  if (status === 'open') return null;
+  if (status === 'idle' || status === 'connecting') {
+    return { text: 'Connecting to shell backend…', action: null };
+  }
+  if (status === 'closed') {
+    return { text: 'Disconnected — click to reconnect', action: 'reconnect' };
+  }
+  return { text: 'Connection failed — click to retry', action: 'reconnect' };
 }
 
 /**

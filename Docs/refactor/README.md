@@ -120,3 +120,5 @@
 - [REQ-099](finished/REQ-099-tek-pane-edge-split.md) — Tek pane'de kenara bırakınca split olmuyor — done
 - [REQ-100](finished/REQ-100-cift-edit-ide-editor.md) — HTML çift Edit + IDE highlight'lı editör — done
 - [REQ-101](finished/REQ-101-account-sade-admin-sekme.md) — Account sade + admin'e ayrı sekme — done
+- [REQ-102](REQ-102-aninda-gonderildi.md) — Gönderim anında gönderilmiş görünsün — pending
+- [REQ-103](REQ-103-calisiyor-animasyonu.md) — Agent çalışırken animasyonlu gösterge — pending

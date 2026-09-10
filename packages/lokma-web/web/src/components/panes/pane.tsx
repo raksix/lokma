@@ -726,8 +726,10 @@ export function WorkspacePane({
 
     const move = parseTabMove(e.dataTransfer);
     if (move) {
-      if (move.fromPane === id) return;
       const edge = target ? splitForZone(target) : null;
+      // REQ-099: same-pane drop onto an edge zone splits (single pane
+      // auto-becomes two panes); same-pane center drop stays a no-op.
+      if (move.fromPane === id && !edge) return;
       onMoveTab(move.tab, move.fromPane, id, edge);
       return;
     }

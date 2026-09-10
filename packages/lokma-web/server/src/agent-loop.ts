@@ -107,6 +107,26 @@ export function retryDelayMs(delaysMs: number[], attempt: number): number {
   return delaysMs[Math.min(attempt - 1, delaysMs.length - 1)] ?? 0;
 }
 
+/**
+ * REQ-116 FAZ A: Claude-Code-style stop_reason discipline for the turn end.
+ * The loop's continue/stop verdict is an explicit decision, not an
+ * emergent `followUps.length` check:
+ * - `tool_use` — the turn emitted tool calls, their results feed back in.
+ * - `ask` — the turn asked blocking questions, answers feed back in.
+ * - `empty` — no text, no calls, no questions: an empty turn (REQ-071
+ *   empty-retry owns the first one, the second still means done).
+ * - `end_turn` — answer text with nothing pending: the run is complete.
+ * Pure — probe it directly.
+ */
+export type TurnEndDecision = 'tool_use' | 'ask' | 'empty' | 'end_turn';
+
+export function decideTurnEnd(args: { toolCalls: number; asks: number; cleanText: string }): TurnEndDecision {
+  if (args.toolCalls > 0) return 'tool_use';
+  if (args.asks > 0) return 'ask';
+  if (!args.cleanText.trim()) return 'empty';
+  return 'end_turn';
+}
+
 /** Abort-aware sleep — resolves false when the parent aborts mid-wait. */
 function sleepAbortable(ms: number, signal: AbortSignal): Promise<boolean> {
   return new Promise((resolve) => {
@@ -475,11 +495,20 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
     }
 
     if (followUps.length === 0) {
+      // REQ-116 FAZ A: explicit stop_reason verdict. tool_use/ask turns
+      // always produce followUps above, so reaching here with calls means
+      // an internal wiring break — but the observed invariant holds, and
+      // the decision below documents the intended mapping either way.
+      const decision = decideTurnEnd({
+        toolCalls: runEnd.toolCalls.length,
+        asks: runEnd.asks.length,
+        cleanText: clean,
+      });
       // REQ-071: the model went quiet with nothing done this turn. Once per
       // run, nudge it instead of calling the job complete (tool-then-silence
       // used to abandon real tasks: list_files ran, write_file never came).
       // A second quiet turn still means done — no poke loops.
-      const quietTurn = !clean.trim() && runEnd.toolCalls.length === 0 && runEnd.asks.length === 0;
+      const quietTurn = decision === 'empty';
       if (quietTurn && turns < maxTurns && !nudgedQuiet) {
         nudgedQuiet = true;
         const nudge = '<system>You stopped without responding. Continue the user task now: emit the next <tool> block or write the answer.</system>';
@@ -494,6 +523,14 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
     messages.push({ role: 'user', content: followUp });
   }
 
+  // REQ-116 FAZ A: a maxed-out run leaves a machine-readable stop marker
+  // in the transcript (`[run stopped: max_turns=N]`), not just a live
+  // error frame a refresh can never catch.
+  await opts.store.append(opts.sessionId, {
+    role: 'assistant',
+    content: `[run stopped: max_turns=${maxTurns}]`,
+    timestamp: new Date().toISOString(),
+  });
   opts.send({
     type: 'error',
     message: `Paused after ${maxTurns} tool turns with work still queued — say "continue" and I will pick up where I left off.`,

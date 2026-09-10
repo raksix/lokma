@@ -4,7 +4,7 @@
  * No test framework — plain asserts so the package stays dependency-free.
  * Not imported by server code, so `tsc -p` output ignores it.
  */
-import { buildLoopHistory, retryDelayMs, truncateHistoryText } from './agent-loop';
+import { buildLoopHistory, decideTurnEnd, retryDelayMs, truncateHistoryText } from './agent-loop';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -63,3 +63,14 @@ assert(retryDelayMs([], 1) === 0, 'empty list = no wait');
 assert(retryDelayMs(D, 0) === 0, 'attempt 0 = no wait');
 
 console.log(`agent-loop-retry probe: ${passed} passed`);
+
+/* REQ-116 FAZ A — decideTurnEnd: Claude-Code-style stop_reason discipline. */
+assert(decideTurnEnd({ toolCalls: 2, asks: 0, cleanText: 'working' }) === 'tool_use', 'calls present -> tool_use');
+assert(decideTurnEnd({ toolCalls: 1, asks: 1, cleanText: '' }) === 'tool_use', 'calls beat asks -> tool_use');
+assert(decideTurnEnd({ toolCalls: 0, asks: 2, cleanText: '' }) === 'ask', 'asks without calls -> ask');
+assert(decideTurnEnd({ toolCalls: 0, asks: 0, cleanText: '' }) === 'empty', 'no text/calls/asks -> empty');
+assert(decideTurnEnd({ toolCalls: 0, asks: 0, cleanText: '   \n  ' }) === 'empty', 'whitespace-only -> empty');
+assert(decideTurnEnd({ toolCalls: 0, asks: 0, cleanText: 'done, here it is' }) === 'end_turn', 'answer text -> end_turn');
+assert(decideTurnEnd({ toolCalls: 0, asks: 1, cleanText: 'one question' }) === 'ask', 'text plus asks -> ask');
+
+console.log(`agent-loop-turnend probe: ${passed} passed`);

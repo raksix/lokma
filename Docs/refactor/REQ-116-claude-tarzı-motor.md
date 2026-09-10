@@ -1,6 +1,6 @@
 # REQ-116 — Claude-Code-tarzı motor: native tool_use döngüsü + headless çalıştırma
 
-- **Status:** open (araştırma tamam — 2026-09-10, 3 paralel araştırma kolu)
+- **Status:** in-progress (FAZ A shipped 2026-09-11 — stop_reason discipline + max_turns transcript marker; FAZ B/C/D remaining)
 - **Asked:** "Harness boktan çalışıyor, Claude'un harness'i nasıl çalışıyor incele,
   entegrasyon için req yaz, sonra loopla yap."
 - **Kaynaklar:** `Docs/claude-code-harness-arastirma.md` (263 satır, SDK/CLI/auth/maliyet),

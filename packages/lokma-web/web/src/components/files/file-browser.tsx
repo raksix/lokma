@@ -36,6 +36,7 @@ import {
   joinRel,
   parentDir,
 } from './files';
+import { CodeEditor, CodeView, languageForPath } from '../panes/code-editor';
 
 /**
  * FileBrowser — real workspace explorer ported from the concept shell.
@@ -45,8 +46,8 @@ import {
  * `expectedSha` lost-update guard (409 → conflict UI, never silent
  * overwrite). Dragging a file into the chat (or "Mention") inserts
  * `@path`, which the Composer already sends as `contextPaths` — the
- * server reads the bytes into model context. No Monaco dependency:
- * the editor is a plain textarea (honest scope note, plan §W3-9).
+ * server reads the bytes into model context. Editing uses the shared
+ * IDE-style CodeEditor (REQ-100, REQ-105: highlight + gutter, no Monaco).
  * Terminal/Browser tabs from the concept land in W3-10/W3-12.
  */
 
@@ -549,17 +550,23 @@ export function FileBrowser({ sessionId }: { sessionId: string }) {
                 </div>
               )}
               {editing ? (
-                <textarea
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  spellCheck={false}
-                  rows={12}
-                  className="mt-1.5 w-full resize-y rounded border border-line bg-[#FDFCFB] p-1.5 font-mono text-[11px] leading-relaxed dark:bg-[#161618]"
-                />
+                <div className="mt-1.5 flex h-56 flex-col overflow-hidden rounded border border-line">
+                  <CodeEditor
+                    value={draft}
+                    onChange={setDraft}
+                    language={languageForPath(selected ?? '')}
+                    onSave={() => void saveFile()}
+                    label={'Edit ' + (selected ?? 'file')}
+                  />
+                </div>
+              ) : view.content ? (
+                <div className="mt-1.5 flex h-56 flex-col overflow-hidden rounded border border-line bg-[#FDFCFB] dark:bg-[#161618]">
+                  <CodeView code={view.content} language={languageForPath(selected ?? '')} />
+                </div>
               ) : (
-                <pre className="mt-1.5 max-h-56 overflow-auto rounded bg-[#FDFCFB] p-1.5 font-mono text-[11px] leading-relaxed dark:bg-[#161618]">
-                  {view.content || <span className="text-zinc-400">(empty file)</span>}
-                </pre>
+                <div className="mt-1.5 rounded bg-[#FDFCFB] p-1.5 font-mono text-[11px] text-zinc-400 dark:bg-[#161618]">
+                  (empty file)
+                </div>
               )}
               <div className="mt-1.5 flex gap-1.5">
                 {editing ? (

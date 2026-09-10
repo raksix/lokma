@@ -1,6 +1,6 @@
 # REQ-116 — Claude-Code-tarzı motor: native tool_use döngüsü + headless çalıştırma
 
-- **Status:** in-progress (FAZ A shipped 2026-09-11 — stop_reason discipline + max_turns transcript marker; FAZ B/C/D remaining)
+- **Status:** in-progress (FAZ A shipped 2026-09-11 — stop_reason discipline + max_turns transcript marker; FAZ B-engine shipped 2026-09-11 — `server/src/engines/claude-print.ts` translator + spawn path, 29-assert probe green; FAZ B-wiring + C/D remaining)
 - **Asked:** "Harness boktan çalışıyor, Claude'un harness'i nasıl çalışıyor incele,
   entegrasyon için req yaz, sonra loopla yap."
 - **Kaynaklar:** `Docs/claude-code-harness-arastirma.md` (263 satır, SDK/CLI/auth/maliyet),

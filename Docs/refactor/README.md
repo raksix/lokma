@@ -124,3 +124,4 @@
 - [REQ-103](REQ-103-calisiyor-animasyonu.md) — Agent çalışırken animasyonlu gösterge — pending
 - [REQ-104](REQ-104-default-model-zinciri.md) — Default model seçimi + akıllı zincir — pending
 - [REQ-105](finished/REQ-105-explorer-editor-highlight.md) — Explorer editörde de highlight — done
+- [REQ-106](finished/REQ-106-session-duz-liste.md) — Session'lar kutucuktan çıksın — done

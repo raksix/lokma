@@ -24,10 +24,9 @@ import {
 import { decodeClientMessage, encodeServerMessage } from '@lokma/shared';
 import { LoopAborted, LOOP_DEFAULT_MAX_TURNS, buildLoopHistory, runAgentLoop, type ApprovalDecision } from '../agent-loop.js';
 import {
-  CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS,
-  CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS,
   CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD,
   parseClaudeEngineModel,
+  resolveClaudePermissions,
   runClaudePrint,
 } from '../engines/claude-print.js';
 import {
@@ -92,13 +91,19 @@ async function runClaudeEngineTurn(
   const { sessionId, cwd, store, send, state, model, prompt } = args;
   const ctrl = new AbortController();
   state.abort = ctrl;
+  // REQ-116 FAZ C — permission bridge: the project's `permissions` config
+  // steers the headless allow/deny lists (deny wins, `Bash(rm *)` always
+  // denied). Missing/unreadable config falls back to the engine defaults.
+  const claudePerms = resolveClaudePermissions(
+    await loadConfig(cwd).then((cfg) => cfg?.permissions).catch(() => null),
+  );
   try {
     const summary = await runClaudePrint({
       prompt,
       cwd,
       model: args.claudeModel,
-      allowedTools: [...CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS],
-      disallowedTools: [...CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS],
+      allowedTools: claudePerms.allowedTools,
+      disallowedTools: claudePerms.disallowedTools,
       maxTurns: LOOP_DEFAULT_MAX_TURNS,
       maxBudgetUsd: CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD,
       sessionId,

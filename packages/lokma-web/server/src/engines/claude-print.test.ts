@@ -5,7 +5,7 @@
  * Not imported by server code, so `tsc -p` output ignores it.
  */
 import { spawn } from 'node:child_process';
-import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, parseClaudeEngineModel, runClaudePrint, translateClaudeLine } from './claude-print';
+import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, translateClaudeLine } from './claude-print';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -135,5 +135,27 @@ assert(CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD === 2, 'default budget matches REQ-1
 const full = buildClaudeArgs({ prompt: 'hi', allowedTools: ['Read'], disallowedTools: ['Bash(rm *)'], maxBudgetUsd: 2, resumeSessionId: 's-9' });
 assert(full.includes('--disallowedTools') && full.includes('Bash(rm *)'), 'disallowlist flag carried');
 assert(full.includes('--resume') && full.includes('s-9'), 'resume handle carried');
+
+// 12. FAZ C: permission bridge — Lokma config allow/deny becomes Claude argv.
+const defPerms = resolveClaudePermissions(null);
+assert(JSON.stringify(defPerms.allowedTools) === JSON.stringify([...CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS]), 'null perms keep default allowlist');
+assert(defPerms.disallowedTools.includes('Bash(rm *)'), 'inviolable deny survives null perms');
+const emptyPerms = resolveClaudePermissions({ allow: [], deny: [] });
+assert(JSON.stringify(emptyPerms.allowedTools) === JSON.stringify([...CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS]), 'empty perms keep default allowlist');
+const wAllow = resolveClaudePermissions({ allow: ['write_file'], deny: [] });
+assert(wAllow.allowedTools.includes('Edit') && wAllow.allowedTools.includes('Write'), 'write_file expands to Edit+Write');
+const rAllow = resolveClaudePermissions({ allow: ['run_command'], deny: [] });
+assert(rAllow.allowedTools.includes('Bash'), 'run_command expands to Bash');
+const wDeny = resolveClaudePermissions({ allow: [], deny: ['write_file'] });
+assert(wDeny.disallowedTools.includes('Edit') && wDeny.disallowedTools.includes('Write'), 'deny write_file denies Edit+Write');
+assert(!wDeny.allowedTools.includes('Edit') && !wDeny.allowedTools.includes('Write'), 'deny wins over default allow');
+const both = resolveClaudePermissions({ allow: ['run_command'], deny: ['run_command'] });
+assert(both.disallowedTools.includes('Bash') && !both.allowedTools.includes('Bash'), 'deny beats allow on the same tool');
+const native = resolveClaudePermissions({ allow: ['Bash(git:*)'], deny: [] });
+assert(native.allowedTools.includes('Bash(git:*)'), 'Claude-native matcher passes through');
+const prefix = resolveClaudePermissions({ allow: ['write'], deny: [] });
+assert(prefix.allowedTools.includes('Edit') && prefix.allowedTools.includes('Write'), 'prefix allow mirrors gate prefix matching');
+const dupe = resolveClaudePermissions({ allow: ['read_file', 'Read', 'read_file', '  '], deny: [] });
+assert(dupe.allowedTools.filter((t) => t === 'Read').length === 1, 'allowlist deduped, blanks dropped');
 
 console.log('\nclaude-print probe: ' + passed + ' passed');

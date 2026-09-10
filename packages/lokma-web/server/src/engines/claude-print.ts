@@ -89,6 +89,102 @@ export const CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS = ['Bash(rm *)'];
 export const CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD = 2;
 
 /**
+ * REQ-116 FAZ C — permission bridge (config-driven allow/deny).
+ *
+ * Lokma's gate (`lokma-core` gate.ts) speaks Lokma tool ids
+ * (`read_file`, `write_file`, `run_command`, ...) with deny > allow >
+ * defaultMode precedence. Claude's CLI speaks Claude tool names (`Read`,
+ * `Edit`, `Bash`, ...) via `--allowedTools` / `--disallowedTools` (deny
+ * wins there too). This translator maps one vocabulary onto the other so
+ * a project's `permissions` config steers headless runs instead of the
+ * hardcoded FAZ B defaults.
+ *
+ * Headless honesty notes (why this is only a partial FAZ C):
+ * - `--permission-mode dontAsk` (kept per the REQ-116 plan) auto-approves
+ *   everything NOT disallowed — so only the disallow list enforces. The
+ *   allow list is carried for intent plus future mode changes.
+ * - `ask`-fated tools (mutations under `auto`/`manual`) CANNOT open a live
+ *   Lokma permission card from inside the subprocess: by the time the
+ *   harness sees `tool_start`, the tool already ran. Live ask-bridging
+ *   needs hook-callback infrastructure (PreToolUse round-trip into the
+ *   harness), recorded as FAZ C-remaining — never faked here.
+ * - `defaultMode: bypass` deliberately does NOT map to
+ *   `--dangerously-skip-permissions` (out of scope per REQ-116 section 5);
+ *   the inviolable `Bash(rm *)` deny holds in every mode.
+ * - Denials surface honestly: Claude reports the refusal and the
+ *   translator below maps the `user[tool_result]` (`is_error`) block into
+ *   a `tool_result` frame — visible in chat, never silent.
+ */
+
+/** Lokma tool id (plus gate-style prefixes) to Claude tool names. */
+const LOKMA_TO_CLAUDE_TOOLS: Record<string, readonly string[]> = {
+  'read_file': ['Read'],
+  'list_files': ['Glob'],
+  'search_files': ['Grep'],
+  'write_file': ['Edit', 'Write'],
+  'run_command': ['Bash'],
+};
+
+export type LokmaPermissionInput = {
+  allow?: readonly string[] | null;
+  deny?: readonly string[] | null;
+};
+
+export type ClaudePermissionLists = {
+  allowedTools: string[];
+  disallowedTools: string[];
+};
+
+function expandLokmaEntries(entries: readonly string[] | null | undefined): string[] {
+  const out: string[] = [];
+  for (const raw of entries ?? []) {
+    if (typeof raw !== 'string') continue;
+    const entry = raw.trim();
+    if (!entry) continue;
+    const direct = LOKMA_TO_CLAUDE_TOOLS[entry];
+    if (direct) {
+      out.push(...direct);
+      continue;
+    }
+    // Gate-style prefix: `write` covers `write_file` (gate.ts `listed`).
+    const prefixed = Object.keys(LOKMA_TO_CLAUDE_TOOLS).filter((id) => id.startsWith(entry));
+    if (prefixed.length > 0) {
+      for (const id of prefixed) out.push(...(LOKMA_TO_CLAUDE_TOOLS[id] ?? []));
+      continue;
+    }
+    // Claude-native matcher (`Bash(git:*)`, `Edit`) passes through verbatim.
+    out.push(entry);
+  }
+  return out;
+}
+
+function dedupeNames(names: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of names) {
+    const name = raw.trim();
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    out.push(name);
+  }
+  return out;
+}
+
+/**
+ * Translate a Lokma `permissions` object into Claude argv lists. Pure —
+ * probe it. Deny wins over allow (mirrors gate.ts); the inviolable
+ * default deny (`Bash(rm *)`) is always present.
+ */
+export function resolveClaudePermissions(perms?: LokmaPermissionInput | null): ClaudePermissionLists {
+  const allowed = dedupeNames([...CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, ...expandLokmaEntries(perms?.allow)]);
+  const disallowed = new Set(dedupeNames([...CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, ...expandLokmaEntries(perms?.deny)]));
+  return {
+    allowedTools: allowed.filter((name) => !disallowed.has(name)),
+    disallowedTools: [...disallowed],
+  };
+}
+
+/**
  * Build the exact argv for the child. Pure — probe it (no invented flags:
  * every flag below exists in `claude --help` v2.1.x).
  */

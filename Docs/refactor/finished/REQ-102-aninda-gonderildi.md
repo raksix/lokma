@@ -1,6 +1,6 @@
 # REQ-102 — Gönderim anında gönderilmiş görünsün, sending takılmasın
 
-- **Status:** done (canlıda — 2026-09-10, commit 3154eff)
+- **Status:** done (canlıda — 2026-09-10, commit 8cb6b2c)
 - **Asked:** 2026-09-10 — "direkt mesaj atınca sending... kalmasın, direkt gönderilmiş/işleniyor gibi olsun zaten."
 - **Teşhis (koddan):** `single-chat-view.tsx:303-315` — gönderilen mesaj optimistic `pending` satırında "You · sending…" + kesik-çizgili balonla bekler; REQ-038 sessiz ölümü bitirdi ama yavaş upstream'de satır uzun süre "sending…"de kalır. İstek: satır anında normal gönderilmiş gibi görünsün (kesik çizgi/sending yok) ve akış REQ-103'teki çalışma göstergesine bağlansın; gerçek hata yine inline error card'a düşer (toast'a değil).
 - **Touched:** `packages/lokma-web/web/src/components/chat/single-chat-view.tsx` (pending optimistic row only).

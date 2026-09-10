@@ -139,11 +139,10 @@ function SessionRow({
         setMenuAt({ x: e.clientX, y: e.clientY });
         setMenuOpen(true);
       }}
+      // REQ-106 — plain rows, no boxes: hover tint + active tint only.
       className={cn(
-        'group relative rounded-md border bg-white dark:bg-[#1E1E21] transition cursor-grab active:cursor-grabbing',
-        active
-          ? 'border-terracotta/50 shadow-sm'
-          : 'border-line hover:border-terracotta/30 hover:shadow-sm',
+        'group relative rounded-sm transition cursor-grab active:cursor-grabbing',
+        active ? 'bg-terracotta/10' : 'hover:bg-muted',
       )}
     >
       {/* REQ-051 — compact single-line row: tighter padding, the title
@@ -575,7 +574,7 @@ function ProjectGroup({
           <Plus className="w-3 h-3" />
         </Button>
       </div>
-      <div className="space-y-1">
+      <div className="divide-y divide-line/50">
         {visible.map((s) => (
           <SessionRow
             key={s.id}
@@ -920,7 +919,7 @@ export function SessionsSidebar({
                 {items.length}
               </span>
             </div>
-            <div className="space-y-1">
+            <div className="divide-y divide-line/50">
               {items.slice(0, showAll ? items.length : RENDER_CAP).map((s) => (
                 <SessionRow
                   key={s.id}

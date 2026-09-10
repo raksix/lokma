@@ -1,4 +1,5 @@
-export { AuthPane } from './auth-pane';
+export { AccountPane } from './account-pane';
+export { AdminPane } from './admin-pane';
 export { LoginGate } from './login-gate';
 export { OnboardingWizard } from './onboarding-wizard';
 export { defaultAuthChoice, nextStep, prevStep, stepIndex, type AuthChoice, type OnboardingStep } from './onboarding';

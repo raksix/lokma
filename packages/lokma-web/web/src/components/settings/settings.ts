@@ -452,6 +452,7 @@ export function buildSessionsPatch(defaultCwd: string): Record<string, unknown> 
 export const SETTINGS_SECTIONS = [
   { id: 'general', label: 'General' },
   { id: 'account', label: 'Account' },
+  { id: 'admin', label: 'Admin' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'providers', label: 'Providers' },
   { id: 'models', label: 'Models' },

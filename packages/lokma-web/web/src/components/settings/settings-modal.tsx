@@ -12,10 +12,12 @@ import {
   Plug2,
   Settings,
   Shield,
+  ShieldCheck,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { api } from '@/lib/api';
+import { api, type AuthUser } from '@/lib/api';
+import { canDo } from '@/components/auth/auth';
 import { cn } from '@/lib/utils';
 import {
   emitToast,
@@ -24,7 +26,8 @@ import {
   type ExplorerSide,
 } from '@/components/shell';
 import {
-  LazyAuthPane,
+  LazyAccountPane,
+  LazyAdminPane,
   LazyCronApprovalsPane,
   LazyMemoryPane,
   LazyModelsPane,
@@ -60,6 +63,7 @@ import { McpPane } from './mcp-pane';
 const SECTION_ICONS: Record<SettingsSectionId, typeof Settings> = {
   'general': Settings,
   'account': CircleUserRound,
+  'admin': ShieldCheck,
   'appearance': Palette,
   'providers': Plug2,
   'models': Layers,
@@ -88,6 +92,10 @@ export function SettingsModal({
   const [config, setConfig] = React.useState<NormalizedConfig | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [reloadToken, setReloadToken] = React.useState(0);
+  // REQ-101 — Admin tab visibility + content guard (quiet 401 → no tab).
+  const [me, setMe] = React.useState<AuthUser | null>(null);
+  const [meLoaded, setMeLoaded] = React.useState(false);
+  const canSeeAdmin = canDo(me, 'manageUsers');
   const panelRef = React.useRef<HTMLDivElement>(null);
   useFocusTrap(open, panelRef, { onEscape: onClose });
 
@@ -108,8 +116,23 @@ export function SettingsModal({
   React.useEffect(() => {
     if (!open) return;
     setSection(isSettingsSection(initialSection) ? initialSection : DEFAULT_SETTINGS_SECTION);
+    setMe(null);
+    setMeLoaded(false);
     void load();
+    api
+      .authMeQuiet()
+      .then((res) => setMe(res.user))
+      .catch(() => setMe(null))
+      .finally(() => setMeLoaded(true));
   }, [open, load, initialSection]);
+
+  // REQ-101 route guard — a deep-linked/remembered admin section bounces
+  // to Account once identity resolves without admin rights.
+  React.useEffect(() => {
+    if (open && meLoaded && section === 'admin' && !canSeeAdmin) {
+      setSection('account');
+    }
+  }, [open, meLoaded, section, canSeeAdmin]);
 
   // Body scroll lock while the large modal is up (same as MobileDrawer).
   React.useEffect(() => {
@@ -158,7 +181,7 @@ export function SettingsModal({
             aria-label="Settings sections"
             className="flex shrink-0 flex-row gap-1 overflow-x-auto border-b border-line p-2 sm:w-52 sm:flex-col sm:overflow-x-hidden sm:overflow-y-auto sm:border-r sm:border-b-0"
           >
-            {SETTINGS_SECTIONS.map((s) => {
+            {SETTINGS_SECTIONS.filter((s) => s.id !== 'admin' || canSeeAdmin).map((s) => {
               const Icon = SECTION_ICONS[s.id];
               const active = section === s.id;
               return (
@@ -191,7 +214,15 @@ export function SettingsModal({
               ) : section === 'about' ? (
                 <AboutSection />
               ) : section === 'account' ? (
-                <LazyAuthPane />
+                <LazyAccountPane />
+              ) : section === 'admin' ? (
+                canSeeAdmin ? (
+                  <LazyAdminPane />
+                ) : (
+                  <div className="p-4 text-center text-xs text-zinc-400">
+                    Admin access required — your own profile lives in Account.
+                  </div>
+                )
               ) : section === 'providers' ? (
                 <LazyProvidersPane />
               ) : section === 'models' ? (

@@ -6,8 +6,6 @@ import {
   Crown,
   Eye,
   KeyRound,
-  Lock,
-  LogOut,
   Plus,
   RefreshCw,
   Search,
@@ -22,11 +20,8 @@ import { ApiError, api, type AuthProject, type AuthRole, type AuthSettings, type
 import {
   canDo,
   canEditProject,
-  clearToken,
   emptyInviteForm,
-  emptyLoginForm,
   emptyProjectForm,
-  emptyRegisterForm,
   filterProjects,
   filterUsers,
   formatLastActive,
@@ -35,11 +30,8 @@ import {
   memberCountLabel,
   roleTone,
   statusTone,
-  storeToken,
   validateInviteForm,
-  validateLoginForm,
   validateProjectForm,
-  validateRegisterForm,
 } from './auth';
 
 function toast(message: string): void {
@@ -50,9 +42,18 @@ function errMessage(e: unknown): string {
   return e instanceof ApiError ? e.message : e instanceof Error ? e.message : 'Request failed';
 }
 
-const labelClass = 'mb-1 block text-[11px] font-medium text-zinc-500';
-const inputClass =
-  'h-7 rounded-md border border-line bg-white px-2 text-xs focus:outline-none dark:bg-[#1E1E21]';
+/** REQ-101 — locked note for signed-out / non-admin viewers (never the tables). */
+function AdminLockedNote({ reason }: { reason: string }) {
+  return (
+    <div className="h-full grid place-items-center p-6 text-center">
+      <div className="space-y-1">
+        <Shield className="mx-auto h-5 w-5 text-zinc-400" />
+        <p className="text-xs font-medium">Admin access required</p>
+        <p className="text-[11px] text-zinc-500">{reason}</p>
+      </div>
+    </div>
+  );
+}
 
 const ROLES: { id: AuthRole; label: string; desc: string; can: string }[] = [
   { id: 'superadmin', label: 'Superadmin', desc: 'Instance owner — users, roles, auth policy, all projects', can: "can('*') → true" },
@@ -62,37 +63,22 @@ const ROLES: { id: AuthRole; label: string; desc: string; can: string }[] = [
 ];
 
 /**
- * AuthPane — login + RBAC matrix + projects + members (W6-21, Docs/36).
- * Concept layout 1:1 (role cards, projects with visibility badges,
- * members with invite row, flow footer), but every pixel is live:
- * `POST /api/auth/login|register|accept-invite` (httpOnly cookie +
- * Bearer token stored for the CLI path), `GET /api/auth/me` (quiet
- * 401 probe — no login bounce), `GET/PATCH /api/auth/settings`
- * (admin write, viewer 403), `GET /api/users` + invite/edit/disable/
- * delete/reset (admin only), `GET/POST /api/projects` + visibility
- * toggle + member add/remove (`project:edit`).
- * NOT ported: the concept's mock PROJECTS/MEMBERS rows, pravatar
- * avatars (initial squares from real names instead), and the
- * toast-only can()/Invite/Manage buttons (every button hits an
- * endpoint now). The concept's `lk_...` token box became the real
- * email+password login per Docs/36 §6.2 (local auth).
+ * AdminPane — REQ-101. Instance administration only (Settings → Admin):
+ * role reference cards, superadmin instance policy, projects with
+ * visibility & members, the admin-only user table (search, role/status,
+ * password reset, delete, invites with project assignment — REQ-092/093).
+ *
+ * Own profile + sign-in/out live in `AccountPane` (Settings → Account).
+ * This pane renders for admin/superadmin only — everyone else (and
+ * signed-out viewers) gets a short locked note, never the tables.
+ * Every button hits a live endpoint; the server re-checks permissions
+ * (`requireAdmin`), so a stale client gate can hide UI, never grant it.
  */
-export function AuthPane() {
+export function AdminPane() {
   const [me, setMe] = React.useState<AuthUser | null>(null);
   const [settings, setSettings] = React.useState<AuthSettings | null>(null);
   const [bootstrapped, setBootstrapped] = React.useState(true);
   const [loading, setLoading] = React.useState(true);
-  const [mode, setMode] = React.useState<'login' | 'register' | 'invite'>('login');
-
-  // Auth forms
-  const [loginForm, setLoginForm] = React.useState({ ...emptyLoginForm });
-  const [registerForm, setRegisterForm] = React.useState({ ...emptyRegisterForm });
-  const [inviteToken, setInviteToken] = React.useState('');
-  const [inviteName, setInviteName] = React.useState('');
-  const [invitePassword, setInvitePassword] = React.useState('');
-  const [showPassword, setShowPassword] = React.useState(false);
-  const [authError, setAuthError] = React.useState<string | null>(null);
-  const [authBusy, setAuthBusy] = React.useState(false);
 
   // Data
   const [users, setUsers] = React.useState<AuthUser[]>([]);
@@ -128,7 +114,6 @@ export function AuthPane() {
       setSettings(settingsRes.settings);
       setBootstrapped(settingsRes.bootstrapped);
       if (!settingsRes.bootstrapped) {
-        setMode('register');
         setMe(null);
         setUsers([]);
         setProjects([]);
@@ -173,101 +158,10 @@ export function AuthPane() {
   }, []);
 
   React.useEffect(() => {
-    if (me) void loadTables(me);
+    // REQ-101 — tables load for admin/superadmin only; everyone else sees
+    // the locked note below (and the server 401/403s direct API calls).
+    if (me && (me.role === 'admin' || me.role === 'superadmin')) void loadTables(me);
   }, [me, loadTables]);
-
-  const afterSession = (user: AuthUser, token: string) => {
-    storeToken(token);
-    setMe(user);
-    setAuthError(null);
-  };
-
-  const doLogin = async () => {
-    const problem = validateLoginForm(loginForm);
-    if (problem) {
-      setAuthError(problem);
-      return;
-    }
-    setAuthBusy(true);
-    setAuthError(null);
-    try {
-      const res = await api.login({ email: loginForm.email.trim(), password: loginForm.password });
-      afterSession(res.user, res.token);
-      setLoginForm({ ...emptyLoginForm });
-      toast(`Signed in as ${res.user.name}`);
-    } catch (e) {
-      setAuthError(errMessage(e));
-    } finally {
-      setAuthBusy(false);
-    }
-  };
-
-  const doRegister = async () => {
-    const problem = validateRegisterForm(registerForm);
-    if (problem) {
-      setAuthError(problem);
-      return;
-    }
-    setAuthBusy(true);
-    setAuthError(null);
-    try {
-      const res = await api.registerFirstAdmin({
-        email: registerForm.email.trim(),
-        name: registerForm.name.trim(),
-        password: registerForm.password,
-      });
-      afterSession(res.user, res.token);
-      setRegisterForm({ ...emptyRegisterForm });
-      toast(`Instance seeded — ${res.user.name} is admin`);
-    } catch (e) {
-      setAuthError(errMessage(e));
-    } finally {
-      setAuthBusy(false);
-    }
-  };
-
-  const doAcceptInvite = async () => {
-    if (!inviteToken.trim()) {
-      setAuthError('Paste the invite token from your invite link');
-      return;
-    }
-    if (!inviteName.trim() || inviteName.trim().length > 40) {
-      setAuthError('Name must be 1-40 chars');
-      return;
-    }
-    if (invitePassword.length < 8 || invitePassword.length > 200) {
-      setAuthError('Password must be 8-200 chars');
-      return;
-    }
-    setAuthBusy(true);
-    setAuthError(null);
-    try {
-      const res = await api.acceptInvite({ token: inviteToken.trim(), name: inviteName.trim(), password: invitePassword });
-      afterSession(res.user, res.token);
-      setInviteToken('');
-      setInviteName('');
-      setInvitePassword('');
-      toast(`Welcome, ${res.user.name}`);
-    } catch (e) {
-      setAuthError(errMessage(e));
-    } finally {
-      setAuthBusy(false);
-    }
-  };
-
-  const doLogout = async () => {
-    try {
-      await api.logout();
-    } catch {
-      // Cookie may already be gone — local state still resets.
-    }
-    clearToken();
-    setMe(null);
-    setUsers([]);
-    setProjects([]);
-    setSelectedId(null);
-    setMode('login');
-  };
 
   const doInvite = async () => {
     const problem = validateInviteForm(inviteForm);
@@ -512,199 +406,16 @@ export function AuthPane() {
     );
   }
 
-  // ─── Logged out ──────────────────────────────────────────────────────
+  // ─── Locked — sign-in lives in Settings \u2192 Account (REQ-101) ───
   if (!me) {
     return (
-      <div className="h-full flex flex-col bg-white dark:bg-[#161618] rounded-lg overflow-hidden border border-line">
-        <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0">
-          <Lock className="w-3 h-3 text-zinc-500" />
-          <span className="text-xs font-semibold">Auth</span>
-          <span className="text-[11px] text-zinc-400">RBAC · scrypt · can()</span>
-        </div>
-        <div className="flex-1 grid place-items-center p-6 bg-[#FAF9F5]/50 dark:bg-[#0F0F11]/50 overflow-auto">
-          {/* REQ-053 — login card spans the full Inspector page width (no max-width cap). */}
-          <div className="w-full min-w-0 rounded-xl bg-white dark:bg-[#1E1E21] border border-line p-5 shadow-sm">
-            <div className="w-8 h-8 rounded-lg bg-[#262624] text-white grid place-items-center text-xs font-bold mx-auto font-serif">
-              L
-            </div>
-            <h3 className="text-center text-sm font-semibold mt-2 font-serif">
-              {!bootstrapped ? 'Seed the first admin' : mode === 'invite' ? 'Accept your invite' : 'Sign in to Lokma'}
-            </h3>
-            <p className="text-center text-xs text-zinc-500 mt-1">
-              {!bootstrapped
-                ? 'No users yet — this account becomes the instance admin'
-                : 'email + password → httpOnly cookie + Bearer token'}
-            </p>
-            {bootstrapped && (
-              <div className="mt-3 grid grid-cols-2 gap-1 rounded-md bg-muted/40 border border-line p-1">
-                <Button
-                  variant={mode === 'login' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-6 text-[11px]"
-                  onClick={() => {
-                    setMode('login');
-                    setAuthError(null);
-                  }}
-                >
-                  Sign in
-                </Button>
-                <Button
-                  variant={mode === 'invite' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-6 text-[11px]"
-                  onClick={() => {
-                    setMode('invite');
-                    setAuthError(null);
-                  }}
-                >
-                  I have an invite
-                </Button>
-              </div>
-            )}
-            <div className="mt-4 space-y-2">
-              {mode === 'invite' ? (
-                <>
-                  <div>
-                    <label className={labelClass} htmlFor="auth-invite-token">Invite token</label>
-                    <Input
-                      id="auth-invite-token"
-                      placeholder="paste the token from your invite link"
-                      value={inviteToken}
-                      onChange={(e) => setInviteToken(e.target.value)}
-                      className="h-8 text-xs font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass} htmlFor="auth-invite-name">Display name</label>
-                    <Input
-                      id="auth-invite-name"
-                      placeholder="e.g. Aylin"
-                      value={inviteName}
-                      onChange={(e) => setInviteName(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass} htmlFor="auth-invite-password">Password (8+ chars)</label>
-                    <div className="relative">
-                      <KeyRound className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
-                      <Input
-                        id="auth-invite-password"
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="Choose a password"
-                        value={invitePassword}
-                        onChange={(e) => setInvitePassword(e.target.value)}
-                        className="pl-8 pr-8 h-8 text-xs"
-                      />
-                      <button
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 grid place-items-center rounded hover:bg-muted"
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      >
-                        <Eye className="w-3 h-3 text-zinc-400" />
-                      </button>
-                    </div>
-                  </div>
-                  <Button className="w-full h-7 text-xs" disabled={authBusy} onClick={doAcceptInvite}>
-                    {authBusy ? 'Accepting…' : 'Accept invite — activate account'}
-                  </Button>
-                </>
-              ) : mode === 'register' ? (
-                <>
-                  <div>
-                    <label className={labelClass} htmlFor="auth-reg-email">Email</label>
-                    <Input
-                      id="auth-reg-email"
-                      placeholder="admin@example.com"
-                      value={registerForm.email}
-                      onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass} htmlFor="auth-reg-name">Display name</label>
-                    <Input
-                      id="auth-reg-name"
-                      placeholder="e.g. Furkan"
-                      value={registerForm.name}
-                      onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass} htmlFor="auth-reg-password">Password (8+ chars)</label>
-                    <div className="relative">
-                      <KeyRound className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
-                      <Input
-                        id="auth-reg-password"
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="Choose an admin password"
-                        value={registerForm.password}
-                        onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                        className="pl-8 pr-8 h-8 text-xs"
-                      />
-                      <button
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 grid place-items-center rounded hover:bg-muted"
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      >
-                        <Eye className="w-3 h-3 text-zinc-400" />
-                      </button>
-                    </div>
-                  </div>
-                  <Button className="w-full h-7 text-xs" disabled={authBusy} onClick={doRegister}>
-                    {authBusy ? 'Seeding…' : 'Create instance admin'}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <label className={labelClass} htmlFor="auth-login-email">Email</label>
-                    <Input
-                      id="auth-login-email"
-                      placeholder="you@example.com"
-                      value={loginForm.email}
-                      onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass} htmlFor="auth-login-password">Password</label>
-                    <div className="relative">
-                      <KeyRound className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
-                      <Input
-                        id="auth-login-password"
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="Your password"
-                        value={loginForm.password}
-                        onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') void doLogin();
-                        }}
-                        className="pl-8 pr-8 h-8 text-xs"
-                      />
-                      <button
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 grid place-items-center rounded hover:bg-muted"
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      >
-                        <Eye className="w-3 h-3 text-zinc-400" />
-                      </button>
-                    </div>
-                  </div>
-                  <Button className="w-full h-7 text-xs" disabled={authBusy} onClick={doLogin}>
-                    {authBusy ? 'Signing in…' : 'Sign in — verify credentials'}
-                  </Button>
-                </>
-              )}
-              {authError && <p className="text-[11px] text-red-600 dark:text-red-400">{authError}</p>}
-            </div>
-            <div className="mt-3 text-[11px] text-zinc-400 text-center">
-              Protected routes answer 401/403 with a code — never a stack
-            </div>
-          </div>
-        </div>
-      </div>
+      <AdminLockedNote
+        reason={
+          !bootstrapped
+            ? 'No users yet \u2014 seed the first admin from Settings \u2192 Account.'
+            : 'Sign in from Settings \u2192 Account, then reopen this tab.'
+        }
+      />
     );
   }
 
@@ -714,18 +425,23 @@ export function AuthPane() {
   const shownUsers = filterUsers(users, userQuery);
   const shownProjects = filterProjects(projects, projectQuery);
 
+  // REQ-101 — non-admin members never see the tables (own profile lives
+  // in Settings → Account). Server endpoints 401/403 independently.
+  if (!isAdmin) {
+    return (
+      <AdminLockedNote reason="Requires an admin or superadmin account — your own profile lives in Settings → Account." />
+    );
+  }
+
   return (
     <div className="h-full flex flex-col bg-white dark:bg-[#161618] rounded-lg overflow-hidden border border-line">
       <div className="h-7 flex items-center gap-1.5 px-3 border-b border-line bg-[#FDFCFB] dark:bg-[#1E1E21] shrink-0">
         <Shield className="w-3 h-3 text-emerald-600" />
-        <span className="text-xs font-semibold">Auth</span>
+        <span className="text-xs font-semibold">Admin</span>
         <span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] flex items-center gap-1">
           <Check className="w-3 h-3" /> {me.name} · {me.role}
         </span>
-        <span className="hidden @min-[320px]:inline ml-1 text-[11px] text-zinc-400">superadmin/admin/calisan/viewer · project-scoped</span>
-        <Button variant="ghost" size="sm" className="ml-auto h-5 text-[11px] gap-1" onClick={doLogout}>
-          <LogOut className="w-3 h-3" /> Sign out
-        </Button>
+        <span className="hidden @min-[320px]:inline ml-1 text-[11px] text-zinc-400">users · roles · projects · policy</span>
       </div>
 
       <div className="flex-1 overflow-auto p-2 space-y-2">

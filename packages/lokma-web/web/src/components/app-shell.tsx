@@ -146,7 +146,8 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         return;
       }
       if (key === 'account') {
-        // REQ-072: profile/admin/users/projects live in Settings → Account.
+        // REQ-072 + REQ-101: own profile lives in Settings → Account;
+        // users/roles/projects/policy live in Settings → Admin.
         setSettingsSection('account');
         setSettingsOpen(true);
         return;

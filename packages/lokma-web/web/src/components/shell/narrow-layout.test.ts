@@ -43,7 +43,7 @@ const SRC = join(HERE, '..', '..');
 // file suffix + class-snippet pairs reviewed to fit narrow viewports.
 const ALLOW_FIXED_GRIDS: Array<{ file: string; snippet: string; reason: string }> = [
   {
-    file: `auth${sep}auth-pane.tsx`,
+    file: `auth${sep}account-pane.tsx`,
     snippet: 'grid grid-cols-2 gap-1 rounded-md bg-muted/40',
     reason: 'login/invite toggle: two tiny buttons inside a max-w-[360px] card',
   },

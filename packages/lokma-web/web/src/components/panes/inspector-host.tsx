@@ -9,7 +9,7 @@ import type { ExtrasTabId } from '@/components/extras/extras';
 import {
   LazyAgentsPane,
   LazyArchifyPane,
-  LazyAuthPane,
+  LazyAdminPane,
   LazyBotsPane,
   LazyBrowserPane,
   LazyCronApprovalsPane,
@@ -93,7 +93,7 @@ function LazyTab({
   if (tab === 'design') return <LazyDesignPane />;
   if (tab === 'testing') return <LazyTestingPane />;
   if (tab === 'bots') return <LazyBotsPane onOpenSession={onOpenSession} />;
-  if (tab === 'auth') return <LazyAuthPane />;
+  if (tab === 'auth') return <LazyAdminPane />;
   if (tab === 'setup') return <LazySetupPane />;
   if (tab === 'plugins') return <LazyPluginsPane />;
   if (tab === 'observability') return <LazyObservabilityPane />;

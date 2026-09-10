@@ -93,7 +93,7 @@ async function toApiError(res: Response, redirect = true): Promise<ApiError> {
 /**
  * Core request helper — GET/POST/PATCH/DELETE with auth + 401 handling.
  * Throws ApiError on any non-2xx response. Pass `{ redirect401: false }`
- * for expected-401 probes (e.g. the AuthPane logged-out check) so the
+ * for expected-401 probes (e.g. the AccountPane logged-out check) so the
  * global login bounce does not fire.
  */
 export async function request<T>(

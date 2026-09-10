@@ -56,8 +56,11 @@ export const LazyTestingPane = React.lazy(() =>
 export const LazyBotsPane = React.lazy(() =>
   import('@/components/bots/bots-pane').then((m) => ({ default: m.BotsPane })),
 );
-export const LazyAuthPane = React.lazy(() =>
-  import('@/components/auth/auth-pane').then((m) => ({ default: m.AuthPane })),
+export const LazyAccountPane = React.lazy(() =>
+  import('@/components/auth/account-pane').then((m) => ({ default: m.AccountPane })),
+);
+export const LazyAdminPane = React.lazy(() =>
+  import('@/components/auth/admin-pane').then((m) => ({ default: m.AdminPane })),
 );
 export const LazySetupPane = React.lazy(() =>
   import('@/components/setup/setup-pane').then((m) => ({ default: m.SetupPane })),

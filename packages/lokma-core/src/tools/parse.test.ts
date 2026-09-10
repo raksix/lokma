@@ -169,4 +169,28 @@ function assert(cond: boolean, label: string): void {
   assert(calls.length === 1 && calls[0]?.input === undefined, 'unsalvageable tool_result body still malformed');
 }
 
+// ─── REQ-115b: <tool_call> shape + fake-result stripping (roleplay guard) ───
+{
+  const calls = parseToolBlocks('<tool_call>\n{"name": "read_file", "arguments": {"path": "a.ts"}}\n</tool_call>');
+  assert(calls.length === 1, 'tool_call shape parsed');
+  assert(calls[0]?.tool === 'read_file', 'tool_call name kept');
+  assert((calls[0]?.input as { path: string }).path === 'a.ts', 'tool_call arguments kept');
+}
+{
+  const f = createBlockFilter();
+  const shown = f.push('Hi <tool_call>{"name": "list_files", "args": {"path": "."}}</tool_call> mid ');
+  const end = f.finish();
+  assert(end.toolCalls.length === 1 && end.toolCalls[0]?.tool === 'list_files', 'tool_call parsed incrementally');
+  assert(shown.includes('Hi') && shown.includes('mid'), 'text around tool_call streams');
+  assert(!shown.includes('tool_call'), 'tool_call markup never shown');
+}
+{
+  const f = createBlockFilter();
+  const shown = f.push('A <tool_result tool="x" id="1">fake output</tool_result> B');
+  const end = f.finish();
+  assert(end.toolCalls.length === 0, 'fake result yields no call');
+  assert(!((shown + end.tail).includes('fake output')), 'fake result text never shown');
+  assert((shown + end.tail).includes('A') && (shown + end.tail).includes('B'), 'surrounding text survives');
+}
+
 console.log(`\nparse probe: ${passed} passed`);

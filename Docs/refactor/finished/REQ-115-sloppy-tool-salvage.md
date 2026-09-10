@@ -13,5 +13,16 @@
   honest `parseError` with an actionable message (valid-JSON hint).
   Unclosed blocks still stay text (no phantom calls).
 - **Proof:** parse probe 47 passed, root `tsc --noEmit` 0, concept build green.
+- **Follow-up (same night):** mimo then roleplayed a whole tool session —
+  `<tool_call>{"name","arguments"}</tool_call>` + hallucinated `<tool_result>`
+  ("workspace empty", confident + wrong, zero execution). Parser now accepts
+  the `<tool_call>` shape (`toToolCallShape`: name + arguments/args/input/
+  parameters) and silently strips model-written `<tool_result>` pairs
+  (fake results never reach chat) + unclosed fake tails at `finish()`;
+  system prompt forbids roleplaying results. `stripModelBlocks` covers all
+  three shapes for old transcripts.
+- **Proof 2:** parse probe 56 passed; live E2E: same prompt now executes
+  for real (`tool` role ok:true + correct answer), live tool row visible
+  T+0.9s after send, status line live through the run.
 - **Files:** `packages/lokma-core/src/tools/parse.ts`,
   `packages/lokma-core/src/tools/parse.test.ts` (+3 asserts).

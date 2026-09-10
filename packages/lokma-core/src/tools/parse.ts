@@ -46,6 +46,9 @@ export const BLOCK_FILTER_BUFFER_CAP = 262_144;
 const COMPLETE_BLOCK =
   /<(tool|ask)\b([^>]*?)(\/>|>([\s\S]*?)<\/(?:\1|tool_result)\s*>)/g;
 
+/** Legacy `<tool_call>{"name","arguments"}</tool_call>` shape (also model-slop). */
+const TOOL_CALL_BLOCK = /<tool_call\s*>([\s\S]*?)<\/tool_call\s*>/g;
+
 /** Common wrong arg names sloppy models emit — normalized before validation. */
 const ARG_ALIASES: Record<string, string> = {
   dir: 'path',
@@ -101,6 +104,45 @@ function toAsk(attrs: string, body: string | undefined, selfClosing: boolean): P
   return choices.length ? { question, choices } : { question };
 }
 
+/** Parse one `<tool_call>{"name","arguments"}</tool_call>` legacy shape (never throws). */
+function toToolCallShape(body: string): ParsedToolCall {
+  let data: unknown;
+  try {
+    data = JSON.parse(body);
+  } catch {
+    const salvaged = salvageXmlArgs(body);
+    if (salvaged && typeof salvaged.name === 'string') {
+      const { name, ...rest } = salvaged as Record<string, string> & { name: string };
+      const args = rest['arguments'] ?? rest['args'] ?? rest['input'];
+      if (args !== undefined) {
+        try {
+          return { tool: name.trim(), input: JSON.parse(args) as unknown };
+        } catch {
+          return { tool: name.trim(), input: undefined, parseError: 'tool_call arguments are not valid JSON' };
+        }
+      }
+      return { tool: name.trim(), input: rest };
+    }
+    return { tool: '', input: undefined, parseError: 'tool_call body is not valid JSON (use {"name": ..., "arguments": {...}})' };
+  }
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    return { tool: '', input: undefined, parseError: 'tool_call body must be an object' };
+  }
+  const rec = data as Record<string, unknown>;
+  const tool = typeof rec['name'] === 'string' ? rec['name'].trim() : '';
+  if (!tool) return { tool: '', input: undefined, parseError: 'tool_call is missing "name"' };
+  const rawInput = rec['arguments'] ?? rec['args'] ?? rec['input'] ?? rec['parameters'] ?? {};
+  if (typeof rawInput === 'string') {
+    const salvaged = salvageXmlArgs(rawInput);
+    return { tool, input: salvaged ?? undefined, ...(salvaged ? {} : { parseError: 'tool_call arguments are not valid JSON' }) };
+  }
+  return { tool, input: rawInput };
+}
+
+/** Model-roleplayed fake results — never valid model output, never shown. */
+const FAKE_RESULT_BLOCK = /<tool_result\b[^>]*>([\s\S]*?)<\/tool_result\s*>/g;
+const FAKE_RESULT_OPEN = /<tool_result\b[^>]*>?[\s\S]*$/;
+
 /**
  * Parse every complete tool block in finished text.
  * Streaming callers prefer `createBlockFilter()` (same shapes, incremental).
@@ -109,6 +151,9 @@ export function parseToolBlocks(text: string): ParsedToolCall[] {
   const calls: ParsedToolCall[] = [];
   for (const m of text.matchAll(COMPLETE_BLOCK)) {
     if (m[1] === 'tool') calls.push(toToolCall(m[2] ?? '', m[4], m[3] === '/>'));
+  }
+  for (const m of text.matchAll(TOOL_CALL_BLOCK)) {
+    calls.push(toToolCallShape(m[1] ?? ''));
   }
   return calls;
 }
@@ -124,7 +169,12 @@ export function parseAskBlocks(text: string): ParsedAsk[] {
 
 /** Remove all complete tool/ask blocks (for stored transcripts + display). */
 export function stripModelBlocks(text: string): string {
-  return text.replace(COMPLETE_BLOCK, '').replace(/[ \t]+\n/g, '\n').trim();
+  return text
+    .replace(FAKE_RESULT_BLOCK, '')
+    .replace(TOOL_CALL_BLOCK, '')
+    .replace(COMPLETE_BLOCK, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .trim();
 }
 
 /**
@@ -144,15 +194,35 @@ export function createBlockFilter(): {
   function drain(force: boolean): string {
     let out = '';
     for (;;) {
+      // Fake roleplayed results are never valid output — drop silently first
+      // so a `<tool>` block closed by `</tool_result>` still matches below.
+      FAKE_RESULT_BLOCK.lastIndex = 0;
+      const fake = FAKE_RESULT_BLOCK.exec(buffer);
+      if (fake && fake.index !== undefined) {
+        out += buffer.slice(0, fake.index);
+        buffer = buffer.slice(fake.index + fake[0].length);
+        continue;
+      }
       COMPLETE_BLOCK.lastIndex = 0;
       const m = COMPLETE_BLOCK.exec(buffer);
-      if (!m || m.index === undefined) break;
-      out += buffer.slice(0, m.index);
-      if (m[1] === 'tool') toolCalls.push(toToolCall(m[2] ?? '', m[4], m[3] === '/>'));
-      else asks.push(toAsk(m[2] ?? '', m[4], m[3] === '/>'));
-      buffer = buffer.slice(m.index + m[0].length);
+      if (m && m.index !== undefined) {
+        out += buffer.slice(0, m.index);
+        if (m[1] === 'tool') toolCalls.push(toToolCall(m[2] ?? '', m[4], m[3] === '/>'));
+        else asks.push(toAsk(m[2] ?? '', m[4], m[3] === '/>'));
+        buffer = buffer.slice(m.index + m[0].length);
+        continue;
+      }
+      TOOL_CALL_BLOCK.lastIndex = 0;
+      const tc = TOOL_CALL_BLOCK.exec(buffer);
+      if (!tc || tc.index === undefined) break;
+      out += buffer.slice(0, tc.index);
+      toolCalls.push(toToolCallShape(tc[1] ?? ''));
+      buffer = buffer.slice(tc.index + tc[0].length);
     }
     if (force) {
+      // Unclosed fake-result tail is roleplay, not chat — drop it; an
+      // unclosed real block stays visible text (fail-open, no phantom call).
+      buffer = buffer.replace(FAKE_RESULT_OPEN, '');
       out += buffer;
       buffer = '';
       return out;
@@ -199,6 +269,7 @@ export function buildToolSystemPrompt(tools: { name: string; description: string
     'One block per call, valid JSON body only. Text outside blocks is your reply.',
     'Emit ONLY <tool name="...">...</tool> — never <tool_call>, never bare name{...}, never any other tag shape.',
     'Each result comes back as <tool_result tool="..." id="...">...</tool_result>. After EVERY result you MUST continue: emit the next <tool> block or write the answer. Stopping silently after a result is a failure.',
+    'NEVER write <tool_result> or <tool_call> yourself and NEVER invent tool output — results arrive on their own; roleplayed results are lies.',
     'To ask the user something blocking, emit <ask question="...">a|b|c</ask> (omit choices for free text).',
     'RULES: never narrate intent ("I will look", "hazırlıyorum", "bakıyorum") — emit the tool block immediately, then report the result.',
     'Never call the same tool twice in a row with the same input. Chain: list/search → read → write/run, one turn at a time.',

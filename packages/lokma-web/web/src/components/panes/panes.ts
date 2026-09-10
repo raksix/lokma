@@ -9,6 +9,7 @@
  * every factory carries a real session id, inspector id, or file path.
  */
 import type { LayoutNode } from '@/stores/layout';
+import type { InspectorTab } from '@/components/providers';
 
 /** Drag MIME type for session rows (same wire as the sessions sidebar). */
 export const SESSION_DRAG_MIME = 'application/x-lokma-session';
@@ -38,7 +39,6 @@ export const INSPECTOR_TABS = [
   // REQ-043 — Files is its own Inspector page (VS Code Explorer position,
   // first), no longer docked above every other tab.
   { id: 'files', label: 'Files' },
-  { id: 'info', label: 'Info' },
   { id: 'providers', label: 'Providers' },
   { id: 'models', label: 'Models' },
   { id: 'usage', label: 'Usage' },
@@ -233,7 +233,7 @@ export function parseSessionDrop(dt: DataGetter): string | null {
  * sidebar, not the Inspector, so its drop opens the pane tab picker
  * (the live sessions + tools chooser) instead of a tool tab.
  */
-export type RailDropId = InspectorTabId | 'sessions';
+export type RailDropId = InspectorTab | 'sessions';
 
 export function isRailDropId(value: unknown): value is RailDropId {
   return value === 'sessions' || isInspectorTabId(value);

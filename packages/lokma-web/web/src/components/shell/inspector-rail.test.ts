@@ -23,12 +23,12 @@ check('rail sits opposite the Explorer (left)', inspectorRailSide('left') === 'r
 check('rail sits opposite the Explorer (right)', inspectorRailSide('right') === 'left');
 
 const tabs = INSPECTOR_RAIL_ITEMS.map((item) => item.tab);
-check('twenty-four rail items (all Inspector menus)', tabs.length === 24);
+check('twenty-three rail items (all Inspector menus)', tabs.length === 23);
 check('rail tabs unique', new Set(tabs).size === tabs.length);
 check('files first (VS Code Explorer position), todos last', tabs[0] === 'files' && tabs[tabs.length - 1] === 'todos');
 check(
   'covers every Inspector menu',
-  ['files', 'info', 'providers', 'models', 'usage', 'settings', 'terminal', 'git', 'browser', 'agents', 'orchestration', 'vault', 'skills', 'archify', 'design', 'testing', 'bots', 'setup', 'plugins', 'observability', 'cron', 'extras', 'memory'].every(
+  ['files', 'providers', 'models', 'usage', 'settings', 'terminal', 'git', 'browser', 'agents', 'orchestration', 'vault', 'skills', 'archify', 'design', 'testing', 'bots', 'setup', 'plugins', 'observability', 'cron', 'extras', 'memory'].every(
     (tab) => tabs.includes(tab as (typeof tabs)[number]),
   ),
 );

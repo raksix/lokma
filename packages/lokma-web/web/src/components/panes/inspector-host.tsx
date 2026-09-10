@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { FileBrowser } from '@/components/files';
-import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
 import { useSessionStore } from '@/stores/session';
 import { emitToast } from '@/components/shell';
@@ -52,7 +51,6 @@ export function InspectorHost({
   onOpenSession?: (id: string) => void;
   onOpenInspectorTab: (id: InspectorTabId) => void;
 }) {
-  if (tab === 'info') return <InfoPanel />;
   return (
     <React.Suspense fallback={<PaneFallback pane={tab} />}>
       <LazyTab tab={tab} sessionId={sessionId} ws={ws} onOpenSession={onOpenSession} onOpenInspectorTab={onOpenInspectorTab} />

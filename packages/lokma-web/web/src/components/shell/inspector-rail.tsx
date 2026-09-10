@@ -22,7 +22,6 @@ export const INSPECTOR_RAIL_ITEMS: InspectorRailItem[] = [
   // REQ-043 — Files first (VS Code Explorer position): its page shows
   // ONLY files, separate from every other Inspector tab.
   { tab: 'files', label: 'Files', Icon: FolderOpen },
-  { tab: 'info', label: 'Info', Icon: Info },
   { tab: 'providers', label: 'Providers', Icon: Plug2 },
   { tab: 'models', label: 'Models', Icon: Layers },
   { tab: 'usage', label: 'Usage', Icon: BarChart3 },

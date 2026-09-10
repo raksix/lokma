@@ -69,7 +69,7 @@ export function MobileSingleView({
   requestedTab?: InspectorTab | null;
 }) {
   const [tab, setTab] = React.useState<MobileTab>('chat');
-  const [toolTab, setToolTab] = React.useState<InspectorTab>(requestedTab ?? 'info');
+  const [toolTab, setToolTab] = React.useState<InspectorTab>(requestedTab ?? 'files');
 
   // An outside request (activity affordance, deep-link) lands on Tools and
   // selects the tab — same contract as the desktop Inspector rail.

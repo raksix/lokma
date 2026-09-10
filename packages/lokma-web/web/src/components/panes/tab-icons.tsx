@@ -12,7 +12,6 @@ import {
   GitBranch,
   Globe,
   HardDrive,
-  Info,
   Layers,
   ListTodo,
   Package,
@@ -35,7 +34,6 @@ import type { InspectorTabId } from './panes';
 export const TAB_ICONS: Record<InspectorTabId, React.ReactNode> = {
   // REQ-043 — Files page icon (open folder; Vault keeps the closed Folder).
   files: <FolderOpen className="h-3 w-3" />,
-  info: <Info className="h-3 w-3" />,
   providers: <Plug2 className="h-3 w-3" />,
   models: <Layers className="h-3 w-3" />,
   usage: <BarChart3 className="h-3 w-3" />,

@@ -129,7 +129,7 @@ export function InspectorPanel({
   ws?: UseWs;
   requestedTab?: InspectorTab | null;
 }) {
-  const [tab, setTab] = React.useState<InspectorTab>('info');
+  const [tab, setTab] = React.useState<InspectorTab>('files');
 
   React.useEffect(() => {
     if (requestedTab) setTab(requestedTab);

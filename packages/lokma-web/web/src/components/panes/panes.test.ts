@@ -99,7 +99,7 @@ check("tab id prefix", makeTabId("tab-x").startsWith("tab-x-"));
 check("pane id prefix unique", makePaneId().startsWith("p-") && makePaneId() !== makePaneId());
 
 /* 2 — registry mirrors the left Inspector (25 tabs incl. REQ-062 Todos); tiling bar keeps the 20 open actions. */
-check("registry has 25 entries", INSPECTOR_TABS.length === 25);
+check("registry has 24 entries", INSPECTOR_TABS.length === 24);
 check("registry has files first", INSPECTOR_TABS[0].id === "files");
 check("registry has browser", INSPECTOR_TABS.some((t) => t.id === "browser"));
 check("registry has orchestration+agents pair", INSPECTOR_TABS.some((t) => t.id === "orchestration") && INSPECTOR_TABS.some((t) => t.id === "agents"));
@@ -231,7 +231,7 @@ check("parse rail ignores empty", parseInspectorDrop(stubData({})) === null);
 check("parse rail ignores label-only text", parseInspectorDrop(stubData({ "text/plain": "Terminal" })) === null);
 check("rail drop makes a live tool tab", (() => {
   const got = parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: "bots" }));
-  if (!got || got === "sessions") return false;
+  if (!got || got === "sessions" || !isInspectorTabId(got)) return false;
   const tab = makeInspectorTab(got);
   return tab.kind === "inspector" && tab.inspectorId === "bots";
 })());

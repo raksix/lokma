@@ -42,6 +42,7 @@ import {
   dropZoneFor,
   encodeTabMove,
   filePreviewKind,
+  isInspectorTabId,
   isValidRelPath,
   makeFileTab,
   makeInspectorTab,
@@ -765,7 +766,8 @@ export function WorkspacePane({
         setPickerOpen(true);
         return;
       }
-      const tab = makeInspectorTab(railId);
+      const tab = isInspectorTabId(railId) ? makeInspectorTab(railId) : null;
+      if (!tab) return;
       if (target) {
         const edge = splitForZone(target);
         if (edge) {

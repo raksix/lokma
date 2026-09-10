@@ -576,7 +576,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         {explorerSide === 'left' ? (
           <ActivityBar active={activity} onSelect={handleActivitySelect} side="left" />
         ) : (
-          <InspectorRail active={inspectorTab ?? 'info'} onSelect={handleInspectorRailSelect} side="left" />
+          <InspectorRail active={inspectorTab ?? 'files'} onSelect={handleInspectorRailSelect} side="left" />
         )}
         {sidebars.left ? (
           isMobile ? (
@@ -643,7 +643,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
             bar (REQ-008 rail now travels with its panel instead of staying
             pinned far right). */}
         {explorerSide === 'left' ? (
-          <InspectorRail active={inspectorTab ?? 'info'} onSelect={handleInspectorRailSelect} side="right" />
+          <InspectorRail active={inspectorTab ?? 'files'} onSelect={handleInspectorRailSelect} side="right" />
         ) : (
           <ActivityBar active={activity} onSelect={handleActivitySelect} side="right" />
         )}

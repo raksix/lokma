@@ -7,6 +7,8 @@ import { SingleChatView, type PendingMessage, type TranscriptMessage } from './s
 import { useWs, type UseWs } from '@/hooks/use-ws';
 import { api, type Bot } from '@/lib/api';
 import { botClearPatch, botSwitchPatch, filterPickerBots, sessionBotName } from '@/components/bots/bot-chat';
+import { normalizeConfig } from '@/components/settings/settings';
+import { resolveDefaultModel } from '@/components/providers/models';
 import { useKnownSession, useProviderStore, useSessionStore } from '@/stores';
 import { emitToast } from '@/components/shell';
 import { FILE_DRAG_MIME, INSERT_MENTION_EVENT } from '@/components/files';
@@ -72,7 +74,10 @@ export function Chat({
   const loadTranscript = useSessionStore((s) => s.loadTranscript);
   const invalidateSession = useSessionStore((s) => s.invalidateSession);
   const storeModels = useProviderStore((s) => s.models);
+  const providerLoading = useProviderStore((s) => s.loading);
   const refreshProviders = useProviderStore((s) => s.refresh);
+  /** REQ-104: one smart-chain resolution per session (guard, not state — never re-fires). */
+  const chainResolved = React.useRef<string | null>(null);
 
   const { status, stream, thinking, cost, done, lastError, retry, toolCalls, permissions, questions, sendText, interrupt, answerPermission, answerQuestion } = ws;
   const socketOpen = status === 'open';
@@ -161,6 +166,45 @@ export function Chat({
     return raw.filter(isTranscriptMessage);
   }, [transcripts, sessionId]);
 
+  // REQ-104: no session model and no stored model → smart default chain
+  // (configured → most-used 30d → first enabled → built-in fallback).
+  // Runs once per session after the catalog settles; an explicit user pick
+  // (model !== '') always wins and is never overwritten.
+  React.useEffect(() => {
+    if (model !== '' || known === 'loading' || providerLoading) return;
+    if (chainResolved.current === sessionId) return;
+    chainResolved.current = sessionId;
+    void (async () => {
+      try {
+        const [cfgRes, usageRes] = await Promise.all([
+          api.getConfig().catch(() => null),
+          api.getUsageSummary('30d').catch(() => null),
+        ]);
+        const resolved = resolveDefaultModel({
+          configured: cfgRes ? normalizeConfig(cfgRes).defaultModel : '',
+          usageTop: usageRes?.summary?.topModel ?? null,
+          models: useProviderStore.getState().models,
+        });
+        // An explicit pick mid-flight stamps `:picked` — never overwrite it.
+        if (chainResolved.current !== sessionId) return;
+        if (!resolved.model) return;
+        setModel(resolved.model);
+        try {
+          localStorage.setItem(MODEL_KEY, resolved.model);
+        } catch {
+          // Selection still applies for this tab without persistence.
+        }
+        if (known) {
+          api.patchSession(sessionId, { model: resolved.model }).catch((e: Error) => {
+            emitToast(`Model not saved server-side: ${e.message}`);
+          });
+        }
+      } catch {
+        // Keep empty — the server WS default applies to the run.
+      }
+    })();
+  }, [model, known, sessionId, providerLoading]);
+
   const reloadTranscript = React.useCallback(async () => {
     invalidateSession(sessionId);
     // Forced: the finished stream created the session server-side even when
@@ -220,6 +264,7 @@ export function Chat({
   const pickModel = React.useCallback(
     (id: string) => {
       setModel(id);
+      chainResolved.current = `${sessionId}:picked`;
       try {
         localStorage.setItem(MODEL_KEY, id);
       } catch {
@@ -238,6 +283,7 @@ export function Chat({
     (bot: Bot) => {
       const patch = botSwitchPatch(bot);
       setBotId(patch.botId);
+      chainResolved.current = `${sessionId}:picked`;
       setModel(patch.model);
       setBotOpen(false);
       try {

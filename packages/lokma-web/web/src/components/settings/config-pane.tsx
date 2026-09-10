@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { emitToast } from '@/components/shell';
 import type { NormalizedConfig } from './settings';
+import { DefaultModelPicker } from '@/components/providers/default-model-picker';
 import { buildAgentsPatch, buildRetryPatch, buildSessionsPatch, isValidAgentDefaultModel, isValidSessionDefaultCwd, parseRetryDelays, validateAgentsBudgets, validateAgentsCaps, validateRetryForm } from './settings';
 
 /**
@@ -16,8 +17,6 @@ import { buildAgentsPatch, buildRetryPatch, buildSessionsPatch, isValidAgentDefa
  * every row below is a real server value.
  */
 export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onReload: () => Promise<void> }) {
-  const [model, setModel] = React.useState(config.defaultModel);
-  const [saving, setSaving] = React.useState(false);
   const [caps, setCaps] = React.useState({
     maxAgents: config.maxAgents === null ? '' : String(config.maxAgents),
     maxConcurrent: config.maxConcurrent === null ? '' : String(config.maxConcurrent),
@@ -39,24 +38,6 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
   const [retryDelays, setRetryDelays] = React.useState(config.retryDelaysSec.join(', '));
   const [retryErrors, setRetryErrors] = React.useState<Record<string, string>>({});
   const [savingRetry, setSavingRetry] = React.useState(false);
-
-  async function handleSaveModel(): Promise<void> {
-    const next = model.trim();
-    if (!next) {
-      emitToast('Default model must not be empty');
-      return;
-    }
-    setSaving(true);
-    try {
-      await api.patchConfig({ defaultModel: next });
-      emitToast('Default model saved');
-      await onReload();
-    } catch (e) {
-      emitToast(e instanceof Error ? e.message : 'Save failed');
-    } finally {
-      setSaving(false);
-    }
-  }
 
   const credEntries = Object.entries(config.credentials);
   const keysSet = credEntries.filter(([, c]) => c.keySet).length;
@@ -177,22 +158,8 @@ export function ConfigPane({ config, onReload }: { config: NormalizedConfig; onR
       </div>
 
       <div className="rounded-lg border border-line bg-white p-2.5 dark:bg-[#1E1E21]">
-        <label htmlFor="settings-default-model" className="font-semibold">
-          Default model
-        </label>
-        <div className="mt-1.5 flex gap-1">
-          <Input
-            id="settings-default-model"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            placeholder="provider::model-id"
-            className="h-7 font-mono text-xs min-w-0"
-          />
-          <Button size="sm" className="h-7 shrink-0 text-xs" disabled={saving} onClick={handleSaveModel}>
-            {saving ? 'Saving…' : 'Save'}
-          </Button>
-        </div>
-        <div className="mt-1 text-[11px] text-zinc-500">Persists to global config via PATCH /api/config.</div>
+        <DefaultModelPicker onSaved={onReload} />
+        <div className="mt-1 text-[11px] text-zinc-500">Persists to global config via PATCH /api/config. Empty = Auto smart chain.</div>
       </div>
 
       <div className="rounded-lg border border-line bg-white p-2.5 dark:bg-[#1E1E21]">

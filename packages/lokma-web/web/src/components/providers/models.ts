@@ -32,3 +32,62 @@ export function buildBulkMap(models: ModelInfo[], enabled: boolean): Record<stri
 export function enabledModels(models: ModelInfo[]): ModelInfo[] {
   return models.filter((m) => m.enabled);
 }
+
+/**
+ * Built-in last-resort model (mirrors the server WS `DEFAULT_MODEL`).
+ * Used only when the catalog is empty and nothing else resolves.
+ */
+export const FALLBACK_MODEL = 'anthropic/claude-sonnet-4-5';
+
+/** Where a resolved default model came from (REQ-104 smart chain). */
+export type DefaultModelSource = 'configured' | 'most-used' | 'first-enabled' | 'fallback';
+
+/**
+ * Trim a model id (non-strings become empty — never crashes on odd payloads).
+ */
+export function normalizeModelId(id: unknown): string {
+  return typeof id === 'string' ? id.trim() : '';
+}
+
+/**
+ * Tolerant id equality — the stored config predates the slash canonical
+ * form (`provider::model` vs `provider/model`), so both separators match.
+ */
+export function modelIdMatches(a: string, b: string): boolean {
+  if (a === b) return true;
+  const canon = (s: string): string => s.replace(/::/g, '/');
+  return canon(a) === canon(b);
+}
+
+/**
+ * Smart default-model chain (REQ-104):
+ * 1. configured `defaultModel` — when it still matches an enabled model;
+ * 2. most-used model (`GET /api/usage/summary` topModel) — when enabled;
+ * 3. first enabled catalog model;
+ * 4. built-in fallback.
+ * Returns the catalog-canonical id whenever a catalog row matched, so the
+ * Composer sends the exact id the server catalog knows.
+ */
+export function resolveDefaultModel(input: {
+  configured: unknown;
+  usageTop: unknown;
+  models: ModelInfo[];
+  fallback?: string;
+}): { model: string; source: DefaultModelSource } {
+  const fallback = normalizeModelId(input.fallback) || FALLBACK_MODEL;
+  const enabled = enabledModels(input.models);
+  const configured = normalizeModelId(input.configured);
+  const usageTop = normalizeModelId(input.usageTop);
+  if (enabled.length === 0) {
+    if (configured) return { model: configured, source: 'configured' };
+    if (usageTop) return { model: usageTop, source: 'most-used' };
+    return { model: fallback, source: 'fallback' };
+  }
+  const configuredHit = configured ? enabled.find((m) => modelIdMatches(m.id, configured)) : undefined;
+  if (configuredHit) return { model: configuredHit.id, source: 'configured' };
+  const usageHit = usageTop ? enabled.find((m) => modelIdMatches(m.id, usageTop)) : undefined;
+  if (usageHit) return { model: usageHit.id, source: 'most-used' };
+  const first = enabled[0];
+  if (first) return { model: first.id, source: 'first-enabled' };
+  return { model: fallback, source: 'fallback' };
+}

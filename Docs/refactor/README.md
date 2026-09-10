@@ -122,6 +122,6 @@
 - [REQ-101](finished/REQ-101-account-sade-admin-sekme.md) — Account sade + admin'e ayrı sekme — done
 - [REQ-102](finished/REQ-102-aninda-gonderildi.md) — Gönderim anında gönderilmiş görünsün — done
 - [REQ-103](finished/REQ-103-calisiyor-animasyonu.md) — Agent çalışırken animasyonlu gösterge — done
-- [REQ-104](REQ-104-default-model-zinciri.md) — Default model seçimi + akıllı zincir — pending
+- [REQ-104](finished/REQ-104-default-model-zinciri.md) — Default model seçimi + akıllı zincir — done
 - [REQ-105](finished/REQ-105-explorer-editor-highlight.md) — Explorer editörde de highlight — done
 - [REQ-106](finished/REQ-106-session-duz-liste.md) — Session'lar kutucuktan çıksın — done

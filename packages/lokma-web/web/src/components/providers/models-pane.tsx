@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { useProviderStore } from '@/stores';
 import { emitToast } from '@/components/shell';
 import { buildBulkMap, countEnabled, filterModels } from './models';
+import { DefaultModelPicker } from './default-model-picker';
 
 /**
  * ModelsPane — real model enable/disable (ported from the concept
@@ -85,6 +86,9 @@ export function ModelsPane() {
 
   return (
     <div className="space-y-2 p-2">
+      <div className="rounded-lg border border-line bg-white p-2.5 text-xs dark:bg-[#1E1E21]">
+        <DefaultModelPicker />
+      </div>
       <div className="flex flex-wrap items-center gap-1">
         <div className="relative min-w-[160px] flex-1">
           <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-zinc-400" />

@@ -40,6 +40,14 @@ export type WsUiState = {
   /** Live reasoning text (REQ-050) — shown while streaming, never persisted. */
   thinking: string;
   toolCalls: Record<string, ToolCallEntry>;
+  /**
+   * REQ-111: stream cut recorded at each `tool_start` (`at` = stream length
+   * when the call arrived). The view slices the live stream at these marks so
+   * tool rows render interleaved in arrival order (text → tool → text → tool)
+   * instead of one block pinned under the message. Explicit array (not key
+   * order) — integer-like callIds would sort numerically in a Record.
+   */
+  toolMarks: Array<{ callId: string; at: number }>;
   cost: CostTotal;
   permissions: PermissionRequest[];
   questions: QuestionRequest[];
@@ -171,6 +179,7 @@ export function initialWsUiState(): WsUiState {
     stream: '',
     thinking: '',
     toolCalls: {},
+    toolMarks: [],
     cost: { inputTokens: 0, outputTokens: 0, costUsd: 0, model: '' },
     permissions: [],
     questions: [],
@@ -201,11 +210,16 @@ export function applyServerFrame(state: WsUiState, msg: ServerMessage): WsUiStat
       return { ...state, stream: state.stream + msg.delta, done: false };
     case 'thinking_delta':
       return { ...state, thinking: state.thinking + msg.delta, done: false };
-    case 'tool_start':
+    case 'tool_start': {
+      // REQ-111: cut the live stream here so the row interleaves in arrival
+      // order. Idempotent — a resent start never double-marks the same call.
+      const marked = state.toolMarks.some((m) => m.callId === msg.callId);
       return {
         ...state,
         toolCalls: { ...state.toolCalls, [msg.callId]: { tool: msg.tool, input: msg.input } },
+        toolMarks: marked ? state.toolMarks : [...state.toolMarks, { callId: msg.callId, at: state.stream.length }],
       };
+    }
     case 'tool_result': {
       const prev = state.toolCalls[msg.callId];
       if (!prev) return state;

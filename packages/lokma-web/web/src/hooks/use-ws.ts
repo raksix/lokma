@@ -45,6 +45,8 @@ export type UseWs = {
   stream: string;
   thinking: string;
   toolCalls: Record<string, ToolCallEntry>;
+  /** REQ-111: live stream cuts in arrival order (view interleaves tool rows). */
+  toolMarks: Array<{ callId: string; at: number }>;
   cost: CostTotal;
   permissions: PermissionRequest[];
   questions: QuestionRequest[];
@@ -200,7 +202,7 @@ export function useWs(sessionId: string): UseWs {
     const text = prompt.trim();
     if (!text) return;
     // A new prompt starts a new run — clear the previous run's trace with it.
-    setUi((prev) => ({ ...prev, stream: '', thinking: '', done: false, doneReason: null, lastError: null, toolCalls: {}, retry: null }));
+    setUi((prev) => ({ ...prev, stream: '', thinking: '', done: false, doneReason: null, lastError: null, toolCalls: {}, toolMarks: [], retry: null }));
     socketSend(wsRef.current, promptMessage(text, sessionRef.current, opts));
   }, []);
 
@@ -248,6 +250,7 @@ export function useWs(sessionId: string): UseWs {
     stream: ui.stream,
     thinking: ui.thinking,
     toolCalls: ui.toolCalls,
+    toolMarks: ui.toolMarks,
     cost: ui.cost,
     permissions: ui.permissions,
     questions: ui.questions,

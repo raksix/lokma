@@ -79,7 +79,7 @@ export function Chat({
   /** REQ-104: one smart-chain resolution per session (guard, not state — never re-fires). */
   const chainResolved = React.useRef<string | null>(null);
 
-  const { status, stream, thinking, cost, done, lastError, retry, toolCalls, permissions, questions, sendText, interrupt, answerPermission, answerQuestion } = ws;
+  const { status, stream, thinking, cost, done, lastError, retry, toolCalls, toolMarks, permissions, questions, sendText, interrupt, answerPermission, answerQuestion } = ws;
   const socketOpen = status === 'open';
   // REQ-070: a backend run outlives refresh — the badge stays on while the
   // server reports running/queued even with no live stream on this socket.
@@ -638,6 +638,7 @@ export function Chat({
           runError={done && lastError ? lastError : null}
           costLabel={costLabel}
           toolCalls={toolCalls}
+          toolMarks={toolMarks}
           permissions={permissions}
           questions={questions}
           answerBusy={answerBusy}

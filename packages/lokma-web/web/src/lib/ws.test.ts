@@ -137,5 +137,18 @@ state = applyServerFrame(state, { type: 'retry_notice', attempt: 2, maxAttempts:
 assert(state.retry !== null && state.retry.attempt === 2 && state.retry.waitMs === 10000, 'retry notice stored');
 assert(!state.done, 'retry does not end the run');
 
+// 11. REQ-111: tool_start cuts the live stream in arrival order.
+let cut = initialWsUiState();
+cut = applyServerFrame(cut, { type: 'text_delta', delta: 'looking', sessionId: 's' });
+cut = applyServerFrame(cut, { type: 'tool_start', tool: 'read', input: {}, callId: 'c1', sessionId: 's' });
+assert(cut.toolMarks.length === 1 && cut.toolMarks[0].callId === 'c1' && cut.toolMarks[0].at === 7, 'first mark cuts after prior text');
+cut = applyServerFrame(cut, { type: 'text_delta', delta: ' found it', sessionId: 's' });
+cut = applyServerFrame(cut, { type: 'tool_start', tool: 'write', input: {}, callId: 'c2', sessionId: 's' });
+assert(cut.toolMarks.length === 2 && cut.toolMarks[1].callId === 'c2' && cut.toolMarks[1].at === 16, 'second mark cuts after later text');
+cut = applyServerFrame(cut, { type: 'tool_result', callId: 'c1', result: 'ok', isError: false, sessionId: 's' });
+assert(cut.toolMarks.length === 2, 'tool_result adds no mark');
+cut = applyServerFrame(cut, { type: 'tool_start', tool: 'read', input: {}, callId: 'c1', sessionId: 's' });
+assert(cut.toolMarks.length === 2, 'resent tool_start is idempotent');
+
 delete (globalThis as unknown as Record<string, unknown>).window;
 console.log('ws.test.ts: all WS-client checks passed');

@@ -129,4 +129,4 @@
 - [REQ-108](finished/REQ-108-info-sekmesi-kaldir.md) — Info sekmesi (i) kalksın — done
 - [REQ-109](finished/REQ-109-browser-hep-pane.md) — Browser her seferinde pane açılsın — done
 - [REQ-110](finished/REQ-110-obsidian-graph-parite.md) — Obsidian tarzı memory graph paritesi — done
-- [REQ-111](REQ-111-tool-akista-ara-satir.md) — Tool calling mesaj aralarında görünsün — pending
+- [REQ-111](finished/REQ-111-tool-akista-ara-satir.md) — Tool calling mesaj aralarında görünsün — done

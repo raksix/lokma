@@ -1,0 +1,7 @@
+# REQ-111 — Tool calling mesajların arasında, akışta görünsün
+
+- **Status:** done (2026-09-10)
+- **Asked:** 2026-09-10 — "bu tool loading mesajın altında kalıyor. Şöyle olmalı: tamam bakıyorum → tool calling → sonuç mesajı → tool calling... mesajların aralarında gözükmeli."
+- **Teşhis (koddan):** canlı `toolCalls` kaydı TEK blokta transcriptin ALTINDA render ediliyor (`single-chat-view.tsx:342-349` ThoughtTrace) — akışla bağı yok. Oysa transcript modeli satır-içi tool satırını zaten taşıyor (`TranscriptMessage.toolName/toolCallId`, satır 38). 'yap'ta: tool çağrıları varış sırasına göre mesaj aralarına serpiştirilir (metin → tool → metin → tool); blok alta yapışmaz; kayıtlı geçmişte transcript gömülü satırlar korunur.
+- **Touched:** `packages/lokma-web/web/src/lib/ws.ts` (`WsUiState.toolMarks` arrival-order cuts, `tool_start` records `{callId, at: stream.length}` idempotent, `tool_result` untouched), `hooks/use-ws.ts` (`toolMarks` exposed + cleared on new prompt), `components/chat/single-chat-view.tsx` (pure `interleaveLiveBlocks` + live area renders text slices and `ToolCallRow`s interleaved in one Lokma row; `ThoughtTrace` import dropped, export kept), `components/chat/index.tsx` (`toolMarks` passthrough), `lib/ws.test.ts` (+4 asserts), `components/chat/single-chat-view.test.ts` (new, 11 asserts)
+- **Verify:** ws probe 4 new PASS, interleave probe 11/11 PASS, root tsc 0 errors, web build green index-hVFkLR6W.js (sourcemap carries interleaveLiveBlocks), pm2 restart lokma-web online, served == disk (BUNDLE-MATCH) + live 200

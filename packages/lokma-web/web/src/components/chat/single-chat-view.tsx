@@ -15,7 +15,6 @@ import {
   QuestionCard,
   RunErrorCard,
   ThinkingTrace,
-  ThoughtTrace,
   ToolCallRow,
   transcriptToolEntry,
   WorkingIndicator,
@@ -37,6 +36,47 @@ function scrollBehavior(): ScrollBehavior {
 
 export type TranscriptMessage = { role: string; content: string; timestamp?: string; toolName?: string; toolCallId?: string };
 export type PendingMessage = { key: number; text: string };
+/** REQ-111: one stream cut per `tool_start` (arrival order, see `@/lib/ws`). */
+export type ToolMark = { callId: string; at: number };
+/** One live row in flow order — a text slice or a single tool call. */
+export type LiveBlock =
+  | { kind: 'text'; text: string }
+  | { kind: 'tool'; callId: string; entry: ToolCallEntry };
+
+/**
+ * REQ-111: slice the live stream at each tool mark so tool rows render
+ * interleaved in arrival order (text → tool → text → tool), never as one
+ * block pinned under the message. Pure + unit-tested.
+ * Marks are clamped into range (out-of-order frames can't corrupt slices);
+ * empty slices are dropped; toolCalls entries with no mark (shouldn't happen
+ * — e.g. a rehydrated map) trail at the end so no call ever disappears.
+ */
+export function interleaveLiveBlocks(
+  stream: string,
+  toolMarks: ToolMark[],
+  toolCalls: Record<string, ToolCallEntry>,
+): LiveBlock[] {
+  const blocks: LiveBlock[] = [];
+  let cursor = 0;
+  const seen = new Set<string>();
+  for (const mark of toolMarks) {
+    const cut = Math.min(Math.max(mark.at, cursor), stream.length);
+    const slice = stream.slice(cursor, cut);
+    if (slice) blocks.push({ kind: 'text', text: slice });
+    cursor = cut;
+    const entry = toolCalls[mark.callId];
+    if (entry && !seen.has(mark.callId)) {
+      seen.add(mark.callId);
+      blocks.push({ kind: 'tool', callId: mark.callId, entry });
+    }
+  }
+  const tail = stream.slice(cursor);
+  if (tail) blocks.push({ kind: 'text', text: tail });
+  for (const [callId, entry] of Object.entries(toolCalls)) {
+    if (!seen.has(callId)) blocks.push({ kind: 'tool', callId, entry });
+  }
+  return blocks;
+}
 
 function formatTime(iso: string | undefined): string {
   if (!iso) return '';
@@ -207,6 +247,7 @@ export function SingleChatView({
   runError,
   costLabel,
   toolCalls,
+  toolMarks,
   permissions,
   questions,
   answerBusy,
@@ -227,6 +268,8 @@ export function SingleChatView({
   runError: string | null;
   costLabel: string | null;
   toolCalls: Record<string, ToolCallEntry>;
+  /** REQ-111: arrival-order stream cuts — tool rows interleave with text. */
+  toolMarks: ToolMark[];
   permissions: PermissionRequest[];
   questions: QuestionRequest[];
   answerBusy: string | null;
@@ -266,6 +309,10 @@ export function SingleChatView({
     permissions.length === 0 &&
     questions.length === 0 &&
     !runError;
+
+  // REQ-111: live tool rows interleave with the stream in arrival order
+  // (text → tool → text → tool) — never one block pinned under the message.
+  const liveBlocks = React.useMemo(() => interleaveLiveBlocks(stream, toolMarks, toolCalls), [stream, toolMarks, toolCalls]);
 
   return (
     <div className="relative flex gap-3">
@@ -339,20 +386,32 @@ export function SingleChatView({
                 </div>
               </div>
             )}
-            {(stream || Object.keys(toolCalls).length > 0) && (
+            {liveBlocks.length > 0 && (
               <div className="flex gap-3">
                 <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full border border-line bg-[#262624] font-serif text-xs text-white">
                   L
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-semibold">Lokma</div>
-                  <ThoughtTrace toolCalls={toolCalls} />
-                  {stream && (
-                  <div className="mt-1.5 text-[13.5px] leading-[1.6] whitespace-pre-wrap">
-                    {stream}
-                    {streaming && <span className="ml-1 inline-block h-4 w-0.5 animate-pulse bg-foreground align-middle" />}
+                  <div className="space-y-1.5">
+                    {liveBlocks.map((b, bi) =>
+                      b.kind === 'text' ? (
+                        <div key={`t${bi}`} className="mt-1.5 text-[13.5px] leading-[1.6] whitespace-pre-wrap first:mt-0">
+                          {b.text}
+                          {streaming && bi === liveBlocks.length - 1 && (
+                            <span className="ml-1 inline-block h-4 w-0.5 animate-pulse bg-foreground align-middle" />
+                          )}
+                        </div>
+                      ) : (
+                        <div key={b.callId} className="mt-1.5 first:mt-0">
+                          <ToolCallRow entry={b.entry} />
+                        </div>
+                      ),
+                    )}
+                    {streaming && liveBlocks[liveBlocks.length - 1].kind === 'tool' && (
+                      <span className="ml-1 inline-block h-4 w-0.5 animate-pulse bg-foreground align-middle" aria-hidden="true" />
+                    )}
                   </div>
-                  )}
                 </div>
               </div>
             )}

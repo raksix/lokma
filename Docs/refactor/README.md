@@ -133,3 +133,4 @@
 - [REQ-112](finished/REQ-112-composer-durum-satiri.md) — Composer altında canlı durum satırı — done
 - [REQ-113](finished/REQ-113-attachment-50mb.md) — Attachment limiti 50MB + inline bütçe — done
 - [REQ-114](finished/REQ-114-pdf-attach.md) — Ham PDF ekleme, server-side metin çıkarma — done
+- [REQ-115](finished/REQ-115-sloppy-tool-salvage.md) — Sloppy-model tool-block salvage (XML args + tool_result closer) — done

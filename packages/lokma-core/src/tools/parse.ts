@@ -44,7 +44,31 @@ export type ParsedAsk = {
 export const BLOCK_FILTER_BUFFER_CAP = 262_144;
 
 const COMPLETE_BLOCK =
-  /<(tool|ask)\b([^>]*?)(\/>|>([\s\S]*?)<\/\1\s*>)/g;
+  /<(tool|ask)\b([^>]*?)(\/>|>([\s\S]*?)<\/(?:\1|tool_result)\s*>)/g;
+
+/** Common wrong arg names sloppy models emit — normalized before validation. */
+const ARG_ALIASES: Record<string, string> = {
+  dir: 'path',
+  file: 'path',
+  filepath: 'path',
+  filename: 'path',
+  cmd: 'command',
+};
+
+/** Salvage `<key>value</key>` children (sloppy-model XML args) into an object. */
+function salvageXmlArgs(body: string): Record<string, string> | null {
+  const out: Record<string, string> = {};
+  const re = /<([A-Za-z_][\w.-]*)\s*>([^<>]*)<\/\1\s*>/g;
+  let m: RegExpExecArray | null;
+  for (;;) {
+    m = re.exec(body);
+    if (!m) break;
+    const raw = (m[1] ?? '').toLowerCase();
+    const key = ARG_ALIASES[raw] ?? raw;
+    if (!(key in out)) out[key] = (m[2] ?? '').trim();
+  }
+  return Object.keys(out).length ? out : null;
+}
 
 function attr(source: string, name: string): string | null {
   const m = source.match(new RegExp(`${name}\\s*=\\s*"([^"]*)"`));
@@ -58,8 +82,11 @@ function toToolCall(attrs: string, body: string | undefined, selfClosing: boolea
   if (selfClosing || body === undefined || !body.trim()) return { tool, input: {} };
   try {
     return { tool, input: JSON.parse(body) as unknown };
-  } catch (e) {
-    return { tool, input: undefined, parseError: e instanceof Error ? e.message : String(e) };
+  } catch {
+    // Sloppy-model salvage (REQ-115): `<dir>Docs</dir>` XML args → object.
+    const salvaged = salvageXmlArgs(body);
+    if (salvaged) return { tool, input: salvaged };
+    return { tool, input: undefined, parseError: 'body is not valid JSON (use {"k": "v"})' };
   }
 }
 

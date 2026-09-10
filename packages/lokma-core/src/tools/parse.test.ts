@@ -150,4 +150,23 @@ function assert(cond: boolean, label: string): void {
   assert(!(end.tail.includes('<tool')), 'block markup never leaks to chat');
 }
 
+// ─── REQ-115: sloppy-model salvage (mimo writes XML args + </tool_result>) ───
+{
+  const calls = parseToolBlocks('<tool name="list_files">\n<dir>Docs/refactor</dir>\n</tool_result>');
+  assert(calls.length === 1, 'tool_result-closed block parsed');
+  assert(calls[0]?.tool === 'list_files', 'tool name kept');
+  assert((calls[0]?.input as { path: string }).path === 'Docs/refactor', 'XML <dir> salvaged + aliased to path');
+  assert(calls[0]?.parseError === undefined, 'salvaged call has no parseError');
+}
+{
+  const f = createBlockFilter();
+  f.push('Checking <tool name="list_files"><dir>Docs</dir>');
+  const end = f.finish();
+  assert(end.toolCalls.length === 0, 'unclosed block without closer stays text (no phantom call)');
+}
+{
+  const calls = parseToolBlocks('<tool name="x">{oops</tool_result>');
+  assert(calls.length === 1 && calls[0]?.input === undefined, 'unsalvageable tool_result body still malformed');
+}
+
 console.log(`\nparse probe: ${passed} passed`);

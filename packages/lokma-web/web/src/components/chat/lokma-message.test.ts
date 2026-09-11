@@ -5,7 +5,7 @@
  * Not imported by app code, so the Vite bundle ignores it.
  */
 import { applyServerFrame, dropRequest, initialWsUiState, permissionAnswer, questionAnswer } from '@/lib/ws';
-import { describeToolCall, formatBytes, parseMarkdownBlocks, sanitizeMdUrl, splitCodeFences, summarizeInput, summarizeResult, transcriptToolEntry } from './lokma-message';
+import { describeToolCall, formatBytes, parseMarkdownBlocks, sanitizeMdUrl, splitCodeFences, stripThinkingMarkup, summarizeInput, summarizeResult, transcriptToolEntry } from './lokma-message';
 
 function assert(cond: boolean, label: string): void {
   if (!cond) throw new Error(`FAIL: ${label}`);
@@ -110,3 +110,32 @@ assert(transcriptToolEntry({ role: 'assistant', content: 'hi' }) === null, 'non-
 assert(transcriptToolEntry({ role: 'tool', content: 'not-json' }) === null, 'broken rows ignored');
 
 console.log('lokma-message.test.ts: all W1-2 checks passed');
+
+// ─── REQ-124: thinking reads human — markup stripped, prose kept ───
+{
+  const bar = String.fromCharCode(0xff5c);
+  const d = `${bar}${bar}DSML${bar}${bar}`;
+  const raw = [
+    'Let me check the docs first.',
+    `<tool name="read_file">{"path": "Docs/x.md"}</tool>`,
+    'Got it.',
+    `<tool_call>{"name":"list_files"}</tool_call>`,
+    'Done thinking.',
+    `<${d} invoke name="read_file">{"path":"y"}</${d} invoke>`,
+    'After dsml.',
+    `<tool_result>{"ok":true}</tool_result>`,
+    'Unclosed tail <tool name="write_file">{"path":',
+  ].join('\n');
+  const clean = stripThinkingMarkup(raw);
+  assert(clean.includes('Let me check the docs first.'), 'prose kept');
+  assert(clean.includes('Done thinking.'), 'prose between calls kept');
+  assert(!clean.includes('<tool'), 'tool blocks gone');
+  assert(!clean.includes('tool_call'), 'tool_call gone');
+  assert(!clean.includes('tool_result'), 'tool_result gone');
+  assert(!clean.includes('DSML'), 'dsml gone');
+  assert(!clean.includes('write_file'), 'unclosed tag cut, lead prose kept');
+  assert(stripThinkingMarkup('plain reasoning, no tags') === 'plain reasoning, no tags', 'plain untouched');
+  assert(stripThinkingMarkup(`before <tool name="x">{"a":1}</tool>`) === 'before', 'call cut, prose kept');
+  assert(stripThinkingMarkup('a\n\n\n\nb') === 'a\n\nb', 'blank runs collapsed');
+}
+console.log('lokma-message.test.ts: REQ-124 thinking-strip checks passed');

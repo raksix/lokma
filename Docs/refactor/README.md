@@ -142,3 +142,4 @@
 - [REQ-121](finished/REQ-121-session-live-row-and-stable-order.md) — Session live run row + stable order — done
 - [REQ-122](finished/REQ-122-transcript-interleave.md) — Transcript yerinde sıra (thinking+tool+metin) — done
 - [REQ-123](finished/REQ-123-canli-markdown.md) — Akış sırasında canlı markdown — done
+- [REQ-124](finished/REQ-124-thinking-human-markup.md) — Thinking reads human (render-side markup strip) — done

@@ -542,8 +542,33 @@ export function RunErrorCard({ message }: { message: string }) {
 // Claude-Code style reasoning block: open + pulsing while the model thinks,
 // collapsed to a quiet line once the answer streams. Never persisted —
 // `thinking` resets on every new prompt (see use-ws sendText).
+/**
+ * Human-readable remainder of raw reasoning (REQ-124, Hermes-style
+ * activity): models echo tool markup (DSML invokes/tags, `<tool>`,
+ * `<tool_call>`, `<tool_result>` — complete or cut off) into thinking.
+ * Whole-string strip (never per-delta, so split tags can't leak).
+ * Local copy of the ai-side cleaner — web never imports server packages.
+ */
+export function stripThinkingMarkup(text: string): string {
+  const bar = String.fromCharCode(0xff5c);
+  const d = `${bar}${bar}DSML${bar}${bar}`;
+  return (
+    text
+      .replace(new RegExp(`<${d} invoke\\b[^>]*>[\\s\\S]*?(<\\/${d} invoke\\s*>|$)`, 'g'), '')
+      .replace(new RegExp(`<\\/?${d}[^>]*>?`, 'g'), '')
+      .replace(/<(tool|tool_call|tool_result)\b[^>]*>[\s\S]*?(<\/\1\s*>|$)/g, '')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  );
+}
 export function ThinkingTrace({ thinking, streaming }: { thinking: string; streaming: boolean }) {
   if (!thinking) return null;
+  // REQ-124: reasoning models echo tool markup into thinking — show the
+  // human-readable remainder (whole-string strip, never per-delta fragments).
+  const readable = stripThinkingMarkup(thinking);
+  if (!readable && !streaming) return null;
+  const shown = readable || thinking;
   return (
     <details
       open={streaming}
@@ -553,11 +578,11 @@ export function ThinkingTrace({ thinking, streaming }: { thinking: string; strea
         <Brain className={`h-3.5 w-3.5 text-terracotta ${streaming ? 'animate-pulse' : ''}`} />
         Thinking{streaming ? '…' : ''}
         <span className="ml-auto text-[11px] font-normal text-zinc-400">
-          {thinking.length > 120 ? `${thinking.slice(0, 120)}…` : thinking}
+          {shown.length > 120 ? `${shown.slice(0, 120)}…` : shown}
         </span>
       </summary>
       <div className="max-h-48 overflow-auto border-t border-line px-3 py-2 text-xs leading-[1.6] text-zinc-500 whitespace-pre-wrap">
-        {thinking}
+        {shown}
       </div>
     </details>
   );

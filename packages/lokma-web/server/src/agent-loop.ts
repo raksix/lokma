@@ -5,27 +5,21 @@ import {
   buildUiControlTools,
   createBlockFilter,
   decideToolCall,
-  emptyResultPlaceholder,
   executeToolCall,
+  feedBackResults,
+  formatToolResult,
   heartbeatSession,
-  isEmptyResultText,
   mintCallId,
   parseToolBlocks,
-  persistedOutputEnvelope,
-  previewCut,
-  resultBudget,
-  resultOverBudget,
-  resultToText,
   runApprovedCall,
   SessionStore,
-  spillPathFor,
   ToolRegistry,
+  toolResultCarrier,
   type ParsedToolCall,
   type SessionMessage,
   type ToolEvent,
+  type ToolResultCarrier,
 } from '@lokma/core';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
 import { ProviderError, stream as aiStream, zodToJsonSchema, type ProviderMessage } from '@lokma/ai';
 import type { Permissions, ServerMessage } from '@lokma/shared';
 
@@ -310,37 +304,6 @@ function toolRecord(callId: string, tool: string, record: Record<string, unknown
     toolCallId: callId,
     toolName: tool,
   };
-}
-
-/**
- * REQ-128: what the model actually reads for one tool result. Over-budget
- * payloads are spilled to `.lokma/tool-results/` and replaced with a
- * `<persisted-output>` envelope (Claude-Code discipline: never truncate a
- * result into uselessness, and never let one payload evict the
- * conversation). Best-effort — if the spill write fails, a capped preview
- * still goes out rather than the whole turn erroring.
- */
-async function formatModelResult(
-  cwd: string,
-  tool: string,
-  callId: string,
-  result: unknown,
-  declaredBudget: number | undefined,
-): Promise<string> {
-  const text = resultToText(result);
-  if (isEmptyResultText(text)) return emptyResultPlaceholder(tool);
-  const budget = resultBudget(declaredBudget);
-  if (!resultOverBudget(text, budget)) return text;
-  const rel = spillPathFor(callId);
-  const { preview, hasMore } = previewCut(text);
-  try {
-    const abs = join(cwd, rel);
-    await mkdir(dirname(abs), { recursive: true });
-    await writeFile(abs, text, 'utf8');
-    return persistedOutputEnvelope({ originalChars: text.length, path: rel, preview, hasMore });
-  } catch {
-    return `${text.slice(0, budget)}\n…[truncated ${text.length - budget} chars — could not persist output]`;
-  }
 }
 
 export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult> {
@@ -680,24 +643,7 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
       }
     };
 
-    /**
-     * REQ-128: one result handed back to the model. `native` is present when
-     * the call arrived as a gateway function call — that pair is replayed
-     * exactly (assistant.tool_calls + one `tool` row per result), the shape
-     * Claude Code uses; text-parsed calls feed back as one `<tool_result>`
-     * user blob, which every upstream reads.
-     */
-    type FollowUp = {
-      tool: string;
-      input: unknown;
-      /** Text-mode payload: the full `<tool_result …>body</tool_result>` block. */
-      text: string;
-      /** Native-mode payload: the bare result body (the id links it already). */
-      body: string;
-      isError: boolean;
-      native?: { id: string; name: string; arguments: string };
-    };
-    const results: FollowUp[] = [];
+    const results: ToolResultCarrier[] = [];
     /** Blocking-question answers — plain text, never tool rows. */
     const answers: string[] = [];
 
@@ -708,24 +654,17 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
       body: string,
       isError: boolean,
     ): void => {
-      const nativeId = typeof call.nativeCallId === 'string' ? call.nativeCallId.trim() : '';
-      const nativeArgs = typeof call.nativeArgs === 'string' && call.nativeArgs.trim() ? call.nativeArgs : '';
-      results.push({
-        tool: call.tool || 'unknown',
-        input: call.input,
-        text: `<tool_result tool="${call.tool || 'unknown'}" id="${resultId}">${body}</tool_result>`,
-        body,
-        isError,
-        ...(nativeId
-          ? {
-              native: {
-                id: nativeId,
-                name: call.tool || 'unknown',
-                arguments: nativeArgs || JSON.stringify(call.input ?? {}),
-              },
-            }
-          : {}),
-      });
+      results.push(
+        toolResultCarrier({
+          tool: call.tool,
+          input: call.input,
+          resultId,
+          body,
+          isError,
+          nativeCallId: call.nativeCallId,
+          nativeArgs: call.nativeArgs,
+        }),
+      );
     };
 
     // ── Tool calls (model order) ────────────────────────────────────────────
@@ -780,7 +719,13 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
             pushResult(
               b.call,
               resultId,
-              await formatModelResult(opts.cwd, b.call.tool, b.callId, outcome.result, registry.get(b.call.tool)?.maxResultSizeChars),
+              await formatToolResult({
+                cwd: opts.cwd,
+                tool: b.call.tool,
+                callId: b.callId,
+                result: outcome.result,
+                declaredBudget: registry.get(b.call.tool)?.maxResultSizeChars,
+              }),
               false,
             );
           } else {
@@ -854,7 +799,13 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
             pushResult(
               call,
               resultId,
-              await formatModelResult(opts.cwd, outcome.tool, callId, ran.result, registry.get(outcome.tool)?.maxResultSizeChars),
+              await formatToolResult({
+                cwd: opts.cwd,
+                tool: outcome.tool,
+                callId,
+                result: ran.result,
+                declaredBudget: registry.get(outcome.tool)?.maxResultSizeChars,
+              }),
               false,
             );
           } else {
@@ -873,7 +824,13 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
         pushResult(
           call,
           resultId,
-          await formatModelResult(opts.cwd, call.tool, callId, outcome.result, registry.get(call.tool)?.maxResultSizeChars),
+          await formatToolResult({
+            cwd: opts.cwd,
+            tool: call.tool,
+            callId,
+            result: outcome.result,
+            declaredBudget: registry.get(call.tool)?.maxResultSizeChars,
+          }),
           false,
         );
       } else {
@@ -930,37 +887,8 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
       }
       return { outcome: 'complete', inputChars, outputChars, turns };
     }
-    // ── Feed the results back (REQ-128) ─────────────────────────────────────
-    // Claude-Code shape first: a turn whose calls arrived as gateway
-    // function calls is replayed WITH its calls (`assistant.tool_calls[]`)
-    // and answered by one `tool` row per result — the model sees the same
-    // pairing it produced. Text-parsed calls in the same turn get synthetic
-    // ids, because an unanswered call id is an instant upstream 400.
-    const nativeTurn = results.some((r) => r.native !== undefined);
-    if (nativeTurn) {
-      const calls = results.map((r, i) => ({
-        id: r.native?.id ?? `call_text_${turns}_${i}`,
-        name: r.tool,
-        arguments: r.native?.arguments ?? JSON.stringify(r.input ?? {}),
-      }));
-      inputChars += clean.length;
-      messages.push({ role: 'assistant', content: clean, toolCalls: calls });
-      results.forEach((r, i) => {
-        const id = calls[i]?.id ?? `call_text_${turns}_${i}`;
-        inputChars += r.body.length;
-        messages.push({ role: 'tool', content: r.body, toolCallId: id, name: r.tool });
-      });
-      // Question answers stay plain conversation, after the tool pair.
-      if (answers.length > 0) {
-        const blob = answers.join('\n');
-        inputChars += blob.length;
-        messages.push({ role: 'user', content: blob });
-      }
-    } else {
-      const followUp = [...results.map((r) => r.text), ...answers].join('\n');
-      inputChars += followUp.length;
-      messages.push({ role: 'user', content: followUp });
-    }
+    // ── Feed the results back (REQ-128, shared with the CLI loop) ───────────
+    feedBackResults(messages, { results, answers, assistantText: clean, turn: turns });
   }
 
   // REQ-116 FAZ A: a maxed-out run leaves a machine-readable stop marker

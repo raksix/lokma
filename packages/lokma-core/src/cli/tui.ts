@@ -3,7 +3,7 @@ import { readdirSync } from 'node:fs';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { createInterface, type Interface } from 'node:readline/promises';
-import { stream as aiStream, type ProviderMessage } from '@lokma/ai';
+import { stream as aiStream, zodToJsonSchema, type ProviderMessage } from '@lokma/ai';
 import { loadConfig, saveGlobal } from '../config/loader.js';
 import { RepoGit } from '../git/git.js';
 import { SessionStore } from '../session/store.js';
@@ -15,6 +15,7 @@ import { buildTodoTools } from '../tools/todos.js';
 import { buildToolSystemPrompt, createBlockFilter } from '../tools/parse.js';
 import { executeToolCall, mintCallId, runApprovedCall } from '../tools/executor.js';
 import { describeToolCall } from '../tools/gate.js';
+import { feedBackResults, formatToolResult, toolResultCarrier, type ToolResultCarrier } from '../tools/tool-results.js';
 import { estimateCost, estimateTokens } from '../usage/pricing.js';
 import { UsageLedger } from '../usage/ledger.js';
 import { listThemes } from '../themes/themes.js';
@@ -259,10 +260,10 @@ async function runPrompt(opts: {
 
     const filter = createBlockFilter();
     let clean = '';
-    // REQ-118 FAZ B: gateway-typed native calls (collected for direct
-    // execution below; the CLI currently sends no tool schemas, so this
-    // stays empty until tools ride the CLI stream too).
-    const nativeCalls: { tool: string; input: unknown; parseError?: string }[] = [];
+    // REQ-128: gateway-typed native calls — collected for direct execution
+    // below (the harness now sends tool schemas, so this is the main path on
+    // every upstream that supports function calling).
+    const nativeCalls: { tool: string; input: unknown; callId: string; argumentsJson?: string; parseError?: string }[] = [];
     let streamFailed: unknown = null;
     console.log('');
     try {
@@ -274,6 +275,13 @@ async function runPrompt(opts: {
         baseUrl: upstream.baseUrl,
         signal: turnCtrl.signal,
         extraHeaders: { 'x-opencode-session': `lokma-${sessionId}` },
+        // REQ-128: the same registry schemas the Web loop sends — a model
+        // with function calling drives the CLI through native tools too.
+        tools: registry.list().map((t) => ({
+          name: t.name,
+          description: t.description,
+          parameters: zodToJsonSchema(t.inputSchema),
+        })),
       })) {
         if (chunk.type === 'text_delta') {
           const visible = filter.push(chunk.delta);
@@ -284,12 +292,16 @@ async function runPrompt(opts: {
         } else if (chunk.type === 'thinking_delta') {
           if (chunk.delta) process.stdout.write(p.dim(chunk.delta));
         } else if (chunk.type === 'native_tool_call') {
-          // REQ-118 FAZ B: gateway-typed call — direct execution below.
-          if (chunk.parseError === undefined) {
-            nativeCalls.push({ tool: chunk.tool, input: chunk.input });
-          } else {
-            nativeCalls.push({ tool: chunk.tool, input: chunk.input, parseError: chunk.parseError });
-          }
+          // REQ-128: gateway-typed call — executed directly below, with the
+          // gateway id + raw argument json so the follow-up can answer it
+          // natively (assistant.tool_calls + tool rows).
+          nativeCalls.push({
+            tool: chunk.tool,
+            input: chunk.input,
+            callId: chunk.callId,
+            argumentsJson: chunk.argumentsJson,
+            ...(chunk.parseError === undefined ? {} : { parseError: chunk.parseError }),
+          });
         } else if (chunk.type === 'done') {
           break;
         }
@@ -328,8 +340,17 @@ async function runPrompt(opts: {
         const key = `${n.tool}::${JSON.stringify(n.input ?? null)}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        if (n.parseError === undefined) end.toolCalls.push({ tool: n.tool, input: n.input });
-        else end.toolCalls.push({ tool: n.tool, input: n.input, parseError: n.parseError });
+        if (n.parseError === undefined) {
+          end.toolCalls.push({ tool: n.tool, input: n.input, nativeCallId: n.callId, nativeArgs: n.argumentsJson });
+        } else {
+          end.toolCalls.push({
+            tool: n.tool,
+            input: n.input,
+            parseError: n.parseError,
+            nativeCallId: n.callId,
+            nativeArgs: n.argumentsJson,
+          });
+        }
       }
     }
     if (end.tail) {
@@ -345,15 +366,42 @@ async function runPrompt(opts: {
       await store.append(sessionId, { role: 'assistant', content: clean, timestamp: new Date().toISOString() }).catch(() => {});
     }
 
-    const followUps: string[] = [];
+    /**
+     * REQ-128: results ready to hand back to the model — the shared carrier
+     * keeps the CLI and the Web loop on one tool→model wire shape.
+     */
+    const results: ToolResultCarrier[] = [];
+    /** Blocking-question answers — plain text, never tool rows. */
+    const answers: string[] = [];
+    const pushResult = (
+      call: { tool: string; input: unknown; nativeCallId?: string; nativeArgs?: string },
+      resultId: string,
+      body: string,
+      isError: boolean,
+    ): void => {
+      results.push(
+        toolResultCarrier({
+          tool: call.tool,
+          input: call.input,
+          resultId,
+          body,
+          isError,
+          nativeCallId: call.nativeCallId,
+          nativeArgs: call.nativeArgs,
+        }),
+      );
+    };
 
     for (const call of end.toolCalls) {
       if (opts.signal.aborted) return { inputChars, outputChars, turns: turn, aborted: true };
       const callId = mintCallId();
+      // REQ-128: native calls answer with the gateway id so the next turn
+      // links the pairing; text calls keep the minted execution id.
+      const resultId = call.nativeCallId ?? callId;
       if (!call.tool || call.input === undefined) {
         const message = !call.tool ? 'Model emitted a <tool> block without a name' : `Model emitted invalid tool JSON: ${call.parseError ?? 'parse error'}`;
         console.log(`\n${p.err(`${p.symbols.fail} ${call.tool || 'unknown'}`)} ${p.muted(message)}`);
-        followUps.push(`<tool_result tool="${call.tool || 'unknown'}" id="${callId}">ERROR bad_tool_block: ${message}</tool_result>`);
+        pushResult(call, resultId, `ERROR bad_tool_block: ${message}`, true);
         continue;
       }
       const argPreview = JSON.stringify(call.input);
@@ -368,7 +416,7 @@ async function runPrompt(opts: {
           await store
             .append(sessionId, { role: 'tool', content: JSON.stringify({ callId, ok: false, code: 'denied', message }), timestamp: new Date().toISOString(), toolCallId: callId, toolName: outcome.tool })
             .catch(() => {});
-          followUps.push(`<tool_result tool="${outcome.tool}" id="${callId}">ERROR denied: ${message}</tool_result>`);
+          pushResult(call, resultId, `ERROR denied: ${message}`, true);
         } else {
           if (decision === 'always') {
             const allow = [...(permissions?.allow ?? [])];
@@ -385,13 +433,24 @@ async function runPrompt(opts: {
             await store
               .append(sessionId, { role: 'tool', content: JSON.stringify({ callId, ok: true, result: ran.result }), timestamp: new Date().toISOString(), toolCallId: callId, toolName: outcome.tool })
               .catch(() => {});
-            followUps.push(`<tool_result tool="${outcome.tool}" id="${callId}">${JSON.stringify(ran.result)}</tool_result>`);
+            pushResult(
+              call,
+              resultId,
+              await formatToolResult({
+                cwd,
+                tool: outcome.tool,
+                callId,
+                result: ran.result,
+                declaredBudget: registry.get(outcome.tool)?.maxResultSizeChars,
+              }),
+              false,
+            );
           } else {
             console.log(`  ${p.err(`${p.symbols.fail} ${ran.code}`)} ${p.muted(ran.message.slice(0, 200))}`);
             await store
               .append(sessionId, { role: 'tool', content: JSON.stringify({ callId, ok: false, code: ran.code, message: ran.message }), timestamp: new Date().toISOString(), toolCallId: callId, toolName: outcome.tool })
               .catch(() => {});
-            followUps.push(`<tool_result tool="${outcome.tool}" id="${callId}">ERROR ${ran.code}: ${ran.message}</tool_result>`);
+            pushResult(call, resultId, `ERROR ${ran.code}: ${ran.message}`, true);
           }
         }
       } else if (outcome.outcome === 'denied') {
@@ -400,20 +459,31 @@ async function runPrompt(opts: {
         await store
           .append(sessionId, { role: 'tool', content: JSON.stringify({ callId, ok: false, code: 'denied', message }), timestamp: new Date().toISOString(), toolCallId: callId, toolName: outcome.tool })
           .catch(() => {});
-        followUps.push(`<tool_result tool="${outcome.tool}" id="${callId}">ERROR denied: ${message}</tool_result>`);
+        pushResult(call, resultId, `ERROR denied: ${message}`, true);
       } else if (outcome.outcome === 'ok') {
         const preview = JSON.stringify(outcome.result);
         console.log(`  ${p.ok(`${p.symbols.ok}`)} ${p.muted(preview.length > 240 ? preview.slice(0, 240) + '…' : preview)}`);
         await store
           .append(sessionId, { role: 'tool', content: JSON.stringify({ callId, ok: true, result: outcome.result }), timestamp: new Date().toISOString(), toolCallId: callId, toolName: call.tool })
           .catch(() => {});
-        followUps.push(`<tool_result tool="${call.tool}" id="${callId}">${JSON.stringify(outcome.result)}</tool_result>`);
+        pushResult(
+          call,
+          resultId,
+          await formatToolResult({
+            cwd,
+            tool: call.tool,
+            callId,
+            result: outcome.result,
+            declaredBudget: registry.get(call.tool)?.maxResultSizeChars,
+          }),
+          false,
+        );
       } else {
         console.log(`  ${p.err(`${p.symbols.fail} ${outcome.code}`)} ${p.muted(outcome.message.slice(0, 200))}`);
         await store
           .append(sessionId, { role: 'tool', content: JSON.stringify({ callId, ok: false, code: outcome.code, message: outcome.message }), timestamp: new Date().toISOString(), toolCallId: callId, toolName: call.tool })
           .catch(() => {});
-        followUps.push(`<tool_result tool="${call.tool}" id="${callId}">ERROR ${outcome.code}: ${outcome.message}</tool_result>`);
+        pushResult(call, resultId, `ERROR ${outcome.code}: ${outcome.message}`, true);
       }
     }
 
@@ -421,10 +491,10 @@ async function runPrompt(opts: {
       if (opts.signal.aborted) return { inputChars, outputChars, turns: turn, aborted: true };
       const answer = await askUser(ask.question || '(the model asked an empty question)', ask.choices);
       if (answer === null) return { inputChars, outputChars, turns: turn, aborted: true };
-      followUps.push(`<answer question="${ask.question}">${answer}</answer>`);
+      answers.push(`<answer question="${ask.question}">${answer}</answer>`);
     }
 
-    if (followUps.length === 0) {
+    if (results.length === 0 && answers.length === 0) {
       const quietTurn = !clean.trim() && end.toolCalls.length === 0 && end.asks.length === 0;
       if (quietTurn && turn < MAX_TURNS && !nudgedQuiet) {
         nudgedQuiet = true;
@@ -436,9 +506,9 @@ async function runPrompt(opts: {
       process.stdout.write('\n');
       return { inputChars, outputChars, turns: turn, aborted: false };
     }
-    const followUp = followUps.join('\n');
-    inputChars += followUp.length;
-    messages.push({ role: 'user', content: followUp });
+    // REQ-128: one shared feed-back path for both loops (native pairing when
+    // the calls arrived as function calls, text blob otherwise).
+    feedBackResults(messages, { results, answers, assistantText: clean, turn });
   }
 
   console.log(p.warn(`\n[paused after ${MAX_TURNS} tool turns with work still queued — say "continue"]`));

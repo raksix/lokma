@@ -1,5 +1,12 @@
 import { ProviderError } from './errors.js';
 import { isLocalBaseUrl, readErrorSnippet, readSse } from './sse.js';
+import {
+  looksLikeReasoningUnsupported,
+  markReasoningRejected,
+  reasoningBlocked,
+  reasoningKey,
+} from './reasoning.js';
+import type { ReasoningEffort } from '@lokma/shared/protocol/ws';
 import type { AdapterStreamOpts, ProviderAdapter, ProviderMessage, ProviderToolSchema, StreamChunk } from './types.js';
 
 /**
@@ -472,6 +479,13 @@ export class OpenAIAdapter implements ProviderAdapter {
     // REQ-128: set when an upstream rejects the native tool pairing — the
     // history then flattens to the legacy text shape for the retry.
     let flattenHistory = false;
+    // REQ-133: thinking budget for this request. `off`/undefined means "no
+    // reasoning field"; pairs already known to refuse it are skipped up
+    // front, and the probe below clears it for the retry.
+    let effort: ReasoningEffort | null =
+      opts.reasoningEffort && opts.reasoningEffort !== 'off' && !reasoningBlocked(reasoningKey(base, shortModelId(opts.model)))
+        ? opts.reasoningEffort
+        : null;
     const buildBody = (): Record<string, unknown> =>
       viaResponses
         ? {
@@ -479,12 +493,14 @@ export class OpenAIAdapter implements ProviderAdapter {
             input: toResponsesInput(opts.messages),
             stream: true,
             ...(responsesTools.length > 0 ? { tools: responsesTools, tool_choice: 'auto' } : {}),
+            ...(effort ? { reasoning: { effort } } : {}),
           }
         : {
             model: shortModelId(opts.model),
             messages: toChatMessages(opts.messages, { flatten: flattenHistory }),
             stream: true,
             ...(chatTools.length > 0 ? { tools: chatTools, tool_choice: 'auto' } : {}),
+            ...(effort ? { reasoning_effort: effort } : {}),
           };
     const post = async (): Promise<Response> =>
       fetch(url, {
@@ -521,6 +537,15 @@ export class OpenAIAdapter implements ProviderAdapter {
       // turn still runs: only the history flattens to text.
       if (!res.ok && !flattenHistory && looksLikeToolPairingError(res.status, snippet)) {
         flattenHistory = true;
+        res = await postOrThrow();
+        if (!res.ok) snippet = await readErrorSnippet(res);
+      }
+      // REQ-133 capability probe — an upstream that rejects the reasoning
+      // field still answers the turn: retry once without it and remember
+      // the pair so later turns go straight to the shape that works.
+      if (!res.ok && effort && looksLikeReasoningUnsupported(res.status, snippet)) {
+        markReasoningRejected(reasoningKey(base, shortModelId(opts.model)));
+        effort = null;
         res = await postOrThrow();
         if (!res.ok) snippet = await readErrorSnippet(res);
       }

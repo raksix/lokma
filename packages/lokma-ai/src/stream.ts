@@ -1,6 +1,7 @@
 import { ProviderError } from './provider/errors.js';
 import { providerRegistry } from './provider/registry.js';
 import type { ProviderMessage, StreamChunk } from './provider/types.js';
+import type { ReasoningEffort } from '@lokma/shared/protocol/ws';
 
 /**
  * Unified stream() — picks adapter by provider, yields normalized chunks.
@@ -20,6 +21,11 @@ export type StreamOpts = {
   extraHeaders?: Record<string, string>;
   /** Native tool schemas — forwarded to adapters that support them (REQ-118). */
   tools?: { name: string; description: string; parameters: unknown }[];
+  /**
+   * REQ-133: thinking budget picked in the composer. Adapters translate it
+   * into their own reasoning field; `undefined`/`off` adds nothing.
+   */
+  reasoningEffort?: ReasoningEffort;
 };
 
 export async function* stream(opts: StreamOpts): AsyncGenerator<StreamChunk> {
@@ -38,5 +44,6 @@ export async function* stream(opts: StreamOpts): AsyncGenerator<StreamChunk> {
     signal: opts.signal,
     extraHeaders: opts.extraHeaders,
     tools: opts.tools,
+    reasoningEffort: opts.reasoningEffort,
   });
 }

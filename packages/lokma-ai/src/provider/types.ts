@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { ReasoningEffort } from '@lokma/shared/protocol/ws';
 
 /**
  * Provider abstraction — one interface for all LLMs.
@@ -61,6 +62,13 @@ export type AdapterStreamOpts = {
    * natively ignore this — the text `<tool>` loop still works.
    */
   tools?: ProviderToolSchema[];
+  /**
+   * REQ-133: thinking budget from the composer. `low|medium|high` become
+   * the provider's own reasoning knob (`reasoning_effort`, Responses
+   * `reasoning.effort`, Anthropic `thinking.budget_tokens`); `off` or
+   * undefined adds no field at all.
+   */
+  reasoningEffort?: ReasoningEffort;
 };
 
 export type StreamChunk =

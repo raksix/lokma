@@ -1,6 +1,14 @@
 import { ProviderError } from './errors.js';
 import { readErrorSnippet, readSse } from './sse.js';
 import { shortModelId } from './openai.js';
+import {
+  activeEffort,
+  anthropicThinkingBudget,
+  looksLikeReasoningUnsupported,
+  markReasoningRejected,
+  reasoningBlocked,
+  reasoningKey,
+} from './reasoning.js';
 import type { AdapterStreamOpts, ProviderAdapter, ProviderMessage, ProviderToolSchema, StreamChunk } from './types.js';
 
 /**
@@ -111,6 +119,8 @@ export class AnthropicAdapter implements ProviderAdapter {
       );
     }
     const base = (opts.baseUrl ?? ANTHROPIC_DEFAULT_BASE_URL).replace(/\/$/, '');
+    // Narrowed once so the request closure keeps the non-null type.
+    const apiKey = opts.apiKey;
     const system: string[] = [];
     const turns: ProviderMessage[] = [];
     for (const m of opts.messages) {
@@ -118,13 +128,17 @@ export class AnthropicAdapter implements ProviderAdapter {
       else turns.push(m);
     }
     const tools = toAnthropicTools(opts.tools);
-    let res: Response;
-    try {
-      res = await fetch(`${base}/v1/messages`, {
+    // REQ-133: composer thinking budget → `thinking.budget_tokens` (extended
+    // thinking). A pair known to refuse the field skips it up front; the
+    // probe below retries without it and remembers the pair.
+    const rKey = reasoningKey(base, shortModelId(opts.model));
+    let effort = reasoningBlocked(rKey) ? null : activeEffort(opts.reasoningEffort);
+    const post = (): Promise<Response> =>
+      fetch(`${base}/v1/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': opts.apiKey,
+          'x-api-key': apiKey,
           'anthropic-version': ANTHROPIC_VERSION,
           ...(opts.extraHeaders ?? {}),
         },
@@ -136,19 +150,34 @@ export class AnthropicAdapter implements ProviderAdapter {
           ...(system.length ? { system: system.join('\n') } : {}),
           messages: toAnthropicMessages(turns),
           ...(tools.length > 0 ? { tools, tool_choice: { type: 'auto' } } : {}),
+          ...(effort ? { thinking: { type: 'enabled', budget_tokens: anthropicThinkingBudget(effort) } } : {}),
         }),
       });
+    let res: Response;
+    try {
+      res = await post();
     } catch (e) {
       if (e instanceof Error && e.name === 'AbortError') throw e;
       throw new ProviderError('network_error', `Anthropic request failed: ${e instanceof Error ? e.message : String(e)}`);
     }
     if (!res.ok) {
-      const snippet = await readErrorSnippet(res);
-      throw new ProviderError(
-        'http_error',
-        `Anthropic HTTP ${res.status}${snippet ? ` — ${snippet}` : ''}`,
-        res.status,
-      );
+      let snippet = await readErrorSnippet(res);
+      // REQ-133 capability probe — a model without extended thinking still
+      // answers the turn: retry once without the field, remember the pair.
+      if (effort && looksLikeReasoningUnsupported(res.status, snippet)) {
+        markReasoningRejected(rKey);
+        effort = null;
+        try {
+          res = await post();
+        } catch (e) {
+          if (e instanceof Error && e.name === 'AbortError') throw e;
+          throw new ProviderError('network_error', `Anthropic request failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
+        if (!res.ok) snippet = await readErrorSnippet(res);
+      }
+      if (!res.ok) {
+        throw new ProviderError('http_error', `Anthropic HTTP ${res.status}${snippet ? ` — ${snippet}` : ''}`, res.status);
+      }
     }
     /** index → in-flight tool_use block; flushed when its block stops. */
     const open = new Map<number, ToolUseBlock>();

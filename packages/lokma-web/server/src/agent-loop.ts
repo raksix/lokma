@@ -176,14 +176,52 @@ export function truncateHistoryText(text: string, cap: number): string {
   return `${text.slice(0, cap)}\n…[truncated ${text.length - cap} chars]`;
 }
 
+/** Split a persisted tool row into (argumentsJson, body) for native replay. */
+export function toolRowParts(content: string): { argumentsJson: string; body: string } {
+  try {
+    const rec = JSON.parse(content) as {
+      input?: unknown;
+      result?: unknown;
+      message?: unknown;
+      ok?: unknown;
+      code?: unknown;
+    };
+    if (rec && typeof rec === 'object' && !Array.isArray(rec)) {
+      const argumentsJson = JSON.stringify(rec.input ?? {});
+      let body: string;
+      if ('result' in rec) body = typeof rec.result === 'string' ? rec.result : JSON.stringify(rec.result ?? null);
+      else if (rec.ok === false) body = `ERROR ${String(rec.code ?? 'error')}: ${String(rec.message ?? '')}`;
+      else body = content;
+      return { argumentsJson, body };
+    }
+  } catch {
+    // Legacy/plain row — replay it verbatim as the result body.
+  }
+  return { argumentsJson: '{}', body: content };
+}
+
 /**
- * Rebuild model history from the JSONL transcript. Tool rows become
- * user-role `<tool_result>` text (adapters map unknown roles safely);
- * oldest rows drop first past the caps. Pure — probe it directly.
+ * Rebuild model history from the JSONL transcript (REQ-071 caps + REQ-128
+ * native pairing).
+ *
+ * Oldest rows drop first past the caps; thinking rows never ride upstream.
+ * REQ-128: an assistant row followed by id-bearing tool rows is re-paired
+ * into the native structure (`assistant.tool_calls[]` + one `tool` row per
+ * result) — otherwise a second conversation in the same session would show
+ * the model a wall of `<tool_result>` text instead of the tool protocol it
+ * actually speaks. Anything unpaired (no id, no assistant row ahead of it)
+ * degrades to that text blob, so a `tool_call_id` is never left dangling.
+ * Pure — probe it directly.
  */
 export function buildLoopHistory(messages: SessionMessage[]): ProviderMessage[] {
   const recent = messages.slice(-HISTORY_MESSAGE_CAP);
-  const out: ProviderMessage[] = [];
+  type Row = {
+    role: 'user' | 'assistant' | 'tool';
+    content: string;
+    toolCallId?: string;
+    toolName?: string;
+  };
+  const rows: Row[] = [];
   let chars = 0;
   for (let i = recent.length - 1; i >= 0; i--) {
     const m = recent[i];
@@ -195,20 +233,68 @@ export function buildLoopHistory(messages: SessionMessage[]): ProviderMessage[] 
     // answered); older rows are truncated per-role so giants cannot evict
     // the conversation the model is supposed to remember.
     const isNewest = i === recent.length - 1;
-    let text: string;
-    let role: ProviderMessage['role'];
-    if (m.role === 'tool') {
-      role = 'user';
-      const body = isNewest ? m.content : truncateHistoryText(m.content, HISTORY_TOOL_TRUNC);
-      text = `<tool_result tool="${m.toolName ?? 'unknown'}" id="${m.toolCallId ?? ''}">${body}</tool_result>`;
-    } else {
-      role = m.role === 'assistant' ? 'assistant' : 'user';
-      text = isNewest ? m.content : truncateHistoryText(m.content, HISTORY_CHAT_TRUNC);
+    const row: Row =
+      m.role === 'tool'
+        ? {
+            role: 'tool',
+            content: isNewest ? m.content : truncateHistoryText(m.content, HISTORY_TOOL_TRUNC),
+            toolCallId: m.toolCallId,
+            toolName: m.toolName,
+          }
+        : {
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: isNewest ? m.content : truncateHistoryText(m.content, HISTORY_CHAT_TRUNC),
+          };
+    if (!row.content.trim()) continue;
+    chars += row.content.length;
+    if (chars > HISTORY_CHAR_CAP && rows.length > 0) break;
+    rows.unshift(row);
+  }
+
+  const out: ProviderMessage[] = [];
+  let i = 0;
+  while (i < rows.length) {
+    const row = rows[i] as Row;
+    if (row.role === 'assistant') {
+      const group: Row[] = [];
+      let j = i + 1;
+      while (j < rows.length) {
+        const next = rows[j] as Row;
+        if (next.role !== 'tool' || !next.toolCallId) break;
+        group.push(next);
+        j++;
+      }
+      if (group.length > 0) {
+        out.push({
+          role: 'assistant',
+          content: row.content,
+          toolCalls: group.map((g) => {
+            const parts = toolRowParts(g.content);
+            return { id: g.toolCallId as string, name: g.toolName ?? 'unknown', arguments: parts.argumentsJson };
+          }),
+        });
+        for (const g of group) {
+          out.push({
+            role: 'tool',
+            content: toolRowParts(g.content).body,
+            toolCallId: g.toolCallId as string,
+            name: g.toolName,
+          });
+        }
+        i = j;
+        continue;
+      }
     }
-    if (!text.trim()) continue;
-    chars += text.length;
-    if (chars > HISTORY_CHAR_CAP && out.length > 0) break;
-    out.unshift({ role, content: text });
+    // Unpaired tool row (or plain turn): the text blob every upstream reads.
+    if (row.role === 'tool') {
+      out.push({
+        role: 'user',
+        content: `<tool_result tool="${row.toolName ?? 'unknown'}" id="${row.toolCallId ?? ''}">${row.content}</tool_result>`,
+      });
+    } else {
+      out.push({ role: row.role, content: row.content });
+    }
+    i++;
   }
   return out;
 }

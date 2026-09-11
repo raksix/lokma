@@ -4,7 +4,7 @@
  * No test framework — plain asserts so the package stays dependency-free.
  * Not imported by server code, so `tsc -p` output ignores it.
  */
-import { buildLoopHistory, decideTurnEnd, retryDelayMs, truncateHistoryText } from './agent-loop';
+import { buildLoopHistory, decideTurnEnd, retryDelayMs, toolRowParts, truncateHistoryText } from './agent-loop';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -49,6 +49,56 @@ const toolHistory = buildLoopHistory([
 const toolRow = toolHistory.find((m) => m.content.includes('<tool_result'));
 assert(toolRow !== undefined && toolRow.content.length < 5_000, 'tool row truncated');
 assert(toolHistory[toolHistory.length - 1].content === 'now write it', 'newest prompt whole after tool row');
+
+// 5. REQ-128: an assistant row + id-bearing tool rows re-pair natively.
+const paired = buildLoopHistory([
+  msg('user', 'read a.ts'),
+  msg('assistant', 'Reading it now.'),
+  msg('tool', JSON.stringify({ callId: 't_1', ok: true, result: { content: 'FILE BODY' }, input: { path: 'a.ts' } }), {
+    toolName: 'read_file',
+    toolCallId: 't_1',
+  }),
+  msg('user', 'thanks'),
+]);
+const pairedAssistant = paired[1];
+assert(
+  pairedAssistant?.role === 'assistant' &&
+    pairedAssistant.toolCalls?.length === 1 &&
+    pairedAssistant.toolCalls[0]?.id === 't_1' &&
+    pairedAssistant.toolCalls[0]?.arguments === '{"path":"a.ts"}',
+  'history re-pairs the assistant turn with its native tool_calls',
+);
+assert(
+  paired[2]?.role === 'tool' && paired[2]?.toolCallId === 't_1' && paired[2]?.content === '{"content":"FILE BODY"}',
+  'history replays the RESULT body (not the whole transcript record) as a tool row',
+);
+
+// 5b. An unpaired tool row (no assistant ahead of it) stays text — a
+// tool_call_id must never be left dangling upstream.
+const unpaired = buildLoopHistory([msg('tool', '{"ok":true,"result":"x"}', { toolName: 'glob', toolCallId: 't9' })]);
+assert(
+  unpaired.length === 1 && unpaired[0]?.role === 'user' && unpaired[0]?.content.includes('<tool_result') && !unpaired[0]?.toolCalls,
+  'a tool row without an assistant turn degrades to text',
+);
+
+// 5c. A failed tool row replays as an ERROR body.
+const failed = buildLoopHistory([
+  msg('assistant', 'Trying.'),
+  msg('tool', JSON.stringify({ callId: 't_2', ok: false, code: 'file_not_found', message: 'No such file' }), {
+    toolName: 'read_file',
+    toolCallId: 't_2',
+  }),
+]);
+assert(
+  failed[1]?.role === 'tool' && failed[1]?.content === 'ERROR file_not_found: No such file',
+  'a failed tool row replays its error body',
+);
+
+// 5d. toolRowParts: legacy plain rows survive untouched.
+assert(
+  toolRowParts('not json at all').body === 'not json at all' && toolRowParts('not json at all').argumentsJson === '{}',
+  'a legacy plain tool row still replays',
+);
 
 console.log(`\nagent-loop probe: ${passed} passed`);
 

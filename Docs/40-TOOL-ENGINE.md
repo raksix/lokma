@@ -126,13 +126,38 @@ divergence:
   concurrently. We follow Claude Code: read-only calls fan out (limit 10),
   writes still serialize.
 
+### 3.6 Hardening copied from Claude Code
+
+The `01-claude-code-tool-engine` teardown (38 built-ins, `cli.js` v2.1.89)
+confirmed our numbers were already right — per-tool budgets `Bash|Run=30k`,
+`Grep=20k`, preview 2000 chars, hard ceiling 50k, `Read=Infinity`, concurrency
+10 — and added two behaviours we were missing:
+
+- **Spill files are opened `wx`.** Claude Code writes `<id>.txt` with the
+  exclusive flag, so a second spill can never clobber a file the model may
+  still be reading. Our sanitizer maps distinct ids onto one path
+  (`call/1` and `call 1` → `call1`) and a replayed turn can reuse an id, so
+  `spillResult()` now probes free names (`call1.txt`, `call1-2.txt`, …) and
+  the envelope always names the file that was actually written. The written
+  copy is what the model is told to read — never a path that lost a race.
+- **Concurrency is an operator knob.** Claude Code reads
+  `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` (default 10). We now read
+  `LOKMA_MAX_TOOL_CONCURRENCY` through `maxToolConcurrency()` — clamped 1..32,
+  junk or non-positive values fall back to 10 instead of failing the turn.
+
+Not ported, deliberately: `strict` schemas / `eager_input_streaming` /
+`defer_loading` (ToolSearch) — all three are Anthropic-API features with no
+equivalent on the chat-completions path that most lokma providers use; and
+image-bearing results are never truncated in Claude Code, but lokma tools
+return text only today (see §5).
+
 ## 4. Proof
 
 | Layer | Command | Result |
 |---|---|---|
 | Adapter (119 checks) | `bun src/provider/adapters.test.ts` (packages/lokma-ai) | chat-completions tools, fragmented `tool_calls`, recycled indices, capability probes, Anthropic blocks |
-| Tools + budget (79 checks) | `bun src/tools/tools.test.ts` (packages/lokma-core) | glob/grep/edit on a real temp workspace, budgets, no-spill marker |
-| Loop history (26 checks) | `bun src/agent-loop.test.ts` (packages/lokma-web/server) | caps, native re-pairing, dangling-id guards |
+| Tools + budget (82 checks) | `bun src/tools/tools.test.ts` (packages/lokma-core) | glob/grep/edit on a real temp workspace, budgets, no-spill marker, spill collision safety |
+| Loop history (31 checks) | `bun src/agent-loop.test.ts` (packages/lokma-web/server) | caps, native re-pairing, dangling-id guards, concurrency knob |
 | **Live, real model** | `bun scripts/probe-live-tools.ts omniroute/auto/best-free` | model emits a NATIVE call, 2 turns, answer contains the real file contents |
 | **Live, CLI** | `lokma tui -p "read hello.txt"` | `read_file` called natively, answer from the real file |
 

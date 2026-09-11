@@ -5,7 +5,7 @@
  * Not imported by server code, so `tsc -p` output ignores it.
  */
 import { spawn } from 'node:child_process';
-import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_CLEAR_MARKER, CLAUDE_COMPACT_FOCUS_MAX, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, CLAUDE_MUTATION_SURFACE, claudeCompactMarker, claudeToolsForLokmaTool, describeClaudeAskCard, formatClaudeContextReport, formatClaudeFocusLine, isClaudeClearCommand, isClaudeCompactCommand, isClaudeContextCommand, parseClaudeCompactCommand, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, translateClaudeLine } from './claude-print';
+import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_CLEAR_MARKER, CLAUDE_COMPACT_FOCUS_MAX, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, CLAUDE_MUTATION_SURFACE, claudeCompactMarker, claudeToolsForLokmaTool, countClaudeCategories, describeClaudeAskCard, formatClaudeCategoryLine, formatClaudeContextReport, formatClaudeFocusLine, isClaudeClearCommand, isClaudeCompactCommand, isClaudeContextCommand, parseClaudeCompactCommand, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, translateClaudeLine } from './claude-print';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -243,5 +243,17 @@ const exactFocus = parseClaudeCompactCommand('/compact ' + 'y'.repeat(500));
 assert(exactFocus !== null && exactFocus.truncated === false && exactFocus.focus.length === 500, 'cap-length focus is not truncated');
 assert(formatClaudeFocusLine({ focus: 'keep auth', truncated: false }) === '[focus: keep auth]', 'focus line formats plain');
 assert(formatClaudeFocusLine({ focus: 'abc', truncated: true }) === '[focus: abc [truncated]]', 'truncated focus line says so');
+
+// 18. FAZ D-context-categories: per-role breakdown in `/context`.
+const cats = countClaudeCategories(['user', 'assistant', 'tool', 'user', 'tool', 'tool']);
+assert(cats.user === 2 && cats.assistant === 1 && cats.tool === 3, 'roles count into user/assistant/tool');
+assert(countClaudeCategories([]).user === 0, 'empty transcript counts zero');
+const catsUnknown = countClaudeCategories(['user', 'system', 'compact-anchor', 'tool']);
+assert(catsUnknown.user === 1 && catsUnknown.assistant === 0 && catsUnknown.tool === 1, 'unknown roles are ignored');
+assert(formatClaudeCategoryLine({ user: 2, assistant: 1, tool: 3 }) === '[categories: 2 user, 1 assistant, 3 tool]', 'category line formats counts');
+assert(formatClaudeCategoryLine({ user: 0, assistant: 0, tool: 0 }) === '[categories: 0 user, 0 assistant, 0 tool]', 'category line formats zeros');
+const ctxCats = formatClaudeContextReport({ messages: 6, chars: 9000, hygieneNeeded: false, summaryNeeded: false, resumed: false, maxBudgetUsd: 2, lastCompact: null, categories: { user: 2, assistant: 2, tool: 2 } });
+assert(ctxCats.includes('[categories: 2 user, 2 assistant, 2 tool]'), 'report appends the category line when present');
+assert(!ctxFresh.includes('[categories:'), 'report without categories stays unchanged');
 
 console.log('\nclaude-print probe: ' + passed + ' passed');

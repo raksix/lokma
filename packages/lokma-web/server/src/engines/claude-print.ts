@@ -303,7 +303,40 @@ export type ClaudeContextInput = {
   maxBudgetUsd: number;
   /** Pre-formatted last-compact line (`mode before->after (at)`) or null. */
   lastCompact: string | null;
+  /**
+   * REQ-116 FAZ D-context-categories — per-role breakdown (`kategori
+   * dökümü`, REQ-116 §3 FAZ D). Optional so older callers (fresh-session
+   * path, existing probes) keep working: absent means no category line.
+   */
+  categories?: ClaudeCategoryCounts | null;
 };
+
+/** Per-role message counts for the `/context` category line. */
+export type ClaudeCategoryCounts = {
+  user: number;
+  assistant: number;
+  tool: number;
+};
+
+/**
+ * REQ-116 FAZ D-context-categories — count transcript roles into the
+ * category breakdown. Unknown roles are ignored (anchor rows and future
+ * roles never inflate the line). Pure — probe it.
+ */
+export function countClaudeCategories(roles: readonly string[]): ClaudeCategoryCounts {
+  const counts: ClaudeCategoryCounts = { user: 0, assistant: 0, tool: 0 };
+  for (const role of roles) {
+    if (role === 'user') counts.user += 1;
+    else if (role === 'assistant') counts.assistant += 1;
+    else if (role === 'tool') counts.tool += 1;
+  }
+  return counts;
+}
+
+/** One category line for the `/context` report. Pure — probe it. */
+export function formatClaudeCategoryLine(counts: ClaudeCategoryCounts): string {
+  return '[categories: ' + String(counts.user) + ' user, ' + String(counts.assistant) + ' assistant, ' + String(counts.tool) + ' tool]';
+}
 
 /** One readable status block for the `/context` assistant row. Pure. */
 export function formatClaudeContextReport(input: ClaudeContextInput): string {
@@ -318,6 +351,7 @@ export function formatClaudeContextReport(input: ClaudeContextInput): string {
     'budget: $' + String(input.maxBudgetUsd) + ' per run',
     'last compact: ' + (input.lastCompact ?? 'none'),
   ];
+  if (input.categories) lines.push(formatClaudeCategoryLine(input.categories));
   return lines.join('\n');
 }
 

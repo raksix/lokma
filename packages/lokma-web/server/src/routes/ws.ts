@@ -32,6 +32,7 @@ import {
   CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD,
   CLAUDE_MUTATION_SURFACE,
   claudeCompactMarker,
+  countClaudeCategories,
   describeClaudeAskCard,
   formatClaudeContextReport,
   formatClaudeFocusLine,
@@ -170,6 +171,13 @@ async function runClaudeEngineTurn(
       const last = status.last && status.last.compacted
         ? status.last.mode + ' ' + String(status.last.beforeMessages) + '->' + String(status.last.afterMessages) + ' (' + status.last.compactedAt + ')'
         : null;
+      // REQ-116 FAZ D-context-categories: per-role breakdown reads the same
+      // transcript the counts above come from; a missing read degrades to
+      // no category line (never breaks the report).
+      const categories = await store.read(sessionId).then(
+        (messages) => countClaudeCategories(messages.map((m) => m.role)),
+        () => null,
+      );
       await store.append(sessionId, {
         role: 'assistant',
         content: formatClaudeContextReport({
@@ -180,6 +188,7 @@ async function runClaudeEngineTurn(
           resumed: Boolean(meta?.claudeSessionId?.trim()),
           maxBudgetUsd: CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD,
           lastCompact: last,
+          categories,
         }),
         timestamp: new Date().toISOString(),
       });

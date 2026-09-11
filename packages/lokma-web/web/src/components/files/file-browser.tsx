@@ -675,7 +675,9 @@ function FileContextMenu({
 }) {
   const download = async () => {
     try {
-      const blob = await api.readWorkspaceFileRaw(cwd, path);
+      // REQ-125: /raw only serves previewable types (415 otherwise) — real
+      // downloads ride /download (any jailed file, attachment disposition).
+      const blob = await api.downloadWorkspaceFile(cwd, path);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

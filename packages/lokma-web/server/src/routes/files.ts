@@ -5,6 +5,8 @@ import { FileError, WorkspaceFiles } from '@lokma/core';
  * Workspace files — real file-system access for the FileBrowser pane (W3-9).
  * `GET /api/files` (one-level tree + git overlay),
  * `GET /api/files/read` (capped content + full-file sha),
+ * `GET /api/files/raw` (binary preview: images/pdf/html, 415 otherwise),
+ * `GET /api/files/download` (any jailed file as attachment),
  * `GET /api/files/search` (fuzzy quick-open),
  * `POST /api/files/write` (atomic save with `expectedSha` lost-update guard).
  * Every path is jailed to `?cwd=` (outside escapes → 400 `outside_root`);
@@ -71,6 +73,27 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
     try {
       const raw = await files(query.cwd).readRaw(query.path);
       return reply.type(type).send(raw.bytes);
+    } catch (e) {
+      if (e instanceof FileError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      throw e;
+    }
+  });
+
+  app.get('/api/files/download', async (req, reply) => {
+    // REQ-125: real download for ANY jailed file (preview map is images/pdf/
+    // html only — downloading .md/.ts/.json through /raw 415s). Same jail +
+    // 10MB cap as /raw; octet-stream + attachment so the browser saves it.
+    const query = req.query as { cwd?: unknown; path?: unknown };
+    if (typeof query.path !== 'string' || !query.path.trim()) {
+      return reply.status(400).send({ code: 'bad_path', message: 'download needs ?path=<workspace file>' });
+    }
+    try {
+      const raw = await files(query.cwd).readRaw(query.path);
+      const name = String(query.path).split('/').pop() || 'download';
+      return reply
+        .type('application/octet-stream')
+        .header('content-disposition', `attachment; filename="${name.replace(/["\r\n]/g, '_')}"`)
+        .send(raw.bytes);
     } catch (e) {
       if (e instanceof FileError) return reply.status(e.status).send({ code: e.code, message: e.message });
       throw e;

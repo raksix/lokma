@@ -1228,6 +1228,12 @@ export const api = {
     if (!res.ok) throw await toApiError(res);
     return res.blob();
   },
+  /** REQ-125: download bytes for ANY workspace file (not just previewable). */
+  downloadWorkspaceFile: async (cwd: string, path: string): Promise<Blob> => {
+    const res = await authedFetch(`/api/files/download?cwd=${encodeURIComponent(cwd)}&path=${encodeURIComponent(path)}`);
+    if (!res.ok) throw await toApiError(res);
+    return res.blob();
+  },
   searchWorkspaceFiles: (cwd: string, q: string, max = 50) =>
     get<FileSearchRes>(
       `/api/files/search?cwd=${encodeURIComponent(cwd)}&q=${encodeURIComponent(q)}&max=${max}`,

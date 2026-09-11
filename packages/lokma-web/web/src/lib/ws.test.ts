@@ -10,6 +10,7 @@ import {
   applyServerFrame,
   decodeServerFrame,
   directWsUrl,
+  dropLiveTrace,
   initialWsUiState,
   permissionAnswer,
   promptMessage,
@@ -149,6 +150,20 @@ cut = applyServerFrame(cut, { type: 'tool_result', callId: 'c1', result: 'ok', i
 assert(cut.toolMarks.length === 2, 'tool_result adds no mark');
 cut = applyServerFrame(cut, { type: 'tool_start', tool: 'read', input: {}, callId: 'c1', sessionId: 's' });
 assert(cut.toolMarks.length === 2, 'resent tool_start is idempotent');
+
+// 12. REQ-132: a finished run must drop the live trace, otherwise the answer
+//     renders twice — once from the refetched transcript row, once from the
+//     still-populated live buffers (the "stream bitince iki kere geliyor" bug).
+let dup = initialWsUiState();
+dup = applyServerFrame(dup, { type: 'thinking_delta', delta: 'weighing options', sessionId: 's' });
+dup = applyServerFrame(dup, { type: 'text_delta', delta: 'Final answer.', sessionId: 's' });
+dup = applyServerFrame(dup, { type: 'tool_start', tool: 'read', input: {}, callId: 'c9', sessionId: 's' });
+assert(dup.stream === 'Final answer.' && dup.thinking === 'weighing options', 'live trace is populated while streaming');
+const settled = dropLiveTrace(applyServerFrame(dup, { type: 'done', sessionId: 's', reason: 'complete' }));
+assert(settled.stream === '' && settled.thinking === '', 'finished run drops the live answer and thinking');
+assert(settled.toolMarks.length === 0 && Object.keys(settled.toolCalls).length === 0, 'finished run drops live tool rows');
+assert(settled.done === true && settled.doneReason === 'complete', 'dropping the trace keeps the run marked done');
+assert(settled.retry === null, 'dropping the trace clears a stale retry notice');
 
 delete (globalThis as unknown as Record<string, unknown>).window;
 console.log('ws.test.ts: all WS-client checks passed');

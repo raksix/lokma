@@ -33,8 +33,10 @@ import {
   CLAUDE_MUTATION_SURFACE,
   claudeCompactMarker,
   describeClaudeAskCard,
+  formatClaudeContextReport,
   isClaudeClearCommand,
   isClaudeCompactCommand,
+  isClaudeContextCommand,
   parseClaudeEngineModel,
   resolveClaudePermissions,
   runClaudePrint,
@@ -146,6 +148,56 @@ async function runClaudeEngineTurn(
         content: '[compact failed: ' + (e instanceof Error ? e.message : String(e)) + ']',
         timestamp: new Date().toISOString(),
       });
+    }
+    send({ type: 'done', sessionId, reason: 'complete' });
+    return;
+  }
+  // REQ-116 FAZ D-context: `/context` reports headless-run context state
+  // harness-side and never spawns the binary — the read-only counterpart to
+  // `/clear` + `/compact`. Same inputs the pre-turn auto-compact window
+  // reads (`compactionStatus`) plus the resume-handle + budget the engine
+  // owns. Fresh/empty sessions report a fresh state instead of erroring;
+  // any other failure only warns and leaves a marker row.
+  if (isClaudeContextCommand(prompt)) {
+    try {
+      const status = await compactionStatus(cwd, sessionId);
+      const meta = await store.readMeta(sessionId).catch(() => null);
+      const last = status.last && status.last.compacted
+        ? status.last.mode + ' ' + String(status.last.beforeMessages) + '->' + String(status.last.afterMessages) + ' (' + status.last.compactedAt + ')'
+        : null;
+      await store.append(sessionId, {
+        role: 'assistant',
+        content: formatClaudeContextReport({
+          messages: status.messages,
+          chars: status.chars,
+          hygieneNeeded: status.hygieneNeeded,
+          summaryNeeded: status.summaryNeeded,
+          resumed: Boolean(meta?.claudeSessionId?.trim()),
+          maxBudgetUsd: CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD,
+          lastCompact: last,
+        }),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (e) {
+      const code = (e as { code?: string })?.code;
+      await store.append(sessionId, {
+        role: 'assistant',
+        content: code === 'session_not_found'
+          ? formatClaudeContextReport({
+            messages: 0,
+            chars: 0,
+            hygieneNeeded: false,
+            summaryNeeded: false,
+            resumed: false,
+            maxBudgetUsd: CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD,
+            lastCompact: null,
+          })
+          : '[context failed: ' + (e instanceof Error ? e.message : String(e)) + ']',
+        timestamp: new Date().toISOString(),
+      });
+      if (code !== 'session_not_found') {
+        app.log.warn('[ws] claude context failed session=' + sessionId + ': ' + String(e));
+      }
     }
     send({ type: 'done', sessionId, reason: 'complete' });
     return;

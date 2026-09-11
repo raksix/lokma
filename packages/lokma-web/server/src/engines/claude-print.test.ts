@@ -5,7 +5,7 @@
  * Not imported by server code, so `tsc -p` output ignores it.
  */
 import { spawn } from 'node:child_process';
-import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_CLEAR_MARKER, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, CLAUDE_MUTATION_SURFACE, claudeCompactMarker, claudeToolsForLokmaTool, describeClaudeAskCard, isClaudeClearCommand, isClaudeCompactCommand, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, translateClaudeLine } from './claude-print';
+import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_CLEAR_MARKER, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, CLAUDE_MUTATION_SURFACE, claudeCompactMarker, claudeToolsForLokmaTool, describeClaudeAskCard, formatClaudeContextReport, isClaudeClearCommand, isClaudeCompactCommand, isClaudeContextCommand, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, translateClaudeLine } from './claude-print';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -199,5 +199,28 @@ assert(!isClaudeCompactCommand('compact'), 'bare compact without slash does not 
 assert(!isClaudeCompactCommand('please /compact this'), 'embedded /compact does not match');
 assert(claudeCompactMarker(10, 3, 'full') === '[compact: full 10->3 messages]', 'shared marker formats before->after with mode');
 assert(claudeCompactMarker(5, 5, 'hygiene').includes('hygiene'), 'shared marker carries the mode');
+
+// 16. FAZ D-context: `/context` detection + status report for headless runs.
+assert(isClaudeContextCommand('/context'), '/context matches');
+assert(isClaudeContextCommand('  /context  '), '/context matches with surrounding whitespace');
+assert(!isClaudeContextCommand('/context now'), '/context with args does not match');
+assert(!isClaudeContextCommand('/clear'), '/clear is not context');
+assert(!isClaudeContextCommand('/compact'), '/compact is not context');
+assert(!isClaudeContextCommand('context'), 'bare context without slash does not match');
+assert(!isClaudeContextCommand('please /context this'), 'embedded /context does not match');
+assert(!isClaudeClearCommand('/context'), '/context is not clear');
+assert(!isClaudeCompactCommand('/context'), '/context is not compact');
+const ctxFresh = formatClaudeContextReport({ messages: 3, chars: 1200, hygieneNeeded: false, summaryNeeded: false, resumed: false, maxBudgetUsd: 2, lastCompact: null });
+assert(ctxFresh.includes('3 messages') && ctxFresh.includes('1200 chars'), 'context report carries counts');
+assert(ctxFresh.includes('within budget'), 'small transcript reports within budget');
+assert(ctxFresh.includes('fresh (no resume handle)'), 'missing handle reports fresh');
+assert(ctxFresh.includes('$2 per run'), 'report carries the per-run budget');
+assert(ctxFresh.includes('last compact: none'), 'missing compact reports none');
+const ctxHot = formatClaudeContextReport({ messages: 90, chars: 70000, hygieneNeeded: true, summaryNeeded: false, resumed: true, maxBudgetUsd: 2, lastCompact: 'full 90->22 (2026-09-11T00:00:00.000Z)' });
+assert(ctxHot.includes('over hygiene budget'), 'hygiene-over transcript reports hygiene budget');
+assert(ctxHot.includes('resumed (resume handle stored)'), 'stored handle reports resumed');
+assert(ctxHot.includes('full 90->22'), 'report carries the last compact line');
+const ctxFull = formatClaudeContextReport({ messages: 200, chars: 200000, hygieneNeeded: true, summaryNeeded: true, resumed: true, maxBudgetUsd: 5, lastCompact: null });
+assert(ctxFull.includes('over summary budget'), 'summary budget wins over hygiene in the report');
 
 console.log('\nclaude-print probe: ' + passed + ' passed');

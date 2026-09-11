@@ -246,6 +246,49 @@ export function claudeCompactMarker(beforeMessages: number, afterMessages: numbe
 }
 
 /**
+ * REQ-116 FAZ D-context — `/context` reports headless-run context state.
+ *
+ * Claude Code's `/context` shows window usage; ours reports the same inputs
+ * the pre-turn auto-compact window reads (`compactionStatus`: message/char
+ * counts against the hygiene/summary budgets) plus headless-run state the
+ * engine owns (resume handle present/fresh, per-run budget, last compact).
+ * Read-only: never spawns the binary, never mutates the transcript itself
+ * (the WS pump still appends the report as the visible assistant row, like
+ * the `/clear` + `/compact` paths). Pure — probe it.
+ */
+export function isClaudeContextCommand(prompt: string): boolean {
+  return prompt.trim() === '/context';
+}
+
+/** Inputs for {@link formatClaudeContextReport} — all plain values, no store. */
+export type ClaudeContextInput = {
+  messages: number;
+  chars: number;
+  hygieneNeeded: boolean;
+  summaryNeeded: boolean;
+  resumed: boolean;
+  maxBudgetUsd: number;
+  /** Pre-formatted last-compact line (`mode before->after (at)`) or null. */
+  lastCompact: string | null;
+};
+
+/** One readable status block for the `/context` assistant row. Pure. */
+export function formatClaudeContextReport(input: ClaudeContextInput): string {
+  const window = input.summaryNeeded
+    ? 'over summary budget'
+    : input.hygieneNeeded
+      ? 'over hygiene budget'
+      : 'within budget';
+  const lines = [
+    '[context: ' + String(input.messages) + ' messages, ' + String(input.chars) + ' chars — ' + window + ']',
+    'engine session: ' + (input.resumed ? 'resumed (resume handle stored)' : 'fresh (no resume handle)'),
+    'budget: $' + String(input.maxBudgetUsd) + ' per run',
+    'last compact: ' + (input.lastCompact ?? 'none'),
+  ];
+  return lines.join('\n');
+}
+
+/**
  * Build the exact argv for the child. Pure — probe it (no invented flags:
  * every flag below exists in `claude --help` v2.1.x).
  */

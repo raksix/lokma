@@ -72,12 +72,18 @@ async function probeAllEnabled(): Promise<LiveProbeOutcome[]> {
 }
 
 /** Fold live ids into the static base (same-id live hit wins). Pure. */
-function mergeLiveIds(base: CatalogModel[], outcomes: LiveProbeOutcome[]): CatalogModel[] {
+export function mergeLiveIds(base: CatalogModel[], outcomes: LiveProbeOutcome[]): CatalogModel[] {
   const byId = new Map(base.map((m) => [m.id, m]));
   for (const outcome of outcomes) {
     if (outcome.status !== 'ok') continue;
     for (const raw of outcome.ids) {
-      const full = raw.includes('/') ? raw : `${outcome.viewId}/${raw}`;
+      // Always namespace by the provider that actually served the id. Upstream
+      // ids that already contain a slash (commandcode's `deepseek/deepseek-v4.1-flash`,
+      // `Qwen/Qwen3.8-Max`, omniroute's `cmd/…`) used to be stored bare, which
+      // (a) attributed them to a fabricated provider and (b) let two providers
+      // collide on one Map key — so a perfectly valid configured default was
+      // missing from the catalog and the picker flagged it "(unavailable)".
+      const full = `${outcome.viewId}/${raw}`;
       const short = full.slice(full.lastIndexOf('/') + 1);
       byId.set(full, {
         id: full,

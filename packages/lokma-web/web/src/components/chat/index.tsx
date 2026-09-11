@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Bot as BotIcon, GitFork, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Composer, type ComposerSend } from './composer';
+import { Composer, readThinking, type ComposerSend } from './composer';
 import { SingleChatView, type PendingMessage, type TranscriptMessage } from './single-chat-view';
 import { useWs, type UseWs } from '@/hooks/use-ws';
 import { api, type Bot } from '@/lib/api';
@@ -355,6 +355,7 @@ export function Chat({
       sendText(s.text, {
         model: s.model || undefined,
         contextPaths: s.contextPaths.length ? s.contextPaths : undefined,
+        reasoningEffort: s.reasoningEffort === 'off' ? undefined : s.reasoningEffort,
       });
     },
     [sendText],
@@ -538,7 +539,8 @@ export function Chat({
   const startStarter = React.useCallback(
     (prompt: string) => {
       if (transcript.length === 0 && pending.length === 0 && !stream) {
-        send({ text: prompt, model, contextPaths: [] });
+        // Starter cards honour the persisted thinking pick (REQ-133).
+        send({ text: prompt, model, contextPaths: [], reasoningEffort: readThinking() });
         return;
       }
       api

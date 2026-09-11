@@ -21,6 +21,7 @@ import {
   type CostTotal,
   type PermissionRequest,
   type QuestionRequest,
+  type ReasoningEffort,
   type ServerMessage,
   type ToolCallEntry,
   type UiActionRequest,
@@ -38,7 +39,7 @@ import {
  * frames keep the Hub + Orchestration panes live without polling (W4-14).
  */
 
-export type SendOpts = { model?: string; contextPaths?: string[] };
+export type SendOpts = { model?: string; contextPaths?: string[]; reasoningEffort?: ReasoningEffort };
 
 export type UseWs = {
   status: WsStatus;

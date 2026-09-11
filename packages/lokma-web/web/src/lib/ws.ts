@@ -11,10 +11,11 @@ import {
   ClientMessageSchema,
   ServerMessageSchema,
   type ClientMessage,
+  type ReasoningEffort,
   type ServerMessage,
 } from '@lokma/shared/protocol/ws';
 
-export type { ClientMessage, ServerMessage };
+export type { ClientMessage, ReasoningEffort, ServerMessage };
 
 export type WsStatus = 'idle' | 'connecting' | 'open' | 'closed' | 'error';
 
@@ -134,9 +135,16 @@ function checked(msg: ClientMessage): string {
 export function promptMessage(
   prompt: string,
   sessionId?: string,
-  opts: { model?: string; contextPaths?: string[] } = {},
+  opts: { model?: string; contextPaths?: string[]; reasoningEffort?: ReasoningEffort } = {},
 ): string {
-  return checked({ type: 'prompt', prompt, sessionId, model: opts.model, contextPaths: opts.contextPaths });
+  return checked({
+    type: 'prompt',
+    prompt,
+    sessionId,
+    model: opts.model,
+    contextPaths: opts.contextPaths,
+    reasoningEffort: opts.reasoningEffort,
+  });
 }
 
 /** Stop the running stream (server answers with `done/aborted`). */

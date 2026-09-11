@@ -1,5 +1,6 @@
 import * as React from 'react';
 import {
+  Brain,
   ChevronDown,
   LifeBuoy,
   ListTree,
@@ -11,6 +12,7 @@ import {
   Square,
   X,
 } from 'lucide-react';
+import type { ReasoningEffort } from '@lokma/shared/protocol/ws';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -31,11 +33,30 @@ import { enabledModels } from '@/components/providers/models';
  * images attach as thumbnail + marker), stop fires the WS interrupt.
  */
 
-export type ComposerSend = { text: string; model: string; contextPaths: string[] };
+export type ComposerSend = { text: string; model: string; contextPaths: string[]; reasoningEffort: ReasoningEffort };
 
 type QueuedPrompt = { key: number; text: string };
 
 const MODE_KEY = 'lokma-composer-mode';
+const THINKING_KEY = 'lokma-composer-thinking';
+/** Composer thinking picker (REQ-133) — `off` sends no reasoning field. */
+const THINKING_LEVELS: { id: ReasoningEffort; label: string; hint: string }[] = [
+  { id: 'off', label: 'Off', hint: 'Answer straight away — fastest, fewest tokens.' },
+  { id: 'low', label: 'Low', hint: 'Short reasoning pass before the answer.' },
+  { id: 'medium', label: 'Medium', hint: 'Balanced reasoning budget (recommended).' },
+  { id: 'high', label: 'High', hint: 'Deep reasoning — slowest, most tokens.' },
+];
+
+/** Persisted pick; unknown/stale values fall back to `off`. */
+export function readThinking(): ReasoningEffort {
+  try {
+    const raw = localStorage.getItem(THINKING_KEY);
+    return THINKING_LEVELS.some((l) => l.id === raw) ? (raw as ReasoningEffort) : 'off';
+  } catch {
+    return 'off';
+  }
+}
+
 const MAX_ATTACH_BYTES = 50 * 1024 * 1024;
 /** How much of a text file is inlined into the prompt (REQ-113) — the rest
  *  is noted, not sent, so a 50MB attach cannot nuke the context window. */
@@ -188,6 +209,8 @@ export function Composer({
 }) {
   const [text, setText] = React.useState('');
   const [mode, setMode] = React.useState<'steer' | 'queue'>(readMode);
+  const [thinking, setThinking] = React.useState<ReasoningEffort>(readThinking);
+  const [thinkOpen, setThinkOpen] = React.useState(false);
   const [modelOpen, setModelOpen] = React.useState(false);
   const [modelQuery, setModelQuery] = React.useState('');
   const [paletteOpen, setPaletteOpen] = React.useState(false);
@@ -294,9 +317,9 @@ export function Composer({
         for (const a of attachments) revokeAttachment(a);
         setAttachments([]);
       }
-      onSend({ text: full, model, contextPaths: parseMentions(body).map((m) => m.path) });
+      onSend({ text: full, model, contextPaths: parseMentions(body).map((m) => m.path), reasoningEffort: thinking });
     },
-    [attachments, commands, contextPaths, model, onSend],
+    [attachments, commands, contextPaths, model, onSend, thinking],
   );
 
   const handleSend = (): void => {
@@ -678,6 +701,63 @@ export function Composer({
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" /> Rec
             </span>
           )}
+          {/* REQ-133: thinking budget for the next prompt — sits with the input tools. */}
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setThinkOpen((v) => !v)}
+              title="Thinking budget for the next prompt"
+              aria-label="Thinking budget"
+              aria-expanded={thinkOpen}
+              className={cn(
+                'h-7 gap-1 px-2 text-[11px]',
+                thinking !== 'off' &&
+                  'border-[#F2D5C2] bg-[#FDF0E6] text-terracotta dark:border-[#5A3A28] dark:bg-[#2A1E15] dark:text-[#E8A87C]',
+              )}
+            >
+              <Brain className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Thinking</span>
+              <span className="font-medium">{THINKING_LEVELS.find((l) => l.id === thinking)?.label}</span>
+              <ChevronDown
+                className={cn('h-3 w-3 shrink-0 text-zinc-400 transition-transform', thinkOpen && 'rotate-180')}
+              />
+            </Button>
+            {thinkOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setThinkOpen(false)} />
+                <div className="absolute bottom-[calc(100%+8px)] left-0 z-50 w-[250px] overflow-hidden rounded-xl border border-line bg-white p-1 shadow-2xl dark:border-[#2A2A2E] dark:bg-[#111113]">
+                  <div className="px-2.5 pt-2 pb-1 text-[10px] font-semibold tracking-widest text-zinc-500 uppercase">
+                    Thinking budget
+                  </div>
+                  {THINKING_LEVELS.map((l) => (
+                    <button
+                      key={l.id}
+                      onClick={() => {
+                        setThinking(l.id);
+                        setThinkOpen(false);
+                        try {
+                          localStorage.setItem(THINKING_KEY, l.id);
+                        } catch {
+                          /* Private mode / quota — the pick still applies for this session. */
+                        }
+                      }}
+                      className={cn(
+                        'w-full rounded-lg px-2.5 py-1.5 text-left hover:bg-muted dark:hover:bg-white/10',
+                        thinking === l.id && 'bg-muted dark:bg-white/10',
+                      )}
+                    >
+                      <span className="flex items-center gap-1.5 text-[13px] text-ink dark:text-white">
+                        {thinking === l.id && <span className="h-1.5 w-1.5 rounded-full bg-terracotta" />}
+                        {l.label}
+                      </span>
+                      <span className="mt-0.5 block pl-3 text-[11px] leading-snug text-zinc-500">{l.hint}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
           <div className="ml-auto flex items-center gap-1.5">
             <span className="hidden text-[11px] text-zinc-400 sm:inline">Enter send · Shift+Enter newline · / commands</span>
             {streaming ? (

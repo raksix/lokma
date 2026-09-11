@@ -21,7 +21,7 @@ import {
   type ToolResultCarrier,
 } from '@lokma/core';
 import { ProviderError, stream as aiStream, zodToJsonSchema, type ProviderMessage } from '@lokma/ai';
-import type { Permissions, ServerMessage } from '@lokma/shared';
+import type { Permissions, ReasoningEffort, ServerMessage } from '@lokma/shared';
 
 /**
  * Agent tool loop — the WS `prompt` path with real tool/permission/ask
@@ -80,6 +80,13 @@ export type AgentLoopOpts = {
    * of the tool system prompt so a bot-bound session chats AS the bot.
    */
   systemPreamble?: string;
+  /**
+   * REQ-133: per-prompt thinking budget chosen in the composer. Forwarded
+   * untouched to the adapter, which maps it to its own reasoning field
+   * (`reasoning_effort` / `thinking.budget_tokens`); `undefined`/`off`
+   * sends nothing.
+   */
+  reasoningEffort?: ReasoningEffort;
   maxTurns?: number;
   turnTimeoutMs?: number;
   /**
@@ -432,6 +439,8 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
           apiKey: opts.upstream.apiKey,
           baseUrl: opts.upstream.baseUrl,
           signal: turnCtrl.signal,
+          // REQ-133: composer thinking budget rides every turn of this run.
+          reasoningEffort: opts.reasoningEffort,
           // REQ-118 FAZ A/B: registry schemas ride as native Responses tools
           // on spark (other adapters ignore them); native calls execute
           // directly and results return as `function_call_output`

@@ -526,6 +526,7 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
           history,
           prompt: effectivePrompt,
           systemPreamble: botCtx?.systemPreamble || undefined,
+          reasoningEffort: item.reasoningEffort,
           permissions: config?.permissions,
           maxRetries: config?.retry?.maxAttempts,
           retryDelaysMs: config?.retry?.delaysSec ? config.retry.delaysSec.map((s) => s * 1000) : undefined,
@@ -789,6 +790,7 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
           prompt,
           model: msg.model?.trim() || undefined,
           contextPaths: msg.contextPaths,
+          reasoningEffort: msg.reasoningEffort,
           userId: turnUser?.id,
           enqueuedAt: new Date().toISOString(),
         });

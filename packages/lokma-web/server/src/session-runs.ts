@@ -1,3 +1,4 @@
+import type { ReasoningEffort } from '@lokma/shared/protocol/ws';
 import type { ApprovalDecision } from './agent-loop.js';
 
 /**
@@ -22,6 +23,8 @@ export type QueuedPrompt = {
   prompt: string;
   model?: string;
   contextPaths?: string[];
+  /** REQ-133: composer thinking budget, forwarded to the provider adapter. */
+  reasoningEffort?: ReasoningEffort;
   /** Resolved at enqueue time (the socket may be gone when the turn runs). */
   userId?: string;
   enqueuedAt: string;

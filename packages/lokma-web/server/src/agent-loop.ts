@@ -4,16 +4,28 @@ import {
   buildToolSystemPrompt,
   buildUiControlTools,
   createBlockFilter,
+  decideToolCall,
+  emptyResultPlaceholder,
   executeToolCall,
   heartbeatSession,
+  isEmptyResultText,
   mintCallId,
   parseToolBlocks,
+  persistedOutputEnvelope,
+  previewCut,
+  resultBudget,
+  resultOverBudget,
+  resultToText,
   runApprovedCall,
   SessionStore,
+  spillPathFor,
   ToolRegistry,
+  type ParsedToolCall,
   type SessionMessage,
   type ToolEvent,
 } from '@lokma/core';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { ProviderError, stream as aiStream, zodToJsonSchema, type ProviderMessage } from '@lokma/ai';
 import type { Permissions, ServerMessage } from '@lokma/shared';
 
@@ -212,6 +224,37 @@ function toolRecord(callId: string, tool: string, record: Record<string, unknown
     toolCallId: callId,
     toolName: tool,
   };
+}
+
+/**
+ * REQ-128: what the model actually reads for one tool result. Over-budget
+ * payloads are spilled to `.lokma/tool-results/` and replaced with a
+ * `<persisted-output>` envelope (Claude-Code discipline: never truncate a
+ * result into uselessness, and never let one payload evict the
+ * conversation). Best-effort — if the spill write fails, a capped preview
+ * still goes out rather than the whole turn erroring.
+ */
+async function formatModelResult(
+  cwd: string,
+  tool: string,
+  callId: string,
+  result: unknown,
+  declaredBudget: number | undefined,
+): Promise<string> {
+  const text = resultToText(result);
+  if (isEmptyResultText(text)) return emptyResultPlaceholder(tool);
+  const budget = resultBudget(declaredBudget);
+  if (!resultOverBudget(text, budget)) return text;
+  const rel = spillPathFor(callId);
+  const { preview, hasMore } = previewCut(text);
+  try {
+    const abs = join(cwd, rel);
+    await mkdir(dirname(abs), { recursive: true });
+    await writeFile(abs, text, 'utf8');
+    return persistedOutputEnvelope({ originalChars: text.length, path: rel, preview, hasMore });
+  } catch {
+    return `${text.slice(0, budget)}\n…[truncated ${text.length - budget} chars — could not persist output]`;
+  }
 }
 
 export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult> {
@@ -599,9 +642,77 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
       });
     };
 
-    // ── Tool calls (in model order, one at a time) ──────────────────────────
-    for (const call of runEnd.toolCalls) {
+    // ── Tool calls (model order) ────────────────────────────────────────────
+    // REQ-128: consecutive read-only calls run as one parallel batch (max 10,
+    // Claude-Code parity) — independent reads must not queue behind each
+    // other. Mutating calls stay strictly serial, and anything the gate wants
+    // to ask about takes the serial path so approvals keep their
+    // one-at-a-time semantics. Results are recorded in MODEL order either way.
+    const TOOL_CONCURRENCY = 10;
+    const parallelizable = (call: ParsedToolCall | undefined): boolean => {
+      if (!call || !call.tool || call.input === undefined) return false;
+      if (registry.get(call.tool)?.readOnly !== true) return false;
+      return decideToolCall(opts.permissions, call.tool) === 'allow';
+    };
+    for (let callIdx = 0; callIdx < runEnd.toolCalls.length; callIdx++) {
+      const call = runEnd.toolCalls[callIdx];
+      if (!call) continue;
       if (opts.signal.aborted) return { outcome: 'aborted', inputChars, outputChars, turns };
+      if (parallelizable(call)) {
+        const run: ParsedToolCall[] = [];
+        while (run.length < TOOL_CONCURRENCY && parallelizable(runEnd.toolCalls[callIdx + run.length])) {
+          run.push(runEnd.toolCalls[callIdx + run.length] as ParsedToolCall);
+        }
+        // Text segments between the consumed blocks flush first, so the
+        // transcript keeps stream order even though the calls overlapped.
+        for (let k = 0; k < run.length; k++) {
+          await flushText(runMarks[execIdx]?.at ?? clean.length);
+          execIdx++;
+        }
+        const batch = run.map((c) => ({ call: c, callId: mintCallId() }));
+        const settled = await Promise.all(
+          batch.map((b) =>
+            executeToolCall(registry, {
+              tool: b.call.tool,
+              input: b.call.input,
+              permissions: opts.permissions,
+              callId: b.callId,
+              onEvent: forwardEvent,
+            }),
+          ),
+        );
+        for (let k = 0; k < batch.length; k++) {
+          const b = batch[k] as { call: ParsedToolCall; callId: string };
+          const outcome = settled[k];
+          if (!outcome) continue;
+          const resultId = b.call.nativeCallId ?? b.callId;
+          if (outcome.outcome === 'ok') {
+            await opts.store.append(
+              opts.sessionId,
+              toolRecord(b.callId, b.call.tool, { callId: b.callId, ok: true, result: outcome.result }, b.call.input),
+            );
+            pushResult(
+              b.call,
+              resultId,
+              await formatModelResult(opts.cwd, b.call.tool, b.callId, outcome.result, registry.get(b.call.tool)?.maxResultSizeChars),
+              false,
+            );
+          } else {
+            // A gated batch cannot reach here through the normal path; if it
+            // ever does, the call is reported honestly instead of vanishing.
+            const code = outcome.outcome === 'error' ? outcome.code : outcome.outcome;
+            const message =
+              outcome.outcome === 'error' ? outcome.message : `Call was not executed (${outcome.outcome})`;
+            await opts.store.append(
+              opts.sessionId,
+              toolRecord(b.callId, b.call.tool, { callId: b.callId, ok: false, code, message }, b.call.input),
+            );
+            pushResult(b.call, resultId, `ERROR ${code}: ${message}`, true);
+          }
+        }
+        callIdx += run.length - 1;
+        continue;
+      }
       // Text-parsed calls consume stream marks in order; merged calls flush
       // whatever text remains, then run adjacency-ordered.
       if (execIdx < runMarks.length) {
@@ -654,7 +765,12 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
           const ran = await runApprovedCall(registry, { tool: outcome.tool, input: call.input, callId, onEvent: forwardEvent });
           if (ran.outcome === 'ok') {
             await opts.store.append(opts.sessionId, toolRecord(callId, outcome.tool, { callId, ok: true, result: ran.result }, call.input));
-            pushResult(call, resultId, JSON.stringify(ran.result), false);
+            pushResult(
+              call,
+              resultId,
+              await formatModelResult(opts.cwd, outcome.tool, callId, ran.result, registry.get(outcome.tool)?.maxResultSizeChars),
+              false,
+            );
           } else {
             await opts.store.append(opts.sessionId, toolRecord(callId, outcome.tool, { callId, ok: false, code: ran.code, message: ran.message }, call.input));
             pushResult(call, resultId, `ERROR ${ran.code}: ${ran.message}`, true);
@@ -668,7 +784,12 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
         pushResult(call, resultId, `ERROR denied: ${result.message}`, true);
       } else if (outcome.outcome === 'ok') {
         await opts.store.append(opts.sessionId, toolRecord(callId, call.tool, { callId, ok: true, result: outcome.result }, call.input));
-        pushResult(call, resultId, JSON.stringify(outcome.result), false);
+        pushResult(
+          call,
+          resultId,
+          await formatModelResult(opts.cwd, call.tool, callId, outcome.result, registry.get(call.tool)?.maxResultSizeChars),
+          false,
+        );
       } else {
         await opts.store.append(opts.sessionId, toolRecord(callId, call.tool, { callId, ok: false, code: outcome.code, message: outcome.message }, call.input));
         pushResult(call, resultId, `ERROR ${outcome.code}: ${outcome.message}`, true);

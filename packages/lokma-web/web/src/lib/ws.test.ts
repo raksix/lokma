@@ -60,6 +60,8 @@ assert(decodeServerFrame(JSON.stringify({ type: 'text_delta' })) === null, 'shap
 // 7. Builders emit schema-valid client messages (no drift from the protocol).
 for (const raw of [
   promptMessage('hello', 's'),
+  promptMessage('think', 's', { reasoningEffort: 'high' }),
+  promptMessage('plain', 's', { reasoningEffort: 'off' }),
   abortMessage('s'),
   permissionAnswer('r1', 'allow'),
   permissionAnswer('r2', 'always'),
@@ -68,6 +70,17 @@ for (const raw of [
   const parsed = ClientMessageSchema.safeParse(JSON.parse(raw));
   assert(parsed.success, `builder output validates: ${raw.slice(0, 48)}`);
 }
+
+// 7b. REQ-133: the composer pick reaches the wire only when it asks for
+// reasoning, and an unknown level is rejected rather than silently sent.
+const withThinking = JSON.parse(promptMessage('hi', 's', { reasoningEffort: 'medium' })) as { reasoningEffort?: string };
+assert(withThinking.reasoningEffort === 'medium', 'promptMessage carries the thinking level');
+const withoutThinking = JSON.parse(promptMessage('hi', 's')) as { reasoningEffort?: string };
+assert(withoutThinking.reasoningEffort === undefined, 'an unset level stays off the wire');
+assert(
+  !ClientMessageSchema.safeParse({ type: 'prompt', prompt: 'x', reasoningEffort: 'max' }).success,
+  'an unknown thinking level is rejected by the schema',
+);
 
 // 8. Reducer folds frames into UI state.
 let state = initialWsUiState();

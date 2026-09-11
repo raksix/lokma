@@ -32,6 +32,13 @@ schemas, streaming partial arguments, denied calls answered as results),
 so the design below is not an Anthropic quirk — it is the shape every
 serious agent harness converges on.
 
+One deliberate divergence: opencode does NOT fan parallel calls out itself —
+it hands execution to the bundled AI SDK `streamText` runtime and only
+*asks* the model to emit several calls in one turn (plus a `batch` tool).
+Claude Code does fan read-only calls out, and Lokma follows Claude Code
+here. Do not "align" the batcher toward opencode; it would serialize
+independent reads for no gain.
+
 ## 3. What Lokma does now
 
 ### 3.1 Protocol — native first, text as fallback

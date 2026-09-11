@@ -58,6 +58,20 @@
   --border: 0 0% 16%;
   --input: 0 0% 16%;
   --ring: 16 53% 52%;
+
+  /* REQ-127 — the @theme palette above is static, so utility classes built
+     from it (bg-muted, bg-muted-2, bg-line, border-line, text-ink, …) used
+     to resolve to LIGHT hexes in dark mode. That is why the hardcoded-hex
+     override block further down had grown a `[class*="…"]` hack for each
+     one — and why `hover:bg-muted` flashed near-white on dark. Re-point the
+     tokens at the dark ramp instead: base utilities and their hover:/
+     focus: variants now both land on dark values. */
+  --color-muted: #1E1E21;
+  --color-muted-2: #232326;
+  --color-line: #232326;
+  --color-line-strong: #2A2A2E;
+  --color-paper: #1E1E21;
+  --color-ink: #EDE9E2;
 }
 
 * {
@@ -157,8 +171,16 @@ a[href]:not(.cursor-default),
 .dark [class*="bg-white"]:not(.bg-\[\#111113\]):not(.bg-\[\#1E1E20\]):not(.bg-\[\#0A84FF\]) { background-color: #1E1E21 !important; border-color: #2A2A2E !important; color: #EDE9E2 !important; }
 .dark .bg-\[\#FDFCFB\],
 .dark [class*="bg-[#FDFCFB]"] { background-color: #161618 !important; border-color: #232326 !important; }
+/* REQ-127 — token-boundary match only. A bare [class*="bg-muted"] also
+   matched variant-prefixed utilities (hover:bg-muted/40, focus:bg-muted,
+   dark:bg-muted), which painted EVERY such element with an opaque
+   #1E1E21 box in dark mode — idle session rows looked like cards instead
+   of sitting flush on the sidebar. Requiring the token to start the class
+   list or follow a space keeps the real bg-muted utilities and lets
+   hover:/focus: variants resolve through the Tailwind tokens. */
 .dark .bg-muted,
-.dark [class*="bg-muted"] { background-color: #1E1E21 !important; border-color: #2A2A2E !important; color: #EDE9E2 !important; }
+.dark [class^="bg-muted"],
+.dark [class*=" bg-muted"] { background-color: #1E1E21 !important; border-color: #2A2A2E !important; color: #EDE9E2 !important; }
 .dark .bg-\[\#FDF0E6\],
 .dark [class*="bg-[#FDF0E6]"] { background-color: #2A1E15 !important; border-color: #3A2A1A !important; color: #EDE9E2 !important; }
 .dark .border-line,

@@ -162,9 +162,15 @@ function SessionRow({
       // REQ-121 — fully transparent idle rows (hover barely tints); the
       // terracotta wash + top sweep bar render ONLY while running. An open
       // but idle session looks like any other row (no fake "active").
+      // REQ-127 — the row paints NOTHING of its own, so it sits flush on the
+      // sidebar in every theme. The hover tint is spelled per-theme (ink 5%
+      // on light, warm white 6% on dark) instead of `hover:bg-muted/40`,
+      // whose dark value resolved to a 40% near-white flash.
       className={cn(
         'group relative transition cursor-grab active:cursor-grabbing',
-        running ? 'bg-terracotta/10' : 'bg-transparent hover:bg-muted/40',
+        running
+          ? 'bg-terracotta/10'
+          : 'bg-transparent hover:bg-[rgba(38,38,36,0.05)] dark:hover:bg-[rgba(237,233,226,0.06)]',
       )}
     >
       {running ? (

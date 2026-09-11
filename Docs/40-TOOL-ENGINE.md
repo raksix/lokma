@@ -102,12 +102,36 @@ batcher reads the same marker.
 fallback. Before this, the prompt only taught markup, so models that could
 call functions imitated markup instead.
 
+### 3.5 Hardening copied from Hermes
+
+The `03-hermes-tool-engine` teardown surfaced three failure modes worth
+porting verbatim; two are now fixed here, one is documented as a deliberate
+divergence:
+
+- **Recycled indices.** Hermes' `_ToolCallAccumulator` redirects a slot when
+  a *different* call id shows up on an already-used index (Ollama reuses
+  indices). Ours now starts a fresh call instead of appending the new
+  arguments onto the closed one.
+- **Quadratic argument assembly.** Hermes buffers argument fragments and
+  joins once. Ours did `prev.args + fragment` per delta, which re-copies the
+  whole string every time — visible on a 256KB `write_file` payload. Now a
+  parts array joined in `list()`.
+- **Persist/read-back loop.** Hermes pins `read_file` to an unlimited budget
+  so a spilled read can never invite the model to read back a file that is
+  itself over budget. `read_file` now declares `TOOL_RESULT_NO_SPILL`.
+- **Deliberate divergence: parallelism.** opencode does *not* fan out tool
+  calls itself — it hands the batch to the AI SDK `streamText` runtime and
+  asks the model for multiple calls per turn (plus a `batch` tool). Hermes
+  has a parallel-safe whitelist; Claude Code actually runs read-only calls
+  concurrently. We follow Claude Code: read-only calls fan out (limit 10),
+  writes still serialize.
+
 ## 4. Proof
 
 | Layer | Command | Result |
 |---|---|---|
-| Adapter (116 checks) | `bun src/provider/adapters.test.ts` (packages/lokma-ai) | chat-completions tools, fragmented `tool_calls`, capability probes, Anthropic blocks |
-| Tools + budget (78 checks) | `bun src/tools/tools.test.ts` (packages/lokma-core) | glob/grep/edit on a real temp workspace, budgets, markers |
+| Adapter (119 checks) | `bun src/provider/adapters.test.ts` (packages/lokma-ai) | chat-completions tools, fragmented `tool_calls`, recycled indices, capability probes, Anthropic blocks |
+| Tools + budget (79 checks) | `bun src/tools/tools.test.ts` (packages/lokma-core) | glob/grep/edit on a real temp workspace, budgets, no-spill marker |
 | Loop history (26 checks) | `bun src/agent-loop.test.ts` (packages/lokma-web/server) | caps, native re-pairing, dangling-id guards |
 | **Live, real model** | `bun scripts/probe-live-tools.ts omniroute/auto/best-free` | model emits a NATIVE call, 2 turns, answer contains the real file contents |
 | **Live, CLI** | `lokma tui -p "read hello.txt"` | `read_file` called natively, answer from the real file |

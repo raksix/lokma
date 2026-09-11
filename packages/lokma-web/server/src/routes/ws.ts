@@ -34,9 +34,10 @@ import {
   claudeCompactMarker,
   describeClaudeAskCard,
   formatClaudeContextReport,
+  formatClaudeFocusLine,
   isClaudeClearCommand,
-  isClaudeCompactCommand,
   isClaudeContextCommand,
+  parseClaudeCompactCommand,
   parseClaudeEngineModel,
   resolveClaudePermissions,
   runClaudePrint,
@@ -126,19 +127,23 @@ async function runClaudeEngineTurn(
     send({ type: 'done', sessionId, reason: 'complete' });
     return;
   }
-  // REQ-116 FAZ D-compact: `/compact` runs the Lokma-side compaction
-  // harness-side (default `full` mode) and never spawns the binary — the
-  // explicit counterpart to the pre-turn auto-compact window below. No
-  // permission cards open (nothing mutates the workspace beyond the
-  // transcript the user asked to compact). Always leaves a marker.
-  if (isClaudeCompactCommand(prompt)) {
+  // REQ-116 FAZ D-compact + D-compact-focus: `/compact` (or `/compact
+  // <focus>`) runs the Lokma-side compaction harness-side (default `full`
+  // mode) and never spawns the binary — the explicit counterpart to the
+  // pre-turn auto-compact window below. No permission cards open (nothing
+  // mutates the workspace beyond the transcript the user asked to compact).
+  // Always leaves a marker; a focus suffix rides the marker row so the next
+  // turn reads the user's instruction from the persisted transcript.
+  const compactCmd = parseClaudeCompactCommand(prompt);
+  if (compactCmd) {
+    const focusSuffix = compactCmd.focus ? ' ' + formatClaudeFocusLine(compactCmd) : '';
     try {
       const report = await compactSession(cwd, sessionId, {});
       await store.append(sessionId, {
         role: 'assistant',
         content: report.compacted
-          ? claudeCompactMarker(report.beforeMessages, report.afterMessages, report.mode)
-          : '[compact: no-op - ' + String(report.beforeMessages) + ' messages within budget]',
+          ? claudeCompactMarker(report.beforeMessages, report.afterMessages, report.mode) + focusSuffix
+          : '[compact: no-op - ' + String(report.beforeMessages) + ' messages within budget]' + focusSuffix,
         timestamp: new Date().toISOString(),
       });
     } catch (e) {

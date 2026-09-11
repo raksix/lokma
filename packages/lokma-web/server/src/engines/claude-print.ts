@@ -238,6 +238,39 @@ export function isClaudeCompactCommand(prompt: string): boolean {
 }
 
 /**
+ * REQ-116 FAZ D-compact-focus — `/compact <focus>` keeps focus instructions.
+ *
+ * Claude Code's `/compact` takes optional focus text ("compact, keeping the
+ * auth work"). The bare form above stays exact-match (probe-locked), so this
+ * parser owns the full command shape: bare `/compact` (empty focus),
+ * `/compact <text>` (focus carried), anything else null. The WS pump runs
+ * the same harness-side `compactSession`, then appends the focus line to
+ * the marker row — the next turn reads the instruction from the persisted
+ * transcript, and the binary never spawns for either form. Focus is capped
+ * (`truncated: true` says so honestly) so a pasted paragraph cannot bloat
+ * the transcript it just shrank.
+ */
+export type ClaudeCompactCommand = { focus: string; truncated: boolean };
+
+export const CLAUDE_COMPACT_FOCUS_MAX = 500;
+
+export function parseClaudeCompactCommand(prompt: string): ClaudeCompactCommand | null {
+  const trimmed = prompt.trim();
+  if (trimmed === '/compact') return { focus: '', truncated: false };
+  if (!trimmed.startsWith('/compact')) return null;
+  const rest = trimmed.slice('/compact'.length);
+  if (rest.trim().length >= rest.length) return null;
+  const focus = rest.trim();
+  if (focus.length <= CLAUDE_COMPACT_FOCUS_MAX) return { focus, truncated: false };
+  return { focus: focus.slice(0, CLAUDE_COMPACT_FOCUS_MAX), truncated: true };
+}
+
+/** Transcript line carrying the focus into the next turn. Pure — probe it. */
+export function formatClaudeFocusLine(cmd: ClaudeCompactCommand): string {
+  return '[focus: ' + cmd.focus + (cmd.truncated ? ' [truncated]' : '') + ']';
+}
+
+/**
  * Shared `[compact: ...]` marker so the explicit `/compact` path and the
  * pre-turn auto-compact window write identical transcript text. Pure.
  */

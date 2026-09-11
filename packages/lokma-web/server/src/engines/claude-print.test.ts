@@ -5,7 +5,7 @@
  * Not imported by server code, so `tsc -p` output ignores it.
  */
 import { spawn } from 'node:child_process';
-import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_CLEAR_MARKER, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, CLAUDE_MUTATION_SURFACE, claudeCompactMarker, claudeToolsForLokmaTool, describeClaudeAskCard, formatClaudeContextReport, isClaudeClearCommand, isClaudeCompactCommand, isClaudeContextCommand, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, translateClaudeLine } from './claude-print';
+import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_CLEAR_MARKER, CLAUDE_COMPACT_FOCUS_MAX, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, CLAUDE_MUTATION_SURFACE, claudeCompactMarker, claudeToolsForLokmaTool, describeClaudeAskCard, formatClaudeContextReport, formatClaudeFocusLine, isClaudeClearCommand, isClaudeCompactCommand, isClaudeContextCommand, parseClaudeCompactCommand, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, translateClaudeLine } from './claude-print';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -222,5 +222,26 @@ assert(ctxHot.includes('resumed (resume handle stored)'), 'stored handle reports
 assert(ctxHot.includes('full 90->22'), 'report carries the last compact line');
 const ctxFull = formatClaudeContextReport({ messages: 200, chars: 200000, hygieneNeeded: true, summaryNeeded: true, resumed: true, maxBudgetUsd: 5, lastCompact: null });
 assert(ctxFull.includes('over summary budget'), 'summary budget wins over hygiene in the report');
+
+// 17. FAZ D-compact-focus: `/compact <focus>` keeps focus instructions.
+const bareCmd = parseClaudeCompactCommand('/compact');
+assert(bareCmd !== null && bareCmd.focus === '' && bareCmd.truncated === false, 'bare /compact parses with empty focus');
+const paddedCmd = parseClaudeCompactCommand('  /compact  ');
+assert(paddedCmd !== null && paddedCmd.focus === '', 'padded bare /compact parses with empty focus');
+const focusCmd = parseClaudeCompactCommand('/compact keep the auth work');
+assert(focusCmd !== null && focusCmd.focus === 'keep the auth work' && focusCmd.truncated === false, 'focused /compact carries the focus text');
+const spacedCmd = parseClaudeCompactCommand('/compact   spaced   out  ');
+assert(spacedCmd !== null && spacedCmd.focus === 'spaced   out', 'focus trims edges but keeps inner spacing');
+assert(parseClaudeCompactCommand('/compactfoo') === null, '/compactfoo is not the command');
+assert(parseClaudeCompactCommand('please /compact this') === null, 'embedded /compact does not parse');
+assert(parseClaudeCompactCommand('/clear') === null, '/clear is not compact');
+assert(parseClaudeCompactCommand('/context') === null, '/context is not compact');
+assert(CLAUDE_COMPACT_FOCUS_MAX === 500, 'focus cap is 500 chars');
+const longFocus = parseClaudeCompactCommand('/compact ' + 'x'.repeat(600));
+assert(longFocus !== null && longFocus.truncated === true && longFocus.focus.length === 500, 'oversize focus truncates honestly at the cap');
+const exactFocus = parseClaudeCompactCommand('/compact ' + 'y'.repeat(500));
+assert(exactFocus !== null && exactFocus.truncated === false && exactFocus.focus.length === 500, 'cap-length focus is not truncated');
+assert(formatClaudeFocusLine({ focus: 'keep auth', truncated: false }) === '[focus: keep auth]', 'focus line formats plain');
+assert(formatClaudeFocusLine({ focus: 'abc', truncated: true }) === '[focus: abc [truncated]]', 'truncated focus line says so');
 
 console.log('\nclaude-print probe: ' + passed + ' passed');

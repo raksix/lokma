@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { api, type AuthProject, type SessionSummary } from '@/lib/api';
 import { usePaneStore, useSessionStore } from '@/stores';
+import { SEEN_EVENT, isSessionUnread, markSessionSeen, readSeenMap, seedSeenMap } from '@/stores/session';
 import { emitToast, isMobileViewport, useIsMobile } from '@/components/shell';
 import { ProjectModal } from './project-modal';
 import {
@@ -47,6 +48,18 @@ import {
 
 const RENDER_CAP = 120;
 
+/** Live read of the seen-map; re-renders dots on `markSessionSeen`. */
+function useSeenMap(): Record<string, string> {
+  const [version, setVersion] = React.useState(0);
+  React.useEffect(() => {
+    const bump = () => setVersion((x) => x + 1);
+    window.addEventListener(SEEN_EVENT, bump);
+    return () => window.removeEventListener(SEEN_EVENT, bump);
+  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return React.useMemo(() => readSeenMap(), [version]);
+}
+
 /** Collapsed project groups show the 5 most recent sessions (REQ-078). */
 const PROJECT_COLLAPSED_COUNT = 5;
 
@@ -55,6 +68,8 @@ type RowAction = 'rename' | 'merge' | 'delete-confirm' | null;
 function SessionRow({
   session,
   active,
+  running,
+  unread,
   action,
   onAction,
   onResume,
@@ -67,6 +82,10 @@ function SessionRow({
 }: {
   session: SessionSummary;
   active: boolean;
+  /** REQ-121: live agent run — the ONLY "active-looking" state. */
+  running: boolean;
+  /** REQ-121: activity newer than the last open. */
+  unread: boolean;
   action: RowAction;
   onAction: (a: Exclude<RowAction, null>) => void;
   onResume: () => void;
@@ -140,24 +159,41 @@ function SessionRow({
         setMenuOpen(true);
       }}
       // REQ-106 — plain rows, no boxes: hover tint + active tint only.
+      // REQ-121 — fully transparent idle rows (hover barely tints); the
+      // terracotta wash + top sweep bar render ONLY while running. An open
+      // but idle session looks like any other row (no fake "active").
       className={cn(
-        'group relative rounded-sm transition cursor-grab active:cursor-grabbing',
-        active ? 'bg-terracotta/10' : 'hover:bg-muted',
+        'group relative transition cursor-grab active:cursor-grabbing',
+        running ? 'bg-terracotta/10' : 'bg-transparent hover:bg-muted/40',
       )}
     >
+      {running ? (
+        <span className="absolute inset-x-1 top-0 h-[2px] overflow-hidden rounded-full" aria-hidden="true">
+          <span className="lokma-scanbar block h-full w-1/5 bg-gradient-to-r from-transparent via-[#C96442] to-transparent" />
+        </span>
+      ) : null}
       {/* REQ-051 — compact single-line row: tighter padding, the title
           flexes and truncates to whatever width is left, and the m/h/d
           badge pins to the right of it. */}
       <div className="flex items-center gap-1.5 px-2 py-1">
         <span
-          title={active ? 'Open session' : 'Idle'}
+          title={running ? 'Agent working' : unread ? 'New activity' : active ? 'Open session' : 'Idle'}
           className={cn(
             'w-1.5 h-1.5 rounded-full shrink-0',
-            active ? 'bg-terracotta animate-pulse' : 'bg-zinc-300 dark:bg-zinc-600',
+            running
+              ? 'bg-terracotta animate-pulse'
+              : unread
+                ? 'bg-green-500'
+                : 'bg-zinc-300 dark:bg-zinc-600',
           )}
         />
         <div className="flex-1 min-w-0 cursor-pointer" onClick={onResume}>
-          <div className="text-xs font-medium truncate pr-1" title={title}>{title}</div>
+          <div
+            className={cn('text-xs truncate pr-1', unread && !running ? 'font-semibold' : 'font-medium')}
+            title={title}
+          >
+            {title}
+          </div>
         </div>
         {/* REQ-055 — kebab menu: the inline badge is gone; duration info
             (full relative string + compact token) lives in the menu header,
@@ -435,6 +471,8 @@ function ProjectGroup({
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [confirmingDelete, setConfirmingDelete] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
+  // REQ-121: read/unread dots need the seen-map live in every group.
+  const seen = useSeenMap();
   React.useEffect(() => {
     if (!menuOpen) return;
     const onDown = (e: MouseEvent) => {
@@ -580,6 +618,8 @@ function ProjectGroup({
             key={s.id}
             session={s}
             active={s.id === activeId}
+            running={!!s.running}
+            unread={isSessionUnread(s.updatedAt, seen[s.id])}
             action={openAction?.id === s.id ? openAction.action : null}
             mergeTargets={sessions.filter((t) => t.id !== s.id)}
             {...rowProps(s)}
@@ -609,6 +649,7 @@ export function SessionsSidebar({
   const loading = useSessionStore((s) => s.loading);
   const lastError = useSessionStore((s) => s.lastError);
   const refreshSessions = useSessionStore((s) => s.refreshSessions);
+  const refreshSessionsQuiet = useSessionStore((s) => s.refreshSessionsQuiet);
   const createSession = useSessionStore((s) => s.createSession);
   const deleteSession = useSessionStore((s) => s.deleteSession);
   const forkSession = useSessionStore((s) => s.forkSession);
@@ -620,8 +661,16 @@ export function SessionsSidebar({
   const [openAction, setOpenAction] = React.useState<{ id: string; action: RowAction } | null>(null);
   const [showAll, setShowAll] = React.useState(false);
   const [creating, setCreating] = React.useState(false);
-  // REQ-078 — expanded project groups (key = group key). Reset with the
-  // other list state so a new search/grouping starts collapsed.
+  // REQ-121: read/unread dots + live run flags. Seed once per list (old
+  // rows grandfather as read), then poll quietly for runs/ordering.
+  const seen = useSeenMap();
+  React.useEffect(() => {
+    if (sessions.length) seedSeenMap(sessions.map((s) => s.id));
+  }, [sessions.length]);
+  React.useEffect(() => {
+    const t = window.setInterval(() => void refreshSessionsQuiet(), 4000);
+    return () => window.clearInterval(t);
+  }, [refreshSessionsQuiet]);
   const [expandedProjects, setExpandedProjects] = React.useState<Set<string>>(new Set());
   const [creatingProjectCwd, setCreatingProjectCwd] = React.useState<string | null>(null);
   // REQ-080 — project records (visible even with zero sessions) + modal.
@@ -748,7 +797,10 @@ export function SessionsSidebar({
   // ProjectGroup so rows behave identically collapsed/expanded/by-time).
   const makeRowProps = React.useCallback((s: SessionSummary) => ({
     onAction: (a: Exclude<RowAction, null>) => setOpenAction({ id: s.id, action: a }),
-    onResume: () => onSelect(s.id),
+    onResume: () => {
+      markSessionSeen(s.id);
+      onSelect(s.id);
+    },
     onOpenAsPane: () => handleOpenAsPane(s),
     onFork: () => handleFork(s.id),
     onSubmitRename: (title: string) => {
@@ -925,6 +977,8 @@ export function SessionsSidebar({
                   key={s.id}
                   session={s}
                   active={s.id === activeId}
+                  running={!!s.running}
+                  unread={isSessionUnread(s.updatedAt, seen[s.id])}
                   action={openAction?.id === s.id ? openAction.action : null}
                   mergeTargets={sessions.filter((t) => t.id !== s.id)}
                   {...makeRowProps(s)}

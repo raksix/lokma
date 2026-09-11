@@ -274,3 +274,58 @@ export function useKnownSession(id: string | undefined | null): KnownSession {
   if (!listLoaded) return 'loading';
   return sessions.find((s) => s.id === id) ?? null;
 }
+
+// ─── Read/unread tracking (REQ-121) ─────────────────────────────────────
+// A session is unread when it has activity newer than the last time the user
+// opened it (or watched it finish). Stored in localStorage; `markSessionSeen`
+// broadcasts `SEEN_EVENT` so all sidebar groups re-render their dots.
+const SEEN_KEY = 'lokma-seen:v1';
+export const SEEN_EVENT = 'lokma:seen';
+
+export function readSeenMap(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(SEEN_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, string>;
+    }
+  } catch {
+    // Corrupt JSON reads as all-unseen — seeding below repairs it.
+  }
+  return {};
+}
+
+export function markSessionSeen(id: string): void {
+  try {
+    const all = readSeenMap();
+    all[id] = new Date().toISOString();
+    localStorage.setItem(SEEN_KEY, JSON.stringify(all));
+  } catch {
+    // Private mode: the dot just won't persist; still notify live rows.
+  }
+  window.dispatchEvent(new CustomEvent(SEEN_EVENT, { detail: id }));
+}
+
+/** Seed never-opened sessions as read-as-of-now (grandfathers old rows). */
+export function seedSeenMap(ids: string[]): void {
+  try {
+    const all = readSeenMap();
+    let dirty = false;
+    const now = new Date().toISOString();
+    for (const id of ids) {
+      if (!(id in all)) {
+        all[id] = now;
+        dirty = true;
+      }
+    }
+    if (dirty) localStorage.setItem(SEEN_KEY, JSON.stringify(all));
+  } catch {
+    // Private mode — skip.
+  }
+}
+
+export function isSessionUnread(updatedAt: string | undefined, seenAt: string | undefined): boolean {
+  if (!updatedAt) return false;
+  if (!seenAt) return false;
+  return Date.parse(updatedAt) > Date.parse(seenAt);
+}

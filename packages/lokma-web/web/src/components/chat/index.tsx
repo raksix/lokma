@@ -10,6 +10,7 @@ import { botClearPatch, botSwitchPatch, filterPickerBots, sessionBotName } from 
 import { normalizeConfig } from '@/components/settings/settings';
 import { resolveDefaultModel } from '@/components/providers/models';
 import { useKnownSession, useProviderStore, useSessionStore } from '@/stores';
+import { markSessionSeen } from '@/stores/session';
 import { emitToast } from '@/components/shell';
 import { FILE_DRAG_MIME, INSERT_MENTION_EVENT } from '@/components/files';
 import { formatCostBadge } from '@/components/header';
@@ -241,6 +242,8 @@ export function Chat({
     doneSeen.current = true;
     setPending([]);
     setRunActive(false);
+    // REQ-121: watching it finish counts as read (sidebar dot clears).
+    markSessionSeen(sessionId);
     void reloadTranscript().then(() => setStreamVisible(false));
   }, [done, reloadTranscript]);
 

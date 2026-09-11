@@ -120,5 +120,31 @@ GÖNDERME — gateway toleranssız olabilir). Tool SONUÇLARI bu fazda mevcut
 - **Kurtarılan kesik iş:** flush bloğu `try` dışındaydı
   (`nativeCalls`/`streamedSeen` TS2304) → `try` içine taşındı; stub
   SSE kaçışları tek-tersbölüydü (geçersiz JSON) → bayt-düzeyi fix.
-- **FAZ B açık:** `native_tool_call` chunk'ı, `function_call_output`
-  ile sonuç dönüşü, 403/429 ayrımı — ayrı REQ ister.
+- **FAZ B açık:** `native_tool_call` chunk'ı (FAZ B.1'de bitti, aşağıda),
+  `function_call_output` ile sonuç dönüşü, 403/429 ayrımı — ayrı REQ ister.
+
+## 7) Kapanış — FAZ B.1 (2026-09-11)
+
+- **Kapsam:** sentetik `<tool>` metni kalktı. `StreamChunk` + `native_tool_call`
+  (tool/input/callId/parseError); adapter `nativeCallInput` ile gateway
+  argümanını parse edip chunk yayar (bozuk JSON → honest `parseError`,
+  çalıştırma yok); server `agent-loop` toplar, retry'de sıfırlar,
+  `runEnd.toolCalls`'a tool+input dedupe ile birleştirir; CLI `tui.ts`
+  aynı merge'ü yapar (CLI henüz şema göndermiyor, no-op).
+- **Mock probe:** §8/8b FAZ B'ye çevrildi — 58/58 yeşil (chunk birebir:
+  read_file / `{"path":"a.ts"}` / call-1; akan metinde `<tool` yok;
+  chat yolunda `tools` anahtarı yok).
+- **Loop-merge kanıtı:** gerçek `runAgentLoop` + Responses-SSE konuşan
+  lokal stub → `tool_start:list_files` + `tool_result` frame'leri +
+  transcriptte `tool` satırı, outcome complete/1 turn.
+- **Canlı spark YAPILAMADI (upstream bloklu):** 5 router key'in tamamı
+  OmniRoute'ta 400 insufficient-credits; env direkt key zen/go'da 401
+  invalid. Harness kodu değil, provider bakiyesi/kredisi — kredi gelince
+  tek temsilci çağrı ile doğrulanacak.
+- **Eşzamanlı oturum notu:** kardeş REQ-119 oturumu aynı tick'te
+  parse.ts/agent-loop.ts/openai.ts'te çalışıyordu; 3 dosyam ara ara
+  stash/checkout ile kayboldu (stash'ten geri alındı, bayt-düzeyi
+  doğrulamalı), openai/agent-loop hunks'larım satır-seviyede süzülüp
+  `git apply --cached` ile commitlendi; kardeş hunks'lar worktree'de
+  duruyor, dokunulmadı.
+- **Açık (FAZ B.2):** `function_call_output` ile sonuç dönüşü, 403/429 ayrımı.

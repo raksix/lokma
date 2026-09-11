@@ -285,6 +285,9 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
 
     const filter = createBlockFilter();
     let clean = '';
+    // REQ-118 FAZ B: gateway-typed native calls bypass the text filter —
+    // collected per attempt, merged into runEnd.toolCalls below.
+    let nativeCalls: { tool: string; input: unknown; callId: string; parseError?: string }[] = [];
     let streamFailed: unknown = null;
     // REQ-077: retry attempts loop — a dead upstream re-tries the same turn
     // with backoff instead of killing the run. `attempt` counts tries (1 =
@@ -297,7 +300,10 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
       // A fresh filter per attempt: a partial failed stream must not leak
       // half-written tool blocks into the retry.
       const attemptFilter = attempt === 1 ? filter : createBlockFilter();
-      if (attempt > 1) clean = '';
+      if (attempt > 1) {
+        clean = '';
+        nativeCalls = [];
+      }
       streamFailed = null;
       try {
         for await (const chunk of aiStream({
@@ -308,8 +314,9 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
           baseUrl: opts.upstream.baseUrl,
           signal: turnCtrl.signal,
           // REQ-118 FAZ A: registry schemas ride as native Responses tools
-          // on spark (other adapters ignore them); results still return via
-          // the text <tool_result> path this phase.
+          // on spark (other adapters ignore them); FAZ B executes native
+          // calls directly, results still return via the text
+          // <tool_result> path this phase.
           tools: registry.list().map((t) => ({
             name: t.name,
             description: t.description,
@@ -329,6 +336,20 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
             // REQ-050: reasoning streams straight through (never filtered,
             // never persisted as answer text).
             if (chunk.delta) opts.send({ type: 'thinking_delta', delta: chunk.delta, sessionId: opts.sessionId });
+          } else if (chunk.type === 'native_tool_call') {
+            // REQ-118 FAZ B: gateway-typed call — collected for direct
+            // execution below; the live tool_start row fires at execution
+            // time like the text path (no double rows).
+            if (chunk.parseError === undefined) {
+              nativeCalls.push({ tool: chunk.tool, input: chunk.input, callId: chunk.callId });
+            } else {
+              nativeCalls.push({
+                tool: chunk.tool,
+                input: chunk.input,
+                callId: chunk.callId,
+                parseError: chunk.parseError,
+              });
+            }
           } else if (chunk.type === 'done') {
             break;
           }
@@ -345,7 +366,14 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
         // REQ-071: a first turn with no text, no tool calls and no questions
         // is an empty upstream reply, NOT a completed run — it retries like
         // any other upstream failure instead of showing an empty response.
-        if (turns === 1 && !clean.trim() && finished.toolCalls.length === 0 && finished.asks.length === 0) {
+        // REQ-118 FAZ B: native calls count as activity too.
+        if (
+          turns === 1 &&
+          !clean.trim() &&
+          finished.toolCalls.length === 0 &&
+          nativeCalls.length === 0 &&
+          finished.asks.length === 0
+        ) {
           streamFailed = new Error('Model returned an empty response');
         } else {
           end = finished;
@@ -405,6 +433,22 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
       throw streamFailed;
     }
     const runEnd = end ?? filter.finish();
+    // REQ-118 FAZ B: gateway-typed native calls join the text-parsed ones
+    // (deduped by tool+input like the REQ-119 merge, so a model that both
+    // dispatches natively and echoes text never executes twice).
+    {
+      const seen = new Set(
+        runEnd.toolCalls.map((c) => `${c.tool}::${JSON.stringify(c.input ?? null)}`),
+      );
+      for (const n of nativeCalls) {
+        if (!n.tool) continue;
+        const key = `${n.tool}::${JSON.stringify(n.input ?? null)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (n.parseError === undefined) runEnd.toolCalls.push({ tool: n.tool, input: n.input });
+        else runEnd.toolCalls.push({ tool: n.tool, input: n.input, parseError: n.parseError });
+      }
+    }
     outputChars += clean.length;
     if (clean.trim()) {
       await opts.store.append(opts.sessionId, {

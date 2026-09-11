@@ -259,6 +259,10 @@ async function runPrompt(opts: {
 
     const filter = createBlockFilter();
     let clean = '';
+    // REQ-118 FAZ B: gateway-typed native calls (collected for direct
+    // execution below; the CLI currently sends no tool schemas, so this
+    // stays empty until tools ride the CLI stream too).
+    const nativeCalls: { tool: string; input: unknown; parseError?: string }[] = [];
     let streamFailed: unknown = null;
     console.log('');
     try {
@@ -279,6 +283,13 @@ async function runPrompt(opts: {
           }
         } else if (chunk.type === 'thinking_delta') {
           if (chunk.delta) process.stdout.write(p.dim(chunk.delta));
+        } else if (chunk.type === 'native_tool_call') {
+          // REQ-118 FAZ B: gateway-typed call — direct execution below.
+          if (chunk.parseError === undefined) {
+            nativeCalls.push({ tool: chunk.tool, input: chunk.input });
+          } else {
+            nativeCalls.push({ tool: chunk.tool, input: chunk.input, parseError: chunk.parseError });
+          }
         } else if (chunk.type === 'done') {
           break;
         }
@@ -308,6 +319,19 @@ async function runPrompt(opts: {
     }
 
     const end = filter.finish();
+    // REQ-118 FAZ B: merge gateway-typed native calls (deduped by
+    // tool+input so a dual-channel echo never executes twice).
+    {
+      const seen = new Set(end.toolCalls.map((c) => `${c.tool}::${JSON.stringify(c.input ?? null)}`));
+      for (const n of nativeCalls) {
+        if (!n.tool) continue;
+        const key = `${n.tool}::${JSON.stringify(n.input ?? null)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (n.parseError === undefined) end.toolCalls.push({ tool: n.tool, input: n.input });
+        else end.toolCalls.push({ tool: n.tool, input: n.input, parseError: n.parseError });
+      }
+    }
     if (end.tail) {
       clean += end.tail;
       process.stdout.write(p.text(end.tail));

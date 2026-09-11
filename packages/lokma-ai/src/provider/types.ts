@@ -45,6 +45,13 @@ export type StreamChunk =
   | { type: 'thinking_delta'; delta: string }
   | { type: 'tool_start'; tool: string; input: unknown; callId: string }
   | { type: 'tool_result'; callId: string; result: unknown }
+  | {
+      type: 'native_tool_call';
+      tool: string;
+      input: unknown;
+      callId: string;
+      parseError?: string;
+    }
   | { type: 'done'; reason: 'complete' | 'error' };
 
 export interface ProviderAdapter {

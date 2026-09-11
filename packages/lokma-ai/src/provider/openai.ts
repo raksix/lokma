@@ -68,10 +68,25 @@ export function toResponsesTools(tools: ProviderToolSchema[] | undefined): {
 }
 
 /**
+ * Parse gateway-echoed function-call arguments into loop-ready input
+ * (REQ-118 FAZ B). Empty args become `{}`; unparseable args keep
+ * `input: undefined` plus a `parseError` so the loop reports the block
+ * honestly instead of executing garbage.
+ */
+export function nativeCallInput(args: string): { input: unknown; parseError?: string } {
+  const text = args.trim() ? args : '{}';
+  try {
+    return { input: JSON.parse(text) as unknown };
+  } catch (e) {
+    return { input: undefined, parseError: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
  * Render one native function call as the machine-made text block the
- * existing filter/execute chain already parses (REQ-118 FAZ A). The JSON is
- * always machine-generated, so slop risk is nil; empty args become `{}` so
- * the block never parses as malformed.
+ * existing filter/execute chain already parses (REQ-118 FAZ A fallback).
+ * The JSON is always machine-generated, so slop risk is nil; empty args
+ * become `{}` so the block never parses as malformed.
  */
 export function nativeCallToToolBlock(name: string, args: string): string {
   const safeName = name.replace(/"/g, '');
@@ -318,14 +333,23 @@ export class OpenAIAdapter implements ProviderAdapter {
         const reasoning = (record?.choices?.[0]?.delta as { reasoning_content?: unknown } | undefined)?.reasoning_content;
         if (typeof reasoning === 'string' && reasoning) yield { type: 'thinking_delta', delta: reasoning };
       }
-      // REQ-118 FAZ A: flush native calls as machine-made text blocks so the
-      // existing filter/execute/follow-up chain runs unchanged. The JSON is
-      // gateway-echoed, never model-typed, so slop salvage never sees it.
+      // REQ-118 FAZ B: flush native calls as machine-typed chunks — the
+      // loop executes them directly, no synthetic text passes the filter
+      // (so slop salvage never sees them and nothing executes twice).
       for (const call of nativeCalls.values()) {
         if (!call.name) continue;
-        const block = nativeCallToToolBlock(call.name, call.args);
-        streamedSeen += block;
-        yield { type: 'text_delta', delta: block };
+        const parsed = nativeCallInput(call.args);
+        if (parsed.parseError === undefined) {
+          yield { type: 'native_tool_call', tool: call.name, input: parsed.input, callId: call.callId };
+        } else {
+          yield {
+            type: 'native_tool_call',
+            tool: call.name,
+            input: parsed.input,
+            callId: call.callId,
+            parseError: parsed.parseError,
+          };
+        }
       }
     } catch (e) {
       if (e instanceof ProviderError) throw e;

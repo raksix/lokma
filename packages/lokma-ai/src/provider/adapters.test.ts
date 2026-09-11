@@ -10,7 +10,7 @@ import { createServer, type Server } from 'node:http';
 import { type AddressInfo } from 'node:net';
 import { AnthropicAdapter } from './anthropic';
 import { ProviderError } from './errors';
-import { nativeCallToToolBlock, OpenAIAdapter, shortModelId, toResponsesTools, unseenSuffix, usesResponsesApi } from './openai';
+import { nativeCallInput, nativeCallToToolBlock, OpenAIAdapter, shortModelId, toResponsesTools, unseenSuffix, usesResponsesApi } from './openai';
 import { zodToJsonSchema } from './tools-schema';
 import { stream } from '../stream';
 
@@ -324,8 +324,9 @@ try {
 assert(caughtUnknown instanceof ProviderError, 'stream() unknown provider throws ProviderError');
 assert((caughtUnknown as ProviderError).code === 'unknown_provider', 'stream() unknown provider keeps code');
 
-// 8. REQ-118 FAZ A: native tools ride the responses body; function_call
-// items flush as machine-made <tool> blocks (mock-transport probe).
+// 8. REQ-118 FAZ B: native tools ride the responses body; function_call
+// items flush as machine-typed native_tool_call chunks (mock-transport
+// probe) — no synthetic <tool> text passes the filter anymore.
 assert(toResponsesTools(undefined).length === 0, 'no tools option means no tools array');
 assert(toResponsesTools([]).length === 0, 'empty tools means no tools array');
 assert(
@@ -340,6 +341,19 @@ assert(
 assert(
   nativeCallToToolBlock('list_files', '  ') === '<tool name="list_files">{}</tool>',
   'empty native args become empty object block',
+);
+assert(
+  JSON.stringify(nativeCallInput('{"path":"a.ts"}').input) === '{"path":"a.ts"}' &&
+    nativeCallInput('{"path":"a.ts"}').parseError === undefined,
+  'nativeCallInput parses gateway-echoed JSON args',
+);
+assert(
+  JSON.stringify(nativeCallInput('  ').input) === '{}',
+  'nativeCallInput maps empty args to empty object',
+);
+assert(
+  nativeCallInput('{oops').input === undefined && typeof nativeCallInput('{oops').parseError === 'string',
+  'nativeCallInput reports unparseable args honestly',
 );
 assert(
   (zodToJsonSchema({ _def: { typeName: 'ZodString' } }) as { type?: string }).type === 'string',
@@ -387,7 +401,7 @@ const toolStub = await listen((req, res) => {
   });
 });
 try {
-  const chunks: { type: string; delta?: string }[] = [];
+  const chunks: { type: string; delta?: string; tool?: string; input?: unknown; callId?: string }[] = [];
   for await (const chunk of new OpenAIAdapter().stream({
     model: 'opencode-go/muse-spark-1.3-contributor',
     messages: [{ role: 'user', content: 'read a.ts' }],
@@ -397,9 +411,12 @@ try {
   })) {
     if (chunk.type === 'text_delta' && typeof (chunk as { delta?: unknown }).delta === 'string') {
       chunks.push({ type: chunk.type, delta: (chunk as { delta: string }).delta });
+    } else if (chunk.type === 'native_tool_call') {
+      chunks.push({ type: chunk.type, tool: chunk.tool, input: chunk.input, callId: chunk.callId });
     }
   }
   const joined = chunks.map((c) => c.delta ?? '').join('');
+  const native = chunks.filter((c) => c.type === 'native_tool_call');
   assert(seenTools.path === '/opencode.ai/zen/go/v1/responses', 'native tools still ride /responses');
   assert(
     Array.isArray(seenTools.tools) &&
@@ -410,10 +427,14 @@ try {
   assert(seenTools.choice === 'auto', 'responses body sets tool_choice auto');
   assert(joined.includes('checking'), 'native run keeps streamed text');
   assert(
-    joined.includes('<tool name="read_file">{"path":"a.ts"}</tool>'),
-    `function_call flushes one exact tool block, got: ${JSON.stringify(joined)}`,
+    native.length === 1 &&
+      native[0]?.tool === 'read_file' &&
+      JSON.stringify(native[0]?.input) === '{"path":"a.ts"}' &&
+      native[0]?.callId === 'call-1',
+    `function_call flushes one native_tool_call chunk, got: ${JSON.stringify(native)}`,
   );
-  assert(!joined.includes('checkingchecking'), 'no text doubling beside the native block');
+  assert(!joined.includes('<tool'), 'no synthetic tool text passes the filter anymore');
+  assert(!joined.includes('checkingchecking'), 'no text doubling beside the native call');
 } finally {
   toolStub.server.close();
 }

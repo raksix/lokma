@@ -100,4 +100,32 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
       throw e;
     }
   });
+
+  // REQ-120: delete one file or dir tree (jailed, see WorkspaceFiles.remove).
+  app.delete('/api/files', async (req, reply) => {
+    const query = req.query as { cwd?: unknown; path?: unknown };
+    if (typeof query.path !== 'string' || !query.path.trim()) {
+      return reply.status(400).send({ code: 'bad_path', message: 'delete needs ?path=<workspace file>' });
+    }
+    try {
+      return { ok: true, ...(await files(query.cwd).remove(query.path)) };
+    } catch (e) {
+      if (e instanceof FileError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      throw e;
+    }
+  });
+
+  // REQ-120: rename/move inside the workspace (both paths jailed).
+  app.post('/api/files/rename', async (req, reply) => {
+    const body = (req.body ?? {}) as { cwd?: unknown; oldPath?: unknown; newPath?: unknown };
+    if (typeof body.oldPath !== 'string' || !body.oldPath.trim() || typeof body.newPath !== 'string' || !body.newPath.trim()) {
+      return reply.status(400).send({ code: 'bad_path', message: 'rename needs { oldPath, newPath }' });
+    }
+    try {
+      return { ok: true, ...(await files(body.cwd).rename(body.oldPath, body.newPath)) };
+    } catch (e) {
+      if (e instanceof FileError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      throw e;
+    }
+  });
 }

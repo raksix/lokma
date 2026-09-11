@@ -1239,6 +1239,14 @@ export const api = {
   /** REQ-114: PDF text extraction for composer attaches (pdftotext on server). */
   extractPdf: (body: { name: string; dataBase64: string }) =>
     post<{ ok: boolean; text: string; chars: number; truncated: boolean }>('/api/attachments/extract', body),
+  /** REQ-120: delete one file or dir tree (jailed server-side). */
+  deleteWorkspaceFile: (cwd: string, path: string) =>
+    del<{ ok: boolean; path: string; wasDir: boolean }>(
+      `/api/files?cwd=${encodeURIComponent(cwd)}&path=${encodeURIComponent(path)}`,
+    ),
+  /** REQ-120: rename/move inside the workspace (both paths jailed). */
+  renameWorkspaceFile: (cwd: string, oldPath: string, newPath: string) =>
+    post<{ ok: boolean; path: string }>('/api/files/rename', { cwd, oldPath, newPath }),
   /** REQ-084: server directory browser for the project folder picker. */
   listDirs: (path?: string) =>
     get<FsListRes>(path === undefined ? '/api/fs/list' : `/api/fs/list?path=${encodeURIComponent(path)}`),

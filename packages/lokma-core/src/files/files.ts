@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, rename, rm, stat } from 'node:fs/promises';
 import { normalize, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 import { writeAtomic } from '../utils/fs.js';
@@ -350,6 +350,45 @@ export class WorkspaceFiles {
       size: Buffer.byteLength(content, 'utf-8'),
       created: current === null,
     };
+  }
+
+  /** Delete one file or directory tree (REQ-120). Jailed; missing → 404. */
+  async remove(rel: string): Promise<{ path: string; wasDir: boolean }> {
+    const abs = resolveInRoot(this.root, rel);
+    let s;
+    try {
+      s = await stat(abs);
+    } catch {
+      throw new FileError('file_not_found', `No such file: ${rel}`, 404);
+    }
+    if (!s.isFile() && !s.isDirectory()) {
+      throw new FileError('not_a_file', `Not a file: ${rel}`, 400);
+    }
+    await rm(abs, { recursive: true, force: true });
+    return { path: toRel(this.root, abs), wasDir: s.isDirectory() };
+  }
+
+  /** Rename/move one file or dir inside the workspace (REQ-120). Both jailed. */
+  async rename(oldRel: string, newRel: string): Promise<{ path: string }> {
+    if (typeof newRel !== 'string' || !newRel.trim()) {
+      throw new FileError('bad_path', 'rename needs a new path', 400);
+    }
+    const abs = resolveInRoot(this.root, oldRel);
+    try {
+      await stat(abs);
+    } catch {
+      throw new FileError('file_not_found', `No such file: ${oldRel}`, 404);
+    }
+    const dest = resolveInRoot(this.root, newRel.trim());
+    if (dest === abs) return { path: toRel(this.root, abs) };
+    try {
+      await stat(dest);
+      throw new FileError('exists', `Already exists: ${newRel.trim()}`, 409);
+    } catch (e) {
+      if (e instanceof FileError) throw e;
+    }
+    await rename(abs, dest);
+    return { path: toRel(this.root, dest) };
   }
 
   /** Fuzzy file search over the workspace (skips deps/build/VCS dirs). */

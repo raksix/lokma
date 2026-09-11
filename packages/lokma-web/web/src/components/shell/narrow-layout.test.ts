@@ -54,8 +54,8 @@ const ALLOW_FIXED_GRIDS: Array<{ file: string; snippet: string; reason: string }
   },
   {
     file: `providers${sep}models-pane.tsx`,
-    snippet: 'grid-cols-[28px_1fr_90px_60px]',
-    reason: 'model rows: flexible 1fr column with truncate + title tooltip',
+    snippet: 'grid-cols-[28px_1fr_60px]',
+    reason: 'model rows: flexible 1fr column with truncate + title tooltip (the provider column went away with the REQ-131 grouping — the sticky header names the provider now)',
   },
   {
     file: `bots${sep}bots-pane.tsx`,

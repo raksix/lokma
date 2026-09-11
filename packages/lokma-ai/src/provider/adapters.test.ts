@@ -10,7 +10,7 @@ import { createServer, type Server } from 'node:http';
 import { type AddressInfo } from 'node:net';
 import { AnthropicAdapter } from './anthropic';
 import { ProviderError } from './errors';
-import { nativeCallInput, nativeCallToToolBlock, OpenAIAdapter, shortModelId, toResponsesTools, unseenSuffix, usesResponsesApi } from './openai';
+import { nativeCallInput, nativeCallToToolBlock, OpenAIAdapter, responsesHttpError, shortModelId, toResponsesInput, toResponsesTools, unseenSuffix, usesResponsesApi } from './openai';
 import { zodToJsonSchema } from './tools-schema';
 import { stream } from '../stream';
 
@@ -470,5 +470,70 @@ try {
 } finally {
   chatToolStub.server.close();
 }
+
+// 8c. REQ-118 FAZ B.2: follow-up results return as native function_call_output.
+const mixed = toResponsesInput([
+  { role: 'system', content: 'sys' },
+  { role: 'user', content: 'run <tool_result tool="a" id="call-1">1</tool_result> mid <tool_result tool="b" call_id="call-2">ERROR x</tool_result> tail' },
+  { role: 'tool', content: '{"old":"row"}' },
+]);
+assert(mixed.length === 7, 'mixed follow-up splits into text + native items, got ' + mixed.length);
+assert((mixed[0] as { role?: string }).role === 'system', 'system message passes through');
+assert((mixed[1] as { content?: string }).content === 'run ', 'leading text stays a user item');
+const fco1 = mixed[2] as { type?: string; call_id?: string; output?: string };
+assert(fco1.type === 'function_call_output' && fco1.call_id === 'call-1' && fco1.output === '1', 'id attr becomes native function_call_output');
+assert((mixed[3] as { content?: string }).content === ' mid ', 'text between results stays a user item');
+const fco2 = mixed[4] as { type?: string; call_id?: string; output?: string };
+assert(fco2.type === 'function_call_output' && fco2.call_id === 'call-2' && fco2.output === 'ERROR x', 'call_id attr wins and error bodies ride along');
+assert((mixed[5] as { content?: string }).content === ' tail', 'trailing text stays a user item');
+assert((mixed[6] as { role?: string; content?: string }).role === 'user', 'tool history rows stay user text');
+const noId = toResponsesInput([{ role: 'user', content: '<tool_result tool="a">{"x":1}</tool_result>' }]);
+assert(
+  noId.length === 1 && (noId[0] as { role?: string }).role === 'user' && ((noId[0] as { content?: string }).content ?? '').indexOf('tool_result') >= 0,
+  'id-less result block stays user text (fail-open)',
+);
+const unclosed = toResponsesInput([{ role: 'user', content: 'hi <tool_result tool="a" id="c1">oops' }]);
+assert(
+  unclosed.length === 1 && (unclosed[0] as { content?: string }).content === 'hi <tool_result tool="a" id="c1">oops',
+  'unclosed result block stays user text (fail-open)',
+);
+const seenNative: { body: string } = { body: '' };
+const nativeStub = await listen((req, res) => {
+  let body = '';
+  req.on('data', (c) => {
+    body += c;
+  });
+  req.on('end', () => {
+    seenNative.body = body;
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    res.end(sseBody(['{"type":"response.completed","response":{"output":[]}}']));
+  });
+});
+try {
+  await collectText(
+    new OpenAIAdapter().stream({
+      model: 'opencode-go/muse-spark-1.3-contributor',
+      messages: [{ role: 'user', content: '<tool_result tool="read_file" id="call-9">{"ok":true}</tool_result>' }],
+      apiKey: 'test-key',
+      baseUrl: nativeStub.base + '/opencode.ai/zen/go/v1',
+    }),
+  );
+  assert(seenNative.body.indexOf('function_call_output') >= 0, 'follow-up results ride the wire as native function_call_output');
+  assert(seenNative.body.indexOf('call-9') >= 0, 'native output keeps the gateway call id on the wire');
+} finally {
+  nativeStub.server.close();
+}
+
+// 8d. REQ-118 FAZ B.2: honest Responses HTTP mapping (pure, no network).
+const e403 = responsesHttpError(403, 'RegionError', 'https://opencode.ai/zen/go/v1', null);
+assert(e403.code === 'region_blocked' && e403.status === 403, '403 maps to region_blocked');
+const e429 = responsesHttpError(429, 'slow down', 'https://up.example', '17');
+assert(e429.code === 'rate_limited' && e429.message.indexOf('17') >= 0, '429 maps to rate_limited with the retry hint');
+const e400 = responsesHttpError(400, '{"error":"insufficient credits"}', 'https://up.example', null);
+assert(e400.code === 'insufficient_credits', '400 mentioning insufficient maps to insufficient_credits');
+const e400b = responsesHttpError(400, 'bad request', 'https://up.example', null);
+assert(e400b.code === 'http_error', 'other 400s stay http_error');
+const e500 = responsesHttpError(500, 'boom', 'https://up.example', null);
+assert(e500.code === 'http_error' && e500.status === 500, '500 stays http_error');
 
 console.log(`\nAll ${passed} checks passed.`);

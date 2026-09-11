@@ -169,5 +169,6 @@ GÖNDERME — gateway toleranssız olabilir). Tool SONUÇLARI bu fazda mevcut
 - **Kanıt:** `bun x tsc --noEmit` 0; adapters 58/58 yeşil; yeni B.2 probu
   11/11 (split/noid/unclosed/passthrough + 4 HTTP eşleşmesi); concept build
   yeşil; ai→core→server dist rebuild + `pm2 restart lokma-server` + `/health` 200.
+  Follow-up pins §8c/§8d into adapters.test.ts (committed probe, 75/75 total).
 - **Kesik-tick kurtarma:** önceki tick kodu yazıp commit'leyemeden kesilmişti
   (4 dosya dirty); bu tick devraldı, doğruladı, kapattı — ağaç temiz.

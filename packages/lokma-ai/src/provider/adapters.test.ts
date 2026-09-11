@@ -11,6 +11,7 @@ import { type AddressInfo } from 'node:net';
 import { AnthropicAdapter, toAnthropicMessages, toAnthropicTools } from './anthropic';
 import { ProviderError } from './errors';
 import { nativeCallInput, nativeCallToToolBlock, nativeToolsBlocked, looksLikeToolPairingError, looksLikeToolsUnsupported, OpenAIAdapter, responsesHttpError, shortModelId, toChatMessages, toChatTools, ToolCallAccumulator, toResponsesInput, toResponsesTools, unseenSuffix, usesResponsesApi } from './openai';
+import { activeEffort, anthropicThinkingBudget, looksLikeReasoningUnsupported, reasoningBlocked, reasoningKey, resetReasoningMemory } from './reasoning';
 import { zodToJsonSchema } from './tools-schema';
 import { stream } from '../stream';
 
@@ -900,6 +901,203 @@ try {
   assert(chunks.some((c) => c.type === 'text_delta' && c.delta === 'checking'), 'anthropic text beside a tool call streams');
 } finally {
   anthStub.server.close();
+}
+
+// ─── REQ-133: composer thinking budget ──────────────────────────────────────
+resetReasoningMemory();
+
+// 13a. Pure helpers — the level map and the narrow probe wording.
+assert(activeEffort('off') === null && activeEffort(undefined) === null, 'off/undefined ask for no reasoning field');
+assert(activeEffort('medium') === 'medium', 'a real level passes through');
+assert(anthropicThinkingBudget('low') === 1024, 'low maps to the Anthropic thinking floor');
+assert(anthropicThinkingBudget('high') === 6144, 'high stays under max_tokens');
+assert(looksLikeReasoningUnsupported(400, 'reasoning_effort is not supported'), 'reasoning wording is a probe hit');
+assert(!looksLikeReasoningUnsupported(400, 'invalid api key'), 'an unrelated 400 is never a reasoning probe');
+assert(!looksLikeReasoningUnsupported(401, 'reasoning_effort not supported'), 'non-capability statuses are not probes');
+
+// 13b. Chat-Completions: the picked level rides the body as reasoning_effort.
+let thinkBody: Record<string, unknown> | undefined;
+const thinkStub = await listen((req, res) => {
+  let body = '';
+  req.on('data', (c) => {
+    body += c;
+  });
+  req.on('end', () => {
+    thinkBody = JSON.parse(body) as Record<string, unknown>;
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    res.end(sseBody(['{"choices":[{"delta":{"content":"think-ok"}}]}', '[DONE]']));
+  });
+});
+try {
+  let text = '';
+  for await (const chunk of new OpenAIAdapter().stream({
+    model: 'stub/thinking-ok',
+    messages: [{ role: 'user', content: 'hi' }],
+    apiKey: 'stub-key',
+    baseUrl: `${thinkStub.base}/v1`,
+    reasoningEffort: 'high',
+  })) {
+    if (chunk.type === 'text_delta') text += chunk.delta;
+  }
+  assert(
+    thinkBody?.['reasoning_effort'] === 'high',
+    `chat body carries reasoning_effort, got ${JSON.stringify(thinkBody?.['reasoning_effort'])}`,
+  );
+  assert(text === 'think-ok', 'the thinking turn still streams its answer');
+} finally {
+  thinkStub.server.close();
+}
+
+// 13c. `off` adds no reasoning field at all (the default path is unchanged).
+let offBody: Record<string, unknown> | undefined;
+const offStub = await listen((req, res) => {
+  let body = '';
+  req.on('data', (c) => {
+    body += c;
+  });
+  req.on('end', () => {
+    offBody = JSON.parse(body) as Record<string, unknown>;
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    res.end(sseBody(['{"choices":[{"delta":{"content":"plain-ok"}}]}', '[DONE]']));
+  });
+});
+try {
+  for await (const _chunk of new OpenAIAdapter().stream({
+    model: 'stub/no-thinking',
+    messages: [{ role: 'user', content: 'hi' }],
+    apiKey: 'stub-key',
+    baseUrl: `${offStub.base}/v1`,
+    reasoningEffort: 'off',
+  })) {
+    /* drain */
+  }
+  assert(offBody?.['reasoning_effort'] === undefined, 'off sends no reasoning_effort field');
+} finally {
+  offStub.server.close();
+}
+
+// 13d. Capability probe: an upstream that rejects the field is retried
+// without it (the turn still runs) and the pair is remembered.
+let rProbeRequests = 0;
+let secondReasoning: unknown;
+const rProbeStub = await listen((req, res) => {
+  let body = '';
+  req.on('data', (c) => {
+    body += c;
+  });
+  req.on('end', () => {
+    rProbeRequests += 1;
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    if (rProbeRequests === 2) secondReasoning = parsed['reasoning_effort'];
+    if (parsed['reasoning_effort'] !== undefined) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end('{"error":{"message":"reasoning_effort is not supported by this model"}}');
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    res.end(sseBody(['{"choices":[{"delta":{"content":"no-reasoning-ok"}}]}', '[DONE]']));
+  });
+});
+try {
+  let text = '';
+  for await (const chunk of new OpenAIAdapter().stream({
+    model: 'stub/no-reasoning',
+    messages: [{ role: 'user', content: 'hi' }],
+    apiKey: 'stub-key',
+    baseUrl: `${rProbeStub.base}/v1`,
+    reasoningEffort: 'medium',
+  })) {
+    if (chunk.type === 'text_delta') text += chunk.delta;
+  }
+  assert(rProbeRequests === 2, `reasoning rejection is retried exactly once, got ${rProbeRequests} requests`);
+  assert(secondReasoning === undefined, 'the retry drops reasoning_effort from the body');
+  assert(text === 'no-reasoning-ok', 'the retried turn still streams its answer');
+  assert(
+    reasoningBlocked(reasoningKey(`${rProbeStub.base}/v1`, 'no-reasoning')),
+    'the rejected pair is remembered',
+  );
+} finally {
+  rProbeStub.server.close();
+}
+
+// 13e. Anthropic: the level becomes an enabled thinking budget.
+let anthThinkBody: Record<string, unknown> | undefined;
+const anthThinkStub = await listen((req, res) => {
+  let body = '';
+  req.on('data', (c) => {
+    body += c;
+  });
+  req.on('end', () => {
+    anthThinkBody = JSON.parse(body) as Record<string, unknown>;
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    res.end(
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"anth-think-ok"}}\n\n' +
+        'event: message_stop\ndata: {"type":"message_stop"}\n\n',
+    );
+  });
+});
+try {
+  let text = '';
+  for await (const chunk of new AnthropicAdapter().stream({
+    model: 'claude-stub-thinking',
+    messages: [{ role: 'user', content: 'hi' }],
+    apiKey: 'stub-key',
+    baseUrl: anthThinkStub.base,
+    reasoningEffort: 'medium',
+  })) {
+    if (chunk.type === 'text_delta') text += chunk.delta;
+  }
+  const thinking = anthThinkBody?.['thinking'] as { type?: string; budget_tokens?: number } | undefined;
+  assert(
+    thinking?.type === 'enabled' && thinking?.budget_tokens === 4096,
+    `anthropic body enables thinking with the level budget, got ${JSON.stringify(thinking)}`,
+  );
+  assert(text === 'anth-think-ok', 'the anthropic thinking turn still streams its answer');
+} finally {
+  anthThinkStub.server.close();
+}
+
+// 13f. Anthropic probe: a model without extended thinking is retried without
+// the field instead of failing the turn.
+let anthProbeRequests = 0;
+let anthSecondThinking: unknown;
+const anthProbeStub = await listen((req, res) => {
+  let body = '';
+  req.on('data', (c) => {
+    body += c;
+  });
+  req.on('end', () => {
+    anthProbeRequests += 1;
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    if (anthProbeRequests === 2) anthSecondThinking = parsed['thinking'];
+    if (parsed['thinking'] !== undefined) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end('{"error":{"message":"thinking is not supported by this model"}}');
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    res.end(
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"anth-plain-ok"}}\n\n' +
+        'event: message_stop\ndata: {"type":"message_stop"}\n\n',
+    );
+  });
+});
+try {
+  let text = '';
+  for await (const chunk of new AnthropicAdapter().stream({
+    model: 'claude-stub-no-thinking',
+    messages: [{ role: 'user', content: 'hi' }],
+    apiKey: 'stub-key',
+    baseUrl: anthProbeStub.base,
+    reasoningEffort: 'low',
+  })) {
+    if (chunk.type === 'text_delta') text += chunk.delta;
+  }
+  assert(anthProbeRequests === 2, `anthropic thinking rejection is retried once, got ${anthProbeRequests} requests`);
+  assert(anthSecondThinking === undefined, 'the anthropic retry drops the thinking block');
+  assert(text === 'anth-plain-ok', 'the anthropic retried turn still streams its answer');
+} finally {
+  anthProbeStub.server.close();
 }
 
 console.log(`\nAll ${passed} checks passed.`);

@@ -1,6 +1,6 @@
 # REQ-118 — Spark'a native tool calling (Responses `function_call` yolu)
 
-- **Status:** done (FAZ A canlıda — 2026-09-11; FAZ B açık)
+- **Status:** done (FAZ A + FAZ B.1 + FAZ B.2 canlıda — 2026-09-11)
 - **Asked:** "muse-spark tam performansta çalışmıyor (thinking/tool).
   hermes-agent ile anomalyco/opencode'a bak, nasıl çözmüşler."
 - **Kaynaklar:** task-0 hermes-agent notu + task-1 opencode notu (transcriptler:
@@ -152,3 +152,22 @@ GÖNDERME — gateway toleranssız olabilir). Tool SONUÇLARI bu fazda mevcut
   OmniRoute `/models` 200 (cheap read OK) but any spark inference →
   400 `insufficient credits`; OmniRoute has no `/responses` route (404),
   so live native-tools E2E stays pending on provider balance, not harness code.
+
+## 8) Kapanış — FAZ B.2 (2026-09-11, recovery tick)
+
+- **Kapsam:** sonuçlar artık native dönüyor. `toResponsesInput`
+  `<tool_result ... id>body</tool_result>` bloklarını
+  `function_call_output {call_id, output}` öğelerine çevirir (idsiz/kapanmamış
+  blok fail-open metin kalır, hiçbir şey düşmez); `ParsedToolCall.nativeCallId`
+  gateway id'yi taşır, loop follow-up `<tool_result>`'ları gateway id ile yazar
+  (transcript yine minted execution id kullanır).
+- **Honest HTTP:** `responsesHttpError` — 403 → `region_blocked` (bölge kilidi /
+  eğitim-izni, harness bug değil), 429 → `rate_limited` (retry-after taşınır),
+  400 içinde insufficient → `insufficient_credits`; diğerleri `http_error`.
+  Loop `region_blocked`/`insufficient_credits`'te retry bütçesini yakmadan
+  fail-fast yapar (rate limit hâlâ retry).
+- **Kanıt:** `bun x tsc --noEmit` 0; adapters 58/58 yeşil; yeni B.2 probu
+  11/11 (split/noid/unclosed/passthrough + 4 HTTP eşleşmesi); concept build
+  yeşil; ai→core→server dist rebuild + `pm2 restart lokma-server` + `/health` 200.
+- **Kesik-tick kurtarma:** önceki tick kodu yazıp commit'leyemeden kesilmişti
+  (4 dosya dirty); bu tick devraldı, doğruladı, kapattı — ağaç temiz.

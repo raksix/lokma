@@ -136,7 +136,7 @@
 - [REQ-115](finished/REQ-115-sloppy-tool-salvage.md) — Sloppy-model tool-block salvage (XML args + tool_result closer) — done
 - [REQ-116](finished/REQ-116-claude-tarzı-motor.md) — Claude-Code-tarzı motor (stop_reason + headless -p) — done
 - [REQ-117](finished/REQ-117-default-model-session-memory.md) — Default model Duffel/blues + session model hafızası — done
-- [REQ-118](finished/REQ-118-spark-native-tools.md) — Spark native tool calling (Responses function_call) — done (FAZ A + FAZ B.1 native chunk, live spark blocked: no upstream credits)
+- [REQ-118](finished/REQ-118-spark-native-tools.md) — Spark native tool calling (Responses function_call) — done (FAZ A + FAZ B.1 native chunk + FAZ B.2 function_call_output results + honest 403/429 mapping; live spark blocked: no upstream credits)
 - [REQ-119](finished/REQ-119-deepseek-dsml.md) — DeepSeek DSML tool calling (v4.1-flash) — done
 - [REQ-120](finished/REQ-120-file-download-delete-rename.md) — Workspace file download/delete/rename (browser + pane) — done
 - [REQ-121](finished/REQ-121-session-live-row-and-stable-order.md) — Session live run row + stable order — done

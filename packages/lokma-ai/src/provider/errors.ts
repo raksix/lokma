@@ -11,7 +11,11 @@ export type ProviderErrorCode =
   | 'provider_not_wired'
   | 'http_error'
   | 'network_error'
-  | 'bad_response';
+  | 'bad_response'
+  // REQ-118 FAZ B.2: honest Responses-path failures (never a harness bug).
+  | 'region_blocked'
+  | 'rate_limited'
+  | 'insufficient_credits';
 
 export class ProviderError extends Error {
   readonly code: ProviderErrorCode;

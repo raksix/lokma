@@ -27,6 +27,12 @@ export type ParsedToolCall = {
   input: unknown;
   /** Set when the body is not valid JSON — the loop reports it honestly. */
   parseError?: string;
+  /**
+   * Gateway call id for native function calls (REQ-118 FAZ B.2) — carried
+   * so the next turn can answer with `function_call_output`. Text-parsed
+   * calls leave it unset and the loop mints an id instead.
+   */
+  nativeCallId?: string;
 };
 
 /** Where one tool block sat in the visible stream (REQ-122: persist order). */

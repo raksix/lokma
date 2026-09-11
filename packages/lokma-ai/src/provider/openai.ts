@@ -49,12 +49,74 @@ export function usesResponsesApi(baseUrl: string, model: string): boolean {
   return baseUrl.includes('opencode.ai/zen') && shortModelId(model).includes('muse-spark');
 }
 
-/** Adapt harness messages to Responses `input` (tool turns read as user). */
-export function toResponsesInput(messages: ProviderMessage[]): { role: string; content: string }[] {
-  return messages.map((m) => ({
-    role: m.role === 'tool' ? 'user' : m.role,
-    content: m.content,
-  }));
+/**
+ * One Responses `input` entry — plain turns ride as role/content, tool
+ * results return natively (REQ-118 FAZ B.2).
+ */
+export type ResponsesInputItem =
+  | { role: string; content: string }
+  | { type: 'function_call_output'; call_id: string; output: string };
+
+const TOOL_RESULT_OPEN = '<tool_result';
+const TOOL_RESULT_CLOSE = '</tool_result';
+
+/** Read one id="..." / call_id="..." attr with plain string search (never throws, no regex). */
+function resultAttr(attrs: string, name: string): string | null {
+  const key = name + '="';
+  const at = attrs.indexOf(key);
+  if (at < 0) return null;
+  const start = at + key.length;
+  const end = attrs.indexOf('"', start);
+  if (end < 0) return null;
+  return attrs.slice(start, end);
+}
+
+/**
+ * Adapt harness messages to Responses `input` (REQ-118 FAZ B.2).
+ * Assistant/system ride through; `tool` history rows read as user text
+ * (unchanged); `<tool_result ... id>body</tool_result>` blocks inside user
+ * messages return as native `function_call_output` items so the next turn
+ * links each result to its call. A block without an id, or without a
+ * closer, stays user text (fail-open — nothing is ever dropped).
+ */
+export function toResponsesInput(messages: ProviderMessage[]): ResponsesInputItem[] {
+  const out: ResponsesInputItem[] = [];
+  for (const m of messages) {
+    if (m.role !== 'user' || m.content.indexOf(TOOL_RESULT_OPEN) < 0) {
+      if (m.role === 'tool') out.push({ role: 'user', content: m.content });
+      else out.push({ role: m.role, content: m.content });
+      continue;
+    }
+    let rest = m.content;
+    let text = '';
+    for (;;) {
+      const open = rest.indexOf(TOOL_RESULT_OPEN);
+      if (open < 0) break;
+      const openEnd = rest.indexOf('>', open);
+      if (openEnd < 0) break;
+      const close = rest.indexOf(TOOL_RESULT_CLOSE, openEnd);
+      if (close < 0) break;
+      const closeEnd = rest.indexOf('>', close);
+      if (closeEnd < 0) break;
+      text += rest.slice(0, open);
+      const attrs = rest.slice(open + TOOL_RESULT_OPEN.length, openEnd);
+      const body = rest.slice(openEnd + 1, close);
+      rest = rest.slice(closeEnd + 1);
+      if (text.trim()) {
+        out.push({ role: 'user', content: text });
+        text = '';
+      }
+      const callId = resultAttr(attrs, 'call_id') ?? resultAttr(attrs, 'id');
+      if (callId !== null && callId.trim()) {
+        out.push({ type: 'function_call_output', call_id: callId.trim(), output: body });
+      } else {
+        out.push({ role: 'user', content: TOOL_RESULT_OPEN + attrs + '>' + body + '</tool_result>' });
+      }
+    }
+    text += rest;
+    if (text.trim() || out.length === 0) out.push({ role: 'user', content: text });
+  }
+  return out;
 }
 
 /** Map harness tool schemas to Responses native `tools[]` (REQ-118 FAZ A). */
@@ -76,6 +138,36 @@ export function toResponsesTools(tools: ProviderToolSchema[] | undefined): {
           ? t.parameters
           : { type: 'object', properties: {} },
     }));
+}
+
+/**
+ * Honest HTTP mapping for the Responses path (REQ-118 FAZ B.2).
+ * 403 on spark means the Meta region lock or a closed training-data
+ * permission (never a harness bug); 429 carries the server retry hint;
+ * 400 mentioning insufficient balance means the pool is out of credits.
+ * Anything else stays a generic http_error.
+ */
+export function responsesHttpError(status: number, snippet: string, base: string, retryAfter: string | null): ProviderError {
+  const tail = snippet ? ' — ' + snippet : '';
+  if (status === 403) {
+    return new ProviderError(
+      'region_blocked',
+      'Upstream HTTP 403 from ' + base + tail + ' (spark region lock or training-data permission — check RegionError/DataPolicyError, not a harness bug).',
+      status,
+    );
+  }
+  if (status === 429) {
+    const wait = retryAfter !== null && retryAfter.trim() ? ' Retry after ' + retryAfter.trim() + 's.' : '';
+    return new ProviderError('rate_limited', 'Upstream HTTP 429 from ' + base + tail + '.' + wait + ' Back off and retry.', status);
+  }
+  if (status === 400 && snippet.toLowerCase().indexOf('insufficient') >= 0) {
+    return new ProviderError(
+      'insufficient_credits',
+      'Upstream HTTP 400 from ' + base + tail + ' (pool out of credits — top up, then retry; not a harness bug).',
+      status,
+    );
+  }
+  return new ProviderError('http_error', 'Upstream HTTP ' + status + ' from ' + base + tail, status);
 }
 
 /**
@@ -207,6 +299,8 @@ export class OpenAIAdapter implements ProviderAdapter {
     }
     if (!res.ok) {
       const snippet = await readErrorSnippet(res);
+      // REQ-118 FAZ B.2: honest Responses-path mapping (region/rate/credits).
+      if (viaResponses) throw responsesHttpError(res.status, snippet, base, res.headers.get('retry-after'));
       throw new ProviderError(
         'http_error',
         `Upstream HTTP ${res.status} from ${base}${snippet ? ` — ${snippet}` : ''}`,

@@ -14,7 +14,7 @@ import {
   type SessionMessage,
   type ToolEvent,
 } from '@lokma/core';
-import { stream as aiStream, zodToJsonSchema, type ProviderMessage } from '@lokma/ai';
+import { ProviderError, stream as aiStream, zodToJsonSchema, type ProviderMessage } from '@lokma/ai';
 import type { Permissions, ServerMessage } from '@lokma/shared';
 
 /**
@@ -321,10 +321,10 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
           apiKey: opts.upstream.apiKey,
           baseUrl: opts.upstream.baseUrl,
           signal: turnCtrl.signal,
-          // REQ-118 FAZ A: registry schemas ride as native Responses tools
-          // on spark (other adapters ignore them); FAZ B executes native
-          // calls directly, results still return via the text
-          // <tool_result> path this phase.
+          // REQ-118 FAZ A/B: registry schemas ride as native Responses tools
+          // on spark (other adapters ignore them); native calls execute
+          // directly and results return as `function_call_output`
+          // (toResponsesInput converts the follow-up blocks).
           tools: registry.list().map((t) => ({
             name: t.name,
             description: t.description,
@@ -413,6 +413,11 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
         return { outcome: 'aborted', inputChars, outputChars: outputChars + clean.length, turns };
       }
       const reason = streamFailed instanceof Error ? streamFailed.message : String(streamFailed);
+      // REQ-118 FAZ B.2: permanent upstream refusals (region lock, empty
+      // pool) never clear on retry — fail fast with the honest message
+      // instead of burning the retry budget. Rate limits still retry.
+      const failCode = streamFailed instanceof ProviderError ? streamFailed.code : null;
+      if (failCode === 'region_blocked' || failCode === 'insufficient_credits') break;
       if (attempt > maxRetries) break;
       const waitMs = retryDelayMs(retryDelaysMs, attempt);
       opts.send({ type: 'retry_notice', attempt, maxAttempts: maxRetries, waitMs, message: reason.slice(0, 300), sessionId: opts.sessionId });
@@ -479,8 +484,11 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
         const key = `${n.tool}::${JSON.stringify(n.input ?? null)}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        if (n.parseError === undefined) runEnd.toolCalls.push({ tool: n.tool, input: n.input });
-        else runEnd.toolCalls.push({ tool: n.tool, input: n.input, parseError: n.parseError });
+        // REQ-118 FAZ B.2: keep the gateway call id so the follow-up can
+        // answer natively (`function_call_output`); the transcript still
+        // uses the minted execution id below.
+        if (n.parseError === undefined) runEnd.toolCalls.push({ tool: n.tool, input: n.input, nativeCallId: n.callId });
+        else runEnd.toolCalls.push({ tool: n.tool, input: n.input, parseError: n.parseError, nativeCallId: n.callId });
       }
     }
     outputChars += clean.length;
@@ -530,13 +538,16 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
       }
       execIdx++;
       const callId = mintCallId();
+      // REQ-118 FAZ B.2: native calls answer with the gateway id so the
+      // next turn links `function_call_output`; text calls keep the mint.
+      const resultId = call.nativeCallId ?? callId;
       if (!call.tool || call.input === undefined) {
         // Malformed block — honest error frame, no execution, no gate.
         const message = !call.tool ? 'Model emitted a <tool> block without a name' : `Model emitted invalid tool JSON: ${call.parseError ?? 'parse error'}`;
         opts.send({ type: 'tool_start', tool: call.tool || 'unknown', input: null, callId, sessionId: opts.sessionId });
         opts.send({ type: 'tool_result', callId, result: { code: 'bad_tool_block', message }, isError: true, sessionId: opts.sessionId });
         await opts.store.append(opts.sessionId, toolRecord(callId, call.tool || 'unknown', { callId, ok: false, code: 'bad_tool_block', message }, call.input));
-        followUps.push(`<tool_result tool="${call.tool || 'unknown'}" id="${callId}">ERROR bad_tool_block: ${message}</tool_result>`);
+        followUps.push(`<tool_result tool="${call.tool || 'unknown'}" id="${resultId}">ERROR bad_tool_block: ${message}</tool_result>`);
         continue;
       }
       const outcome = await executeToolCall(registry, {
@@ -565,15 +576,15 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
           const result = { code: 'denied', message: `Denied by permissions: ${outcome.tool}` };
           opts.send({ type: 'tool_result', callId, result, isError: true, sessionId: opts.sessionId });
           await opts.store.append(opts.sessionId, toolRecord(callId, outcome.tool, { callId, ok: false, ...result }, call.input));
-          followUps.push(`<tool_result tool="${outcome.tool}" id="${callId}">ERROR denied: ${result.message}</tool_result>`);
+          followUps.push(`<tool_result tool="${outcome.tool}" id="${resultId}">ERROR denied: ${result.message}</tool_result>`);
         } else {
           const ran = await runApprovedCall(registry, { tool: outcome.tool, input: call.input, callId, onEvent: forwardEvent });
           if (ran.outcome === 'ok') {
             await opts.store.append(opts.sessionId, toolRecord(callId, outcome.tool, { callId, ok: true, result: ran.result }, call.input));
-            followUps.push(`<tool_result tool="${outcome.tool}" id="${callId}">${JSON.stringify(ran.result)}</tool_result>`);
+            followUps.push(`<tool_result tool="${outcome.tool}" id="${resultId}">${JSON.stringify(ran.result)}</tool_result>`);
           } else {
             await opts.store.append(opts.sessionId, toolRecord(callId, outcome.tool, { callId, ok: false, code: ran.code, message: ran.message }, call.input));
-            followUps.push(`<tool_result tool="${outcome.tool}" id="${callId}">ERROR ${ran.code}: ${ran.message}</tool_result>`);
+            followUps.push(`<tool_result tool="${outcome.tool}" id="${resultId}">ERROR ${ran.code}: ${ran.message}</tool_result>`);
           }
         }
       } else if (outcome.outcome === 'denied') {
@@ -581,13 +592,13 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
         const result = { code: 'denied', message: `Denied by permissions: ${outcome.tool}` };
         opts.send({ type: 'tool_result', callId, result, isError: true, sessionId: opts.sessionId });
         await opts.store.append(opts.sessionId, toolRecord(callId, outcome.tool, { callId, ok: false, ...result }, call.input));
-        followUps.push(`<tool_result tool="${outcome.tool}" id="${callId}">ERROR denied: ${result.message}</tool_result>`);
+        followUps.push(`<tool_result tool="${outcome.tool}" id="${resultId}">ERROR denied: ${result.message}</tool_result>`);
       } else if (outcome.outcome === 'ok') {
         await opts.store.append(opts.sessionId, toolRecord(callId, call.tool, { callId, ok: true, result: outcome.result }, call.input));
-        followUps.push(`<tool_result tool="${call.tool}" id="${callId}">${JSON.stringify(outcome.result)}</tool_result>`);
+        followUps.push(`<tool_result tool="${call.tool}" id="${resultId}">${JSON.stringify(outcome.result)}</tool_result>`);
       } else {
         await opts.store.append(opts.sessionId, toolRecord(callId, call.tool, { callId, ok: false, code: outcome.code, message: outcome.message }, call.input));
-        followUps.push(`<tool_result tool="${call.tool}" id="${callId}">ERROR ${outcome.code}: ${outcome.message}</tool_result>`);
+        followUps.push(`<tool_result tool="${call.tool}" id="${resultId}">ERROR ${outcome.code}: ${outcome.message}</tool_result>`);
       }
     }
 

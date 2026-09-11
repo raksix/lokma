@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   Copy,
+  Download,
   File as FileIcon,
   Folder,
   FolderOpen,
@@ -13,6 +14,7 @@ import {
   RefreshCw,
   Save,
   Search,
+  Trash2,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -633,9 +635,13 @@ export function FileBrowser({ sessionId }: { sessionId: string }) {
           x={menu.x}
           y={menu.y}
           path={menu.path}
+          cwd={cwd ?? ''}
           onClose={() => setMenu(null)}
           onOpenFile={(p) => void openFile(p)}
           onOpenPane={(p) => void openFileInNewPane(p)}
+          onChanged={() => {
+            if (cwd) void loadDir(cwd, '.');
+          }}
         />
       ) : null}
     </div>
@@ -652,17 +658,47 @@ function FileContextMenu({
   x,
   y,
   path,
+  cwd,
   onClose,
   onOpenFile,
   onOpenPane,
+  onChanged,
 }: {
   x: number;
   y: number;
   path: string;
+  cwd: string;
   onClose: () => void;
   onOpenFile: (p: string) => void;
   onOpenPane: (p: string) => void;
+  onChanged: () => void;
 }) {
+  const download = async () => {
+    try {
+      const blob = await api.readWorkspaceFileRaw(cwd, path);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = path.split('/').pop() ?? path;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+      emitToast('Downloaded');
+    } catch {
+      emitToast('Download failed');
+    }
+  };
+  const remove = async () => {
+    if (!window.confirm(`Delete ${path}? This cannot be undone.`)) return;
+    try {
+      await api.deleteWorkspaceFile(cwd, path);
+      emitToast(`Deleted ${path}`);
+      onChanged();
+    } catch (e) {
+      emitToast(`Delete failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
   const items: ContextMenuEntry[] = [
     { type: 'header', label: path },
     {
@@ -695,6 +731,19 @@ function FileContextMenu({
       label: 'Open in new pane',
       icon: FileIcon,
       onSelect: () => onOpenPane(path),
+    },
+    {
+      type: 'item',
+      label: 'Download',
+      icon: Download,
+      onSelect: () => void download(),
+    },
+    {
+      type: 'item',
+      label: 'Delete',
+      icon: Trash2,
+      danger: true,
+      onSelect: () => void remove(),
     },
   ];
   return <ContextMenu x={x} y={y} items={items} onClose={onClose} label="File actions menu" />;

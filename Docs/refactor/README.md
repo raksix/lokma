@@ -138,3 +138,4 @@
 - [REQ-117](finished/REQ-117-default-model-session-memory.md) — Default model Duffel/blues + session model hafızası — done
 - [REQ-118](finished/REQ-118-spark-native-tools.md) — Spark native tool calling (Responses function_call) — done (FAZ A + FAZ B.1 native chunk, live spark blocked: no upstream credits)
 - [REQ-119](finished/REQ-119-deepseek-dsml.md) — DeepSeek DSML tool calling (v4.1-flash) — done
+- [REQ-120](finished/REQ-120-file-download-delete-rename.md) — Workspace file download/delete/rename (browser + pane) — done

@@ -888,6 +888,8 @@
 
 - 2026-09-11 refactor-scan: REQ-116 FAZ C-ask-gate shipped — cutoff recovery (dirty claude-print.ts ask helpers + ws.ts pre-spawn gate committed), 7-assert section-13 probe added (59/59 green), root tsc 0, concept build green, web untouched (no restart).
 
+- 2026-09-11 refactor-scan: REQ-120 file download/delete/rename UI half shipped — cutoff recovery (dirty file-browser.tsx context menu + pane.tsx preview header committed), root tsc 0, web build green, served bundle == disk (pm2 restart lokma-web). Server half was 55e6ec0.
+
 ## Son Durum
 - **Son güncelleme:** 2026-09-06 (TEST LOOP area E run 11 — harness demo concurrency-limiter live proven, sıradaki alan: F)
 - **Son işlem:** E run 11 (harness demo FULLY GREEN: /tmp/lokma-demo/run12/ limiter.js + limiter.test.js + README.md, gerçek run_command exitCode 0 `All 20 assertions passed`, done-complete, 47 satır transcript opencode-go/mimo-v2.5; mandated model 11. kez upstream 500 + bir geçici 503; model önce sahte `<tool>` metni + erken done yaptı bağımsız node exit 1 ile yakalandı, sed one-liner stratejisiyle dürüstçe toparladı limiter.run→limiter + activeCount microtask race; transcript 4x exit0 + 2x exit1, approvals hep allow global untouched, default-scope 13, provider test 200 35 model, server log 0 hata; kod değişikliği yok, restart yok, PM2 untouched).

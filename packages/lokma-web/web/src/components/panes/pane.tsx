@@ -5,6 +5,7 @@ import {
   Code2,
   Columns2,
   Copy,
+  Download,
   Eye,
   FileText,
   GitFork,
@@ -14,11 +15,13 @@ import {
   Maximize,
   MessageSquare,
   Pencil,
+  PenLine,
   PictureInPicture2,
   Plus,
   Rows2,
   Save,
   Search,
+  Trash2,
   Wrench,
   X,
 } from 'lucide-react';
@@ -78,11 +81,17 @@ export function PaneFilePreview({
   path,
   tabId,
   onDirtyChange,
+  onDeleted,
+  onRenamed,
 }: {
   sessionId: string;
   path: string;
   tabId?: string;
   onDirtyChange?: (tabId: string, dirty: boolean) => void;
+  /** REQ-120: parent closes the tab after a successful delete. */
+  onDeleted?: () => void;
+  /** REQ-120: parent repoints the tab after a successful rename. */
+  onRenamed?: (newPath: string) => void;
 }) {
   const [status, setStatus] = React.useState<'loading' | 'error' | 'ok'>('loading');
   const [error, setError] = React.useState('');
@@ -213,6 +222,88 @@ export function PaneFilePreview({
     }
   };
 
+  // ── REQ-120: download / delete / rename ──────────────────────────────
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const [renaming, setRenaming] = React.useState(false);
+  const [renameValue, setRenameValue] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  React.useEffect(() => {
+    if (!confirmDelete) return;
+    const t = window.setTimeout(() => setConfirmDelete(false), 4000);
+    return () => window.clearTimeout(t);
+  }, [confirmDelete]);
+
+  const fileName = path.split('/').pop() ?? path;
+  const downloadFile = async () => {
+    if (!known || known === 'loading') return;
+    const cwd = known.cwd ?? '';
+    if (!cwd) return;
+    try {
+      let blob: Blob;
+      if (blobUrl) {
+        blob = await (await fetch(blobUrl)).blob();
+      } else if (kind === 'pdf' || kind === 'image') {
+        blob = await api.readWorkspaceFileRaw(cwd, path);
+      } else {
+        blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+      emitToast(`Downloaded ${fileName}`);
+    } catch {
+      emitToast('Download failed');
+    }
+  };
+
+  const deleteFile = async () => {
+    if (!known || known === 'loading') return;
+    const cwd = known.cwd ?? '';
+    if (!cwd || busy) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.deleteWorkspaceFile(cwd, path);
+      emitToast(`Deleted ${path}`);
+      onDeleted?.();
+    } catch (e) {
+      emitToast(`Delete failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(false);
+      setConfirmDelete(false);
+    }
+  };
+
+  const commitRename = async () => {
+    if (!known || known === 'loading') return;
+    const cwd = known.cwd ?? '';
+    const next = renameValue.trim();
+    if (!cwd || !next || busy) return;
+    if (next === path) {
+      setRenaming(false);
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await api.renameWorkspaceFile(cwd, path, next);
+      emitToast(`Renamed to ${res.path}`);
+      setRenaming(false);
+      onRenamed?.(res.path);
+    } catch (e) {
+      emitToast(`Rename failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (status === 'loading') {
     return (
       <div className="flex h-full items-center justify-center gap-2 text-xs text-muted-foreground">
@@ -241,7 +332,21 @@ export function PaneFilePreview({
         {dirty ? (
           <span title="Unsaved changes" className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#C96442]" />
         ) : null}
-        <span className="min-w-0 flex-1 truncate font-mono">{path}</span>
+        {renaming ? (
+          <Input
+            autoFocus
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void commitRename();
+              if (e.key === 'Escape') setRenaming(false);
+            }}
+            className="h-6 max-w-[220px] font-mono text-[11px]"
+            aria-label="New file path"
+          />
+        ) : (
+          <span className="min-w-0 flex-1 truncate font-mono">{path}</span>
+        )}
         {meta ? <span>{formatBytes(meta.size)}</span> : null}
         {meta?.truncated ? <span className="rounded bg-muted px-1">truncated at 256 KB</span> : null}
         {previewable ? (
@@ -327,6 +432,34 @@ export function PaneFilePreview({
             <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[11px]" title="Insert @mention into the chat composer" onClick={() => emitInsertMention(path)}>
               <AtSign className="h-3 w-3" />
               Mention
+            </Button>
+            <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[11px]" title="Download this file" onClick={() => void downloadFile()}>
+              <Download className="h-3 w-3" />
+              Download
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-1.5 text-[11px]"
+              title="Rename this file"
+              onClick={() => {
+                setRenameValue(path);
+                setRenaming(true);
+              }}
+            >
+              <PenLine className="h-3 w-3" />
+              Rename
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-6 px-1.5 text-[11px] ${confirmDelete ? 'bg-red-100 text-red-700 hover:bg-red-200 hover:text-red-800' : ''}`}
+              title={confirmDelete ? 'Click again to confirm deletion' : 'Delete this file'}
+              disabled={busy}
+              onClick={() => void deleteFile()}
+            >
+              {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+              {confirmDelete ? 'Confirm?' : 'Delete'}
             </Button>
           </>
         )}
@@ -910,6 +1043,15 @@ export function WorkspacePane({
               onDirtyChange={markDirty}
               onOpenInspectorTab={(inspectorId) => addTab(makeInspectorTab(inspectorId))}
               onOpenSession={onOpenSession}
+              onCloseTab={closeTab}
+              onRenameFileTab={(id, newPath) => {
+                const base = newPath.split('/').pop() || newPath;
+                onTabsChange(
+                  id,
+                  tabs.map((t) => (t.id === id ? { ...t, filePath: newPath, title: base } : t)),
+                  id,
+                );
+              }}
             />
           </PaneErrorBoundary>
         ) : null}
@@ -1177,12 +1319,16 @@ function PaneTabContent({
   onDirtyChange,
   onOpenInspectorTab,
   onOpenSession,
+  onCloseTab,
+  onRenameFileTab,
 }: {
   tab: PaneTab;
   ctx: PaneCtx;
   onDirtyChange: (tabId: string, dirty: boolean) => void;
   onOpenInspectorTab: (id: InspectorTabId) => void;
   onOpenSession?: (id: string) => void;
+  onCloseTab?: (id: string) => void;
+  onRenameFileTab?: (id: string, newPath: string) => void;
 }) {
   if (tab.kind === 'session' && tab.sessionId) {
     return <ChatWithSocket key={tab.sessionId} sessionId={tab.sessionId} />;
@@ -1197,7 +1343,16 @@ function PaneTabContent({
     );
   }
   if (tab.kind === 'file' && tab.filePath && tab.sessionId && isValidRelPath(tab.filePath)) {
-    return <PaneFilePreview sessionId={tab.sessionId} path={tab.filePath} tabId={tab.id} onDirtyChange={onDirtyChange} />;
+    return (
+      <PaneFilePreview
+        sessionId={tab.sessionId}
+        path={tab.filePath}
+        tabId={tab.id}
+        onDirtyChange={onDirtyChange}
+        onDeleted={() => onCloseTab?.(tab.id)}
+        onRenamed={(newPath) => onRenameFileTab?.(tab.id, newPath)}
+      />
+    );
   }
   return (
     <div className="flex h-full items-center justify-center p-6 text-center text-xs text-muted-foreground">

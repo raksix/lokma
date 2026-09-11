@@ -69,14 +69,21 @@ characters, same prompt):
 
 | Model | off | high | note |
 |---|---|---|---|
-| `google/gemini-3.8-flash` | 0 | **546** | clear effect (2.4s → 3.8s) |
-| `meta/muse-spark-1.3` | 0 | **71** | clear effect (4.4s → 9.7s) |
-| `MiniMaxAI/MiniMax-M2.5` | 741 | 244 | reasons either way |
-| `moonshotai/Kimi-K2.6` | 189 | 115 | reasons either way |
-| `deepseek-v4-pro`, `deepseek-v4.1-flash`, `zai-org/GLM-5.3`, `Qwen/Qwen3.8-Max`, `xai/grok-4.6` | — | — | field accepted (HTTP 200), no visible shift |
+| `google/gemini-3.8-flash` | 0 | **546** | the field switches reasoning ON (2.4s → 3.8s) |
+| `meta/muse-spark-1.3` | 0 | **71** | the field switches reasoning ON (4.4s → 9.7s) |
+| `xiaomi/mimo-v2.5` | 693 | 49 | reasons anyway; high **lowers** it |
+| `MiniMaxAI/MiniMax-M2.5` | 741 | 244 | reasons anyway; high lowers it |
+| `moonshotai/Kimi-K2.6` | 189 | 115 | reasons anyway; high lowers it |
+| `Qwen/Qwen3.8-Max` | 114 | 78 | reasons anyway; high lowers it |
+| `zai-org/GLM-5.3` | 60 | 9 | reasons anyway; high lowers it |
+| `deepseek-v4-pro` | 67 | 60 | field ignored |
+| `deepseek-v4.1-flash` | 54 | 59 | field ignored |
+| `xai/grok-4.6` | 54 | 50 | field ignored |
 
-Every tested model **accepted** the field (no 400s), so the probe stays a
-safety net rather than the normal path.
+Read this carefully before calling a model broken: only the first group reacts
+in the expected direction. The middle group reasons on every turn regardless,
+so a level there trims rather than adds. Every tested model **accepted** the
+field (no 400s), so the probe stays a safety net rather than the normal path.
 
 ## Known limits (not bugs in this change)
 

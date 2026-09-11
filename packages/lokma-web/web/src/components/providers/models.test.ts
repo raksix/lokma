@@ -2,7 +2,7 @@
  * models.test.ts — probe for the pure Models-tab helpers.
  * Run: `bun src/components/providers/models.test.ts` (no DOM, no server).
  */
-import { buildBulkMap, countEnabled, enabledModels, filterModels, modelIdMatches, normalizeModelId, resolveDefaultModel } from './models';
+import { buildBulkMap, countEnabled, enabledModels, filterModels, groupByProvider, modelIdMatches, normalizeModelId, resolveDefaultModel } from './models';
 import type { ModelInfo } from '@/lib/api';
 
 const catalog: ModelInfo[] = [
@@ -35,12 +35,32 @@ check('trims whitespace', filterModels(catalog, '  opus  ').length === 1);
 check('counts enabled', countEnabled(catalog) === 2);
 check('empty catalog is zero', countEnabled([]) === 0);
 
+// groupByProvider (REQ-131 — Models tab parity with the Composer dropdown)
+const grouped = groupByProvider(catalog);
+check('groups come out alphabetically', grouped.map((g) => g.provider).join(',') === 'anthropic,openai');
+check('grouping keeps every model', grouped.reduce((n, g) => n + g.models.length, 0) === catalog.length);
+check(
+  'catalog order survives inside a group',
+  grouped[0]?.models.map((m) => m.id).join(',') === 'anthropic/claude-sonnet,anthropic/claude-opus',
+);
+check('disabled rows stay in their group', grouped[0]?.models.some((m) => m.enabled === false) === true);
+check('empty catalog groups to nothing', groupByProvider([]).length === 0);
+const crossProvider: ModelInfo[] = [
+  { id: 'p/shared', label: 'shared', provider: 'p', enabled: true },
+  { id: 'q/shared', label: 'shared', provider: 'q', enabled: true },
+];
+check('same label on two providers stays in separate groups', groupByProvider(crossProvider).length === 2);
+
 // buildBulkMap (Allow All / Disable All → one PATCH)
 const allowAll = buildBulkMap(catalog, true);
 check('allow-all flags every id', Object.keys(allowAll).length === 3 && Object.values(allowAll).every((v) => v === true));
 const disableAll = buildBulkMap(catalog, false);
 check('disable-all flags every id', Object.keys(disableAll).length === 3 && Object.values(disableAll).every((v) => v === false));
 check('empty catalog builds empty map', Object.keys(buildBulkMap([], true)).length === 0);
+check(
+  'filtered bulk scopes to the shown subset (REQ-131)',
+  Object.keys(buildBulkMap(filterModels(catalog, 'anthropic'), true)).length === 2,
+);
 
 // enabledModels (single source for pickers)
 const visible = enabledModels(catalog);

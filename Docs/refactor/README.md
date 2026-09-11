@@ -140,3 +140,4 @@
 - [REQ-119](finished/REQ-119-deepseek-dsml.md) — DeepSeek DSML tool calling (v4.1-flash) — done
 - [REQ-120](finished/REQ-120-file-download-delete-rename.md) — Workspace file download/delete/rename (browser + pane) — done
 - [REQ-121](finished/REQ-121-session-live-row-and-stable-order.md) — Session live run row + stable order — done
+- [REQ-122](finished/REQ-122-transcript-interleave.md) — Transcript yerinde sıra (thinking+tool+metin) — done

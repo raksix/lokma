@@ -202,6 +202,18 @@ function assert(cond: boolean, label: string): void {
   assert(!((shown + shown2 + end.tail).includes('DSML')), 'wrapper markup never leaks');
 }
 
+// ─── REQ-122: stream marks record visible offsets for persist order ───
+{
+  const f = createBlockFilter();
+  const shown = f.push('Intro <tool name="read_file">{"path": "a.ts"}</tool> mid <tool name="list_files" /> tail');
+  const end = f.finish();
+  assert(end.toolCalls.length === 2, 'two calls parsed');
+  assert(end.marks.length === 2, 'two stream marks recorded');
+  assert(end.marks[0]?.at === 'Intro '.length, 'first mark at visible offset');
+  assert(end.marks[1]?.at === ('Intro '.length + ' mid '.length), 'second mark after mid text');
+  assert(shown + end.tail === 'Intro  mid  tail', 'visible text excludes blocks');
+}
+
 // ─── REQ-115b: <tool_call> shape + fake-result stripping (roleplay guard) ───
 {
   const calls = parseToolBlocks('<tool_call>\n{"name": "read_file", "arguments": {"path": "a.ts"}}\n</tool_call>');
@@ -224,6 +236,22 @@ function assert(cond: boolean, label: string): void {
   assert(end.toolCalls.length === 0, 'fake result yields no call');
   assert(!((shown + end.tail).includes('fake output')), 'fake result text never shown');
   assert((shown + end.tail).includes('A') && (shown + end.tail).includes('B'), 'surrounding text survives');
+}
+
+// ─── REQ-122: stream-order marks (persist order) ───
+{
+  const f = createBlockFilter();
+  const s1 = f.push('Hello ');
+  f.push('<tool name="list_files">{}</tool>');
+  const s3 = f.push(' mid ');
+  const s4 = f.push('<tool name="read_file">{"path": "a.ts"}</tool> end');
+  const end = f.finish();
+  assert(end.toolCalls.length === 2, 'two streamed calls parsed');
+  assert(end.marks.length === 2, 'one mark per tool block');
+  assert(end.marks[0]?.at === 6, 'first mark at visible offset of first block');
+  assert(end.marks[1]?.at === 11, 'second mark at visible offset of second block');
+  assert((end.marks[0]?.at ?? 0) <= (end.marks[1]?.at ?? -1), 'marks non-decreasing');
+  assert((s1 + s3 + s4 + end.tail).includes('Hello') && (s1 + s3 + s4 + end.tail).includes('end'), 'text around marked blocks streams');
 }
 
 console.log(`\nparse probe: ${passed} passed`);

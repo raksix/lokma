@@ -5,7 +5,7 @@
  */
 
 export type SessionMessage = {
-  role: 'user' | 'assistant' | 'tool';
+  role: 'user' | 'assistant' | 'tool' | 'thinking';
   content: string;
   timestamp: string; // ISO
   toolCallId?: string;

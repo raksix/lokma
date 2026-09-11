@@ -356,6 +356,17 @@ export function SingleChatView({
               }
               return m.role === 'user' ? (
                 <UserRow key={`${i}-${m.timestamp ?? ''}`} index={i} message={m} onEditSave={onEditSave} onRewindTo={onRewindTo} onCopy={onCopy} />
+              ) : m.role === 'thinking' ? (
+                // REQ-122: persisted thinking stays where it happened (never
+                // re-sent upstream, never rendered as answer text).
+                <div key={`${i}-${m.timestamp ?? ''}`} className="flex gap-3">
+                  <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full border border-line bg-muted font-serif text-xs">
+                    ?
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <ThinkingTrace thinking={m.content} streaming={false} />
+                  </div>
+                </div>
               ) : (
                 <AssistantRow key={`${i}-${m.timestamp ?? ''}`} index={i} message={m} onCopy={onCopy} onFork={onFork} onRewindTo={onRewindTo} />
               );

@@ -29,6 +29,12 @@ export type ParsedToolCall = {
   parseError?: string;
 };
 
+/** Where one tool block sat in the visible stream (REQ-122: persist order). */
+export type StreamMark = {
+  /** Visible chars emitted before the block (offset into the turn text). */
+  at: number;
+};
+
 export type ParsedAsk = {
   question: string;
   choices?: string[];
@@ -228,11 +234,14 @@ export function stripModelBlocks(text: string): string {
  */
 export function createBlockFilter(): {
   push(delta: string): string;
-  finish(): { tail: string; toolCalls: ParsedToolCall[]; asks: ParsedAsk[] };
+  finish(): { tail: string; toolCalls: ParsedToolCall[]; asks: ParsedAsk[]; marks: StreamMark[] };
 } {
   let buffer = '';
   const toolCalls: ParsedToolCall[] = [];
   const asks: ParsedAsk[] = [];
+  // REQ-122: visible offsets of matched tool blocks (persist order).
+  const marks: StreamMark[] = [];
+  let emitted = 0;
 
   function drain(force: boolean): string {
     let out = '';
@@ -257,6 +266,11 @@ export function createBlockFilter(): {
       const win = cands[0]!;
       out += buffer.slice(0, win.index);
       buffer = buffer.slice(win.index + win.len);
+      // A tool block sat here in the stream: record the visible offset
+      // (preceding text already appended above, so out.length is the spot).
+      if (win.kind === 'tool' || win.kind === 'toolCall' || win.kind === 'dsml') {
+        marks.push({ at: emitted + out.length });
+      }
       // Fake roleplayed results + DSML calls-wrapper tags are pure markup:
       // dropped silently (a `<tool>` block closed by `</tool_result>` still
       // parses via its own match).
@@ -277,6 +291,7 @@ export function createBlockFilter(): {
       buffer = buffer.replace(FAKE_RESULT_OPEN, '');
       out += buffer;
       buffer = '';
+      emitted += out.length;
       return out;
     }
     // Hold back from the FIRST `<`: anything before it can never belong to
@@ -288,13 +303,16 @@ export function createBlockFilter(): {
     if (open === -1) {
       out += buffer;
       buffer = '';
+      emitted += out.length;
     } else if (buffer.length > BLOCK_FILTER_BUFFER_CAP) {
       // Fail-open: a never-closing `<tool` must not swallow the chat.
       out += buffer;
       buffer = '';
+      emitted += out.length;
     } else {
       out += buffer.slice(0, open);
       buffer = buffer.slice(open);
+      emitted += out.length;
     }
     return out;
   }
@@ -304,9 +322,9 @@ export function createBlockFilter(): {
       buffer += delta;
       return drain(false);
     },
-    finish(): { tail: string; toolCalls: ParsedToolCall[]; asks: ParsedAsk[] } {
+    finish(): { tail: string; toolCalls: ParsedToolCall[]; asks: ParsedAsk[]; marks: StreamMark[] } {
       const tail = drain(true);
-      return { tail, toolCalls, asks };
+      return { tail, toolCalls, asks, marks };
     },
   };
 }

@@ -176,6 +176,9 @@ export function buildLoopHistory(messages: SessionMessage[]): ProviderMessage[] 
   for (let i = recent.length - 1; i >= 0; i--) {
     const m = recent[i];
     if (!m) continue;
+    // REQ-122: persisted thinking rows are display-only — they never ride
+    // back upstream (as `user` text they would pollute context + tokens).
+    if (m.role === 'thinking') continue;
     // REQ-071: the newest message always rides whole (it is the prompt being
     // answered); older rows are truncated per-role so giants cannot evict
     // the conversation the model is supposed to remember.
@@ -481,19 +484,51 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
       }
     }
     outputChars += clean.length;
-    if (clean.trim()) {
+    // REQ-122: persist the turn in stream order — thinking first, then text
+    // segments interleaved with their tool rows. `runMarks` cut `clean`
+    // where each text-parsed block sat; merged (thinking/native) calls carry
+    // no mark and flush remaining text first. Empty segments are skipped.
+    const runMarks = [...(runEnd.marks ?? [])].sort((a, b) => a.at - b.at);
+    const THINK_CAP = 12_000;
+    if (thinkingText.trim()) {
+      const t = thinkingText.trim();
       await opts.store.append(opts.sessionId, {
-        role: 'assistant',
-        content: clean,
+        role: 'thinking',
+        content:
+          t.length > THINK_CAP
+            ? `${t.slice(0, THINK_CAP)}\n…[thinking truncated: ${t.length} chars total]`
+            : t,
         timestamp: new Date().toISOString(),
       });
     }
+    let segPos = 0;
+    let execIdx = 0;
+    const flushText = async (to: number): Promise<void> => {
+      const at = Math.max(segPos, Math.min(to, clean.length));
+      const seg = clean.slice(segPos, at);
+      segPos = at;
+      if (seg.trim()) {
+        await opts.store.append(opts.sessionId, {
+          role: 'assistant',
+          content: seg,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    };
 
     const followUps: string[] = [];
 
     // ── Tool calls (in model order, one at a time) ──────────────────────────
     for (const call of runEnd.toolCalls) {
       if (opts.signal.aborted) return { outcome: 'aborted', inputChars, outputChars, turns };
+      // Text-parsed calls consume stream marks in order; merged calls flush
+      // whatever text remains, then run adjacency-ordered.
+      if (execIdx < runMarks.length) {
+        await flushText(runMarks[execIdx]?.at ?? clean.length);
+      } else {
+        await flushText(clean.length);
+      }
+      execIdx++;
       const callId = mintCallId();
       if (!call.tool || call.input === undefined) {
         // Malformed block — honest error frame, no execution, no gate.
@@ -555,6 +590,9 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
         followUps.push(`<tool_result tool="${call.tool}" id="${callId}">ERROR ${outcome.code}: ${outcome.message}</tool_result>`);
       }
     }
+
+    // REQ-122: trailing text after the last tool row belongs to this turn.
+    await flushText(clean.length);
 
     // ── Questions (in model order) ──────────────────────────────────────────
     for (const ask of runEnd.asks) {

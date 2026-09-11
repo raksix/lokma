@@ -21,6 +21,7 @@ export function validateTranscriptSearch(form: { query: string }): string | null
 export function hitRoleLabel(hit: Pick<SessionSearchHit, 'role' | 'toolName'>): string {
   if (hit.role === 'user') return 'You';
   if (hit.role === 'assistant') return 'Assistant';
+  if (hit.role === 'thinking') return 'Thinking';
   return hit.toolName ? `Tool · ${hit.toolName}` : 'Tool';
 }
 

@@ -79,7 +79,7 @@ export function replayExcerpt(content: string, max = 160): string {
 export function asReplayRow(raw: unknown): { role: string; content: string; timestamp: string; toolName?: string } | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const r = raw as Record<string, unknown>;
-  if ((r.role !== 'user' && r.role !== 'assistant' && r.role !== 'tool') || typeof r.content !== 'string') {
+  if ((r.role !== 'user' && r.role !== 'assistant' && r.role !== 'tool' && r.role !== 'thinking') || typeof r.content !== 'string') {
     return null;
   }
   return {

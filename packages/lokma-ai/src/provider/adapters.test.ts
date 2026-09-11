@@ -10,7 +10,7 @@ import { createServer, type Server } from 'node:http';
 import { type AddressInfo } from 'node:net';
 import { AnthropicAdapter } from './anthropic';
 import { ProviderError } from './errors';
-import { nativeCallInput, nativeCallToToolBlock, OpenAIAdapter, responsesHttpError, shortModelId, toResponsesInput, toResponsesTools, unseenSuffix, usesResponsesApi } from './openai';
+import { nativeCallInput, nativeCallToToolBlock, nativeToolsBlocked, looksLikeToolPairingError, looksLikeToolsUnsupported, OpenAIAdapter, responsesHttpError, shortModelId, toChatMessages, toChatTools, ToolCallAccumulator, toResponsesInput, toResponsesTools, unseenSuffix, usesResponsesApi } from './openai';
 import { zodToJsonSchema } from './tools-schema';
 import { stream } from '../stream';
 
@@ -439,8 +439,13 @@ try {
   toolStub.server.close();
 }
 
-// 8b. REQ-118: chat path ignores tools (no body change for non-spark).
-const seenChat: { hasTools: boolean } = { hasTools: false };
+// 8b. REQ-128: the chat path carries native tools too (REQ-118 shipped the
+// Responses path first and left /chat/completions tool-blind).
+const seenChat: { hasTools: boolean; choice: unknown; toolName: unknown } = {
+  hasTools: false,
+  choice: undefined,
+  toolName: undefined,
+};
 const chatToolStub = await listen((req, res) => {
   let body = '';
   req.on('data', (c) => {
@@ -448,7 +453,13 @@ const chatToolStub = await listen((req, res) => {
   });
   req.on('end', () => {
     try {
-      seenChat.hasTools = 'tools' in (JSON.parse(body) as Record<string, unknown>);
+      const parsed = JSON.parse(body) as {
+        tools?: { function?: { name?: string } }[];
+        tool_choice?: unknown;
+      };
+      seenChat.hasTools = 'tools' in parsed;
+      seenChat.choice = parsed.tool_choice;
+      seenChat.toolName = parsed.tools?.[0]?.function?.name;
     } catch {
       seenChat.hasTools = false;
     }
@@ -461,12 +472,14 @@ try {
     new OpenAIAdapter().stream({
       model: 'openai/probe-model',
       messages: [{ role: 'user', content: 'hi' }],
-      apiKey: 'probe-key',
+      apiKey: 'test-key',
       baseUrl: chatToolStub.base,
       tools: [{ name: 'read_file', description: 'Read a file', parameters: { type: 'object' } }],
     }),
   );
-  assert(!seenChat.hasTools, 'chat completions body carries no tools key');
+  assert(seenChat.hasTools, 'chat completions body carries a tools key');
+  assert(seenChat.choice === 'auto', 'chat completions body sets tool_choice auto');
+  assert(seenChat.toolName === 'read_file', 'chat tools use the {type:function,function:{name}} shape');
 } finally {
   chatToolStub.server.close();
 }
@@ -535,5 +548,224 @@ const e400b = responsesHttpError(400, 'bad request', 'https://up.example', null)
 assert(e400b.code === 'http_error', 'other 400s stay http_error');
 const e500 = responsesHttpError(500, 'boom', 'https://up.example', null);
 assert(e500.code === 'http_error' && e500.status === 500, '500 stays http_error');
+
+// ── 9. REQ-128: native function tools on the Chat-Completions path ───────
+// 9a. Pure mappers.
+assert(toChatTools(undefined).length === 0, 'no tools option means no chat tools');
+const chatTools = toChatTools([
+  { name: 'read_file', description: 'Read a file', parameters: { type: 'object', properties: { path: { type: 'string' } } } },
+]);
+assert(
+  chatTools.length === 1 && chatTools[0]?.type === 'function' && chatTools[0]?.function.name === 'read_file',
+  'chat tools map to {type:function, function:{name}} entries',
+);
+const chatMsgs = toChatMessages([
+  { role: 'user', content: 'read a.ts' },
+  { role: 'assistant', content: 'on it', toolCalls: [{ id: 'call-1', name: 'read_file', arguments: '{"path":"a.ts"}' }] },
+  { role: 'tool', content: 'file body', toolCallId: 'call-1', name: 'read_file' },
+]);
+assert(
+  chatMsgs[1]?.role === 'assistant' && Array.isArray(chatMsgs[1]?.['tool_calls']),
+  'assistant turn replays its native tool_calls',
+);
+assert(
+  chatMsgs[2]?.role === 'tool' && chatMsgs[2]?.['tool_call_id'] === 'call-1' && chatMsgs[2]?.['content'] === 'file body',
+  'tool row serializes as role:tool + tool_call_id + raw body',
+);
+const flatMsgs = toChatMessages(
+  [
+    { role: 'assistant', content: 'on it', toolCalls: [{ id: 'call-1', name: 'read_file', arguments: '{}' }] },
+    { role: 'tool', content: 'file body', toolCallId: 'call-1', name: 'read_file' },
+  ],
+  { flatten: true },
+);
+assert(flatMsgs[0]?.['tool_calls'] === undefined && flatMsgs[1]?.role === 'user', 'flatten drops the native pairing');
+assert(
+  String(flatMsgs[1]?.['content']).indexOf('<tool_result') === 0 &&
+    String(flatMsgs[1]?.['content']).indexOf('file body') >= 0,
+  'flatten keeps the result body readable as text',
+);
+
+// 9b. Streaming fragment accumulation (id/name first, arguments split).
+const acc = new ToolCallAccumulator();
+acc.push([{ index: 0, id: 'call-7', function: { name: 'read_file', arguments: '{"pa' } }]);
+acc.push([{ index: 0, function: { arguments: 'th":"a.t' } }]);
+acc.push([{ index: 0, function: { arguments: 's"}' } }]);
+acc.push([{ index: 1, id: 'call-8', function: { name: 'list_files', arguments: '{}' } }]);
+const merged = acc.list();
+assert(
+  merged.length === 2 && merged[0]?.id === 'call-7' && merged[0]?.args === '{"path":"a.ts"}',
+  'indexed fragments merge into one call with joined arguments',
+);
+assert(merged[1]?.name === 'list_files' && merged[1]?.id === 'call-8', 'a second index stays a second call');
+
+// 9c. Capability probes (pure).
+assert(looksLikeToolsUnsupported(400, 'tools are not supported by this model'), 'tools-unsupported wording is a probe hit');
+assert(!looksLikeToolsUnsupported(400, 'invalid api key'), 'an unrelated 400 is never treated as a tools probe');
+assert(looksLikeToolPairingError(400, 'tool_call_id must be provided for each tool message'), 'tool pairing errors are detected');
+assert(!looksLikeToolPairingError(500, 'boom'), 'non-400/422 stays out of the pairing probe');
+
+// 9d. Live stub: chat/completions carries tools[] and flushes native calls.
+const seenChatTools: { path: string; tools: unknown; choice: unknown; msgs: unknown } = {
+  path: '',
+  tools: undefined,
+  choice: undefined,
+  msgs: undefined,
+};
+const chatStub = await listen((req, res) => {
+  let body = '';
+  req.on('data', (c) => {
+    body += c;
+  });
+  req.on('end', () => {
+    seenChatTools.path = req.url ?? '';
+    try {
+      const parsed = JSON.parse(body) as { tools?: unknown; tool_choice?: unknown; messages?: unknown };
+      seenChatTools.tools = parsed.tools;
+      seenChatTools.choice = parsed.tool_choice;
+      seenChatTools.msgs = parsed.messages;
+    } catch {
+      seenChatTools.tools = undefined;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    res.end(
+      sseBody([
+        '{"choices":[{"delta":{"content":"checking"},"finish_reason":null}]}',
+        '{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-42","type":"function","function":{"name":"read_file","arguments":""}}]},"finish_reason":null}]}',
+        '{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\\"path\\":"}}]},"finish_reason":null}]}',
+        '{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"a.ts\\"}"}}]},"finish_reason":"tool_calls"}]}',
+        '[DONE]',
+      ]),
+    );
+  });
+});
+try {
+  const chunks: { type: string; delta?: string; tool?: string; input?: unknown; callId?: string; args?: string }[] = [];
+  for await (const chunk of new OpenAIAdapter().stream({
+    model: 'opencode-go/mimo-v2.5',
+    messages: [
+      { role: 'user', content: 'read a.ts' },
+      { role: 'assistant', content: '', toolCalls: [{ id: 'call-41', name: 'read_file', arguments: '{"path":"a.ts"}' }] },
+      { role: 'tool', content: 'FILE BODY', toolCallId: 'call-41', name: 'read_file' },
+    ],
+    apiKey: 'test-key',
+    baseUrl: `${chatStub.base}/v1`,
+    tools: [{ name: 'read_file', description: 'Read a file', parameters: { type: 'object', properties: {} } }],
+  })) {
+    if (chunk.type === 'text_delta') chunks.push({ type: chunk.type, delta: chunk.delta });
+    else if (chunk.type === 'native_tool_call') {
+      chunks.push({ type: chunk.type, tool: chunk.tool, input: chunk.input, callId: chunk.callId, args: chunk.argumentsJson });
+    }
+  }
+  const native = chunks.filter((c) => c.type === 'native_tool_call');
+  const sentMsgs = seenChatTools.msgs as Record<string, unknown>[] | undefined;
+  assert(seenChatTools.path === '/v1/chat/completions', 'chat path stays /chat/completions');
+  assert(
+    Array.isArray(seenChatTools.tools) &&
+      (seenChatTools.tools as { function?: { name?: string } }[])[0]?.function?.name === 'read_file',
+    'chat body carries the registry schema as function tools',
+  );
+  assert(seenChatTools.choice === 'auto', 'chat body sets tool_choice auto');
+  assert(sentMsgs?.[1]?.['tool_calls'] !== undefined, 'native assistant turn rides the wire with tool_calls');
+  assert(
+    sentMsgs?.[2]?.['role'] === 'tool' && sentMsgs?.[2]?.['tool_call_id'] === 'call-41',
+    'tool result rides as a native tool row',
+  );
+  assert(
+    native.length === 1 && native[0]?.callId === 'call-42' && JSON.stringify(native[0]?.input) === '{"path":"a.ts"}',
+    `fragmented tool_calls flush one native chunk, got ${JSON.stringify(native)}`,
+  );
+  assert(native[0]?.args === '{"path":"a.ts"}', 'raw argument string is preserved for replay');
+  assert(
+    chunks.some((c) => c.type === 'text_delta' && c.delta === 'checking'),
+    'text beside a native call still streams',
+  );
+} finally {
+  chatStub.server.close();
+}
+
+// 9e. Capability probe #1: an upstream that rejects `tools` is retried
+// without the field (turn still runs through the text protocol).
+let noToolsRequests = 0;
+let secondBodyHadTools: boolean | undefined;
+const noToolsStub = await listen((req, res) => {
+  let body = '';
+  req.on('data', (c) => {
+    body += c;
+  });
+  req.on('end', () => {
+    noToolsRequests += 1;
+    const hasTools = body.indexOf('"tools"') >= 0;
+    if (noToolsRequests === 2) secondBodyHadTools = hasTools;
+    if (hasTools) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end('{"error":{"message":"tools are not supported by this endpoint"}}');
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    res.end(sseBody(['{"choices":[{"delta":{"content":"no-tools-ok"}}]}', '[DONE]']));
+  });
+});
+try {
+  let text = '';
+  for await (const chunk of new OpenAIAdapter().stream({
+    model: 'stub/text-only',
+    messages: [{ role: 'user', content: 'hi' }],
+    apiKey: 'test-key',
+    baseUrl: `${noToolsStub.base}/v1`,
+    tools: [{ name: 'read_file', description: 'Read a file', parameters: { type: 'object', properties: {} } }],
+  })) {
+    if (chunk.type === 'text_delta') text += chunk.delta;
+  }
+  assert(noToolsRequests === 2, `tools rejection is retried exactly once, got ${noToolsRequests} requests`);
+  assert(secondBodyHadTools === false, 'the retry drops tools from the body');
+  assert(text === 'no-tools-ok', 'the retried turn still streams its answer');
+  assert(nativeToolsBlocked(`${noToolsStub.base}/v1`, 'stub/text-only'), 'the rejected pair is remembered');
+} finally {
+  noToolsStub.server.close();
+}
+
+// 9f. Capability probe #2: an upstream that rejects the native pairing gets
+// the flattened text history instead — the turn still runs.
+let pairRequests = 0;
+let secondHadPairing: boolean | undefined;
+const pairStub = await listen((req, res) => {
+  let body = '';
+  req.on('data', (c) => {
+    body += c;
+  });
+  req.on('end', () => {
+    pairRequests += 1;
+    const hasPairing = body.indexOf('"tool_calls"') >= 0 || body.indexOf('"role":"tool"') >= 0;
+    if (pairRequests === 2) secondHadPairing = hasPairing;
+    if (hasPairing) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end('{"error":{"message":"tool_call_id must be provided for each tool message"}}');
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    res.end(sseBody(['{"choices":[{"delta":{"content":"flat-ok"}}]}', '[DONE]']));
+  });
+});
+try {
+  let text = '';
+  for await (const chunk of new OpenAIAdapter().stream({
+    model: 'stub/no-pairing',
+    messages: [
+      { role: 'assistant', content: '', toolCalls: [{ id: 'call-9', name: 'read_file', arguments: '{}' }] },
+      { role: 'tool', content: 'BODY', toolCallId: 'call-9', name: 'read_file' },
+      { role: 'user', content: 'continue' },
+    ],
+    apiKey: 'test-key',
+    baseUrl: `${pairStub.base}/v1`,
+  })) {
+    if (chunk.type === 'text_delta') text += chunk.delta;
+  }
+  assert(pairRequests === 2, `pairing rejection is retried exactly once, got ${pairRequests} requests`);
+  assert(secondHadPairing === false, 'the retry sends the flattened history');
+  assert(text === 'flat-ok', 'the flattened turn still streams its answer');
+} finally {
+  pairStub.server.close();
+}
 
 console.log(`\nAll ${passed} checks passed.`);

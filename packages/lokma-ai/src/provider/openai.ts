@@ -234,6 +234,193 @@ export function unseenSuffix(seen: string, tail: string): string {
   return tail;
 }
 
+/**
+ * Map harness tool schemas to Chat-Completions native `tools[]` (REQ-128).
+ * The wire shape is `{type:'function', function:{…}}` — the Responses
+ * shape is flatter (`{type:'function', name, …}`), hence two mappers.
+ */
+export function toChatTools(tools: ProviderToolSchema[] | undefined): {
+  type: 'function';
+  function: { name: string; description: string; parameters: unknown };
+}[] {
+  if (!tools || tools.length === 0) return [];
+  return tools
+    .filter((t) => typeof t?.name === 'string' && t.name.length > 0)
+    .map((t) => ({
+      type: 'function' as const,
+      function: {
+        name: t.name,
+        description: typeof t.description === 'string' ? t.description : '',
+        parameters:
+          t.parameters && typeof t.parameters === 'object'
+            ? t.parameters
+            : { type: 'object', properties: {} },
+      },
+    }));
+}
+
+/**
+ * Adapt harness messages to Chat-Completions `messages[]` (REQ-128).
+ *
+ * The old mapping flattened everything to `{role, content}` — tool rows
+ * became *user* text and assistant turns lost their calls, which is why
+ * the loop had to smuggle results through `<tool_result>` markup. Native
+ * turns now round-trip properly:
+ *   assistant + toolCalls[] → `{role:'assistant', content, tool_calls:[…]}`
+ *   tool row                → `{role:'tool', tool_call_id, content}`
+ *
+ * A native assistant turn with EMPTY content drops the `content` key
+ * (several upstreams 400 on `content: ""` next to `tool_calls`), and a
+ * tool row without an id falls back to user text (fail-open: the request
+ * still goes out instead of 400ing on a malformed pair).
+ */
+export function toChatMessages(messages: ProviderMessage[], opts?: { flatten?: boolean }): Record<string, unknown>[] {
+  const flatten = opts?.flatten === true;
+  const out: Record<string, unknown>[] = [];
+  for (const m of messages) {
+    if (m.role === 'tool') {
+      const id = typeof m.toolCallId === 'string' ? m.toolCallId.trim() : '';
+      if (flatten) {
+        // Recovery shape: the legacy text blob every OpenAI-compatible
+        // upstream accepts, used when a gateway rejects native pairing.
+        out.push({
+          role: 'user',
+          content: `<tool_result tool="${m.name ?? 'unknown'}" id="${id}">${m.content}</tool_result>`,
+        });
+        continue;
+      }
+      if (!id) {
+        out.push({ role: 'user', content: m.content });
+        continue;
+      }
+      out.push({ role: 'tool', tool_call_id: id, content: m.content });
+      continue;
+    }
+    if (!flatten && m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0) {
+      const row: Record<string, unknown> = {
+        role: 'assistant',
+        tool_calls: m.toolCalls.map((c) => ({
+          id: c.id,
+          type: 'function',
+          function: { name: c.name, arguments: c.arguments },
+        })),
+      };
+      if (m.content) row['content'] = m.content;
+      out.push(row);
+      continue;
+    }
+    out.push({ role: m.role, content: m.content });
+  }
+  return out;
+}
+
+/**
+ * Streaming `tool_calls[]` accumulator (REQ-128). Upstreams stream calls
+ * as fragments keyed by `index` — the id and the function name usually
+ * arrive once on the first fragment, arguments arrive split across many
+ * (`{"pa` + `th":"a.t` + `s"}`). Order is preserved by index, and a later
+ * fragment may restate fields, so each merge is "last non-empty wins".
+ */
+export class ToolCallAccumulator {
+  private calls = new Map<number, { id: string; name: string; args: string }>();
+
+  /** Merge one streamed `delta.tool_calls[]` fragment list. */
+  push(fragments: unknown): void {
+    if (!Array.isArray(fragments)) return;
+    fragments.forEach((frag, fallbackIndex) => {
+      if (typeof frag !== 'object' || frag === null) return;
+      const f = frag as {
+        index?: unknown;
+        id?: unknown;
+        function?: { name?: unknown; arguments?: unknown };
+      };
+      const index = typeof f.index === 'number' ? f.index : fallbackIndex;
+      const prev = this.calls.get(index) ?? { id: '', name: '', args: '' };
+      const next = {
+        id: typeof f.id === 'string' && f.id ? f.id : prev.id,
+        name: typeof f.function?.name === 'string' && f.function.name ? f.function.name : prev.name,
+        args:
+          typeof f.function?.arguments === 'string'
+            ? prev.args + f.function.arguments
+            : prev.args,
+      };
+      this.calls.set(index, next);
+    });
+  }
+
+  /** Calls in index order, ids/id-prefixes flushed (empty ones dropped). */
+  list(): { id: string; name: string; args: string }[] {
+    return [...this.calls.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([index, c]) => ({
+        id: c.id || `call_${index}`,
+        name: c.name,
+        args: c.args,
+      }))
+      .filter((c) => c.name.length > 0);
+  }
+
+  get size(): number {
+    return this.calls.size;
+  }
+}
+
+/**
+ * Upstreams that rejected a native `tools[]` payload (REQ-128). Some
+ * OpenAI-compatible gateways 400 on the field rather than ignoring it;
+ * once a `base|model` pair refuses, every later turn skips tools and the
+ * loop falls back to the text `<tool>` protocol — no second 400, no
+ * wasted turn. Process-lifetime memory is fine: a model that cannot take
+ * tools never will, and a restart re-probes.
+ */
+const nativeToolsRejected = new Set<string>();
+
+/** True when this base|model pair should NOT be offered native tools. */
+export function nativeToolsBlocked(base: string, model: string): boolean {
+  return nativeToolsRejected.has(`${base}|${shortModelId(model)}`);
+}
+
+/** Remember that this base|model pair refuses a native `tools[]` payload. */
+export function markNativeToolsRejected(base: string, model: string): void {
+  nativeToolsRejected.add(`${base}|${shortModelId(model)}`);
+}
+
+/**
+ * Does this upstream error look like "tools unsupported"? Kept narrow so a
+ * genuine bad-request (bad key, bad model, bad message) is NOT swallowed
+ * as a capability probe — only explicit tool/function wording counts.
+ */
+export function looksLikeToolsUnsupported(status: number, snippet: string): boolean {
+  if (status !== 400 && status !== 404 && status !== 422 && status !== 500) return false;
+  const s = snippet.toLowerCase();
+  if (s.indexOf('tool') < 0 && s.indexOf('function') < 0) return false;
+  return (
+    s.indexOf('not support') >= 0 ||
+    s.indexOf('unsupported') >= 0 ||
+    s.indexOf('unknown') >= 0 ||
+    s.indexOf('invalid') >= 0 ||
+    s.indexOf('unrecognized') >= 0 ||
+    s.indexOf('not allowed') >= 0
+  );
+}
+
+/**
+ * Does this upstream error look like a rejected NATIVE HISTORY pairing?
+ * (assistant `tool_calls` + `tool` rows must alternate exactly; gateways
+ * that do not implement the pair 400 on `tool_call_id`.) On a hit the
+ * adapter retries the same turn with the flattened text history — the
+ * turn still runs, only the wire shape changes.
+ */
+export function looksLikeToolPairingError(status: number, snippet: string): boolean {
+  if (status !== 400 && status !== 422) return false;
+  const s = snippet.toLowerCase();
+  return (
+    s.indexOf('tool_call_id') >= 0 ||
+    s.indexOf('tool_calls') >= 0 ||
+    (s.indexOf('tool') >= 0 && (s.indexOf('must be') >= 0 || s.indexOf('expected') >= 0))
+  );
+}
+
 export class OpenAIAdapter implements ProviderAdapter {
   id = 'openai' as const;
 
@@ -263,38 +450,74 @@ export class OpenAIAdapter implements ProviderAdapter {
     const viaResponses = usesResponsesApi(base, opts.model);
     const url = viaResponses ? `${base}/responses` : `${base}/chat/completions`;
     const responsesTools = viaResponses ? toResponsesTools(opts.tools) : [];
-    const body = viaResponses
-      ? {
-          model: shortModelId(opts.model),
-          input: toResponsesInput(opts.messages),
-          stream: true,
-          ...(responsesTools.length > 0 ? { tools: responsesTools, tool_choice: 'auto' } : {}),
-        }
-      : {
-          model: shortModelId(opts.model),
-          messages: opts.messages.map((m) => ({ role: m.role === 'tool' ? 'user' : m.role, content: m.content })),
-          stream: true,
-        };
-    try {
-      res = await fetch(url, {
+    // REQ-128: native tools on the Chat-Completions path too. Previously
+    // only the Responses path carried `tools`, so every OpenAI-compatible
+    // upstream (opencode-go, omniroute, deepseek, ollama…) ran the model
+    // blind to the schemas and the loop had to rely on text `<tool>`
+    // blocks. A pair that refuses the field is remembered and skipped.
+    let chatTools = viaResponses || nativeToolsBlocked(base, opts.model) ? [] : toChatTools(opts.tools);
+    // REQ-128: set when an upstream rejects the native tool pairing — the
+    // history then flattens to the legacy text shape for the retry.
+    let flattenHistory = false;
+    const buildBody = (): Record<string, unknown> =>
+      viaResponses
+        ? {
+            model: shortModelId(opts.model),
+            input: toResponsesInput(opts.messages),
+            stream: true,
+            ...(responsesTools.length > 0 ? { tools: responsesTools, tool_choice: 'auto' } : {}),
+          }
+        : {
+            model: shortModelId(opts.model),
+            messages: toChatMessages(opts.messages, { flatten: flattenHistory }),
+            stream: true,
+            ...(chatTools.length > 0 ? { tools: chatTools, tool_choice: 'auto' } : {}),
+          };
+    const post = async (): Promise<Response> =>
+      fetch(url, {
         method: 'POST',
         headers,
         signal: opts.signal,
-        body: JSON.stringify(body),
+        body: JSON.stringify(buildBody()),
       });
-    } catch (e) {
-      if (e instanceof Error && e.name === 'AbortError') throw e;
-      throw new ProviderError('network_error', `Upstream request failed (${base}): ${e instanceof Error ? e.message : String(e)}`);
-    }
+    const postOrThrow = async (): Promise<Response> => {
+      try {
+        return await post();
+      } catch (e) {
+        if (e instanceof Error && e.name === 'AbortError') throw e;
+        throw new ProviderError('network_error', `Upstream request failed (${base}): ${e instanceof Error ? e.message : String(e)}`);
+      }
+    };
+    res = await postOrThrow();
     if (!res.ok) {
-      const snippet = await readErrorSnippet(res);
+      let snippet = await readErrorSnippet(res);
       // REQ-118 FAZ B.2: honest Responses-path mapping (region/rate/credits).
       if (viaResponses) throw responsesHttpError(res.status, snippet, base, res.headers.get('retry-after'));
-      throw new ProviderError(
-        'http_error',
-        `Upstream HTTP ${res.status} from ${base}${snippet ? ` — ${snippet}` : ''}`,
-        res.status,
-      );
+      // REQ-128 capability probe #1 — an upstream that rejects `tools`
+      // entirely is retried without the field (the text `<tool>` loop still
+      // works) and remembered, so the next turn goes straight to the shape
+      // that works instead of paying a failed request every time.
+      if (chatTools.length > 0 && looksLikeToolsUnsupported(res.status, snippet)) {
+        markNativeToolsRejected(base, opts.model);
+        chatTools = [];
+        res = await postOrThrow();
+        if (!res.ok) snippet = await readErrorSnippet(res);
+      }
+      // REQ-128 capability probe #2 — the upstream may accept `tools` but
+      // not the native *pairing* (assistant.tool_calls + tool rows). The
+      // turn still runs: only the history flattens to text.
+      if (!res.ok && !flattenHistory && looksLikeToolPairingError(res.status, snippet)) {
+        flattenHistory = true;
+        res = await postOrThrow();
+        if (!res.ok) snippet = await readErrorSnippet(res);
+      }
+      if (!res.ok) {
+        throw new ProviderError(
+          'http_error',
+          `Upstream HTTP ${res.status} from ${base}${snippet ? ` — ${snippet}` : ''}`,
+          res.status,
+        );
+      }
     }
     try {
       let streamedSeen = '';
@@ -303,6 +526,8 @@ export class OpenAIAdapter implements ProviderAdapter {
       // by item id (fall back to output index). Completed items overwrite
       // partial delta accumulations; the full `output[]` wins last.
       const nativeCalls = new Map<string, { name: string; args: string; callId: string }>();
+      // REQ-128: Chat-Completions streams calls as indexed fragments.
+      const chatCalls = new ToolCallAccumulator();
       for await (const { data } of readSse(res)) {
         let evt: unknown;
         try {
@@ -310,7 +535,13 @@ export class OpenAIAdapter implements ProviderAdapter {
         } catch {
           continue;
         }
-        const record = evt as { error?: { message?: string }; choices?: { delta?: { content?: unknown } }[] };
+        const record = evt as {
+          error?: { message?: string };
+          choices?: {
+            delta?: { content?: unknown; tool_calls?: unknown };
+            finish_reason?: unknown;
+          }[];
+        };
         if (record && typeof record === 'object' && record.error) {
           throw new ProviderError('http_error', `Upstream error: ${record.error.message ?? 'unknown'}`);
         }
@@ -421,12 +652,18 @@ export class OpenAIAdapter implements ProviderAdapter {
           }
           continue;
         }
-        const content = record?.choices?.[0]?.delta?.content;
+        const choice = record?.choices?.[0];
+        const content = choice?.delta?.content;
         if (typeof content === 'string' && content) yield { type: 'text_delta', delta: content };
         // DeepSeek-style reasoning stream rides the same delta object.
         // (Tool markup echoed here is stripped at render, see ThinkingTrace.)
-        const reasoning = (record?.choices?.[0]?.delta as { reasoning_content?: unknown } | undefined)?.reasoning_content;
+        const reasoning = (choice?.delta as { reasoning_content?: unknown } | undefined)?.reasoning_content;
         if (typeof reasoning === 'string' && reasoning) yield { type: 'thinking_delta', delta: reasoning };
+        // REQ-128: native function calls. Fragments arrive across many SSE
+        // events (id/name first, arguments split), so they accumulate and
+        // flush once after the stream — never mid-flight, or a half-parsed
+        // argument string would execute as `{}`.
+        if (choice?.delta?.tool_calls !== undefined) chatCalls.push(choice.delta.tool_calls);
       }
       // REQ-118 FAZ B: flush native calls as machine-typed chunks — the
       // loop executes them directly, no synthetic text passes the filter
@@ -435,16 +672,39 @@ export class OpenAIAdapter implements ProviderAdapter {
         if (!call.name) continue;
         const parsed = nativeCallInput(call.args);
         if (parsed.parseError === undefined) {
-          yield { type: 'native_tool_call', tool: call.name, input: parsed.input, callId: call.callId };
+          yield {
+            type: 'native_tool_call',
+            tool: call.name,
+            input: parsed.input,
+            callId: call.callId,
+            argumentsJson: call.args,
+          };
         } else {
           yield {
             type: 'native_tool_call',
             tool: call.name,
             input: parsed.input,
             callId: call.callId,
+            argumentsJson: call.args,
             parseError: parsed.parseError,
           };
         }
+      }
+      // REQ-128: Chat-Completions calls flush identically — the loop
+      // executes them directly, so no synthetic text ever passes the
+      // filter (slop salvage can never double-execute them). `argumentsJson`
+      // carries the raw streamed string so the native history can replay
+      // the call byte-identical next turn.
+      for (const call of chatCalls.list()) {
+        const parsed = nativeCallInput(call.args);
+        yield {
+          type: 'native_tool_call',
+          tool: call.name,
+          input: parsed.input,
+          callId: call.id,
+          argumentsJson: call.args,
+          ...(parsed.parseError === undefined ? {} : { parseError: parsed.parseError }),
+        };
       }
     } catch (e) {
       if (e instanceof ProviderError) throw e;

@@ -8,10 +8,33 @@ import { z } from 'zod';
 export const ProviderIdSchema = z.enum(['anthropic', 'openai', 'deepseek', 'google', 'ollama', 'openrouter']);
 export type ProviderId = z.infer<typeof ProviderIdSchema>;
 
+/**
+ * One assistant-side native tool call, exactly as the upstream streamed it
+ * (OpenAI `tool_calls[]`, Anthropic `tool_use` block, Responses
+ * `function_call` item). `arguments` stays a RAW JSON STRING here so the
+ * next turn can echo the call back byte-identical — upstreams reject a
+ * re-serialized object (key order, number formatting) on some models, and
+ * Claude-Code-style histories must round-trip.
+ */
+export type ProviderToolCall = {
+  id: string;
+  name: string;
+  arguments: string;
+};
+
 export type ProviderMessage = {
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
+  /** `tool` rows: the call this result answers. */
   toolCallId?: string;
+  /** `tool` rows: the tool name (Anthropic requires it, OpenAI tolerates it). */
+  name?: string;
+  /**
+   * `assistant` rows: the native calls this turn emitted. A native turn
+   * MUST be replayed with its calls attached, otherwise the following
+   * `tool` rows reference call ids the upstream never saw (HTTP 400).
+   */
+  toolCalls?: ProviderToolCall[];
 };
 
 /** One tool schema for native function-calling upstreams (REQ-118). */
@@ -50,8 +73,12 @@ export type StreamChunk =
       tool: string;
       input: unknown;
       callId: string;
+      /** Raw JSON text the model streamed (kept for native history replay). */
+      argumentsJson?: string;
       parseError?: string;
     }
+  /** Live partial tool input (Claude-Code-style progress) — UI only. */
+  | { type: 'tool_input_delta'; tool: string; callId: string; delta: string }
   | { type: 'done'; reason: 'complete' | 'error' };
 
 export interface ProviderAdapter {

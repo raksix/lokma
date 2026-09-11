@@ -56,7 +56,10 @@ export async function loadConfig(cwd: string): Promise<GlobalConfig> {
 
 /** Atomic save to global config.json (masked over API). */
 export async function saveGlobal(patch: Partial<GlobalConfig>): Promise<void> {
-  const cur = await loadConfig(process.cwd());
+  // REQ-117: read the RAW global file — never the merged view. The old code
+  // loaded loadConfig() (global+project+env merged) and wrote it all back,
+  // permanently baking project/env values into the global file.
+  const cur = await readJson(GLOBAL_PATH, (r) => GlobalConfigSchema.parse(r), GlobalConfigSchema.parse({}));
   const next = GlobalConfigSchema.parse({ ...cur, ...patch });
   const { writeAtomic } = await import('../utils/fs.js');
   await writeAtomic(GLOBAL_PATH, JSON.stringify(next, null, 2));

@@ -170,7 +170,11 @@ export function Chat({
     api
       .getSession(sessionId)
       .then((detail) => {
-        setModel(detail.model || readStoredModel());
+        // REQ-117: a known session with no saved model resolves through the
+        // global default chain (empty -> chain effect) — never the global
+        // last-picked localStorage, which leaked one session's pick into
+        // every fresh session.
+        setModel(detail.model || '');
         setBotId(detail.botId ?? known.botId ?? null);
       })
       .catch(() => {

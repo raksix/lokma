@@ -135,3 +135,4 @@
 - [REQ-114](finished/REQ-114-pdf-attach.md) — Ham PDF ekleme, server-side metin çıkarma — done
 - [REQ-115](finished/REQ-115-sloppy-tool-salvage.md) — Sloppy-model tool-block salvage (XML args + tool_result closer) — done
 - [REQ-116](finished/REQ-116-claude-tarzı-motor.md) — Claude-Code-tarzı motor (stop_reason + headless -p) — done
+- [REQ-117](finished/REQ-117-default-model-session-memory.md) — Default model Duffel/blues + session model hafızası — done

@@ -49,6 +49,44 @@ const COMPLETE_BLOCK =
 /** Legacy `<tool_call>{"name","arguments"}</tool_call>` shape (also model-slop). */
 const TOOL_CALL_BLOCK = /<tool_call\s*>([\s\S]*?)<\/tool_call\s*>/g;
 
+/**
+ * DeepSeek DSML tool calls (v4.1-flash emits these, often inside
+ * `reasoning_content`, never as `<tool>`). Delimiter pipes are FULLWIDTH
+ * VERTICAL BAR, built via fromCharCode so no u-escapes are needed. Tolerant:
+ * invoke-level matching, inner DSML tags (`parameter`, …) stripped before
+ * JSON parse. REQ-119.
+ */
+const FW_BAR = String.fromCharCode(0xff5c);
+const DSML_D = `${FW_BAR}${FW_BAR}DSML${FW_BAR}${FW_BAR}`;
+const DSML_INVOKE_BLOCK = new RegExp(
+  `<${DSML_D} invoke\\b([^>]*?)>([\\s\\S]*?)<\\/${DSML_D} invoke\\s*>`,
+  'g',
+);
+const DSML_TAG = new RegExp(`<\\/?${DSML_D}[^>]*>`, 'g');
+
+/** DSML calls-wrapper open/close (pure markup, never content). REQ-119. */
+const DSML_CALLS_TAG = new RegExp(`<\\/?${DSML_D} calls\\s*>`, 'g');
+
+/** Parse one DSML `<invoke name="x">…</invoke>` match into a call (never throws). */
+function toDsmlCall(attrs: string, body: string): ParsedToolCall {
+  const tool = (attr(attrs, 'name') ?? '').trim();
+  if (!tool) return { tool: '', input: undefined, parseError: 'DSML invoke is missing name' };
+  const jsonText = body.replace(DSML_TAG, '').trim();
+  if (!jsonText) return { tool, input: {} };
+  try {
+    return { tool, input: JSON.parse(jsonText) as unknown };
+  } catch {
+    const salvaged = salvageXmlArgs(jsonText);
+    if (salvaged) return { tool, input: salvaged };
+    return { tool, input: undefined, parseError: 'DSML arguments are not valid JSON' };
+  }
+}
+
+/** Strip DSML markup (used on thinking deltas so tool calls show once, as rows). */
+export function stripDsmlBlocks(text: string): string {
+  return text.replace(DSML_TAG, '');
+}
+
 /** Common wrong arg names sloppy models emit — normalized before validation. */
 const ARG_ALIASES: Record<string, string> = {
   dir: 'path',
@@ -155,6 +193,9 @@ export function parseToolBlocks(text: string): ParsedToolCall[] {
   for (const m of text.matchAll(TOOL_CALL_BLOCK)) {
     calls.push(toToolCallShape(m[1] ?? ''));
   }
+  for (const m of text.matchAll(DSML_INVOKE_BLOCK)) {
+    calls.push(toDsmlCall(m[1] ?? '', m[2] ?? ''));
+  }
   return calls;
 }
 
@@ -172,6 +213,8 @@ export function stripModelBlocks(text: string): string {
   return text
     .replace(FAKE_RESULT_BLOCK, '')
     .replace(TOOL_CALL_BLOCK, '')
+    .replace(DSML_INVOKE_BLOCK, '')
+    .replace(DSML_TAG, '')
     .replace(COMPLETE_BLOCK, '')
     .replace(/[ \t]+\n/g, '\n')
     .trim();
@@ -194,30 +237,39 @@ export function createBlockFilter(): {
   function drain(force: boolean): string {
     let out = '';
     for (;;) {
-      // Fake roleplayed results are never valid output — drop silently first
-      // so a `<tool>` block closed by `</tool_result>` still matches below.
-      FAKE_RESULT_BLOCK.lastIndex = 0;
-      const fake = FAKE_RESULT_BLOCK.exec(buffer);
-      if (fake && fake.index !== undefined) {
-        out += buffer.slice(0, fake.index);
-        buffer = buffer.slice(fake.index + fake[0].length);
-        continue;
+      // All shapes compete by EARLIEST match index (REQ-119 lesson: a fixed
+      // priority order lets a trailing markup drop flush a preceding complete
+      // invoke as visible text before the invoke parser ever sees it).
+      type Cand = { index: number; len: number; kind: 'fake' | 'callsTag' | 'tool' | 'toolCall' | 'dsml'; m: RegExpExecArray };
+      const cands: Cand[] = [];
+      const take = (rx: RegExp, kind: Cand['kind']): void => {
+        rx.lastIndex = 0;
+        const m = rx.exec(buffer);
+        if (m && m.index !== undefined) cands.push({ index: m.index, len: m[0].length, kind, m });
+      };
+      take(FAKE_RESULT_BLOCK, 'fake');
+      take(DSML_CALLS_TAG, 'callsTag');
+      take(COMPLETE_BLOCK, 'tool'); // kind refined below via m[1]
+      take(TOOL_CALL_BLOCK, 'toolCall');
+      take(DSML_INVOKE_BLOCK, 'dsml');
+      if (!cands.length) break;
+      cands.sort((a, b) => a.index - b.index);
+      const win = cands[0]!;
+      out += buffer.slice(0, win.index);
+      buffer = buffer.slice(win.index + win.len);
+      // Fake roleplayed results + DSML calls-wrapper tags are pure markup:
+      // dropped silently (a `<tool>` block closed by `</tool_result>` still
+      // parses via its own match).
+      if (win.kind === 'fake' || win.kind === 'callsTag') continue;
+      if (win.kind === 'tool') {
+        // COMPLETE_BLOCK serves tool + ask (m[1] disambiguates).
+        if (win.m[1] === 'tool') toolCalls.push(toToolCall(win.m[2] ?? '', win.m[4], win.m[3] === '/>'));
+        else asks.push(toAsk(win.m[2] ?? '', win.m[4], win.m[3] === '/>'));
+      } else if (win.kind === 'toolCall') {
+        toolCalls.push(toToolCallShape(win.m[1] ?? ''));
+      } else {
+        toolCalls.push(toDsmlCall(win.m[1] ?? '', win.m[2] ?? ''));
       }
-      COMPLETE_BLOCK.lastIndex = 0;
-      const m = COMPLETE_BLOCK.exec(buffer);
-      if (m && m.index !== undefined) {
-        out += buffer.slice(0, m.index);
-        if (m[1] === 'tool') toolCalls.push(toToolCall(m[2] ?? '', m[4], m[3] === '/>'));
-        else asks.push(toAsk(m[2] ?? '', m[4], m[3] === '/>'));
-        buffer = buffer.slice(m.index + m[0].length);
-        continue;
-      }
-      TOOL_CALL_BLOCK.lastIndex = 0;
-      const tc = TOOL_CALL_BLOCK.exec(buffer);
-      if (!tc || tc.index === undefined) break;
-      out += buffer.slice(0, tc.index);
-      toolCalls.push(toToolCallShape(tc[1] ?? ''));
-      buffer = buffer.slice(tc.index + tc[0].length);
     }
     if (force) {
       // Unclosed fake-result tail is roleplay, not chat — drop it; an

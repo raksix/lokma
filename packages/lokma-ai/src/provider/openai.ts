@@ -23,6 +23,17 @@ function hasHeader(headers: Record<string, string> | undefined, name: string): b
   return Object.keys(headers).some((k) => k.toLowerCase() === want);
 }
 
+/** Remove DeepSeek DSML tool-call markup from a thinking delta (REQ-119). */
+export function stripDsmlEchoes(text: string): string {
+  // REQ-119: DeepSeek DSML delimiters use FULLWIDTH VERTICAL BAR (U+FF5C).
+  const bar = String.fromCharCode(0xff5c);
+  const d = `${bar}${bar}DSML${bar}${bar}`;
+  return text
+    .replace(new RegExp(`<${d} invoke\\b[^>]*>[\\s\\S]*?<\\/${d} invoke\\s*>`, 'g'), '')
+    .replace(new RegExp(`<\\/?${d}[^>]*>`, 'g'), '')
+    .trim();
+}
+
 /** Strip the `provider/` prefix the harness model ids carry. */
 export function shortModelId(model: string): string {
   const slash = model.indexOf('/');
@@ -330,8 +341,14 @@ export class OpenAIAdapter implements ProviderAdapter {
         const content = record?.choices?.[0]?.delta?.content;
         if (typeof content === 'string' && content) yield { type: 'text_delta', delta: content };
         // DeepSeek-style reasoning stream rides the same delta object.
+        // REQ-119: v4.1-flash echoes DSML tool calls inside reasoning_content
+        // (the same calls arrive via `content` and execute there) — strip the
+        // markup so thinking shows reasoning once, as text, not raw DSML.
         const reasoning = (record?.choices?.[0]?.delta as { reasoning_content?: unknown } | undefined)?.reasoning_content;
-        if (typeof reasoning === 'string' && reasoning) yield { type: 'thinking_delta', delta: reasoning };
+        if (typeof reasoning === 'string' && reasoning) {
+          const cleaned = stripDsmlEchoes(reasoning);
+          if (cleaned) yield { type: 'thinking_delta', delta: cleaned };
+        }
       }
       // REQ-118 FAZ B: flush native calls as machine-typed chunks — the
       // loop executes them directly, no synthetic text passes the filter

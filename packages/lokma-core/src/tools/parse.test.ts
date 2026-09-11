@@ -169,6 +169,39 @@ function assert(cond: boolean, label: string): void {
   assert(calls.length === 1 && calls[0]?.input === undefined, 'unsalvageable tool_result body still malformed');
 }
 
+// ─── REQ-119: DeepSeek DSML invokes (fullwidth U+FF5C pipes) ───
+{
+  const FW = String.fromCharCode(0xff5c);
+  const D = `${FW}${FW}DSML${FW}${FW}`;
+  const dsml = `<${D} calls>\n<${D} invoke name="list_files">\n{"path": "Docs"}<${D} parameter>\n</${D} invoke>\n</${D} calls>`;
+  const calls = parseToolBlocks(dsml);
+  assert(calls.length === 1, 'DSML invoke parsed');
+  assert(calls[0]?.tool === 'list_files', 'DSML tool name kept');
+  assert((calls[0]?.input as { path: string }).path === 'Docs', 'DSML JSON args kept');
+  assert(calls[0]?.parseError === undefined, 'DSML call has no parseError');
+}
+{
+  const FW = String.fromCharCode(0xff5c);
+  const D = `${FW}${FW}DSML${FW}${FW}`;
+  const f = createBlockFilter();
+  const shown = f.push(`Thinking out loud <${D} invoke name="read_file">{"path": "a.ts"}</${D} invoke> done`);
+  const end = f.finish();
+  assert(end.toolCalls.length === 1 && end.toolCalls[0]?.tool === 'read_file', 'DSML parsed incrementally');
+  assert(shown.includes('Thinking') && shown.includes('done'), 'text around DSML streams');
+  assert(!shown.includes('DSML'), 'DSML markup never shown');
+}
+{
+  // calls-wrapper open/close must not leak as chat text (live DeepSeek shape).
+  const FW = String.fromCharCode(0xff5c);
+  const D = `${FW}${FW}DSML${FW}${FW}`;
+  const f = createBlockFilter();
+  const shown = f.push(`<${D} calls>\n`);
+  const shown2 = f.push(`<${D} invoke name="list_files">\n{"path": "Docs"}<${D} parameter>\n</${D} invoke>\n</${D} calls>`);
+  const end = f.finish();
+  assert(end.toolCalls.length === 1, 'wrapped DSML invoke parsed');
+  assert(!((shown + shown2 + end.tail).includes('DSML')), 'wrapper markup never leaks');
+}
+
 // ─── REQ-115b: <tool_call> shape + fake-result stripping (roleplay guard) ───
 {
   const calls = parseToolBlocks('<tool_call>\n{"name": "read_file", "arguments": {"path": "a.ts"}}\n</tool_call>');

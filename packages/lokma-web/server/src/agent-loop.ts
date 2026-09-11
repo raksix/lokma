@@ -7,6 +7,7 @@ import {
   executeToolCall,
   heartbeatSession,
   mintCallId,
+  parseToolBlocks,
   runApprovedCall,
   SessionStore,
   ToolRegistry,
@@ -285,6 +286,10 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
 
     const filter = createBlockFilter();
     let clean = '';
+    // REQ-119: DeepSeek puts DSML tool calls in reasoning_content, which
+    // never passes the text filter — accumulate thinking per turn so a
+    // thinking-only DSML block still executes (deduped against text calls).
+    let thinkingText = '';
     // REQ-118 FAZ B: gateway-typed native calls bypass the text filter —
     // collected per attempt, merged into runEnd.toolCalls below.
     let nativeCalls: { tool: string; input: unknown; callId: string; parseError?: string }[] = [];
@@ -335,7 +340,10 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
           } else if (chunk.type === 'thinking_delta') {
             // REQ-050: reasoning streams straight through (never filtered,
             // never persisted as answer text).
-            if (chunk.delta) opts.send({ type: 'thinking_delta', delta: chunk.delta, sessionId: opts.sessionId });
+            if (chunk.delta) {
+              thinkingText += chunk.delta;
+              opts.send({ type: 'thinking_delta', delta: chunk.delta, sessionId: opts.sessionId });
+            }
           } else if (chunk.type === 'native_tool_call') {
             // REQ-118 FAZ B: gateway-typed call — collected for direct
             // execution below; the live tool_start row fires at execution
@@ -433,6 +441,29 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
       throw streamFailed;
     }
     const runEnd = end ?? filter.finish();
+    // REQ-119: thinking-only DSML (DeepSeek reasoning_content without a
+    // content echo) — parse the accumulated thinking and merge calls the
+    // text filter missed. Whitespace-insensitive keys so the same call
+    // echoed with different JSON spacing never executes twice.
+    if (thinkingText.includes('DSML')) {
+      const keyOf = (tool: string, input: unknown): string => {
+        let s: string;
+        try {
+          s = JSON.stringify(input ?? null);
+        } catch {
+          s = String(input);
+        }
+        return `${tool}::${s.replace(/\s+/g, '')}`;
+      };
+      const seen = new Set(runEnd.toolCalls.map((c) => keyOf(c.tool, c.input)));
+      for (const call of parseToolBlocks(thinkingText)) {
+        if (!call.tool) continue;
+        const key = keyOf(call.tool, call.input);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        runEnd.toolCalls.push(call);
+      }
+    }
     // REQ-118 FAZ B: gateway-typed native calls join the text-parsed ones
     // (deduped by tool+input like the REQ-119 merge, so a model that both
     // dispatches natively and echoes text never executes twice).

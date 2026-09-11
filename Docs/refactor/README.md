@@ -134,4 +134,4 @@
 - [REQ-113](finished/REQ-113-attachment-50mb.md) — Attachment limiti 50MB + inline bütçe — done
 - [REQ-114](finished/REQ-114-pdf-attach.md) — Ham PDF ekleme, server-side metin çıkarma — done
 - [REQ-115](finished/REQ-115-sloppy-tool-salvage.md) — Sloppy-model tool-block salvage (XML args + tool_result closer) — done
-- [REQ-116](REQ-116-claude-tarzı-motor.md) — Claude-Code-tarzı motor (stop_reason + headless -p) — in-progress (FAZ A + FAZ B-engine + FAZ B-wiring + FAZ C-bridge + FAZ D-continuity + FAZ D-compact-window + FAZ C-ask-gate + FAZ D-clear + FAZ D-compact + FAZ D-context + FAZ D-compact-focus + FAZ D-context-categories + FAZ D-reinject-quota + FAZ B-spawn-fail + FAZ B-run-error done)
+- [REQ-116](finished/REQ-116-claude-tarzı-motor.md) — Claude-Code-tarzı motor (stop_reason + headless -p) — done

@@ -296,4 +296,76 @@ assert(errExec.summary !== undefined && errExec.summary.costUsd === 0.05 && errE
 assert(errExec.summary !== undefined && errExec.summary.claudeSessionId === 's-9', 'error session id carried for --resume');
 assert(errExec.frames.length === 1 && errExec.frames[0].type === 'cost', 'error result still emits a cost frame');
 
+// 22. Acceptance E2E: full spawn -> frames -> summary cycle against a shim
+// binary (zero API spend — the shim prints canned stream-json and exits 0).
+// Proves the live run path end to end: text/tool/cost frames arrive on send,
+// the summary resolves success with session + cost, and the error variant
+// resolves the honest error_during_execution subtype the ws.ts marker reads.
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const shimDir = mkdtempSync(join(tmpdir(), 'req116-shim-'));
+const shimBin = join(shimDir, 'claude');
+const shimLines = [
+  '#!/usr/bin/env node',
+  "'use strict';",
+  "const mode = process.env.LOKMA_SHIM_MODE || 'ok';",
+  'function emit(o) { process.stdout.write(JSON.stringify(o) + String.fromCharCode(10)); }',
+  "emit({ type: 'system', subtype: 'init', session_id: 'shim-s-1' });",
+  "emit({ type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Checking ' } } });",
+  "emit({ type: 'assistant', message: { content: [{ type: 'text', text: 'Looking' }, { type: 'tool_use', id: 'toolu_shim_1', name: 'Read', input: { file_path: '/tmp/x.ts' } }] } });",
+  "emit({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'toolu_shim_1', content: 'file bytes' }] } });",
+  "if (mode === 'error') {",
+  "  emit({ type: 'result', subtype: 'error_during_execution', result: 'half text', total_cost_usd: 0.02, num_turns: 2, session_id: 'shim-s-1' });",
+  '} else {',
+  "  emit({ type: 'result', subtype: 'success', result: 'All good', total_cost_usd: 0.01, num_turns: 2, session_id: 'shim-s-1' });",
+  '}',
+];
+writeFileSync(shimBin, shimLines.join(String.fromCharCode(10)) + String.fromCharCode(10));
+chmodSync(shimBin, 0o755);
+const okKinds: string[] = [];
+let okCost = -1;
+const okSummary = await runClaudePrint({
+  prompt: 'acceptance probe',
+  cwd: '/tmp',
+  allowedTools: ['Read'],
+  disallowedTools: ['Bash(rm *)'],
+  maxTurns: 5,
+  maxBudgetUsd: 2,
+  sessionId: SID,
+  signal: new AbortController().signal,
+  send: (frame) => {
+    okKinds.push(frame.type);
+    if (frame.type === 'cost' && typeof (frame as unknown as Record<string, unknown>)['costUsd'] === 'number') {
+      okCost = (frame as unknown as Record<string, unknown>)['costUsd'] as number;
+    }
+  },
+  claudeBin: shimBin,
+});
+assert(okSummary.subtype === 'success', 'shim success run resolves success');
+assert(okSummary.result === 'All good', 'shim result text carried');
+assert(okSummary.costUsd === 0.01 && okSummary.numTurns === 2, 'shim cost and turns carried');
+assert(okSummary.claudeSessionId === 'shim-s-1', 'shim session handle carried for --resume');
+assert(okKinds.includes('text_delta'), 'shim run streams text frames');
+assert(okKinds.includes('tool_start'), 'shim run emits tool_start');
+assert(okKinds.includes('tool_result'), 'shim run emits tool_result');
+assert(okKinds.includes('cost'), 'shim run emits cost frame');
+assert(okCost === 0.01, 'shim cost frame carries reported cost');
+const errSummary = await runClaudePrint({
+  prompt: 'acceptance probe',
+  cwd: '/tmp',
+  allowedTools: ['Read'],
+  maxTurns: 5,
+  maxBudgetUsd: 2,
+  sessionId: SID,
+  signal: new AbortController().signal,
+  send: () => undefined,
+  claudeBin: shimBin,
+  env: { LOKMA_SHIM_MODE: 'error' },
+});
+assert(errSummary.subtype === 'error_during_execution', 'shim error run resolves honest error subtype');
+assert(errSummary.result === 'half text', 'shim error result text carried');
+assert(errSummary.claudeSessionId === 'shim-s-1', 'shim error keeps session handle for --resume');
+rmSync(shimDir, { recursive: true, force: true });
+
 console.log('\nclaude-print probe: ' + passed + ' passed');

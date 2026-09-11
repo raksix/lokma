@@ -5,7 +5,7 @@
  * Not imported by server code, so `tsc -p` output ignores it.
  */
 import { spawn } from 'node:child_process';
-import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, CLAUDE_MUTATION_SURFACE, claudeToolsForLokmaTool, describeClaudeAskCard, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, translateClaudeLine } from './claude-print';
+import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_CLEAR_MARKER, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, CLAUDE_MUTATION_SURFACE, claudeToolsForLokmaTool, describeClaudeAskCard, isClaudeClearCommand, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, translateClaudeLine } from './claude-print';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -168,5 +168,14 @@ assert(cardW.includes('Edit') && cardW.includes('Write'), 'write card names Edit
 const cardBoth = describeClaudeAskCard(['write_file', 'run_command']);
 assert(cardBoth.includes('Bash') && cardBoth.includes('Edit'), 'combined card names Bash+Edit');
 assert(describeClaudeAskCard([]).includes('mutation tools'), 'empty card falls back to generic surface');
+
+// 14. FAZ D-clear: `/clear` detection + marker for a fresh headless run.
+assert(isClaudeClearCommand('/clear'), '/clear matches');
+assert(isClaudeClearCommand('  /clear  '), '/clear matches with surrounding whitespace');
+assert(!isClaudeClearCommand('/clear now'), '/clear with args does not match');
+assert(!isClaudeClearCommand('/compact'), '/compact is not clear');
+assert(!isClaudeClearCommand('clear'), 'bare clear without slash does not match');
+assert(!isClaudeClearCommand('please /clear this'), 'embedded /clear does not match');
+assert(CLAUDE_CLEAR_MARKER.includes('cleared') && CLAUDE_CLEAR_MARKER.startsWith('['), 'clear marker names the outcome');
 
 console.log('\nclaude-print probe: ' + passed + ' passed');

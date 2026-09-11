@@ -213,6 +213,20 @@ export function describeClaudeAskCard(askLokmaTools: readonly string[]): string 
 }
 
 /**
+ * REQ-116 FAZ D-clear — `/clear` starts the next headless run fresh.
+ *
+ * Without this the stored resume handle (`--resume <id>`) drags the old
+ * engine session along forever: no API or command clears it. The WS pump
+ * intercepts this command harness-side (clears the handle, writes the
+ * marker below, sends `done`) and never spawns the binary. Pure — probe it.
+ */
+export const CLAUDE_CLEAR_MARKER = '[claude session cleared - next run starts fresh]';
+
+export function isClaudeClearCommand(prompt: string): boolean {
+  return prompt.trim() === '/clear';
+}
+
+/**
  * Build the exact argv for the child. Pure — probe it (no invented flags:
  * every flag below exists in `claude --help` v2.1.x).
  */

@@ -28,9 +28,11 @@ import {
 import { decodeClientMessage, encodeServerMessage } from '@lokma/shared';
 import { LoopAborted, LOOP_DEFAULT_MAX_TURNS, buildLoopHistory, runAgentLoop, type ApprovalDecision } from '../agent-loop.js';
 import {
+  CLAUDE_CLEAR_MARKER,
   CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD,
   CLAUDE_MUTATION_SURFACE,
   describeClaudeAskCard,
+  isClaudeClearCommand,
   parseClaudeEngineModel,
   resolveClaudePermissions,
   runClaudePrint,
@@ -102,6 +104,24 @@ async function runClaudeEngineTurn(
   },
 ): Promise<void> {
   const { sessionId, cwd, store, send, state, model, prompt } = args;
+  // REQ-116 FAZ D-clear: `/clear` drops the stored resume handle so the
+  // next headless run starts fresh. Harness-side only — the binary never
+  // spawns, no permission cards open, no compact runs. Empty string clears
+  // the handle per the store merge rule.
+  if (isClaudeClearCommand(prompt)) {
+    try {
+      await store.writeMeta(sessionId, { claudeSessionId: '' });
+    } catch (e) {
+      app.log.warn('[ws] claude clear failed session=' + sessionId + ': ' + String(e));
+    }
+    await store.append(sessionId, {
+      role: 'assistant',
+      content: CLAUDE_CLEAR_MARKER,
+      timestamp: new Date().toISOString(),
+    });
+    send({ type: 'done', sessionId, reason: 'complete' });
+    return;
+  }
   const ctrl = new AbortController();
   state.abort = ctrl;
   // REQ-116 FAZ C — permission bridge: the project's `permissions` config

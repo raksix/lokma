@@ -9,12 +9,22 @@
  * `tsc -p` output (same precedent as `lokma-ai`'s `adapters.test.ts`).
  * See Docs/30 section agent tools + Docs/22 section permissions.
  */
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildBuiltinTools } from './builtins';
+import { buildBuiltinTools, BUILTIN_TOOL_NAMES } from './builtins';
 import { capToolResult, executeToolCall, mintCallId, runApprovedCall, type ToolEvent } from './executor';
+import { globToRegExp, WorkspaceFiles } from '../files/files';
 import { decideToolCall, describeToolCall, READ_TOOLS, WRITE_TOOLS } from './gate';
+import {
+  emptyResultPlaceholder,
+  isEmptyResultText,
+  persistedOutputEnvelope,
+  previewCut,
+  resultBudget,
+  resultOverBudget,
+  spillPathFor,
+} from './result-budget';
 import { ToolRegistry } from './registry';
 
 let passed = 0;
@@ -76,7 +86,11 @@ async function main(): Promise<void> {
   try {
     await writeFile(join(cwd, 'hello.txt'), 'hello tool loop\n');
     const registry = registryWith(cwd);
-    assert(registry.names().length === 5, 'builtins: five tools registered');
+    assert(registry.names().length === BUILTIN_TOOL_NAMES.length, 'builtins: every declared tool is registered');
+    assert(
+      BUILTIN_TOOL_NAMES.every((n) => registry.names().includes(n)),
+      'builtins: the declared name list matches the registry',
+    );
     assert(
       ['read_file', 'list_files', 'search_files', 'write_file', 'run_command'].every((n) => registry.names().includes(n)),
       'builtins: exact tool names',
@@ -228,6 +242,107 @@ async function main(): Promise<void> {
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
+
+  // --- REQ-128: glob / grep / edit tooling ---
+  assert(globToRegExp('src/**/*.tsx').test('src/x/y.tsx'), 'glob: ** crosses directories');
+  assert(globToRegExp('**/*.ts').test('a.ts'), 'glob: **/ also matches zero segments');
+  assert(!globToRegExp('*.ts').test('src/a.ts'), 'glob: a single star does not cross /');
+  assert(globToRegExp('a?c.ts').test('abc.ts'), 'glob: ? is exactly one char');
+
+  const ws = await mkdtemp(join(tmpdir(), 'lokma-edit-'));
+  try {
+    await mkdir(join(ws, 'src'), { recursive: true });
+    await writeFile(join(ws, 'src', 'a.ts'), 'export const a = 1;\nexport const b = 2;\n');
+    await writeFile(join(ws, 'src', 'b.ts'), 'export const a = 1;\n');
+    await writeFile(join(ws, 'README.md'), '# hi\n');
+    const files = new WorkspaceFiles(ws);
+
+    const g = await files.glob('**/*.ts');
+    assert(
+      g.files.length === 2 && g.files.includes('src/a.ts') && g.files.includes('src/b.ts'),
+      `glob finds nested sources, got ${JSON.stringify(g.files)}`,
+    );
+    const g2 = await files.glob('*.md');
+    assert(g2.files.length === 1 && g2.files[0] === 'README.md', 'glob stays at the root for a flat pattern');
+
+    const hit = await files.grep('export const (a|b)');
+    assert(
+      hit.total === 3 && hit.hits.length === 2,
+      `grep groups matches per file, got total=${hit.total} files=${hit.hits.length}`,
+    );
+    assert(hit.hits[0]?.matches[0]?.line === 1, 'grep reports 1-based line numbers');
+    const lit = await files.grep('.', { literal: true });
+    assert(lit.total === 0, 'grep literal mode escapes regex metacharacters');
+
+    const before = await files.read('src/a.ts');
+    const edited = await files.edit('src/a.ts', 'export const b = 2;', 'export const b = 3;');
+    assert(edited.replacements === 1 && edited.sha !== before.sha, 'edit replaces once and re-hashes');
+    const after = await files.read('src/a.ts');
+    assert(after.content.includes('export const b = 3;'), 'edit wrote the new text to disk');
+
+    let dupCode = '';
+    try {
+      await files.edit('src/a.ts', 'export const', 'x');
+    } catch (e) {
+      dupCode = (e as { code?: string }).code ?? '';
+    }
+    assert(dupCode === 'edit_not_unique', 'edit refuses an ambiguous match');
+
+    let missingCode = '';
+    try {
+      await files.edit('src/a.ts', 'not-in-this-file', 'x');
+    } catch (e) {
+      missingCode = (e as { code?: string }).code ?? '';
+    }
+    assert(missingCode === 'edit_not_found', 'edit refuses a missing match');
+
+    let staleCode = '';
+    try {
+      await files.edit('src/a.ts', 'export const b = 3;', 'y', { expectedSha: before.sha });
+    } catch (e) {
+      staleCode = (e as { code?: string }).code ?? '';
+    }
+    assert(staleCode === 'sha_mismatch', 'edit refuses a stale expectedSha');
+
+    const all = await files.edit('src/b.ts', 'export const a = 1;', 'export const a = 9;', { replaceAll: true });
+    assert(all.replacements === 1, 'replaceAll reports its replacement count');
+  } finally {
+    await rm(ws, { recursive: true, force: true });
+  }
+
+  // --- REQ-128: result budget + spill envelope (pure) ---
+  assert(resultBudget(undefined) === 50_000, 'resultBudget defaults to 50k');
+  assert(resultBudget(1_000) === 1_000 && resultBudget(1e9) === 50_000, 'resultBudget honours a smaller budget and clamps a bigger one');
+  assert(!resultOverBudget('abc', 3) && resultOverBudget('abcd', 3), 'over-budget detection is inclusive-safe');
+  const cut = previewCut('line one\nline two\nline three', 12);
+  assert(cut.hasMore && cut.preview.length <= 12 && !cut.preview.endsWith('\n'), 'previewCut backs up to a newline');
+  assert(!previewCut('short', 40).hasMore, 'short text needs no preview marker');
+  assert(emptyResultPlaceholder('grep') === '(grep completed with no output)', 'empty results get a placeholder');
+  assert(isEmptyResultText('{}') && isEmptyResultText('   ') && !isEmptyResultText('{"a":1}'), 'empty-result detection');
+  const env = persistedOutputEnvelope({
+    originalChars: 123_456,
+    path: '.lokma/tool-results/t_1.txt',
+    preview: 'abc',
+    hasMore: true,
+  });
+  assert(
+    env.startsWith('<persisted-output>') &&
+      env.includes('.lokma/tool-results/t_1.txt') &&
+      env.includes('KB') &&
+      env.endsWith('</persisted-output>'),
+    'spill envelope carries size, path and preview',
+  );
+  assert(spillPathFor('t_abc-1') === '.lokma/tool-results/t_abc-1.txt', 'spill path is namespaced under .lokma');
+
+  // --- REQ-128: read-only markers drive the gate ---
+  const markers = registryWith(ws);
+  assert(markers.get('glob')?.readOnly === true && markers.get('grep')?.readOnly === true, 'search tools declare readOnly');
+  assert(markers.get('read_file')?.readOnly === true, 'read_file declares readOnly');
+  assert(markers.get('edit_file')?.readOnly !== true, 'edit_file is NOT read-only');
+  assert(decideToolCall(AUTO, 'glob') === 'allow' && decideToolCall(AUTO, 'grep') === 'allow', 'gate auto allows the new search tools');
+  assert(decideToolCall(AUTO, 'edit_file') === 'ask', 'gate auto asks before edit_file');
+  assert(markers.get('read_file')?.maxResultSizeChars === 50_000, 'read_file declares its output budget');
+  assert(markers.get('grep')?.maxResultSizeChars === 20_000, 'grep declares its output budget');
 
   console.log(`\ntools probe: ${passed} passed`);
 }

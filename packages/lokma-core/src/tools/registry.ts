@@ -11,6 +11,18 @@ export type ToolDefinition = {
   description: string;
   inputSchema: z.ZodTypeAny;
   handler: (input: unknown, ctx: unknown) => Promise<unknown>;
+  /**
+   * REQ-128: concurrency-safe marker (Claude-Code `isReadOnly()`). Consecutive
+   * read-only calls in one turn run in parallel; anything that can mutate the
+   * workspace or read outside it stays serial.
+   */
+  readOnly?: boolean;
+  /**
+   * REQ-128: per-tool output budget in characters (Claude-Code
+   * `maxResultSizeChars`). The loop spills anything larger to disk and hands
+   * the model a preview envelope instead. Undefined = the global default.
+   */
+  maxResultSizeChars?: number;
 };
 
 export class ToolRegistry {

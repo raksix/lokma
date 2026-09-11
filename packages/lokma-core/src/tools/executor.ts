@@ -99,7 +99,12 @@ export async function executeToolCall(registry: ToolRegistry, opts: ExecuteToolO
   if (!registry.get(opts.tool)) {
     return { outcome: 'error', callId, code: 'unknown_tool', message: `Unknown tool: ${opts.tool}` };
   }
-  const gate = decideToolCall(opts.permissions, opts.tool);
+  // REQ-128: a tool's own `readOnly` marker is authoritative — a new
+  // read-only tool must not need a second edit in gate.ts's name sets just
+  // to avoid a pointless approval prompt. The deny-list still wins (it
+  // returns 'deny' above, which this never touches).
+  let gate = decideToolCall(opts.permissions, opts.tool);
+  if (gate === 'ask' && registry.get(opts.tool)?.readOnly === true) gate = 'allow';
   if (gate === 'deny') {
     return { outcome: 'denied', callId, tool: opts.tool };
   }

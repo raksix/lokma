@@ -12,11 +12,18 @@ import type { Permissions } from '@lokma/shared';
 export type GateDecision = 'allow' | 'ask' | 'deny';
 
 /** Tools that only read — safe to auto-run in `auto` mode. */
-export const READ_TOOLS: ReadonlySet<string> = new Set(['read_file', 'list_files', 'search_files']);
+export const READ_TOOLS: ReadonlySet<string> = new Set([
+  'read_file',
+  'list_files',
+  'search_files',
+  'glob',
+  'grep',
+]);
 
 /** Tools that mutate disk or spawn processes — need approval by default. */
 export const WRITE_TOOLS: ReadonlySet<string> = new Set([
   'write_file',
+  'edit_file',
   'run_command',
   'claim_todo',
   'complete_todo',

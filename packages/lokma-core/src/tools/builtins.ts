@@ -36,6 +36,36 @@ const RunCommandInput = z.object({
   args: z.array(z.string().max(500)).max(20).default([]),
   timeoutMs: z.number().int().min(1_000).max(60_000).default(RUN_COMMAND_TIMEOUT_MS),
 });
+const EditFileInput = z.object({
+  path: z.string().min(1).max(500),
+  /** Exact text to replace — must match once (or pass replaceAll). */
+  oldString: z.string().min(1).max(200_000),
+  newString: z.string().max(200_000),
+  expectedSha: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+  replaceAll: z.boolean().optional(),
+});
+const GlobInput = z.object({
+  /** e.g. `**\/*.ts`, `src/**\/*.tsx`, `Docs/*.md`. */
+  pattern: z.string().min(1).max(200),
+  max: z.number().int().min(1).max(500).optional(),
+});
+const GrepInput = z.object({
+  /** Regular expression (set literal: true for a plain substring). */
+  query: z.string().min(1).max(500),
+  path: z.string().min(1).max(500).optional(),
+  max: z.number().int().min(1).max(400).optional(),
+  ignoreCase: z.boolean().optional(),
+  literal: z.boolean().optional(),
+});
+
+/**
+ * Output budgets in characters (REQ-128, Claude-Code parity). Anything past
+ * the budget is spilled to disk by the loop and replaced with a preview
+ * envelope, so a 300KB grep can never evict the conversation.
+ */
+const READ_BUDGET = 50_000;
+const RUN_BUDGET = 30_000;
+const SEARCH_BUDGET = 20_000;
 
 function tail(text: string, cap: number): { text: string; truncated: boolean } {
   if (text.length <= cap) return { text, truncated: false };
@@ -53,6 +83,8 @@ export function buildBuiltinTools(cwd: string): ToolDefinition[] {
     {
       name: 'read_file',
       description: 'Read a workspace-relative file (capped, with sha for guarded writes)',
+      readOnly: true,
+      maxResultSizeChars: READ_BUDGET,
       inputSchema: ReadFileInput,
       handler: async (input) => {
         const { path } = input as z.infer<typeof ReadFileInput>;
@@ -62,6 +94,7 @@ export function buildBuiltinTools(cwd: string): ToolDefinition[] {
     {
       name: 'list_files',
       description: 'List one workspace directory level, dirs-first, with git states',
+      readOnly: true,
       inputSchema: ListFilesInput,
       handler: async (input) => {
         const { path } = input as z.infer<typeof ListFilesInput>;
@@ -70,7 +103,9 @@ export function buildBuiltinTools(cwd: string): ToolDefinition[] {
     },
     {
       name: 'search_files',
-      description: 'Fuzzy filename search over the workspace (skips deps/build/VCS)',
+      description: 'Fuzzy FILE-NAME search over the workspace (skips deps/build/VCS) — use grep to search inside files',
+      readOnly: true,
+      maxResultSizeChars: SEARCH_BUDGET,
       inputSchema: SearchFilesInput,
       handler: async (input) => {
         const { query, max } = input as z.infer<typeof SearchFilesInput>;
@@ -78,8 +113,44 @@ export function buildBuiltinTools(cwd: string): ToolDefinition[] {
       },
     },
     {
+      name: 'glob',
+      description: 'Find files by glob pattern (** crosses dirs, * does not) — e.g. **/*.ts, src/**/*.tsx',
+      readOnly: true,
+      maxResultSizeChars: SEARCH_BUDGET,
+      inputSchema: GlobInput,
+      handler: async (input) => {
+        const { pattern, max } = input as z.infer<typeof GlobInput>;
+        return files.glob(pattern, max);
+      },
+    },
+    {
+      name: 'grep',
+      description:
+        'Search file CONTENTS with a regular expression; returns grouped line matches with line numbers. Use it before reading whole files.',
+      readOnly: true,
+      maxResultSizeChars: SEARCH_BUDGET,
+      inputSchema: GrepInput,
+      handler: async (input) => {
+        const { query, path, max, ignoreCase, literal } = input as z.infer<typeof GrepInput>;
+        return files.grep(query, { path, max, ignoreCase, literal });
+      },
+    },
+    {
+      name: 'edit_file',
+      description:
+        'Replace an exact string inside a workspace file (oldString must match exactly once). Read the file first — prefer this over rewriting the whole file.',
+      maxResultSizeChars: 10_000,
+      inputSchema: EditFileInput,
+      handler: async (input) => {
+        const { path, oldString, newString, expectedSha, replaceAll } = input as z.infer<typeof EditFileInput>;
+        return files.edit(path, oldString, newString, { expectedSha, replaceAll });
+      },
+    },
+    {
       name: 'write_file',
-      description: 'Atomically write a workspace file (expectedSha guards lost updates)',
+      description:
+        'Atomically write (create or overwrite) a workspace file; expectedSha guards lost updates. Prefer edit_file for small changes to existing files.',
+      maxResultSizeChars: 10_000,
       inputSchema: WriteFileInput,
       handler: async (input) => {
         const { path, content, expectedSha } = input as z.infer<typeof WriteFileInput>;
@@ -88,7 +159,8 @@ export function buildBuiltinTools(cwd: string): ToolDefinition[] {
     },
     {
       name: 'run_command',
-      description: 'Run one binary without a shell, jailed to the workspace cwd',
+      description: 'Run one binary without a shell, jailed to the workspace cwd (exit code + output; non-zero exit is a result, not an error)',
+      maxResultSizeChars: RUN_BUDGET,
       inputSchema: RunCommandInput,
       handler: async (input) => {
         const { command, args, timeoutMs } = input as z.infer<typeof RunCommandInput>;
@@ -124,4 +196,13 @@ export function buildBuiltinTools(cwd: string): ToolDefinition[] {
 }
 
 /** Names only — cheap index for the `<available_tools>` prompt section. */
-export const BUILTIN_TOOL_NAMES = ['read_file', 'list_files', 'search_files', 'write_file', 'run_command'] as const;
+export const BUILTIN_TOOL_NAMES = [
+  'read_file',
+  'list_files',
+  'search_files',
+  'glob',
+  'grep',
+  'edit_file',
+  'write_file',
+  'run_command',
+] as const;

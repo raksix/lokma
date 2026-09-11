@@ -6,6 +6,8 @@ import {
   TerminalError,
   UsageLedger,
   canViewSession,
+  compactSession,
+  compactionStatus,
   estimateCost,
   estimateTokens,
   getUserById,
@@ -76,6 +78,11 @@ const APPROVAL_TIMEOUT_MS = 10 * 60_000;
  * `cost` frame from the `result` event, so no second cost frame here.
  * FAZ D-continuity: the next turn resumes the same engine session via the
  * meta-stored handle (`--resume <id>`).
+ * FAZ D-compact-window: before spawning, the Lokma-side transcript is
+ * auto-compacted when over budget (`compactionStatus` → `compactSession`),
+ * so the persisted history the next turn reads stays consistent. Kill
+ * switch: `LOKMA_DISABLE_AUTO_COMPACT=1`. Compaction never breaks chat —
+ * every failure only warns.
  */
 async function runClaudeEngineTurn(
   app: FastifyInstance,
@@ -108,6 +115,31 @@ async function runClaudeEngineTurn(
     .readMeta(sessionId)
     .then((meta) => (meta?.claudeSessionId?.trim() ? meta.claudeSessionId : undefined))
     .catch(() => undefined);
+  // REQ-116 FAZ D-compact-window: auto-compact the Lokma-side transcript
+  // before the headless run when over budget. The engine resumes its own
+  // session server-side; this keeps OUR persisted history (the source the
+  // next turn + reconnects read) consistent on long runs. Opt out with
+  // `LOKMA_DISABLE_AUTO_COMPACT=1`. Failures only warn, never break chat.
+  if (process.env.LOKMA_DISABLE_AUTO_COMPACT !== '1') {
+    try {
+      const status = await compactionStatus(cwd, sessionId);
+      const mode = status.summaryNeeded ? 'full' : status.hygieneNeeded ? 'hygiene' : null;
+      if (mode) {
+        const report = await compactSession(cwd, sessionId, { mode });
+        if (report.compacted) {
+          await store.append(sessionId, {
+            role: 'assistant',
+            content:
+              '[compact: ' + mode + ' ' + String(report.beforeMessages) + '->' + String(report.afterMessages) + ' messages]',
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+    } catch (e) {
+      // Fresh/empty sessions throw sessionNotFound here — expected, not an error.
+      app.log.warn('[ws] claude pre-turn compact skipped session=' + sessionId + ': ' + String(e));
+    }
+  }
   try {
     const summary = await runClaudePrint({
       prompt,

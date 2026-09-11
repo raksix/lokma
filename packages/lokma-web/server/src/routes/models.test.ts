@@ -11,7 +11,7 @@
  * though the model answered tool calls fine.
  */
 import type { CatalogModel } from '@lokma/ai';
-import { mergeLiveIds, type LiveProbeOutcome } from './models';
+import { MAX_BULK_KEYS, mergeLiveIds, type LiveProbeOutcome } from './models';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -82,6 +82,13 @@ const base: CatalogModel[] = [{ id: 'anthropic/claude-sonnet-4-5', label: 'claud
   ];
   const merged = mergeLiveIds(base, outcomes);
   assert(merged.length === 1 && merged[0].id === 'anthropic/claude-sonnet-4-5', 'error/skipped outcomes leave the catalog untouched');
+}
+
+// 7. Bulk cap must clear a real catalog (REQ-131).
+// The live catalog reached 613 ids; the old 500 cap made "Allow All" answer
+// `too_many_models` and silently change nothing. The cap is a DoS guard only.
+{
+  assert(MAX_BULK_KEYS >= 1000, 'bulk cap clears real-world catalogs (>= 1000 ids)');
 }
 
 console.log(`\nmodels catalog probe: ${passed} checks passed`);

@@ -11,7 +11,14 @@ import { listProviderViews, probeProvider, providerNeedsKey, resolveApiKey } fro
  * instead of `:id` URL params. See Docs/22 §models.
  */
 
-const MAX_BULK_KEYS = 500;
+/**
+ * Upper bound on a single bulk PATCH body. This is a DoS guard, not a
+ * product limit: the live catalog already passed the old 500 cap (613 ids
+ * merged from six providers), so "Allow All" answered `too_many_models`
+ * and silently changed nothing. Keep it far above any realistic catalog by
+ * filtering unknown ids below instead of rejecting the whole batch.
+ */
+export const MAX_BULK_KEYS = 5000;
 
 /** Live-probe budget for the catalog merge — bounded, parallel, failures skipped. */
 const MERGE_PROBE_TIMEOUT_MS = 6_000;
@@ -188,8 +195,12 @@ export async function modelRoutes(app: FastifyInstance): Promise<void> {
 
     const base = await getMergedCatalog();
     const known = new Set(base.map((m) => m.id));
+    // Partial success beats all-or-nothing: the live catalog is probe-backed,
+    // so one stale id must not kill a 600-entry "Allow All" batch. Unknown ids
+    // are skipped and reported back instead of rejecting the whole body.
+    const accepted = entries.filter(([id]) => known.has(id));
     const unknown = entries.map(([id]) => id).filter((id) => !known.has(id));
-    if (unknown.length > 0) {
+    if (accepted.length === 0) {
       return reply.code(400).send({
         ok: false,
         code: 'unknown_model',
@@ -199,14 +210,16 @@ export async function modelRoutes(app: FastifyInstance): Promise<void> {
 
     const cfg = await loadConfig(process.cwd());
     const flags = { ...(cfg.models ?? {}) };
-    for (const [id, enabled] of entries) flags[id] = { enabled };
+    for (const [id, enabled] of accepted) flags[id] = { enabled };
     await saveGlobal({ models: flags });
     invalidateCatalog();
 
     const models = applyModelFlags(base, flags);
     return {
       ok: true,
-      updated: entries.length,
+      updated: accepted.length,
+      skipped: unknown.length,
+      skippedIds: unknown.slice(0, 5),
       models,
       count: models.length,
       enabledCount: models.filter((m) => m.enabled).length,

@@ -151,3 +151,4 @@
 - [REQ-130](finished/REQ-130-provider-namespaced-model-catalog.md) — Provider-namespaced model catalog (picker no longer shows "(unavailable)") — done
 - [REQ-131](finished/REQ-131-models-bulk-and-grouping.md) — Allow All / Disable All actually apply (bulk cap + partial success) and the Models tab is grouped by provider — done
 - [REQ-132](finished/REQ-132-duplicate-answer-live-trace.md) — A finished run no longer paints its answer (and thinking) twice — done
+- [REQ-133](finished/REQ-133-composer-thinking-budget.md) — Thinking budget (Off/Low/Medium/High) is settable from the composer input — done

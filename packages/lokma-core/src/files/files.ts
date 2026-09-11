@@ -67,6 +67,56 @@ export type FileWriteResult = { path: string; sha: string; size: number; created
 
 export type FileSearchHit = { path: string; type: FileKind; score: number };
 
+/** One matched line from `grep()` — 1-based line number + trimmed text. */
+export type GrepMatch = { line: number; text: string };
+/** All matches inside one file (files are the group, matches are the rows). */
+export type GrepHit = { path: string; matches: GrepMatch[] };
+
+/** Content search budgets: one huge file or match list must not flood a turn. */
+const GREP_MAX_FILE_BYTES = 1024 * 1024;
+const GREP_MAX_PER_FILE = 20;
+/** Directory cap for the walkers (parity with `search()`). */
+const WALK_MAX_DIRS = 20_000;
+
+/** Clamp an optional numeric option into `[1, max]`, defaulting when absent. */
+function clampCount(value: unknown, fallback: number, max: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.min(Math.floor(n), max);
+}
+
+/**
+ * Translate a workspace glob to a RegExp over relative paths:
+ * `**` crosses directories (and `**\/` also matches zero segments, so
+ * `**\/*.ts` finds root-level files), `*` stops at `/`, `?` is one char.
+ */
+export function globToRegExp(pattern: string): RegExp {
+  let out = '^';
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i] as string;
+    if (c === '*') {
+      if (pattern[i + 1] === '*') {
+        if (pattern[i + 2] === '/') {
+          out += '(?:.*/)?';
+          i += 2;
+        } else {
+          out += '.*';
+          i += 1;
+        }
+      } else {
+        out += '[^/]*';
+      }
+    } else if (c === '?') {
+      out += '[^/]';
+    } else if ('\\^$.|+()[]{}'.includes(c)) {
+      out += `\\${c}`;
+    } else {
+      out += c;
+    }
+  }
+  return new RegExp(`${out}$`);
+}
+
 /** Typed error — routes map `code`/`status` straight into `{ code, message }`. */
 export class FileError extends Error {
   readonly code: string;
@@ -431,5 +481,179 @@ export class WorkspaceFiles {
     }
     scored.sort((a, b) => b.score - a.score || a.path.localeCompare(b.path));
     return { q, hits: scored.slice(0, limit) };
+  }
+
+  /**
+   * Glob a workspace-relative pattern (`**` crosses directories, `*` does
+   * not, `?` is one char). Same skip list and depth cap as `search()`, so
+   * a glob never walks node_modules or build output.
+   */
+  async glob(pattern: unknown, max?: unknown): Promise<{ pattern: string; files: string[]; truncated: boolean }> {
+    if (typeof pattern !== 'string' || !pattern.trim() || pattern.trim().length > 200) {
+      throw new FileError('bad_pattern', 'glob needs a pattern of 1-200 chars', 400);
+    }
+    const raw = pattern.trim().replace(/^\.\//, '');
+    const re = globToRegExp(raw);
+    const limit = clampCount(max, 200, 500);
+    const files: string[] = [];
+    let truncated = false;
+    for await (const relPath of this.walkFiles()) {
+      if (!re.test(relPath)) continue;
+      if (files.length >= limit) {
+        truncated = true;
+        break;
+      }
+      files.push(relPath);
+    }
+    files.sort((a, b) => a.localeCompare(b));
+    return { pattern: raw, files, truncated };
+  }
+
+  /**
+   * Content search over the workspace (regex by default, literal optional).
+   * Skips the same dirs as `search()`, plus files over 1MB and binaries —
+   * one giant match list must never flood the model.
+   */
+  async grep(
+    query: unknown,
+    opts?: { path?: unknown; max?: unknown; ignoreCase?: unknown; literal?: unknown },
+  ): Promise<{ query: string; pattern: string; total: number; hits: GrepHit[]; truncated: boolean }> {
+    if (typeof query !== 'string' || !query.trim() || query.length > 500) {
+      throw new FileError('bad_query', 'grep needs a query of 1-500 chars', 400);
+    }
+    const needle = query.trim();
+    const literal = opts?.literal === true;
+    const flags = opts?.ignoreCase === true ? 'gi' : 'g';
+    let re: RegExp;
+    try {
+      re = new RegExp(literal ? needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : needle, flags);
+    } catch {
+      throw new FileError('bad_pattern', `Invalid regular expression: ${needle}`, 400);
+    }
+    const sub = typeof opts?.path === 'string' && opts.path.trim() ? opts.path.trim() : '.';
+    const base = resolveInRoot(this.root, sub);
+    const limit = clampCount(opts?.max, 80, 400);
+    const hits: GrepHit[] = [];
+    let total = 0;
+    let truncated = false;
+    for await (const relPath of this.walkFiles(base)) {
+      if (relPath.includes('min.js') || relPath.endsWith('.map')) continue;
+      const abs = resolve(this.root, relPath);
+      let buf: Buffer;
+      try {
+        const s = await stat(abs);
+        if (s.size > GREP_MAX_FILE_BYTES || s.size === 0) continue;
+        buf = await readFile(abs);
+      } catch {
+        continue;
+      }
+      if (buf.subarray(0, 8192).includes(0)) continue;
+      const lines = buf.toString('utf-8').split('\n');
+      const matches: GrepMatch[] = [];
+      for (let i = 0; i < lines.length && matches.length < GREP_MAX_PER_FILE; i++) {
+        const text = lines[i] ?? '';
+        re.lastIndex = 0;
+        if (re.test(text)) matches.push({ line: i + 1, text: text.length > 400 ? `${text.slice(0, 400)}…` : text });
+      }
+      if (matches.length === 0) continue;
+      total += matches.length;
+      hits.push({ path: relPath, matches });
+      if (total >= limit) {
+        truncated = true;
+        break;
+      }
+    }
+    hits.sort((a, b) => a.path.localeCompare(b.path));
+    return { query: needle, pattern: re.source, total, hits, truncated };
+  }
+
+  /**
+   * Exact-string edit (the workhorse Claude-Code tool): replace
+   * `oldString` with `newString`. Refuses a missing or ambiguous match
+   * instead of guessing, and writes with the sha it just read so a
+   * concurrent writer loses the race instead of being clobbered.
+   */
+  async edit(
+    rel: string,
+    oldString: unknown,
+    newString: unknown,
+    opts?: { expectedSha?: unknown; replaceAll?: unknown },
+  ): Promise<FileWriteResult & { replacements: number }> {
+    if (typeof oldString !== 'string' || !oldString) {
+      throw new FileError('bad_edit', 'edit needs a non-empty oldString', 400);
+    }
+    if (typeof newString !== 'string') {
+      throw new FileError('bad_edit', 'edit needs a string newString', 400);
+    }
+    if (oldString === newString) {
+      throw new FileError('bad_edit', 'oldString and newString are identical — nothing to do', 400);
+    }
+    const current = await this.read(rel);
+    if (opts?.expectedSha !== undefined && opts.expectedSha !== current.sha) {
+      throw new FileError(
+        'sha_mismatch',
+        `File changed on disk since it was read (expected ${String(opts.expectedSha).slice(0, 12)}…, found ${current.sha.slice(0, 12)}…) — read it again`,
+        409,
+      );
+    }
+    const first = current.content.indexOf(oldString);
+    if (first < 0) {
+      throw new FileError(
+        'edit_not_found',
+        `oldString was not found in ${rel} — read the file and copy the exact text (whitespace matters)`,
+        400,
+      );
+    }
+    const replaceAll = opts?.replaceAll === true;
+    const occurrences = current.content.split(oldString).length - 1;
+    if (occurrences > 1 && !replaceAll) {
+      throw new FileError(
+        'edit_not_unique',
+        `oldString matches ${occurrences} places in ${rel} — add surrounding context to make it unique, or pass replaceAll: true`,
+        400,
+      );
+    }
+    const next = replaceAll
+      ? current.content.split(oldString).join(newString)
+      : current.content.slice(0, first) + newString + current.content.slice(first + oldString.length);
+    const written = await this.write(rel, next, current.sha);
+    return { ...written, replacements: replaceAll ? occurrences : 1 };
+  }
+
+  /**
+   * Walk every file under `base` (workspace-relative or absolute), newest
+   * helper shared by `glob`/`grep`. Yields workspace-relative paths.
+   */
+  private async *walkFiles(base?: string): AsyncGenerator<string> {
+    const start = base ?? this.root;
+    const stack: string[] = [start];
+    let visited = 0;
+    while (stack.length && visited < WALK_MAX_DIRS) {
+      const dir = stack.pop() as string;
+      visited += 1;
+      let names: string[];
+      try {
+        names = await readdir(dir);
+      } catch {
+        continue;
+      }
+      for (const name of names) {
+        if (name === '.' || name === '..') continue;
+        const abs = resolve(dir, name);
+        let s;
+        try {
+          s = await stat(abs);
+        } catch {
+          continue;
+        }
+        if (s.isDirectory()) {
+          if (SKIPPED_DIRS.has(name)) continue;
+          if (toRel(this.root, abs).split('/').length <= 12) stack.push(abs);
+          continue;
+        }
+        if (!s.isFile()) continue;
+        yield toRel(this.root, abs);
+      }
+    }
   }
 }

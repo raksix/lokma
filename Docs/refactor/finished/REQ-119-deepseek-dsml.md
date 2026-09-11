@@ -33,3 +33,11 @@
 - **Not:** ağaçta kardeş/loop'un REQ-118 FAZ B işi vardı — `git stash` +
   hunk-seviyesi ayırma ile YALNIZCA REQ-119 commitlendi; FAZ B unstaged
   duruyor, dokunulmadı.
+- **Recovery tick (2026-09-11 scan):** tick kirli ağaçla açıldı (4 dosya
+  unstaged + bu dosya untracked); kardeş FAZ B.1'i ed94a44 ile commitlemiş,
+  kalan hunks'ların tamamı REQ-119 (DSML) doğrulandı. Kapılar yeniden
+  koşuldu: root tsc 0, parse probe 65/65, adapters 58/58, concept build
+  green. Kod + spec kardeş tarafından 446e926 ile commitlendi (aynı
+  baytlar — kapılar bu baytlar üzerinde koşuldu); ai+core+server dist'leri
+  rebuild + pm2 restart lokma-server (/health 200, gate 401) bu tick'te.
+  Bu commit docs-annotate kapatmasıdır.

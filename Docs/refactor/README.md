@@ -144,3 +144,4 @@
 - [REQ-123](finished/REQ-123-canli-markdown.md) — Akış sırasında canlı markdown — done
 - [REQ-124](finished/REQ-124-thinking-human-markup.md) — Thinking reads human (render-side markup strip) — done
 - [REQ-125](finished/REQ-125-file-download-any-type.md) — Download works for any file type — done
+- [REQ-126](finished/REQ-126-tool-satiri-acilir.md) — Tool satırları açılır (input+result) — done

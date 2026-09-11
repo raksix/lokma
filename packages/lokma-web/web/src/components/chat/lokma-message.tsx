@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { BookOpenText, Brain, Check, Copy, FolderOpen, HelpCircle, ListTodo, Loader2, Pencil, Search, Send, ShieldAlert, SquareTerminal, Wrench } from 'lucide-react';
+import { BookOpenText, Brain, Check, ChevronDown, Copy, FolderOpen, HelpCircle, ListTodo, Loader2, Pencil, Search, Send, ShieldAlert, SquareTerminal, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { PermissionRequest, QuestionRequest, ToolCallEntry } from '@/lib/ws';
@@ -449,36 +449,68 @@ export function ToolCallRow({ entry }: { entry: ToolCallEntry }) {
   const running = e.result === undefined;
   const ToolIcon = TOOL_ICONS[e.tool] ?? Wrench;
   const outcome = summarizeResult(e.tool, e.result);
+  // REQ-126: the row expands — input + full result as JSON (truncated,
+  // scrollable). Native details/summary, same pattern as ThinkingTrace.
+  const dump = (v: unknown): string => {
+    try {
+      const s = typeof v === 'string' ? v : JSON.stringify(v, null, 2);
+      return s.length > 6000 ? `${s.slice(0, 6000)}\n… (truncated)` : s;
+    } catch {
+      return String(v);
+    }
+  };
   return (
-    <div
-      className={`flex items-start gap-2 rounded-lg border px-2.5 py-1.5 text-xs leading-[1.6] ${
+    <details
+      className={`group rounded-lg border px-2.5 py-1.5 text-xs leading-[1.6] ${
         e.isError
           ? 'border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950/30'
           : 'border-line bg-muted/30 dark:bg-[#1E1E21]/50'
       }`}
     >
-      {running ? (
-        <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-terracotta" />
-      ) : e.isError ? (
-        <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-red-100 text-[10px] text-red-600">
-          !
-        </span>
-      ) : (
-        <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
-      )}
-      <div className="min-w-0 flex-1">
-        <span className="inline-flex items-center gap-1.5 text-[13px] text-zinc-700 dark:text-zinc-200">
-          <ToolIcon className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-          <span className="truncate font-medium">{describeToolCall(e.tool, e.input)}</span>
-          {running && <span className="shrink-0 text-[11px] text-zinc-400">Running…</span>}
-        </span>
-        {!running && outcome && (
-          <div className={`mt-0.5 truncate text-[11px] ${e.isError ? 'text-red-600 dark:text-red-400' : 'text-zinc-400'}`}>
-            {outcome}
+      <summary className="flex cursor-pointer list-none items-start gap-2 [&::-webkit-details-marker]:hidden">
+        {running ? (
+          <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-terracotta" />
+        ) : e.isError ? (
+          <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-red-100 text-[10px] text-red-600">
+            !
+          </span>
+        ) : (
+          <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+        )}
+        <div className="min-w-0 flex-1">
+          <span className="inline-flex items-center gap-1.5 text-[13px] text-zinc-700 dark:text-zinc-200">
+            <ToolIcon className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+            <span className="truncate font-medium">{describeToolCall(e.tool, e.input)}</span>
+            {running && <span className="shrink-0 text-[11px] text-zinc-400">Running…</span>}
+          </span>
+          {!running && outcome && (
+            <div className={`mt-0.5 truncate text-[11px] ${e.isError ? 'text-red-600 dark:text-red-400' : 'text-zinc-400'}`}>
+              {outcome}
+            </div>
+          )}
+        </div>
+        <ChevronDown className="mt-1 h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform group-open:rotate-180" />
+      </summary>
+      {/* Input shows even while running; result lands when the call ends. */}
+      <div className="mt-1.5 space-y-1.5 border-t border-line pt-1.5">
+        <div>
+          <div className="mb-0.5 text-[10px] font-semibold tracking-wide text-zinc-400 uppercase">Input</div>
+          <pre className="max-h-64 overflow-auto rounded-md bg-black/5 p-2 font-mono text-[11px] whitespace-pre-wrap dark:bg-white/5">
+            {dump(e.input)}
+          </pre>
+        </div>
+        {running ? (
+          <div className="text-[11px] text-zinc-400">Running…</div>
+        ) : (
+          <div>
+            <div className="mb-0.5 text-[10px] font-semibold tracking-wide text-zinc-400 uppercase">Result</div>
+            <pre className="max-h-64 overflow-auto rounded-md bg-black/5 p-2 font-mono text-[11px] whitespace-pre-wrap dark:bg-white/5">
+              {dump(e.result)}
+            </pre>
           </div>
         )}
       </div>
-    </div>
+    </details>
   );
 }
 

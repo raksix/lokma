@@ -5,7 +5,7 @@
  * Not imported by server code, so `tsc -p` output ignores it.
  */
 import { spawn } from 'node:child_process';
-import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_CLEAR_MARKER, CLAUDE_COMPACT_FOCUS_MAX, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, CLAUDE_MUTATION_SURFACE, CLAUDE_REINJECT_QUOTA_MAX, CLAUDE_REINJECT_WINDOW, claudeCompactMarker, claudeToolsForLokmaTool, countClaudeCategories, countRecentClaudeReinjects, describeClaudeAskCard, formatClaudeCategoryLine, formatClaudeContextReport, formatClaudeFocusLine, formatClaudeReinjectLine, isClaudeClearCommand, isClaudeCompactCommand, isClaudeContextCommand, parseClaudeCompactCommand, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, shouldReinjectSkills, translateClaudeLine } from './claude-print';
+import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_CLEAR_MARKER, CLAUDE_COMPACT_FOCUS_MAX, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, CLAUDE_MUTATION_SURFACE, CLAUDE_REINJECT_QUOTA_MAX, CLAUDE_REINJECT_WINDOW, claudeCompactMarker, claudeToolsForLokmaTool, countClaudeCategories, countRecentClaudeReinjects, describeClaudeAskCard, formatClaudeCategoryLine, formatClaudeContextReport, formatClaudeFocusLine, formatClaudeReinjectLine, formatClaudeRunFailed, isClaudeClearCommand, isClaudeCompactCommand, isClaudeContextCommand, parseClaudeCompactCommand, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, shouldReinjectSkills, translateClaudeLine } from './claude-print';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -269,5 +269,15 @@ assert(shouldReinjectSkills(0) === true && shouldReinjectSkills(2) === true, 'qu
 assert(shouldReinjectSkills(3) === false && shouldReinjectSkills(9) === false, 'exhausted quota means skip');
 assert(formatClaudeReinjectLine(0) === '[reinject: skill guidance re-applied (1/3 in window)]', 'first reinject line stamps 1/3');
 assert(formatClaudeReinjectLine(2) === '[reinject: skill guidance re-applied (3/3 in window)]', 'last reinject line stamps 3/3');
+
+// 20. FAZ B-spawn-fail: honest failure marker for a rejected headless run.
+assert(formatClaudeRunFailed(new Error(CLAUDE_BINARY_NOT_FOUND)) === CLAUDE_BINARY_NOT_FOUND, 'binary-missing marker passes through verbatim');
+assert(formatClaudeRunFailed(new Error('[run failed: claude exit 1: boom]')) === '[run failed: claude exit 1: boom]', 'exit marker passes through verbatim');
+assert(formatClaudeRunFailed(new Error('[run failed: claude spawn: EACCES]')) === '[run failed: claude spawn: EACCES]', 'spawn marker passes through verbatim');
+assert(formatClaudeRunFailed(new Error('[run aborted]')) === '[run aborted]', 'abort marker is not reframed as failure');
+assert(formatClaudeRunFailed(new Error('boom')) === '[run failed: boom]', 'plain error is wrapped');
+assert(formatClaudeRunFailed('string failure') === '[run failed: string failure]', 'non-Error throwable is wrapped');
+assert(formatClaudeRunFailed(new Error('mid [run failed marker')) === '[run failed: mid [run failed marker]', 'passthrough is prefix-only, not substring');
+assert(formatClaudeRunFailed(new Error('')) === '[run failed: ]', 'empty message wraps honestly');
 
 console.log('\nclaude-print probe: ' + passed + ' passed');

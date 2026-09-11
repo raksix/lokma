@@ -38,6 +38,7 @@ import {
   formatClaudeContextReport,
   formatClaudeFocusLine,
   formatClaudeReinjectLine,
+  formatClaudeRunFailed,
   isClaudeClearCommand,
   isClaudeContextCommand,
   parseClaudeCompactCommand,
@@ -389,6 +390,21 @@ async function runClaudeEngineTurn(
     if (e instanceof LoopAborted || ctrl.signal.aborted) {
       send({ type: 'done', sessionId, reason: 'aborted' });
       return;
+    }
+    // REQ-116 FAZ B-spawn-fail: a rejected headless run leaves an honest
+    // failure marker in the transcript (REQ-070 F5-proof) — the `error`
+    // frame alone is transient and a refresh would show nothing. Marker
+    // vocabulary comes from `formatClaudeRunFailed` (engine markers pass
+    // through verbatim, anything else is wrapped, never a raw stack).
+    // Persistence is warn-only and never breaks the error path.
+    try {
+      await store.append(sessionId, {
+        role: 'assistant',
+        content: formatClaudeRunFailed(e),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (persistErr) {
+      app.log.warn('[ws] claude failure marker failed session=' + sessionId + ': ' + String(persistErr));
     }
     send({ type: 'error', message: e instanceof Error ? e.message : String(e), sessionId });
   }

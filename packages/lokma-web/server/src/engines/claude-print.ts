@@ -58,6 +58,23 @@ export type ClaudeRunSummary = {
 export const CLAUDE_BINARY_NOT_FOUND = '[run failed: claude binary not found]';
 
 /**
+ * REQ-116 FAZ B-spawn-fail — honest failure marker for a rejected headless run.
+ *
+ * Engine rejections already speak marker vocabulary (`CLAUDE_BINARY_NOT_FOUND`,
+ * `[run failed: claude spawn: ...]`, `[run failed: claude exit ...]`), so they
+ * pass through verbatim and the transcript shows exactly what the engine
+ * reported. Anything else (unexpected throwables) is wrapped so the
+ * transcript never shows a raw stack. `[run aborted]` is NOT a failure and
+ * passes through untouched — the caller keeps the abort/completion framing.
+ * Pure — probe it.
+ */
+export function formatClaudeRunFailed(error: unknown): string {
+  const msg = error instanceof Error ? error.message : String(error);
+  if (msg.startsWith('[run failed') || msg.startsWith('[run aborted]')) return msg;
+  return '[run failed: ' + msg + ']';
+}
+
+/**
  * REQ-116 FAZ B-wiring — engine selection + harness-side defaults.
  *
  * A model id selects the headless engine only with the `claude-code/`

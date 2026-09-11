@@ -80,6 +80,25 @@ import { requestToken } from './auth.js';
  */
 
 const DEFAULT_MODEL = 'anthropic/claude-sonnet-4-5';
+
+/**
+ * REQ-129: the model a session falls back to when nothing named one.
+ *
+ * The CLI and the web UI both read `~/.lokma/config.json:defaultModel`, but
+ * the server hard-coded an Anthropic id — so on a machine whose configured
+ * default points at another provider (and which has no Anthropic key) the
+ * first message of every session answered with "No API key configured for
+ * Anthropic" and burned the whole retry ladder before aborting. Honour the
+ * default the user actually configured; keep the built-in id only when the
+ * config is unreadable or the named model is explicitly disabled.
+ */
+async function configuredDefaultModel(cwd: string): Promise<string> {
+  const cfg = await loadConfig(cwd).catch(() => null);
+  const candidate = cfg?.defaultModel?.trim();
+  if (!candidate) return DEFAULT_MODEL;
+  if (cfg?.models?.[candidate]?.enabled === false) return DEFAULT_MODEL;
+  return candidate;
+}
 const MAX_CONTEXT_FILES = 5;
 const MAX_CONTEXT_BYTES = 20 * 1024;
 /** A gate left unanswered this long auto-denies (the loop must not hang). */
@@ -451,7 +470,7 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
       // resolves live per turn; a deleted bot degrades to plain chat.
       const meta = await store.readMeta(sessionId);
       const botCtx = meta?.botId ? await resolveBotChatContext(meta.botId, cwd).catch(() => null) : null;
-      const model = item.model?.trim() || botCtx?.model || meta?.model || DEFAULT_MODEL;
+      const model = item.model?.trim() || botCtx?.model || meta?.model || (await configuredDefaultModel(cwd));
       if (item.model?.trim() && item.model.trim() !== meta?.model) {
         await store.writeMeta(sessionId, { model: model });
       }

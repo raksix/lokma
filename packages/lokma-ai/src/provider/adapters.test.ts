@@ -599,6 +599,41 @@ assert(
 );
 assert(merged[1]?.name === 'list_files' && merged[1]?.id === 'call-8', 'a second index stays a second call');
 
+// 9b-ii. Accumulator hardening (mirrors Hermes _ToolCallAccumulator).
+// A reused index belongs to a NEW call once a different id shows up (Ollama
+// recycles indices) — the previous arguments must not bleed into it.
+const reused = new ToolCallAccumulator();
+reused.push([{ index: 0, id: 'call-a', function: { name: 'read_file', arguments: '{"path":"a' } }]);
+reused.push([{ index: 0, function: { arguments: '.ts"}' } }]);
+reused.push([{ index: 0, id: 'call-b', function: { name: 'glob', arguments: '{"pat' } }]);
+reused.push([{ index: 0, function: { arguments: 'tern":"*.ts"}' } }]);
+const reusedCalls = reused.list();
+assert(
+  reusedCalls.length === 1 &&
+    reusedCalls[0]?.id === 'call-b' &&
+    reusedCalls[0]?.name === 'glob' &&
+    reusedCalls[0]?.args === '{"pattern":"*.ts"}',
+  'a reused index starts a fresh call instead of appending onto the closed one',
+);
+// Names are assigned, never appended (MiniMax/NIM resend the full name).
+const renamed = new ToolCallAccumulator();
+renamed.push([{ index: 0, id: 'call-c', function: { name: 'read_file' } }]);
+renamed.push([{ index: 0, function: { name: 'read_file', arguments: '{}' } }]);
+assert(
+  renamed.list()[0]?.name === 'read_file',
+  'a resent function name replaces the old one instead of doubling it',
+);
+// Many fragments must join to the exact payload (no loss, no duplication).
+const many = new ToolCallAccumulator();
+const pieces = Array.from({ length: 200 }, (_, i) => `x${i};`);
+many.push([{ index: 0, id: 'call-d', function: { name: 'write_file', arguments: '["' } }]);
+for (const piece of pieces) many.push([{ index: 0, function: { arguments: piece } }]);
+many.push([{ index: 0, function: { arguments: '"]' } }]);
+assert(
+  many.list()[0]?.args === `["${pieces.join('')}"]`,
+  'hundreds of fragments join back into the exact argument string',
+);
+
 // 9c. Capability probes (pure).
 assert(looksLikeToolsUnsupported(400, 'tools are not supported by this model'), 'tools-unsupported wording is a probe hit');
 assert(!looksLikeToolsUnsupported(400, 'invalid api key'), 'an unrelated 400 is never treated as a tools probe');

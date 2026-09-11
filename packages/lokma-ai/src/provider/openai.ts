@@ -320,9 +320,19 @@ export function toChatMessages(messages: ProviderMessage[], opts?: { flatten?: b
  * arrive once on the first fragment, arguments arrive split across many
  * (`{"pa` + `th":"a.t` + `s"}`). Order is preserved by index, and a later
  * fragment may restate fields, so each merge is "last non-empty wins".
+ *
+ * Two upstream quirks this mirrors from Hermes' `_ToolCallAccumulator`
+ * (REQ-128 follow-up, §3.5 of the teardown):
+ *  - a slot may be REUSED for a brand-new call (Ollama): a different id on a
+ *    used index starts over instead of appending onto the old arguments;
+ *  - argument fragments are buffered as parts and joined once in `list()`,
+ *    so a 256KB write_file argument is not re-copied on every delta
+ *    (naive `+=` is quadratic in the fragment count).
+ * The name is ASSIGNED, never appended — MiniMax/NIM resend the full name on
+ * a later fragment, and appending would give `read_fileread_file`.
  */
 export class ToolCallAccumulator {
-  private calls = new Map<number, { id: string; name: string; args: string }>();
+  private calls = new Map<number, { id: string; name: string; parts: string[] }>();
 
   /** Merge one streamed `delta.tool_calls[]` fragment list. */
   push(fragments: unknown): void {
@@ -335,14 +345,17 @@ export class ToolCallAccumulator {
         function?: { name?: unknown; arguments?: unknown };
       };
       const index = typeof f.index === 'number' ? f.index : fallbackIndex;
-      const prev = this.calls.get(index) ?? { id: '', name: '', args: '' };
+      const id = typeof f.id === 'string' && f.id ? f.id : '';
+      let prev = this.calls.get(index);
+      if (prev && id && prev.id && id !== prev.id) prev = undefined; // reused slot
+      const base = prev ?? { id: '', name: '', parts: [] as string[] };
       const next = {
-        id: typeof f.id === 'string' && f.id ? f.id : prev.id,
-        name: typeof f.function?.name === 'string' && f.function.name ? f.function.name : prev.name,
-        args:
+        id: id || base.id,
+        name: typeof f.function?.name === 'string' && f.function.name ? f.function.name : base.name,
+        parts:
           typeof f.function?.arguments === 'string'
-            ? prev.args + f.function.arguments
-            : prev.args,
+            ? [...base.parts, f.function.arguments]
+            : base.parts,
       };
       this.calls.set(index, next);
     });
@@ -355,7 +368,7 @@ export class ToolCallAccumulator {
       .map(([index, c]) => ({
         id: c.id || `call_${index}`,
         name: c.name,
-        args: c.args,
+        args: c.parts.join(''),
       }))
       .filter((c) => c.name.length > 0);
   }

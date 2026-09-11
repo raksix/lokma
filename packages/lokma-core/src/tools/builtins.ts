@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { z } from 'zod';
 import { WorkspaceFiles } from '../files/files.js';
+import { TOOL_RESULT_NO_SPILL } from './result-budget.js';
 import type { ToolDefinition } from './registry.js';
 
 /**
@@ -63,7 +64,6 @@ const GrepInput = z.object({
  * the budget is spilled to disk by the loop and replaced with a preview
  * envelope, so a 300KB grep can never evict the conversation.
  */
-const READ_BUDGET = 50_000;
 const RUN_BUDGET = 30_000;
 const SEARCH_BUDGET = 20_000;
 
@@ -82,9 +82,12 @@ export function buildBuiltinTools(cwd: string): ToolDefinition[] {
   return [
     {
       name: 'read_file',
-      description: 'Read a workspace-relative file (capped, with sha for guarded writes)',
+      description:
+        'Read a workspace-relative file (capped at 256KB, with sha for guarded writes) — never spilled, so no read-back loop',
       readOnly: true,
-      maxResultSizeChars: READ_BUDGET,
+      // REQ-128: pinned to no-spill. `files.read` already caps the payload,
+      // and spilling a read would hand the model a file to read back.
+      maxResultSizeChars: TOOL_RESULT_NO_SPILL,
       inputSchema: ReadFileInput,
       handler: async (input) => {
         const { path } = input as z.infer<typeof ReadFileInput>;

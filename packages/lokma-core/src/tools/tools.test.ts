@@ -24,6 +24,7 @@ import {
   resultBudget,
   resultOverBudget,
   spillPathFor,
+  TOOL_RESULT_NO_SPILL,
 } from './result-budget';
 import { ToolRegistry } from './registry';
 
@@ -313,6 +314,11 @@ async function main(): Promise<void> {
   // --- REQ-128: result budget + spill envelope (pure) ---
   assert(resultBudget(undefined) === 50_000, 'resultBudget defaults to 50k');
   assert(resultBudget(1_000) === 1_000 && resultBudget(1e9) === 50_000, 'resultBudget honours a smaller budget and clamps a bigger one');
+  assert(
+    resultBudget(TOOL_RESULT_NO_SPILL) === Number.POSITIVE_INFINITY &&
+      !resultOverBudget('x'.repeat(500_000), resultBudget(TOOL_RESULT_NO_SPILL)),
+    'a no-spill tool never trips the budget, so its output can never be re-read in a loop',
+  );
   assert(!resultOverBudget('abc', 3) && resultOverBudget('abcd', 3), 'over-budget detection is inclusive-safe');
   const cut = previewCut('line one\nline two\nline three', 12);
   assert(cut.hasMore && cut.preview.length <= 12 && !cut.preview.endsWith('\n'), 'previewCut backs up to a newline');
@@ -341,7 +347,7 @@ async function main(): Promise<void> {
   assert(markers.get('edit_file')?.readOnly !== true, 'edit_file is NOT read-only');
   assert(decideToolCall(AUTO, 'glob') === 'allow' && decideToolCall(AUTO, 'grep') === 'allow', 'gate auto allows the new search tools');
   assert(decideToolCall(AUTO, 'edit_file') === 'ask', 'gate auto asks before edit_file');
-  assert(markers.get('read_file')?.maxResultSizeChars === 50_000, 'read_file declares its output budget');
+  assert(markers.get('read_file')?.maxResultSizeChars === Number.POSITIVE_INFINITY, 'read_file is pinned to no-spill (no persist/read-back loop)');
   assert(markers.get('grep')?.maxResultSizeChars === 20_000, 'grep declares its output budget');
 
   console.log(`\ntools probe: ${passed} passed`);

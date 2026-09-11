@@ -16,11 +16,22 @@ export const TOOL_RESULT_HARD_BUDGET = 50_000;
 /** Chars of the spilled payload the model still sees inline. */
 export const TOOL_RESULT_PREVIEW_CHARS = 2_000;
 
+/**
+ * "Never spill this tool" (REQ-128 follow-up). A tool that already caps its
+ * own payload declares this instead of a number. `read_file` is the reason
+ * it exists: spilling a read produces a file the model is invited to read
+ * back, and if that file is itself over budget the loop never terminates
+ * (Hermes pins its read budget to infinity for exactly this). Tools that
+ * can emit unbounded output must NOT use this.
+ */
+export const TOOL_RESULT_NO_SPILL = Number.POSITIVE_INFINITY;
+
 export const PERSISTED_OUTPUT_OPEN = '<persisted-output>';
 export const PERSISTED_OUTPUT_CLOSE = '</persisted-output>';
 
 /** Resolve a tool's declared budget against the hard ceiling. */
 export function resultBudget(declared?: number): number {
+  if (declared === TOOL_RESULT_NO_SPILL) return TOOL_RESULT_NO_SPILL;
   if (typeof declared !== 'number' || !Number.isFinite(declared) || declared <= 0) {
     return TOOL_RESULT_DEFAULT_BUDGET;
   }

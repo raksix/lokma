@@ -118,7 +118,10 @@ export function feedBackResults(
  * full text is spilled to `.lokma/tool-results/` inside the workspace (so
  * the agent can read the rest itself). Empty results get an explicit
  * placeholder rather than an ambiguous empty string. Best-effort: if the
- * spill write fails, a capped preview still goes out.
+ * spill write fails, a capped preview still goes out. Tools that already cap
+ * their own payload (`read_file`) declare `TOOL_RESULT_NO_SPILL` and bypass
+ * this path entirely — spilling a read would invite the model to read back
+ * a file that is itself over budget, forever.
  */
 export async function formatToolResult(args: {
   cwd: string;

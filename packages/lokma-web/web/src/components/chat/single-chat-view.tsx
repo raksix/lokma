@@ -407,8 +407,11 @@ export function SingleChatView({
                   <div className="space-y-1.5">
                     {liveBlocks.map((b, bi) =>
                       b.kind === 'text' ? (
-                        <div key={`t${bi}`} className="mt-1.5 text-[13.5px] leading-[1.6] whitespace-pre-wrap first:mt-0">
-                          {b.text}
+                        <div key={`t${bi}`} className="mt-1.5 first:mt-0">
+                          {/* REQ-123: live markdown — the stream renders through
+                              the same renderer as finished messages (open fences
+                              already segment as code), caret rides along. */}
+                          <AssistantBody content={b.text} onCopy={onCopy} />
                           {streaming && bi === liveBlocks.length - 1 && (
                             <span className="ml-1 inline-block h-4 w-0.5 animate-pulse bg-foreground align-middle" />
                           )}

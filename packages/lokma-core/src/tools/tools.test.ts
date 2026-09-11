@@ -27,6 +27,7 @@ import {
   TOOL_RESULT_NO_SPILL,
 } from './result-budget';
 import { ToolRegistry } from './registry';
+import { formatToolResult } from './tool-results';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -349,6 +350,22 @@ async function main(): Promise<void> {
   assert(decideToolCall(AUTO, 'edit_file') === 'ask', 'gate auto asks before edit_file');
   assert(markers.get('read_file')?.maxResultSizeChars === Number.POSITIVE_INFINITY, 'read_file is pinned to no-spill (no persist/read-back loop)');
   assert(markers.get('grep')?.maxResultSizeChars === 20_000, 'grep declares its output budget');
+
+  // A read that would blow every other tool's budget must still come back
+  // whole — otherwise the model is handed a spill path it will read back
+  // into the same spill, forever.
+  const huge = 'x'.repeat(400_000);
+  const readBack = await formatToolResult({
+    cwd: ws,
+    tool: 'read_file',
+    callId: 't_no_spill',
+    result: { content: huge },
+    declaredBudget: markers.get('read_file')?.maxResultSizeChars,
+  });
+  assert(
+    !readBack.includes('<persisted-output>') && readBack.includes(huge),
+    'a 400KB read comes back whole instead of spilling the model into a read-back loop',
+  );
 
   console.log(`\ntools probe: ${passed} passed`);
 }

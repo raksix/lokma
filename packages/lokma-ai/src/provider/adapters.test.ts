@@ -8,7 +8,7 @@
  */
 import { createServer, type Server } from 'node:http';
 import { type AddressInfo } from 'node:net';
-import { AnthropicAdapter } from './anthropic';
+import { AnthropicAdapter, toAnthropicMessages, toAnthropicTools } from './anthropic';
 import { ProviderError } from './errors';
 import { nativeCallInput, nativeCallToToolBlock, nativeToolsBlocked, looksLikeToolPairingError, looksLikeToolsUnsupported, OpenAIAdapter, responsesHttpError, shortModelId, toChatMessages, toChatTools, ToolCallAccumulator, toResponsesInput, toResponsesTools, unseenSuffix, usesResponsesApi } from './openai';
 import { zodToJsonSchema } from './tools-schema';
@@ -766,6 +766,105 @@ try {
   assert(text === 'flat-ok', 'the flattened turn still streams its answer');
 } finally {
   pairStub.server.close();
+}
+
+// ── 10. REQ-128: Anthropic native tools (the protocol Claude Code speaks) ─
+const anthTools = toAnthropicTools([
+  { name: 'read_file', description: 'Read a file', parameters: { type: 'object', properties: { path: { type: 'string' } } } },
+]);
+assert(
+  anthTools.length === 1 && anthTools[0]?.name === 'read_file' && anthTools[0]?.input_schema !== undefined,
+  'anthropic tools map to {name, description, input_schema}',
+);
+assert(toAnthropicTools(undefined).length === 0, 'no tools means no anthropic tools array');
+const anthMsgs = toAnthropicMessages([
+  { role: 'user', content: 'read a.ts' },
+  { role: 'assistant', content: 'on it', toolCalls: [{ id: 'toolu_1', name: 'read_file', arguments: '{"path":"a.ts"}' }] },
+  { role: 'tool', content: 'FILE BODY', toolCallId: 'toolu_1', name: 'read_file' },
+  { role: 'tool', content: 'SECOND', toolCallId: 'toolu_2', name: 'list_files' },
+]);
+const anthAssistant = anthMsgs[1];
+assert(
+  anthAssistant?.role === 'assistant' &&
+    Array.isArray(anthAssistant.content) &&
+    (anthAssistant.content as { type?: string }[])[1]?.type === 'tool_use',
+  'anthropic assistant turn replays tool_use blocks',
+);
+const anthResults = anthMsgs[2];
+assert(
+  anthResults?.role === 'user' &&
+    Array.isArray(anthResults.content) &&
+    (anthResults.content as { type?: string; tool_use_id?: string }[]).length === 2 &&
+    (anthResults.content as { tool_use_id?: string }[])[1]?.tool_use_id === 'toolu_2',
+  'consecutive tool rows merge into ONE user message with both tool_result blocks',
+);
+
+const seenAnth: { path: string; body: Record<string, unknown> | undefined } = { path: '', body: undefined };
+const anthStub = await listen((req, res) => {
+  let body = '';
+  req.on('data', (c) => {
+    body += c;
+  });
+  req.on('end', () => {
+    seenAnth.path = req.url ?? '';
+    try {
+      seenAnth.body = JSON.parse(body) as Record<string, unknown>;
+    } catch {
+      seenAnth.body = undefined;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    res.end(
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"checking"}}\n\n' +
+        'event: content_block_start\ndata: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_9","name":"read_file"}}\n\n' +
+        'event: content_block_delta\ndata: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\\"path\\":"}}\n\n' +
+        'event: content_block_delta\ndata: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\\"a.ts\\"}"}}\n\n' +
+        'event: content_block_stop\ndata: {"type":"content_block_stop","index":1}\n\n' +
+        'event: message_stop\ndata: {"type":"message_stop"}\n\n',
+    );
+  });
+});
+try {
+  const chunks: { type: string; delta?: string; tool?: string; input?: unknown; callId?: string; args?: string }[] = [];
+  for await (const chunk of new AnthropicAdapter().stream({
+    model: 'anthropic/claude-sonnet-4-5',
+    messages: [
+      { role: 'user', content: 'read a.ts' },
+      { role: 'assistant', content: '', toolCalls: [{ id: 'toolu_8', name: 'read_file', arguments: '{"path":"a.ts"}' }] },
+      { role: 'tool', content: 'FILE BODY', toolCallId: 'toolu_8', name: 'read_file' },
+    ],
+    apiKey: 'test-key',
+    baseUrl: anthStub.base,
+    tools: [{ name: 'read_file', description: 'Read a file', parameters: { type: 'object', properties: {} } }],
+  })) {
+    if (chunk.type === 'text_delta') chunks.push({ type: chunk.type, delta: chunk.delta });
+    else if (chunk.type === 'native_tool_call') {
+      chunks.push({ type: chunk.type, tool: chunk.tool, input: chunk.input, callId: chunk.callId, args: chunk.argumentsJson });
+    }
+  }
+  const native = chunks.filter((c) => c.type === 'native_tool_call');
+  assert(seenAnth.path === '/v1/messages', 'anthropic path stays /v1/messages');
+  assert(Array.isArray(seenAnth.body?.['tools']) && seenAnth.body?.['stream'] === true, 'anthropic body carries tools[] and stream:true');
+  assert(
+    JSON.stringify(seenAnth.body?.['tool_choice']) === '{"type":"auto"}',
+    'anthropic body sets tool_choice auto',
+  );
+  const sent = seenAnth.body?.['messages'] as { role?: string; content?: unknown }[] | undefined;
+  assert(
+    sent?.[1]?.role === 'assistant' && JSON.stringify(sent[1]?.content).includes('tool_use'),
+    'anthropic assistant turn rides the wire with tool_use blocks',
+  );
+  assert(
+    sent?.[2]?.role === 'user' && JSON.stringify(sent[2]?.content).includes('tool_result'),
+    'anthropic tool result rides inside a user message',
+  );
+  assert(
+    native.length === 1 && native[0]?.callId === 'toolu_9' && JSON.stringify(native[0]?.input) === '{"path":"a.ts"}',
+    `streamed input_json_delta fragments flush one native call, got ${JSON.stringify(native)}`,
+  );
+  assert(native[0]?.args === '{"path":"a.ts"}', 'anthropic native call keeps the raw argument json');
+  assert(chunks.some((c) => c.type === 'text_delta' && c.delta === 'checking'), 'anthropic text beside a tool call streams');
+} finally {
+  anthStub.server.close();
 }
 
 console.log(`\nAll ${passed} checks passed.`);

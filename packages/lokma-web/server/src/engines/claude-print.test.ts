@@ -5,7 +5,7 @@
  * Not imported by server code, so `tsc -p` output ignores it.
  */
 import { spawn } from 'node:child_process';
-import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, translateClaudeLine } from './claude-print';
+import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, CLAUDE_MUTATION_SURFACE, claudeToolsForLokmaTool, describeClaudeAskCard, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, translateClaudeLine } from './claude-print';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -157,5 +157,16 @@ const prefix = resolveClaudePermissions({ allow: ['write'], deny: [] });
 assert(prefix.allowedTools.includes('Edit') && prefix.allowedTools.includes('Write'), 'prefix allow mirrors gate prefix matching');
 const dupe = resolveClaudePermissions({ allow: ['read_file', 'Read', 'read_file', '  '], deny: [] });
 assert(dupe.allowedTools.filter((t) => t === 'Read').length === 1, 'allowlist deduped, blanks dropped');
+
+// 13. FAZ C-ask-gate: pre-spawn mutation surface card helpers.
+assert(JSON.stringify([...CLAUDE_MUTATION_SURFACE]) === JSON.stringify(['write_file', 'run_command']), 'mutation surface is write_file + run_command');
+assert(JSON.stringify(claudeToolsForLokmaTool('write_file')) === JSON.stringify(['Edit', 'Write']), 'write_file covers Edit+Write');
+assert(JSON.stringify(claudeToolsForLokmaTool('run_command')) === JSON.stringify(['Bash']), 'run_command covers Bash');
+assert(claudeToolsForLokmaTool('no_such_tool').length === 0, 'unknown tool maps to empty surface');
+const cardW = describeClaudeAskCard(['write_file']);
+assert(cardW.includes('Edit') && cardW.includes('Write'), 'write card names Edit+Write');
+const cardBoth = describeClaudeAskCard(['write_file', 'run_command']);
+assert(cardBoth.includes('Bash') && cardBoth.includes('Edit'), 'combined card names Bash+Edit');
+assert(describeClaudeAskCard([]).includes('mutation tools'), 'empty card falls back to generic surface');
 
 console.log('\nclaude-print probe: ' + passed + ' passed');

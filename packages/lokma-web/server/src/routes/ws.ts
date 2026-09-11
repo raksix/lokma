@@ -8,12 +8,14 @@ import {
   canViewSession,
   compactSession,
   compactionStatus,
+  decideToolCall,
   estimateCost,
   estimateTokens,
   getUserById,
   loadConfig,
   locateSession,
   loginGateActive,
+  mintCallId,
   normalizeCwd,
   onAgentEvent,
   recordApprovalDecision,
@@ -27,6 +29,8 @@ import { decodeClientMessage, encodeServerMessage } from '@lokma/shared';
 import { LoopAborted, LOOP_DEFAULT_MAX_TURNS, buildLoopHistory, runAgentLoop, type ApprovalDecision } from '../agent-loop.js';
 import {
   CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD,
+  CLAUDE_MUTATION_SURFACE,
+  describeClaudeAskCard,
   parseClaudeEngineModel,
   resolveClaudePermissions,
   runClaudePrint,
@@ -103,9 +107,8 @@ async function runClaudeEngineTurn(
   // REQ-116 FAZ C — permission bridge: the project's `permissions` config
   // steers the headless allow/deny lists (deny wins, `Bash(rm *)` always
   // denied). Missing/unreadable config falls back to the engine defaults.
-  const claudePerms = resolveClaudePermissions(
-    await loadConfig(cwd).then((cfg) => cfg?.permissions).catch(() => null),
-  );
+  const permissions = await loadConfig(cwd).then((cfg) => cfg?.permissions).catch(() => null);
+  const claudePerms = resolveClaudePermissions(permissions);
   // REQ-116 FAZ D-continuity: resume the same headless Claude session
   // across turns (`--resume <id>`). The mapping lives in the session meta
   // sidecar; a forked session starts without a handle (writeMeta only
@@ -141,6 +144,45 @@ async function runClaudeEngineTurn(
     }
   }
   try {
+    // REQ-116 FAZ C-ask-gate: the subprocess cannot raise a live per-tool
+    // card (`tool_start` arrives after the tool ran), so ask-fated mutation
+    // surface gates the run UP FRONT with the standard permission card.
+    // Deny-fated tools already narrowed the argv lists above (deny wins);
+    // each ask-fated tool gets one card on the shared gate path (`always`
+    // persists a rule, timeout denies, Stop aborts the wait via the catch
+    // below). Nothing spawns until every card is approved.
+    for (const tool of CLAUDE_MUTATION_SURFACE) {
+      if (decideToolCall(permissions, tool) !== 'ask') continue;
+      const requestId = mintCallId('perm');
+      send({ type: 'permission_request', requestId, tool, description: describeClaudeAskCard([tool]), sessionId });
+      let decision: ApprovalDecision;
+      try {
+        decision = await new Promise<ApprovalDecision>((resolve, reject) => {
+          const timer = setTimeout(() => {
+            state.gates.delete(requestId);
+            resolve('deny');
+          }, APPROVAL_TIMEOUT_MS);
+          state.gates.set(requestId, { kind: 'approval', tool, resolve, reject, timer });
+        });
+      } catch (e) {
+        if (e instanceof LoopAborted || ctrl.signal.aborted) {
+          if (state.abort === ctrl) state.abort = null;
+          send({ type: 'done', sessionId, reason: 'aborted' });
+          return;
+        }
+        throw e;
+      }
+      if (decision === 'deny') {
+        await store.append(sessionId, {
+          role: 'assistant',
+          content: '[run stopped: permission denied (' + tool + ')]',
+          timestamp: new Date().toISOString(),
+        });
+        if (state.abort === ctrl) state.abort = null;
+        send({ type: 'done', sessionId, reason: 'aborted' });
+        return;
+      }
+    }
     const summary = await runClaudePrint({
       prompt,
       cwd,

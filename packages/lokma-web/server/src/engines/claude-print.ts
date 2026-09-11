@@ -185,6 +185,34 @@ export function resolveClaudePermissions(perms?: LokmaPermissionInput | null): C
 }
 
 /**
+ * REQ-116 FAZ C-ask-gate — mutation surface a headless run can touch.
+ *
+ * The subprocess cannot raise a live per-tool card: by the time the
+ * harness sees `tool_start` the tool already ran (documented in the
+ * FAZ C bridge above). So the WS pump gates the run UP FRONT on these
+ * Lokma ids via the standard `decideToolCall` gate — `deny` already
+ * narrowed the argv lists (deny wins), `ask` opens one
+ * `permission_request` card per tool before spawning.
+ */
+export const CLAUDE_MUTATION_SURFACE = ['write_file', 'run_command'] as const;
+
+/** Claude tool names covered by one Lokma mutation id (for card text). Pure — probe it. */
+export function claudeToolsForLokmaTool(lokmaTool: string): string[] {
+  return [...(LOKMA_TO_CLAUDE_TOOLS[lokmaTool] ?? [])];
+}
+
+/**
+ * One-line `permission_request.description` for the pre-spawn card.
+ * Names the Claude tools the run may use so the approver sees the real
+ * surface. Pure — probe it.
+ */
+export function describeClaudeAskCard(askLokmaTools: readonly string[]): string {
+  const names = [...new Set(askLokmaTools.flatMap(claudeToolsForLokmaTool))];
+  const surface = names.length > 0 ? names.join(', ') : 'mutation tools';
+  return 'Headless Claude run may change the workspace (' + surface + ') — approve to spawn';
+}
+
+/**
  * Build the exact argv for the child. Pure — probe it (no invented flags:
  * every flag below exists in `claude --help` v2.1.x).
  */

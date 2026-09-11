@@ -127,7 +127,10 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     // REQ-094 strict isolation: only own sessions appear in the list
     // (admins included; unattributed legacy = superadmin-only).
     const visible = user ? sessions.filter((s) => canViewSession(user, s.ownerId)) : sessions;
-    return { sessions: visible, count: visible.length };
+    // REQ-121: live run flags ride the summaries so the sidebar shows
+    // working sessions without per-row polling (in-memory, no I/O).
+    const withRuns = visible.map((s) => ({ ...s, ...runStatus(s.id) }));
+    return { sessions: withRuns, count: withRuns.length };
   });
 
   app.get('/api/sessions/search', async (req, reply) => {

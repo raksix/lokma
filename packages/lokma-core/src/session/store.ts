@@ -151,6 +151,11 @@ export class SessionStore {
     await mkdir(dir, { recursive: true });
     const line = JSON.stringify(msg) + '\n';
     await appendFile(sessionPath(this.cwd, sessionId), line, 'utf-8');
+    // REQ-121: real activity bumps updatedAt (drives newest-first order).
+    // Meta patches (model/bot/title/claude-handle) must NOT bump — opening
+    // a session used to catapult it to the top of the list.
+    const meta = await this.readMeta(sessionId);
+    if (meta) await this.writeMeta(sessionId, {}, { touch: true });
   }
 
   /** Read all messages for a session. Returns [] if not found. */
@@ -189,17 +194,21 @@ export class SessionStore {
   }
 
   /** Merge + persist the `<id>.meta.json` sidecar (creates the dir if needed). */
-  async writeMeta(sessionId: string, patch: Partial<SessionMeta>): Promise<SessionMeta> {
+  async writeMeta(sessionId: string, patch: Partial<SessionMeta>, opts?: { touch?: boolean }): Promise<SessionMeta> {
     const dir = sessionDir(this.cwd);
     await mkdir(dir, { recursive: true });
     const prev = await this.readMeta(sessionId);
     const now = new Date().toISOString();
+    // REQ-121: updatedAt advances only on explicit touch (new sessions get
+    // `now`; plain patches preserve the previous stamp so opening/editing
+    // settings never reorders the list).
+    const updatedAt = opts?.touch ? now : (prev?.updatedAt ?? now);
     const next: SessionMeta = {
       id: sessionId,
       cwd: this.cwd,
       model: patch.model ?? prev?.model ?? '',
       createdAt: prev?.createdAt ?? now,
-      updatedAt: now,
+      updatedAt,
     };
     const title = patch.title ?? prev?.title;
     if (typeof title === 'string' && title) next.title = title;

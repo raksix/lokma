@@ -232,6 +232,10 @@ export type SessionSummary = {
   botId?: string | null;
   /** Owner user id (REQ-062 Parça B) — null for legacy/anonymous sessions. */
   ownerId?: string | null;
+  /** Live run flag (REQ-121) — true while the agent works this session. */
+  running?: boolean;
+  /** Queued prompts behind the live run (REQ-121). */
+  queued?: number;
   messageCount?: number;
   /** ISO timestamps for Today/Yesterday/Earlier grouping. */
   createdAt?: string;

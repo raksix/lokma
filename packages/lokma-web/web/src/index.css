@@ -216,3 +216,13 @@ a[href]:not(.cursor-default),
     scroll-behavior: auto !important;
   }
 }
+
+/* REQ-121: session-row run indicator — a terracotta sweep travels the top
+ * edge start → end while the agent works (killed above for reduced-motion). */
+@keyframes lokma-scan {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(480%); }
+}
+.lokma-scanbar {
+  animation: lokma-scan 1.4s ease-in-out infinite;
+}

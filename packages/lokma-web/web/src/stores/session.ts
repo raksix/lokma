@@ -23,6 +23,8 @@ export type SessionStore = {
   listLoaded: boolean;
   /** Reload the session list from the server (replaces the cache). */
   refreshSessions: (cwd?: string) => Promise<void>;
+  /** Same reload without touching `loading` (REQ-121 background poll). */
+  refreshSessionsQuiet: (cwd?: string) => Promise<void>;
   /** Switch the active session (URL + chat follow this id). */
   selectSession: (id: string | null) => void;
   /** Fetch one transcript unless cached and fresh (`force` refetches after streams). */
@@ -78,6 +80,22 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
       await get().refreshProjects();
     } catch (e) {
       set({ loading: false, lastError: e instanceof Error ? e.message : 'session list failed' });
+    }
+  },
+
+  refreshSessionsQuiet: async (cwd?: string) => {
+    try {
+      const res = await api.listSessions(cwd);
+      const ids = new Set(res.sessions.map((s) => s.id));
+      set((prev) => ({
+        sessions: res.sessions,
+        transcripts: Object.fromEntries(Object.entries(prev.transcripts).filter(([id]) => ids.has(id))),
+        stale: Object.fromEntries(Object.entries(prev.stale).filter(([id]) => ids.has(id))),
+        activeSessionId: prev.activeSessionId && ids.has(prev.activeSessionId) ? prev.activeSessionId : null,
+        listLoaded: true,
+      }));
+    } catch {
+      // Background poll never surfaces errors — next tick retries.
     }
   },
 

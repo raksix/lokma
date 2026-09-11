@@ -106,6 +106,19 @@ export const LOOP_DEFAULT_MAX_RETRIES = 10;
 export const LOOP_DEFAULT_RETRY_DELAYS_MS = [3_000, 10_000, 15_000, 20_000, 30_000, 40_000, 50_000, 60_000, 90_000, 120_000];
 
 /**
+ * REQ-128: how many read-only tool calls may run in one parallel batch.
+ * Claude-Code parity — it reads `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY`
+ * with the same 10 default, so operators can dial concurrency without a
+ * rebuild. Clamped 1..32; a bad value falls back to the default rather
+ * than failing the turn.
+ */
+export function maxToolConcurrency(raw = process.env.LOKMA_MAX_TOOL_CONCURRENCY): number {
+  const parsed = Number.parseInt(String(raw ?? ''), 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return 10;
+  return Math.min(parsed, 32);
+}
+
+/**
  * REQ-077: wait before retry `attempt` (1-based). Past the end of the
  * list the last value repeats; empty list = no wait. Pure — probe it.
  */
@@ -673,7 +686,7 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
     // other. Mutating calls stay strictly serial, and anything the gate wants
     // to ask about takes the serial path so approvals keep their
     // one-at-a-time semantics. Results are recorded in MODEL order either way.
-    const TOOL_CONCURRENCY = 10;
+    const TOOL_CONCURRENCY = maxToolConcurrency();
     const parallelizable = (call: ParsedToolCall | undefined): boolean => {
       if (!call || !call.tool || call.input === undefined) return false;
       if (registry.get(call.tool)?.readOnly !== true) return false;

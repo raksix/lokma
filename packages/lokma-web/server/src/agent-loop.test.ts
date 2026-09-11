@@ -4,7 +4,7 @@
  * No test framework — plain asserts so the package stays dependency-free.
  * Not imported by server code, so `tsc -p` output ignores it.
  */
-import { buildLoopHistory, decideTurnEnd, retryDelayMs, toolRowParts, truncateHistoryText } from './agent-loop';
+import { buildLoopHistory, decideTurnEnd, maxToolConcurrency, retryDelayMs, toolRowParts, truncateHistoryText } from './agent-loop';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -122,5 +122,12 @@ assert(decideTurnEnd({ toolCalls: 0, asks: 0, cleanText: '' }) === 'empty', 'no 
 assert(decideTurnEnd({ toolCalls: 0, asks: 0, cleanText: '   \n  ' }) === 'empty', 'whitespace-only -> empty');
 assert(decideTurnEnd({ toolCalls: 0, asks: 0, cleanText: 'done, here it is' }) === 'end_turn', 'answer text -> end_turn');
 assert(decideTurnEnd({ toolCalls: 0, asks: 1, cleanText: 'one question' }) === 'ask', 'text plus asks -> ask');
+
+// Parallel-batch width (REQ-128, Claude-Code parity on its env knob).
+assert(maxToolConcurrency(undefined) === 10, 'no override -> 10');
+assert(maxToolConcurrency('') === 10 && maxToolConcurrency('abc') === 10, 'junk override falls back to 10');
+assert(maxToolConcurrency('0') === 10 && maxToolConcurrency('-4') === 10, 'non-positive override falls back to 10');
+assert(maxToolConcurrency('4') === 4, 'a sane override is honoured');
+assert(maxToolConcurrency('999') === 32, 'a huge override is clamped to 32');
 
 console.log(`agent-loop-turnend probe: ${passed} passed`);

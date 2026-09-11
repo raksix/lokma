@@ -5,7 +5,7 @@
  * Not imported by server code, so `tsc -p` output ignores it.
  */
 import { spawn } from 'node:child_process';
-import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_CLEAR_MARKER, CLAUDE_COMPACT_FOCUS_MAX, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, CLAUDE_MUTATION_SURFACE, CLAUDE_REINJECT_QUOTA_MAX, CLAUDE_REINJECT_WINDOW, claudeCompactMarker, claudeToolsForLokmaTool, countClaudeCategories, countRecentClaudeReinjects, describeClaudeAskCard, formatClaudeCategoryLine, formatClaudeContextReport, formatClaudeFocusLine, formatClaudeReinjectLine, formatClaudeRunFailed, isClaudeClearCommand, isClaudeCompactCommand, isClaudeContextCommand, parseClaudeCompactCommand, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, shouldReinjectSkills, translateClaudeLine } from './claude-print';
+import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_CLEAR_MARKER, CLAUDE_COMPACT_FOCUS_MAX, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, CLAUDE_MUTATION_SURFACE, CLAUDE_REINJECT_QUOTA_MAX, CLAUDE_REINJECT_WINDOW, CLAUDE_RUN_ERROR_MARKER, claudeCompactMarker, claudeToolsForLokmaTool, countClaudeCategories, countRecentClaudeReinjects, describeClaudeAskCard, formatClaudeCategoryLine, formatClaudeContextReport, formatClaudeFocusLine, formatClaudeReinjectLine, formatClaudeRunFailed, isClaudeClearCommand, isClaudeCompactCommand, isClaudeContextCommand, parseClaudeCompactCommand, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, shouldReinjectSkills, translateClaudeLine } from './claude-print';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -279,5 +279,21 @@ assert(formatClaudeRunFailed(new Error('boom')) === '[run failed: boom]', 'plain
 assert(formatClaudeRunFailed('string failure') === '[run failed: string failure]', 'non-Error throwable is wrapped');
 assert(formatClaudeRunFailed(new Error('mid [run failed marker')) === '[run failed: mid [run failed marker]', 'passthrough is prefix-only, not substring');
 assert(formatClaudeRunFailed(new Error('')) === '[run failed: ]', 'empty message wraps honestly');
+
+// 21. FAZ B-run-error: error_during_execution resolves honestly + marker vocabulary.
+assert(CLAUDE_RUN_ERROR_MARKER === '[run stopped: error_during_execution]', 'run-error marker text');
+assert(CLAUDE_RUN_ERROR_MARKER.startsWith('[run stopped: '), 'run-error marker shares the stop vocabulary');
+const unknownSub = translateClaudeLine(JSON.stringify({ type: 'result', subtype: 'some_future_subtype' }), SID);
+assert(unknownSub.summary !== undefined && unknownSub.summary.subtype === 'error_during_execution', 'unknown subtype normalizes to error_during_execution');
+const noSub = translateClaudeLine(JSON.stringify({ type: 'result' }), SID);
+assert(noSub.summary !== undefined && noSub.summary.subtype === 'error_during_execution', 'missing subtype defaults to error_during_execution');
+const errExec = translateClaudeLine(
+  JSON.stringify({ type: 'result', subtype: 'error_during_execution', result: 'half text', total_cost_usd: 0.05, num_turns: 3, session_id: 's-9' }),
+  SID,
+);
+assert(errExec.summary !== undefined && errExec.summary.result === 'half text', 'error result text carried');
+assert(errExec.summary !== undefined && errExec.summary.costUsd === 0.05 && errExec.summary.numTurns === 3, 'error cost and turns carried');
+assert(errExec.summary !== undefined && errExec.summary.claudeSessionId === 's-9', 'error session id carried for --resume');
+assert(errExec.frames.length === 1 && errExec.frames[0].type === 'cost', 'error result still emits a cost frame');
 
 console.log('\nclaude-print probe: ' + passed + ' passed');

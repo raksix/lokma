@@ -75,6 +75,17 @@ export function formatClaudeRunFailed(error: unknown): string {
 }
 
 /**
+ * REQ-116 FAZ B-run-error — honest stop marker for an
+ * `error_during_execution` result. The binary resolved (exit 0 with a
+ * `result` event) but reports the run failed mid-execution; without a
+ * marker the transcript would read as a clean completion. The engine
+ * `result` text (when non-empty) is already in the transcript via the
+ * caller, so the marker only frames the stop — same `[run stopped: ...]`
+ * vocabulary as the FAZ A max_turns / max_budget markers.
+ */
+export const CLAUDE_RUN_ERROR_MARKER = '[run stopped: error_during_execution]';
+
+/**
  * REQ-116 FAZ B-wiring — engine selection + harness-side defaults.
  *
  * A model id selects the headless engine only with the `claude-code/`

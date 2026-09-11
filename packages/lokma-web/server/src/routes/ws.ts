@@ -31,6 +31,7 @@ import {
   CLAUDE_CLEAR_MARKER,
   CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD,
   CLAUDE_MUTATION_SURFACE,
+  CLAUDE_RUN_ERROR_MARKER,
   claudeCompactMarker,
   countClaudeCategories,
   countRecentClaudeReinjects,
@@ -355,6 +356,17 @@ async function runClaudeEngineTurn(
       await store.append(sessionId, {
         role: 'assistant',
         content: '[run stopped: max_budget_usd=' + String(CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD) + ']',
+        timestamp: new Date().toISOString(),
+      });
+    } else if (summary.subtype === 'error_during_execution') {
+      // REQ-116 FAZ B-run-error: the binary resolved but reports a
+      // mid-execution failure — frame the stop honestly (same `[run
+      // stopped: ...]` vocabulary as the FAZ A markers above) instead of
+      // reading as a clean completion. The engine `result` text (when
+      // non-empty) is already in the transcript from the append above.
+      await store.append(sessionId, {
+        role: 'assistant',
+        content: CLAUDE_RUN_ERROR_MARKER,
         timestamp: new Date().toISOString(),
       });
     }

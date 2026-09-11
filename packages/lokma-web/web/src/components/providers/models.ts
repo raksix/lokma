@@ -18,6 +18,25 @@ export function countEnabled(models: ModelInfo[]): number {
   return models.filter((m) => m.enabled).length;
 }
 
+/**
+ * Group the catalog by provider, alphabetically, keeping the server's order
+ * inside each group. The Models tab renders these as sticky headers so a
+ * 600-entry catalog reads like the Composer dropdown instead of one flat wall.
+ */
+export function groupByProvider(
+  models: ModelInfo[],
+): Array<{ provider: string; models: ModelInfo[] }> {
+  const groups = new Map<string, ModelInfo[]>();
+  for (const m of models) {
+    const list = groups.get(m.provider);
+    if (list) list.push(m);
+    else groups.set(m.provider, [m]);
+  }
+  return [...groups.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([provider, list]) => ({ provider, models: list }));
+}
+
 /** Bulk flag map for Allow All / Disable All (one PATCH, not N round-trips). */
 export function buildBulkMap(models: ModelInfo[], enabled: boolean): Record<string, boolean> {
   const flags: Record<string, boolean> = {};

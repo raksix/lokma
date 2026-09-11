@@ -196,6 +196,9 @@ export type ModelsRes = { models: ModelInfo[]; count: number; enabledCount: numb
 export type ModelsMutationRes = {
   ok: boolean;
   updated: number;
+  /** Ids the server skipped because they are not in the live catalog (partial-success bulk). */
+  skipped?: number;
+  skippedIds?: string[];
   models: ModelInfo[];
   count: number;
   enabledCount: number;

@@ -9,6 +9,7 @@ import {
   api,
   type CreateProviderBody,
   type ModelInfo,
+  type ModelsMutationRes,
   type ModelsRefreshRes,
   type PatchProviderBody,
   type ProviderInfo,
@@ -58,7 +59,7 @@ export type ProviderStore = {
   /** Enable/disable one model (optimistic, rolls back on failure). */
   setModelEnabled: (id: string, enabled: boolean) => Promise<void>;
   /** Bulk enable/disable (one PATCH; optimistic, rolls back on failure). */
-  setModelsBulk: (flags: Record<string, boolean>) => Promise<void>;
+  setModelsBulk: (flags: Record<string, boolean>) => Promise<ModelsMutationRes>;
 };
 
 const initial = {
@@ -186,6 +187,7 @@ export const useProviderStore = create<ProviderStore>()((set, get) => ({
     try {
       const res = await api.setModelsBulk(flags);
       set({ models: res.models, fetchedAt: Date.now() });
+      return res;
     } catch (e) {
       set({ models: previous, lastError: e instanceof Error ? e.message : 'model update failed' });
       throw e;

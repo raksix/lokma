@@ -18,6 +18,8 @@ export type StreamOpts = {
   baseUrl?: string;
   signal?: AbortSignal;
   extraHeaders?: Record<string, string>;
+  /** Native tool schemas — forwarded to adapters that support them (REQ-118). */
+  tools?: { name: string; description: string; parameters: unknown }[];
 };
 
 export async function* stream(opts: StreamOpts): AsyncGenerator<StreamChunk> {
@@ -35,5 +37,6 @@ export async function* stream(opts: StreamOpts): AsyncGenerator<StreamChunk> {
     baseUrl: opts.baseUrl,
     signal: opts.signal,
     extraHeaders: opts.extraHeaders,
+    tools: opts.tools,
   });
 }

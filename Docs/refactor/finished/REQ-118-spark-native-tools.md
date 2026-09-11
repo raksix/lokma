@@ -1,6 +1,6 @@
 # REQ-118 — Spark'a native tool calling (Responses `function_call` yolu)
 
-- **Status:** open (araştırma tamam — 2026-09-11, 2 paralel kol)
+- **Status:** done (FAZ A canlıda — 2026-09-11; FAZ B açık)
 - **Asked:** "muse-spark tam performansta çalışmıyor (thinking/tool).
   hermes-agent ile anomalyco/opencode'a bak, nasıl çözmüşler."
 - **Kaynaklar:** task-0 hermes-agent notu + task-1 opencode notu (transcriptler:
@@ -106,3 +106,19 @@ GÖNDERME — gateway toleranssız olabilir). Tool SONUÇLARI bu fazda mevcut
 `packages/lokma-ai/src/stream.ts` (passthrough),
 `packages/lokma-ai/src/provider/adapters.test.ts` (mock probe),
 `packages/lokma-web/server/src/agent-loop.ts` (şema besleme; FAZ B'de merge).
+
+## 6) Kapanış — FAZ A (2026-09-11)
+
+- **Mock probe:** `adapters.test.ts` §8/8b — `tools[]` + `tool_choice:auto`
+  `/responses` gövdesinde, `function_call` → birebir `<tool>` bloğu,
+  chat yolunda `tools` anahtarı yok. 54/54 yeşil.
+- **Canlı E2E (tek temsilci çağrı):** `muse-spark-1.3-contributor`
+  `tools[]` kabul etti, `<tool>` metni yazmadan native dispatch yaptı,
+  flush edilen blok mevcut filter/execute zincirine indi.
+- **Thinking:** akış kodu değişmedi; bu turda model reasoning üretmedi
+  (sessiz tur normal, regresyon değil).
+- **Kurtarılan kesik iş:** flush bloğu `try` dışındaydı
+  (`nativeCalls`/`streamedSeen` TS2304) → `try` içine taşındı; stub
+  SSE kaçışları tek-tersbölüydü (geçersiz JSON) → bayt-düzeyi fix.
+- **FAZ B açık:** `native_tool_call` chunk'ı, `function_call_output`
+  ile sonuç dönüşü, 403/429 ayrımı — ayrı REQ ister.

@@ -1,6 +1,6 @@
 import { ProviderError } from './errors.js';
 import { isLocalBaseUrl, readErrorSnippet, readSse } from './sse.js';
-import type { AdapterStreamOpts, ProviderAdapter, ProviderMessage, StreamChunk } from './types.js';
+import type { AdapterStreamOpts, ProviderAdapter, ProviderMessage, ProviderToolSchema, StreamChunk } from './types.js';
 
 /**
  * OpenAI-compatible adapter — real HTTP streaming, no SDK dependency.
@@ -44,6 +44,39 @@ export function toResponsesInput(messages: ProviderMessage[]): { role: string; c
     role: m.role === 'tool' ? 'user' : m.role,
     content: m.content,
   }));
+}
+
+/** Map harness tool schemas to Responses native `tools[]` (REQ-118 FAZ A). */
+export function toResponsesTools(tools: ProviderToolSchema[] | undefined): {
+  type: 'function';
+  name: string;
+  description: string;
+  parameters: unknown;
+}[] {
+  if (!tools || tools.length === 0) return [];
+  return tools
+    .filter((t) => typeof t?.name === 'string' && t.name.length > 0)
+    .map((t) => ({
+      type: 'function' as const,
+      name: t.name,
+      description: typeof t.description === 'string' ? t.description : '',
+      parameters:
+        t.parameters && typeof t.parameters === 'object'
+          ? t.parameters
+          : { type: 'object', properties: {} },
+    }));
+}
+
+/**
+ * Render one native function call as the machine-made text block the
+ * existing filter/execute chain already parses (REQ-118 FAZ A). The JSON is
+ * always machine-generated, so slop risk is nil; empty args become `{}` so
+ * the block never parses as malformed.
+ */
+export function nativeCallToToolBlock(name: string, args: string): string {
+  const safeName = name.replace(/"/g, '');
+  const argsText = args.trim() ? args : '{}';
+  return '<tool name="' + safeName + '">' + argsText + '</tool>';
 }
 
 /** Pull finished `output_text` out of a `response.completed` payload. */
@@ -122,8 +155,14 @@ export class OpenAIAdapter implements ProviderAdapter {
     let res: Response;
     const viaResponses = usesResponsesApi(base, opts.model);
     const url = viaResponses ? `${base}/responses` : `${base}/chat/completions`;
+    const responsesTools = viaResponses ? toResponsesTools(opts.tools) : [];
     const body = viaResponses
-      ? { model: shortModelId(opts.model), input: toResponsesInput(opts.messages), stream: true }
+      ? {
+          model: shortModelId(opts.model),
+          input: toResponsesInput(opts.messages),
+          stream: true,
+          ...(responsesTools.length > 0 ? { tools: responsesTools, tool_choice: 'auto' } : {}),
+        }
       : {
           model: shortModelId(opts.model),
           messages: opts.messages.map((m) => ({ role: m.role === 'tool' ? 'user' : m.role, content: m.content })),
@@ -151,6 +190,10 @@ export class OpenAIAdapter implements ProviderAdapter {
     try {
       let streamedSeen = '';
       let thinkingSeen = '';
+      // REQ-118 FAZ A: native function calls of the Responses stream, keyed
+      // by item id (fall back to output index). Completed items overwrite
+      // partial delta accumulations; the full `output[]` wins last.
+      const nativeCalls = new Map<string, { name: string; args: string; callId: string }>();
       for await (const { data } of readSse(res)) {
         let evt: unknown;
         try {
@@ -169,7 +212,62 @@ export class OpenAIAdapter implements ProviderAdapter {
           // REQ-061: the completed payload repeats the FULL text (not just
           // the remainder), so blindly appending it doubles every answer.
           // Emit only the unseen suffix of each tail.
-          const r = evt as { type?: unknown; delta?: unknown; response?: { output?: unknown } };
+          const r = evt as {
+            type?: unknown;
+            delta?: unknown;
+            item?: { id?: unknown; type?: unknown; name?: unknown; call_id?: unknown; arguments?: unknown };
+            item_id?: unknown;
+            output_index?: unknown;
+            response?: { output?: unknown };
+          };
+          if (r?.type === 'response.output_item.added' && typeof r?.item === 'object' && r.item !== null) {
+            const item = r.item;
+            if (item.type === 'function_call') {
+              const key =
+                typeof item.id === 'string' && item.id
+                  ? 'id:' + item.id
+                  : 'idx:' + String(r.output_index ?? '?');
+              nativeCalls.set(key, {
+                name: typeof item.name === 'string' ? item.name : '',
+                args: typeof item.arguments === 'string' ? item.arguments : '',
+                callId:
+                  typeof item.call_id === 'string' && item.call_id
+                    ? item.call_id
+                    : typeof item.id === 'string'
+                      ? item.id
+                      : key,
+              });
+            }
+            continue;
+          }
+          if (r?.type === 'response.function_call_arguments.delta' && typeof r?.delta === 'string') {
+            const key =
+              typeof r.item_id === 'string' && r.item_id
+                ? 'id:' + r.item_id
+                : 'idx:' + String(r.output_index ?? '?');
+            const prev = nativeCalls.get(key) ?? { name: '', args: '', callId: key };
+            prev.args += r.delta;
+            nativeCalls.set(key, prev);
+            continue;
+          }
+          if (r?.type === 'response.output_item.done' && typeof r?.item === 'object' && r.item !== null) {
+            const item = r.item;
+            if (item.type === 'function_call') {
+              const key =
+                typeof item.id === 'string' && item.id
+                  ? 'id:' + item.id
+                  : 'idx:' + String(r.output_index ?? '?');
+              nativeCalls.set(key, {
+                name: typeof item.name === 'string' ? item.name : (nativeCalls.get(key)?.name ?? ''),
+                args: typeof item.arguments === 'string' ? item.arguments : (nativeCalls.get(key)?.args ?? ''),
+                callId:
+                  typeof item.call_id === 'string' && item.call_id
+                    ? item.call_id
+                    : (nativeCalls.get(key)?.callId ?? key),
+              });
+            }
+            continue;
+          }
           if (r?.type === 'response.reasoning_summary_text.delta') {
             if (typeof r?.delta === 'string' && r.delta) {
               thinkingSeen += r.delta;
@@ -197,6 +295,21 @@ export class OpenAIAdapter implements ProviderAdapter {
               yield { type: 'thinking_delta', delta: freshThink };
             }
           }
+          const completedOutput = r?.response?.output;
+          if (Array.isArray(completedOutput)) {
+            for (const outItem of completedOutput) {
+              if (typeof outItem !== 'object' || outItem === null) continue;
+              const rec = outItem as { type?: unknown; id?: unknown; name?: unknown; call_id?: unknown; arguments?: unknown };
+              if (rec.type !== 'function_call') continue;
+              const key =
+                typeof rec.id === 'string' && rec.id ? 'id:' + rec.id : 'call:' + String(rec.call_id ?? '?');
+              nativeCalls.set(key, {
+                name: typeof rec.name === 'string' ? rec.name : (nativeCalls.get(key)?.name ?? ''),
+                args: typeof rec.arguments === 'string' ? rec.arguments : (nativeCalls.get(key)?.args ?? ''),
+                callId: typeof rec.call_id === 'string' && rec.call_id ? rec.call_id : key,
+              });
+            }
+          }
           continue;
         }
         const content = record?.choices?.[0]?.delta?.content;
@@ -204,6 +317,15 @@ export class OpenAIAdapter implements ProviderAdapter {
         // DeepSeek-style reasoning stream rides the same delta object.
         const reasoning = (record?.choices?.[0]?.delta as { reasoning_content?: unknown } | undefined)?.reasoning_content;
         if (typeof reasoning === 'string' && reasoning) yield { type: 'thinking_delta', delta: reasoning };
+      }
+      // REQ-118 FAZ A: flush native calls as machine-made text blocks so the
+      // existing filter/execute/follow-up chain runs unchanged. The JSON is
+      // gateway-echoed, never model-typed, so slop salvage never sees it.
+      for (const call of nativeCalls.values()) {
+        if (!call.name) continue;
+        const block = nativeCallToToolBlock(call.name, call.args);
+        streamedSeen += block;
+        yield { type: 'text_delta', delta: block };
       }
     } catch (e) {
       if (e instanceof ProviderError) throw e;

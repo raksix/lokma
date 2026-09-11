@@ -13,7 +13,7 @@ import {
   type SessionMessage,
   type ToolEvent,
 } from '@lokma/core';
-import { stream as aiStream, type ProviderMessage } from '@lokma/ai';
+import { stream as aiStream, zodToJsonSchema, type ProviderMessage } from '@lokma/ai';
 import type { Permissions, ServerMessage } from '@lokma/shared';
 
 /**
@@ -307,6 +307,14 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
           apiKey: opts.upstream.apiKey,
           baseUrl: opts.upstream.baseUrl,
           signal: turnCtrl.signal,
+          // REQ-118 FAZ A: registry schemas ride as native Responses tools
+          // on spark (other adapters ignore them); results still return via
+          // the text <tool_result> path this phase.
+          tools: registry.list().map((t) => ({
+            name: t.name,
+            description: t.description,
+            parameters: zodToJsonSchema(t.inputSchema),
+          })),
           // REQ-038: session-stable routing id for upstreams that need it
           // (OpenCode Go 400s headerless calls).
           extraHeaders: { 'x-opencode-session': `lokma-${opts.sessionId}` },

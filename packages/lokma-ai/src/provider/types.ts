@@ -14,6 +14,13 @@ export type ProviderMessage = {
   toolCallId?: string;
 };
 
+/** One tool schema for native function-calling upstreams (REQ-118). */
+export type ProviderToolSchema = {
+  name: string;
+  description: string;
+  parameters: unknown;
+};
+
 /** Options every adapter accepts — key/base/signal ride through stream(). */
 export type AdapterStreamOpts = {
   model: string;
@@ -26,6 +33,11 @@ export type AdapterStreamOpts = {
   signal?: AbortSignal;
   /** Extra HTTP headers for the upstream call (e.g. routing headers). */
   extraHeaders?: Record<string, string>;
+  /**
+   * Native tool schemas (REQ-118 FAZ A). Adapters that cannot pass tools
+   * natively ignore this — the text `<tool>` loop still works.
+   */
+  tools?: ProviderToolSchema[];
 };
 
 export type StreamChunk =

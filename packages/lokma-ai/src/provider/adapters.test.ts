@@ -10,7 +10,8 @@ import { createServer, type Server } from 'node:http';
 import { type AddressInfo } from 'node:net';
 import { AnthropicAdapter } from './anthropic';
 import { ProviderError } from './errors';
-import { OpenAIAdapter, shortModelId, unseenSuffix, usesResponsesApi } from './openai';
+import { nativeCallToToolBlock, OpenAIAdapter, shortModelId, toResponsesTools, unseenSuffix, usesResponsesApi } from './openai';
+import { zodToJsonSchema } from './tools-schema';
 import { stream } from '../stream';
 
 let passed = 0;
@@ -322,5 +323,131 @@ try {
 }
 assert(caughtUnknown instanceof ProviderError, 'stream() unknown provider throws ProviderError');
 assert((caughtUnknown as ProviderError).code === 'unknown_provider', 'stream() unknown provider keeps code');
+
+// 8. REQ-118 FAZ A: native tools ride the responses body; function_call
+// items flush as machine-made <tool> blocks (mock-transport probe).
+assert(toResponsesTools(undefined).length === 0, 'no tools option means no tools array');
+assert(toResponsesTools([]).length === 0, 'empty tools means no tools array');
+assert(
+  toResponsesTools([{ name: 'read_file', description: 'read', parameters: { type: 'object' } }])[0]?.type ===
+    'function',
+  'responses tools map to function entries',
+);
+assert(
+  nativeCallToToolBlock('read_file', '{"path":"a.ts"}') === '<tool name="read_file">{"path":"a.ts"}</tool>',
+  'native call renders exact tool block',
+);
+assert(
+  nativeCallToToolBlock('list_files', '  ') === '<tool name="list_files">{}</tool>',
+  'empty native args become empty object block',
+);
+assert(
+  (zodToJsonSchema({ _def: { typeName: 'ZodString' } }) as { type?: string }).type === 'string',
+  'zodToJsonSchema maps ZodString',
+);
+const objSchema = zodToJsonSchema({
+  _def: {
+    typeName: 'ZodObject',
+    shape: () => ({
+      path: { _def: { typeName: 'ZodString' } },
+      max: { _def: { typeName: 'ZodOptional', innerType: { _def: { typeName: 'ZodNumber' } } } },
+    }),
+  },
+}) as { type?: string; properties?: Record<string, unknown>; required?: string[] };
+assert(objSchema.type === 'object' && typeof objSchema.properties?.path === 'object', 'zod object converts shape');
+assert(
+  Array.isArray(objSchema.required) && objSchema.required.length === 1 && objSchema.required[0] === 'path',
+  'optional fields stay out of required',
+);
+
+const seenTools: { path: string; tools: unknown; choice: unknown } = { path: '', tools: undefined, choice: undefined };
+const toolStub = await listen((req, res) => {
+  let body = '';
+  req.on('data', (c) => {
+    body += c;
+  });
+  req.on('end', () => {
+    seenTools.path = req.url ?? '';
+    try {
+      const parsed = JSON.parse(body) as { tools?: unknown; tool_choice?: unknown };
+      seenTools.tools = parsed.tools;
+      seenTools.choice = parsed.tool_choice;
+    } catch {
+      seenTools.tools = undefined;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    res.end(
+      'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"checking"}\n\n' +
+        'event: response.output_item.added\ndata: {"type":"response.output_item.added","output_index":0,"item":{"id":"fc-1","type":"function_call","name":"read_file","call_id":"call-1","arguments":""}}' +
+        '\n\n' +
+        'event: response.function_call_arguments.delta\ndata: {"type":"response.function_call_arguments.delta","item_id":"fc-1","output_index":0,"delta":"{\\"path\\":\\"a.ts\\"}"}' +
+        '\n\n' +
+        'event: response.completed\ndata: {"type":"response.completed","response":{"output":[{"type":"function_call","id":"fc-1","call_id":"call-1","name":"read_file","arguments":"{\\"path\\":\\"a.ts\\"}"}]}}\n\n',
+    );
+  });
+});
+try {
+  const chunks: { type: string; delta?: string }[] = [];
+  for await (const chunk of new OpenAIAdapter().stream({
+    model: 'opencode-go/muse-spark-1.3-contributor',
+    messages: [{ role: 'user', content: 'read a.ts' }],
+    apiKey: 'probe-key',
+    baseUrl: `${toolStub.base}/opencode.ai/zen/go/v1`,
+    tools: [{ name: 'read_file', description: 'Read a file', parameters: { type: 'object', properties: {} } }],
+  })) {
+    if (chunk.type === 'text_delta' && typeof (chunk as { delta?: unknown }).delta === 'string') {
+      chunks.push({ type: chunk.type, delta: (chunk as { delta: string }).delta });
+    }
+  }
+  const joined = chunks.map((c) => c.delta ?? '').join('');
+  assert(seenTools.path === '/opencode.ai/zen/go/v1/responses', 'native tools still ride /responses');
+  assert(
+    Array.isArray(seenTools.tools) &&
+      (seenTools.tools as { name?: string }[]).length === 1 &&
+      (seenTools.tools as { name?: string }[])[0]?.name === 'read_file',
+    'responses body carries tools[] with the registry schema',
+  );
+  assert(seenTools.choice === 'auto', 'responses body sets tool_choice auto');
+  assert(joined.includes('checking'), 'native run keeps streamed text');
+  assert(
+    joined.includes('<tool name="read_file">{"path":"a.ts"}</tool>'),
+    `function_call flushes one exact tool block, got: ${JSON.stringify(joined)}`,
+  );
+  assert(!joined.includes('checkingchecking'), 'no text doubling beside the native block');
+} finally {
+  toolStub.server.close();
+}
+
+// 8b. REQ-118: chat path ignores tools (no body change for non-spark).
+const seenChat: { hasTools: boolean } = { hasTools: false };
+const chatToolStub = await listen((req, res) => {
+  let body = '';
+  req.on('data', (c) => {
+    body += c;
+  });
+  req.on('end', () => {
+    try {
+      seenChat.hasTools = 'tools' in (JSON.parse(body) as Record<string, unknown>);
+    } catch {
+      seenChat.hasTools = false;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    res.end(sseBody(['{"choices":[{"delta":{"content":"ok"}}]}', '[DONE]']));
+  });
+});
+try {
+  await collectText(
+    new OpenAIAdapter().stream({
+      model: 'openai/probe-model',
+      messages: [{ role: 'user', content: 'hi' }],
+      apiKey: 'probe-key',
+      baseUrl: chatToolStub.base,
+      tools: [{ name: 'read_file', description: 'Read a file', parameters: { type: 'object' } }],
+    }),
+  );
+  assert(!seenChat.hasTools, 'chat completions body carries no tools key');
+} finally {
+  chatToolStub.server.close();
+}
 
 console.log(`\nAll ${passed} checks passed.`);

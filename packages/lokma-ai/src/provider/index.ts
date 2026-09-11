@@ -4,3 +4,4 @@ export * from './sse.js';
 export * from './anthropic.js';
 export * from './openai.js';
 export * from './registry.js';
+export * from './tools-schema.js';

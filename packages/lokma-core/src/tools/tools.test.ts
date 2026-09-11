@@ -9,7 +9,7 @@
  * `tsc -p` output (same precedent as `lokma-ai`'s `adapters.test.ts`).
  * See Docs/30 section agent tools + Docs/22 section permissions.
  */
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildBuiltinTools, BUILTIN_TOOL_NAMES } from './builtins';
@@ -365,6 +365,24 @@ async function main(): Promise<void> {
   assert(
     !readBack.includes('<persisted-output>') && readBack.includes(huge),
     'a 400KB read comes back whole instead of spilling the model into a read-back loop',
+  );
+
+  // --- REQ-128: a spill never clobbers an earlier spill ---
+  // Claude Code opens its result files with the `wx` flag; distinct call ids
+  // can sanitize onto one path (`call/1` and `call 1` -> `call1`) and a
+  // replayed turn can reuse an id, so a plain write would replace a file the
+  // model may still be reading.
+  const big1 = 'A'.repeat(90_000);
+  const big2 = 'B'.repeat(90_000);
+  const spillOne = await formatToolResult({ cwd: ws, tool: 'grep', callId: 'call/1', result: { content: big1 } });
+  const spillTwo = await formatToolResult({ cwd: ws, tool: 'grep', callId: 'call 1', result: { content: big2 } });
+  const pathOne = spillOne.match(/\.lokma\/tool-results\/([^\s<]+)/)?.[1] ?? '';
+  const pathTwo = spillTwo.match(/\.lokma\/tool-results\/([^\s<]+)/)?.[1] ?? '';
+  assert(pathOne.length > 0 && pathTwo.length > 0 && pathOne !== pathTwo, 'colliding call ids spill to distinct files');
+  const spilled = await readFile(join(ws, '.lokma/tool-results', pathOne), 'utf8');
+  assert(
+    spilled.includes('A'.repeat(500)) && !spilled.includes('B'.repeat(500)),
+    'the first spill keeps its own bytes after the second one lands',
   );
 
   console.log(`\ntools probe: ${passed} passed`);

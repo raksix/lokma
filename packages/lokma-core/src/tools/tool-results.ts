@@ -1,5 +1,4 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
 import type { ProviderMessage } from '@lokma/ai';
 import {
   emptyResultPlaceholder,
@@ -10,6 +9,7 @@ import {
   resultOverBudget,
   resultToText,
   spillPathFor,
+  spillResult,
 } from './result-budget.js';
 
 /**
@@ -134,14 +134,23 @@ export async function formatToolResult(args: {
   if (isEmptyResultText(text)) return emptyResultPlaceholder(args.tool);
   const budget = resultBudget(args.declaredBudget);
   if (!resultOverBudget(text, budget)) return text;
-  const rel = spillPathFor(args.callId);
-  const { preview, hasMore } = previewCut(text);
+  let rel: string;
   try {
-    const abs = join(args.cwd, rel);
-    await mkdir(dirname(abs), { recursive: true });
-    await writeFile(abs, text, 'utf8');
-    return persistedOutputEnvelope({ originalChars: text.length, path: rel, preview, hasMore });
+    rel = await spillResult(
+      { cwd: args.cwd, callId: args.callId, text },
+      {
+        mkdirp: async (dir: string) => {
+          await mkdir(dir, { recursive: true });
+        },
+        write: async (file: string, body: string) => {
+          // 'wx' — never clobber an earlier spill (Claude Code does the same).
+          await writeFile(file, body, { encoding: 'utf8', flag: 'wx' });
+        },
+      },
+    );
   } catch {
-    return `${text.slice(0, budget)}\n…[truncated ${text.length - budget} chars — could not persist output]`;
+    rel = spillPathFor(args.callId);
   }
+  const { preview, hasMore } = previewCut(text);
+  return persistedOutputEnvelope({ originalChars: text.length, path: rel, preview, hasMore });
 }

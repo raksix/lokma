@@ -8,6 +8,7 @@
  * The pure half lives here so the loop stays testable; the caller owns the
  * filesystem (see `agent-loop.ts`).
  */
+import { dirname, join } from 'node:path';
 
 /** Default per-tool budget when a tool declares none. */
 export const TOOL_RESULT_DEFAULT_BUDGET = 50_000;
@@ -109,7 +110,35 @@ export function resultToText(result: unknown): string {
 }
 
 /** Workspace-relative spill path (kept out of the model's source tree). */
-export function spillPathFor(callId: string): string {
+export function spillPathFor(callId: string, attempt = 1): string {
   const safe = callId.replace(/[^A-Za-z0-9_-]/g, '');
-  return `.lokma/tool-results/${safe || 'result'}.txt`;
+  const suffix = attempt > 1 ? `-${attempt}` : '';
+  return `.lokma/tool-results/${safe || 'result'}${suffix}.txt`;
+}
+
+/**
+ * Write the spilled payload without ever clobbering an earlier spill
+ * (Claude Code opens its result files with the `wx` flag for the same
+ * reason). Distinct call ids can sanitize onto one path — `call/1` and
+ * `call 1` both become `call1` — and a replayed turn can reuse an id, so a
+ * plain write would silently replace a file the model may still be reading.
+ * Returns the path actually written.
+ */
+export async function spillResult(
+  args: { cwd: string; callId: string; text: string },
+  io: { mkdirp: (dir: string) => Promise<void>; write: (file: string, text: string) => Promise<void> },
+): Promise<string> {
+  for (let attempt = 1; attempt <= 20; attempt += 1) {
+    const rel = spillPathFor(args.callId, attempt);
+    const abs = join(args.cwd, rel);
+    await io.mkdirp(dirname(abs));
+    try {
+      await io.write(abs, args.text);
+      return rel;
+    } catch (error) {
+      const code = (error as { code?: string } | undefined)?.code;
+      if (code !== 'EEXIST') throw error;
+    }
+  }
+  throw new Error('could not find a free spill path');
 }

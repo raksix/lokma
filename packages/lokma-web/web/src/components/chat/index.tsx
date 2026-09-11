@@ -80,7 +80,7 @@ export function Chat({
   /** REQ-104: one smart-chain resolution per session (guard, not state — never re-fires). */
   const chainResolved = React.useRef<string | null>(null);
 
-  const { status, stream, thinking, cost, done, lastError, retry, toolCalls, toolMarks, permissions, questions, sendText, interrupt, answerPermission, answerQuestion } = ws;
+  const { status, stream, thinking, cost, done, lastError, retry, toolCalls, toolMarks, permissions, questions, sendText, interrupt, answerPermission, answerQuestion, clearLiveTrace } = ws;
   const socketOpen = status === 'open';
   // REQ-070: a backend run outlives refresh — the badge stays on while the
   // server reports running/queued even with no live stream on this socket.
@@ -244,8 +244,18 @@ export function Chat({
     setRunActive(false);
     // REQ-121: watching it finish counts as read (sidebar dot clears).
     markSessionSeen(sessionId);
-    void reloadTranscript().then(() => setStreamVisible(false));
-  }, [done, reloadTranscript]);
+    // REQ-132: hide the live stream and drop the whole live trace (stream +
+    // thinking + tool rows). The refetched transcript already carries that
+    // answer — keeping both painted every reply twice, thinking block
+    // included. Every finish path persists its output first (a clean reply, or
+    // the partial text an aborted run wrote), so nothing is lost. `finally`
+    // matters too: a failed refetch used to skip the hide and leave the
+    // duplicate on screen.
+    void reloadTranscript().finally(() => {
+      setStreamVisible(false);
+      clearLiveTrace();
+    });
+  }, [done, reloadTranscript, clearLiveTrace]);
 
   // REQ-038: upstream failures used to die silently (stuck "sending…").
   // The run now ends on `error` frames — surface the reason as a toast.

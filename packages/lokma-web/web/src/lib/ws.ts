@@ -264,6 +264,16 @@ export function applyServerFrame(state: WsUiState, msg: ServerMessage): WsUiStat
   }
 }
 
+/**
+ * REQ-132: drop the live trace once the finished transcript has been
+ * refetched. The persisted row and the live buffer describe the same answer,
+ * so keeping both on screen rendered every reply — and its thinking — twice.
+ * Cost/permissions/questions survive: they are not part of the answer text.
+ */
+export function dropLiveTrace(state: WsUiState): WsUiState {
+  return { ...state, stream: '', thinking: '', toolCalls: {}, toolMarks: [], retry: null };
+}
+
 /** Remove an answered request from its queue (by requestId). */
 export function dropRequest<T extends { requestId: string }>(queue: T[], requestId: string): T[] {
   return queue.filter((item) => item.requestId !== requestId);

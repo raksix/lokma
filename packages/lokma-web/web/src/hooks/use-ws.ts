@@ -4,6 +4,7 @@ import {
   MAX_RECONNECT_ATTEMPTS,
   abortMessage,
   applyServerFrame,
+  dropLiveTrace,
   decodeServerFrame,
   directWsUrl,
   dropRequest,
@@ -56,6 +57,12 @@ export type UseWs = {
   retry: { attempt: number; maxAttempts: number; waitMs: number; message: string } | null;
   done: boolean;
   lastError: string | null;
+  /**
+   * REQ-132: drop the live trace (stream + thinking + tool rows) after the
+   * finished transcript has been refetched — otherwise the answer renders
+   * twice (persisted row + still-populated live buffers).
+   */
+  clearLiveTrace: () => void;
   sendText: (prompt: string, opts?: SendOpts) => void;
   sendPrompt: (prompt: string, opts?: SendOpts) => void;
   answerPermission: (requestId: string, decision: 'allow' | 'deny' | 'always') => void;
@@ -244,6 +251,15 @@ export function useWs(sessionId: string): UseWs {
     setUi((prev) => ({ ...prev, uiActions: prev.uiActions.filter((a) => a.actionId !== actionId) }));
   }, []);
 
+  /**
+   * REQ-132: called by the chat shell right after a finished run's transcript
+   * was refetched. Dropping the live buffers is what stops the reply (and its
+   * thinking block) from painting a second time under the persisted rows.
+   */
+  const clearLiveTrace = useCallback(() => {
+    setUi((prev) => dropLiveTrace(prev));
+  }, []);
+
   return {
     status,
     messages,
@@ -258,6 +274,7 @@ export function useWs(sessionId: string): UseWs {
     retry: ui.retry,
     done: ui.done,
     lastError: ui.lastError,
+    clearLiveTrace,
     sendText,
     sendPrompt: sendText,
     answerPermission,

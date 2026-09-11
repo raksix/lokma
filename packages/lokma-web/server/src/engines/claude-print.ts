@@ -356,6 +356,46 @@ export function formatClaudeContextReport(input: ClaudeContextInput): string {
 }
 
 /**
+ * REQ-116 FAZ D-reinject-quota — skill/rule re-injection quota after compact.
+ *
+ * Claude Code re-applies skill + rule context after a compaction (the summary
+ * drops the guidance the run relied on). Our harness-side equivalent is a
+ * `[reinject: ...]` transcript row appended right after a SUCCESSFUL compact,
+ * so the next turn re-reads skill guidance from the persisted history.
+ *
+ * The quota bounds density, not cycles: at most CLAUDE_REINJECT_QUOTA_MAX
+ * reinject rows in the last CLAUDE_REINJECT_WINDOW transcript rows. Without
+ * it a pathological run (auto-compact firing every turn) would grow the
+ * transcript with marker + reinject rows faster than compaction shrinks it.
+ * Quota state lives in the transcript itself — no new store fields, survives
+ * restarts. No-op compacts and failures never reinject (nothing was lost).
+ * Pure — probe it.
+ */
+export const CLAUDE_REINJECT_QUOTA_MAX = 3;
+export const CLAUDE_REINJECT_WINDOW = 20;
+export const CLAUDE_REINJECT_PREFIX = '[reinject:';
+
+/** Count reinject rows in the last window rows. Pure — probe it. */
+export function countRecentClaudeReinjects(contents: readonly string[], window = CLAUDE_REINJECT_WINDOW): number {
+  const tail = contents.slice(Math.max(0, contents.length - window));
+  let count = 0;
+  for (const c of tail) {
+    if (c.indexOf(CLAUDE_REINJECT_PREFIX) !== -1) count += 1;
+  }
+  return count;
+}
+
+/** True while the window still has quota left. Pure — probe it. */
+export function shouldReinjectSkills(recentCount: number): boolean {
+  return recentCount < CLAUDE_REINJECT_QUOTA_MAX;
+}
+
+/** One quota-stamped reinject line. Pure — probe it. */
+export function formatClaudeReinjectLine(recentCount: number): string {
+  return '[reinject: skill guidance re-applied (' + String(recentCount + 1) + '/' + String(CLAUDE_REINJECT_QUOTA_MAX) + ' in window)]';
+}
+
+/**
  * Build the exact argv for the child. Pure — probe it (no invented flags:
  * every flag below exists in `claude --help` v2.1.x).
  */

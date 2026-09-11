@@ -33,15 +33,18 @@ import {
   CLAUDE_MUTATION_SURFACE,
   claudeCompactMarker,
   countClaudeCategories,
+  countRecentClaudeReinjects,
   describeClaudeAskCard,
   formatClaudeContextReport,
   formatClaudeFocusLine,
+  formatClaudeReinjectLine,
   isClaudeClearCommand,
   isClaudeContextCommand,
   parseClaudeCompactCommand,
   parseClaudeEngineModel,
   resolveClaudePermissions,
   runClaudePrint,
+  shouldReinjectSkills,
 } from '../engines/claude-print.js';
 import {
   broadcast,
@@ -96,6 +99,32 @@ const APPROVAL_TIMEOUT_MS = 10 * 60_000;
  * switch: `LOKMA_DISABLE_AUTO_COMPACT=1`. Compaction never breaks chat —
  * every failure only warns.
  */
+async function appendClaudeReinjectIfQuota(
+  app: FastifyInstance,
+  store: SessionStore,
+  sessionId: string,
+): Promise<void> {
+  // REQ-116 FAZ D-reinject-quota: one skill-guidance row after a successful
+  // compact, bounded by the sliding-window quota. Quota-exhausted turns skip
+  // silently (a marker every turn would defeat the bound); read/append
+  // failures only warn, never break chat.
+  try {
+    const contents = await store.read(sessionId).then(
+      (messages) => messages.map((m) => m.content),
+      () => [] as string[],
+    );
+    const recent = countRecentClaudeReinjects(contents);
+    if (!shouldReinjectSkills(recent)) return;
+    await store.append(sessionId, {
+      role: 'assistant',
+      content: formatClaudeReinjectLine(recent),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (e) {
+    app.log.warn('[ws] claude reinject skipped session=' + sessionId + ': ' + String(e));
+  }
+}
+
 async function runClaudeEngineTurn(
   app: FastifyInstance,
   args: {
@@ -147,6 +176,7 @@ async function runClaudeEngineTurn(
           : '[compact: no-op - ' + String(report.beforeMessages) + ' messages within budget]' + focusSuffix,
         timestamp: new Date().toISOString(),
       });
+      if (report.compacted) await appendClaudeReinjectIfQuota(app, store, sessionId);
     } catch (e) {
       app.log.warn('[ws] claude compact failed session=' + sessionId + ': ' + String(e));
       await store.append(sessionId, {
@@ -249,6 +279,7 @@ async function runClaudeEngineTurn(
             content: claudeCompactMarker(report.beforeMessages, report.afterMessages, mode),
             timestamp: new Date().toISOString(),
           });
+          await appendClaudeReinjectIfQuota(app, store, sessionId);
         }
       }
     } catch (e) {

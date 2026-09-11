@@ -5,7 +5,7 @@
  * Not imported by server code, so `tsc -p` output ignores it.
  */
 import { spawn } from 'node:child_process';
-import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_CLEAR_MARKER, CLAUDE_COMPACT_FOCUS_MAX, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, CLAUDE_MUTATION_SURFACE, claudeCompactMarker, claudeToolsForLokmaTool, countClaudeCategories, describeClaudeAskCard, formatClaudeCategoryLine, formatClaudeContextReport, formatClaudeFocusLine, isClaudeClearCommand, isClaudeCompactCommand, isClaudeContextCommand, parseClaudeCompactCommand, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, translateClaudeLine } from './claude-print';
+import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_CLEAR_MARKER, CLAUDE_COMPACT_FOCUS_MAX, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, CLAUDE_MUTATION_SURFACE, CLAUDE_REINJECT_QUOTA_MAX, CLAUDE_REINJECT_WINDOW, claudeCompactMarker, claudeToolsForLokmaTool, countClaudeCategories, countRecentClaudeReinjects, describeClaudeAskCard, formatClaudeCategoryLine, formatClaudeContextReport, formatClaudeFocusLine, formatClaudeReinjectLine, isClaudeClearCommand, isClaudeCompactCommand, isClaudeContextCommand, parseClaudeCompactCommand, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, shouldReinjectSkills, translateClaudeLine } from './claude-print';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -255,5 +255,19 @@ assert(formatClaudeCategoryLine({ user: 0, assistant: 0, tool: 0 }) === '[catego
 const ctxCats = formatClaudeContextReport({ messages: 6, chars: 9000, hygieneNeeded: false, summaryNeeded: false, resumed: false, maxBudgetUsd: 2, lastCompact: null, categories: { user: 2, assistant: 2, tool: 2 } });
 assert(ctxCats.includes('[categories: 2 user, 2 assistant, 2 tool]'), 'report appends the category line when present');
 assert(!ctxFresh.includes('[categories:'), 'report without categories stays unchanged');
+
+// 19. FAZ D-reinject-quota: sliding-window skill re-injection bound.
+assert(CLAUDE_REINJECT_QUOTA_MAX === 3, 'reinject quota is 3');
+assert(CLAUDE_REINJECT_WINDOW === 20, 'reinject window is 20 rows');
+assert(countRecentClaudeReinjects([]) === 0, 'empty transcript counts zero');
+assert(countRecentClaudeReinjects(['hello', '[compact: full 10->2 messages]']) === 0, 'no reinject rows counts zero');
+const twoRecent = ['[reinject: skill guidance re-applied (1/3 in window)]', 'chat', '[reinject: skill guidance re-applied (2/3 in window)]'];
+assert(countRecentClaudeReinjects(twoRecent) === 2, 'recent reinjects count');
+const oldPlus = ['[reinject: old]'].concat(Array(25).fill('chat')).concat(['[reinject: new]']);
+assert(countRecentClaudeReinjects(oldPlus) === 1, 'reinjects outside the window do not count');
+assert(shouldReinjectSkills(0) === true && shouldReinjectSkills(2) === true, 'quota left means reinject');
+assert(shouldReinjectSkills(3) === false && shouldReinjectSkills(9) === false, 'exhausted quota means skip');
+assert(formatClaudeReinjectLine(0) === '[reinject: skill guidance re-applied (1/3 in window)]', 'first reinject line stamps 1/3');
+assert(formatClaudeReinjectLine(2) === '[reinject: skill guidance re-applied (3/3 in window)]', 'last reinject line stamps 3/3');
 
 console.log('\nclaude-print probe: ' + passed + ' passed');

@@ -148,3 +148,7 @@ GÖNDERME — gateway toleranssız olabilir). Tool SONUÇLARI bu fazda mevcut
   `git apply --cached` ile commitlendi; kardeş hunks'lar worktree'de
   duruyor, dokunulmadı.
 - **Açık (FAZ B.2):** `function_call_output` ile sonuç dönüşü, 403/429 ayrımı.
+- **Re-verified 2026-09-11 (loop tick):** upstream still blocked —
+  OmniRoute `/models` 200 (cheap read OK) but any spark inference →
+  400 `insufficient credits`; OmniRoute has no `/responses` route (404),
+  so live native-tools E2E stays pending on provider balance, not harness code.

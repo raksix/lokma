@@ -227,6 +227,25 @@ export function isClaudeClearCommand(prompt: string): boolean {
 }
 
 /**
+ * REQ-116 FAZ D-compact — `/compact` compacts the Lokma-side transcript
+ * harness-side (default `full` mode) and never spawns the binary: the
+ * explicit counterpart to the pre-turn auto-compact window. The engine
+ * keeps its own server-side session; this keeps OUR persisted history
+ * (the source the next turn + reconnects read) consistent. Pure — probe it.
+ */
+export function isClaudeCompactCommand(prompt: string): boolean {
+  return prompt.trim() === '/compact';
+}
+
+/**
+ * Shared `[compact: ...]` marker so the explicit `/compact` path and the
+ * pre-turn auto-compact window write identical transcript text. Pure.
+ */
+export function claudeCompactMarker(beforeMessages: number, afterMessages: number, mode: string): string {
+  return '[compact: ' + mode + ' ' + String(beforeMessages) + '->' + String(afterMessages) + ' messages]';
+}
+
+/**
  * Build the exact argv for the child. Pure — probe it (no invented flags:
  * every flag below exists in `claude --help` v2.1.x).
  */

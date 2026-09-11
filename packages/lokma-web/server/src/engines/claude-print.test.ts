@@ -5,7 +5,7 @@
  * Not imported by server code, so `tsc -p` output ignores it.
  */
 import { spawn } from 'node:child_process';
-import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_CLEAR_MARKER, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, CLAUDE_MUTATION_SURFACE, claudeToolsForLokmaTool, describeClaudeAskCard, isClaudeClearCommand, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, translateClaudeLine } from './claude-print';
+import { buildClaudeArgs, CLAUDE_BINARY_NOT_FOUND, CLAUDE_CLEAR_MARKER, CLAUDE_ENGINE_DEFAULT_ALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_DISALLOWED_TOOLS, CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD, CLAUDE_MUTATION_SURFACE, claudeCompactMarker, claudeToolsForLokmaTool, describeClaudeAskCard, isClaudeClearCommand, isClaudeCompactCommand, parseClaudeEngineModel, resolveClaudePermissions, runClaudePrint, translateClaudeLine } from './claude-print';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -177,5 +177,27 @@ assert(!isClaudeClearCommand('/compact'), '/compact is not clear');
 assert(!isClaudeClearCommand('clear'), 'bare clear without slash does not match');
 assert(!isClaudeClearCommand('please /clear this'), 'embedded /clear does not match');
 assert(CLAUDE_CLEAR_MARKER.includes('cleared') && CLAUDE_CLEAR_MARKER.startsWith('['), 'clear marker names the outcome');
+
+// 15. FAZ D-compact: `/compact` detection + shared marker for headless runs.
+assert(isClaudeCompactCommand('/compact'), '/compact matches');
+assert(isClaudeCompactCommand('  /compact  '), '/compact matches with surrounding whitespace');
+assert(!isClaudeCompactCommand('/compact full'), '/compact with args does not match');
+assert(!isClaudeCompactCommand('/clear'), '/clear is not compact');
+assert(!isClaudeCompactCommand('compact'), 'bare compact without slash does not match');
+assert(!isClaudeCompactCommand('please /compact this'), 'embedded /compact does not match');
+assert(!isClaudeClearCommand('/compact'), '/compact is not clear');
+assert(!isClaudeCompactCommand('/clear'), '/clear is not compact');
+assert(claudeCompactMarker(10, 4, 'full') === '[compact: full 10->4 messages]', 'compact marker carries mode + counts');
+assert(claudeCompactMarker(7, 7, 'hygiene') === '[compact: hygiene 7->7 messages]', 'compact marker works for hygiene mode');
+
+// 15. FAZ D-compact: explicit `/compact` detection + shared marker text.
+assert(isClaudeCompactCommand('/compact'), '/compact matches');
+assert(isClaudeCompactCommand('  /compact  '), '/compact matches with surrounding whitespace');
+assert(!isClaudeCompactCommand('/compact now'), '/compact with args does not match');
+assert(!isClaudeCompactCommand('/clear'), '/clear is not compact');
+assert(!isClaudeCompactCommand('compact'), 'bare compact without slash does not match');
+assert(!isClaudeCompactCommand('please /compact this'), 'embedded /compact does not match');
+assert(claudeCompactMarker(10, 3, 'full') === '[compact: full 10->3 messages]', 'shared marker formats before->after with mode');
+assert(claudeCompactMarker(5, 5, 'hygiene').includes('hygiene'), 'shared marker carries the mode');
 
 console.log('\nclaude-print probe: ' + passed + ' passed');

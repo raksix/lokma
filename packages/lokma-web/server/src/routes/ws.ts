@@ -31,8 +31,10 @@ import {
   CLAUDE_CLEAR_MARKER,
   CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD,
   CLAUDE_MUTATION_SURFACE,
+  claudeCompactMarker,
   describeClaudeAskCard,
   isClaudeClearCommand,
+  isClaudeCompactCommand,
   parseClaudeEngineModel,
   resolveClaudePermissions,
   runClaudePrint,
@@ -122,6 +124,32 @@ async function runClaudeEngineTurn(
     send({ type: 'done', sessionId, reason: 'complete' });
     return;
   }
+  // REQ-116 FAZ D-compact: `/compact` runs the Lokma-side compaction
+  // harness-side (default `full` mode) and never spawns the binary — the
+  // explicit counterpart to the pre-turn auto-compact window below. No
+  // permission cards open (nothing mutates the workspace beyond the
+  // transcript the user asked to compact). Always leaves a marker.
+  if (isClaudeCompactCommand(prompt)) {
+    try {
+      const report = await compactSession(cwd, sessionId, {});
+      await store.append(sessionId, {
+        role: 'assistant',
+        content: report.compacted
+          ? claudeCompactMarker(report.beforeMessages, report.afterMessages, report.mode)
+          : '[compact: no-op - ' + String(report.beforeMessages) + ' messages within budget]',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (e) {
+      app.log.warn('[ws] claude compact failed session=' + sessionId + ': ' + String(e));
+      await store.append(sessionId, {
+        role: 'assistant',
+        content: '[compact failed: ' + (e instanceof Error ? e.message : String(e)) + ']',
+        timestamp: new Date().toISOString(),
+      });
+    }
+    send({ type: 'done', sessionId, reason: 'complete' });
+    return;
+  }
   const ctrl = new AbortController();
   state.abort = ctrl;
   // REQ-116 FAZ C — permission bridge: the project's `permissions` config
@@ -152,8 +180,7 @@ async function runClaudeEngineTurn(
         if (report.compacted) {
           await store.append(sessionId, {
             role: 'assistant',
-            content:
-              '[compact: ' + mode + ' ' + String(report.beforeMessages) + '->' + String(report.afterMessages) + ' messages]',
+            content: claudeCompactMarker(report.beforeMessages, report.afterMessages, mode),
             timestamp: new Date().toISOString(),
           });
         }

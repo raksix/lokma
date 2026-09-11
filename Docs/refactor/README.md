@@ -147,3 +147,4 @@
 - [REQ-126](finished/REQ-126-tool-satiri-acilir.md) — Tool satırları açılır (input+result) — done
 - [REQ-127](finished/REQ-127-session-satiri-sidebar-zemini.md) — Session satırları sidebar'la aynı zeminde (tüm temalar) — done
 - [REQ-128](finished/REQ-128-native-tool-engine.md) — Tool calling engine: native function calling, parallel reads, result spill — done
+- [REQ-129](finished/REQ-129-configured-default-model.md) — Configured default model actually drives the server — done

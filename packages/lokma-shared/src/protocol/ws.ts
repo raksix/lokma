@@ -7,6 +7,17 @@ import { z } from 'zod';
  */
 
 // ─── Client → Server ───────────────────────────────────────────────────────
+
+/**
+ * REQ-133: composer-level thinking budget. `off` (or absent) puts no
+ * reasoning field on the upstream request; the rest map per adapter to
+ * `reasoning_effort` (OpenAI-compatible) or `thinking.budget_tokens`
+ * (Anthropic). Kept as one shared union so the client picker, the wire
+ * schema and the adapters cannot drift apart.
+ */
+export const REASONING_EFFORTS = ['off', 'low', 'medium', 'high'] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
 export const ClientMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('prompt'),
@@ -16,6 +27,8 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
     model: z.string().optional(),
     // Workspace-relative `@file` mentions — the server reads these into context.
     contextPaths: z.array(z.string()).max(5).optional(),
+    // Thinking budget for this prompt (REQ-133).
+    reasoningEffort: z.enum(REASONING_EFFORTS).optional(),
   }),
   z.object({ type: z.literal('abort'), sessionId: z.string() }),
   z.object({ type: z.literal('permission_response'), requestId: z.string(), decision: z.enum(['allow', 'deny', 'always']) }),

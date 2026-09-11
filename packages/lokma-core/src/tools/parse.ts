@@ -33,6 +33,12 @@ export type ParsedToolCall = {
    * calls leave it unset and the loop mints an id instead.
    */
   nativeCallId?: string;
+  /**
+   * REQ-128: the raw JSON argument string the gateway streamed. Replayed
+   * byte-identical in the next turn's `assistant.tool_calls[]` — some
+   * upstreams reject a re-serialized argument object.
+   */
+  nativeArgs?: string;
 };
 
 /** Where one tool block sat in the visible stream (REQ-122: persist order). */
@@ -335,22 +341,39 @@ export function createBlockFilter(): {
   };
 }
 
-/** System-prompt section advertising the tools (names + one-line usage). */
+/**
+ * System-prompt section advertising the tools (names + one-line usage).
+ *
+ * REQ-128: the protocol is dual. A model whose runtime exposes function
+ * calling must USE those schemas (no markup, no prompt tax); a model whose
+ * runtime cannot (or whose upstream refused the payload) still drives the
+ * same registry through text blocks. Both are described so one prompt
+ * covers every upstream — and the text half is phrased as the fallback,
+ * which is what stopped good models from imitating markup instead of
+ * calling functions.
+ */
 export function buildToolSystemPrompt(tools: { name: string; description: string }[]): string {
   const lines = tools.map((t) => `- ${t.name}: ${t.description}`);
   return [
-    'You have workspace tools. To use one, emit a block on its own line:',
+    'You are an autonomous agent working in a real workspace. Act through your tools.',
+    'Call the tools you were given (function calling) — they are the ONLY way to read, search, write or run anything.',
+    'Never narrate an intent instead of acting ("let me check", "bakıyorum", "hazırlıyorum") and never claim a result you did not get back: call the tool, then report what it returned.',
+    'Several independent read-only calls (list/read/search) may be issued together in one turn — they run in parallel. Writes and commands run in order.',
+    'After EVERY tool result you MUST keep going: call the next tool or write the answer. Going silent after a result abandons the task.',
+    '',
+    'If your runtime does not expose tools as functions, use this fallback — one block on its own line:',
     '<tool name="read_file">{"path": "src/index.ts"}</tool>',
-    'Use a self-closing tag for empty input: <tool name="list_files" />',
-    'One block per call, valid JSON body only. Text outside blocks is your reply.',
-    'Emit ONLY <tool name="...">...</tool> — never <tool_call>, never bare name{...}, never any other tag shape.',
-    'Each result comes back as <tool_result tool="..." id="...">...</tool_result>. After EVERY result you MUST continue: emit the next <tool> block or write the answer. Stopping silently after a result is a failure.',
+    'Self-closing for empty input: <tool name="list_files" />',
+    'Valid JSON body only, one block per call; text outside blocks is your reply.',
+    'Emit ONLY <tool name="...">...</tool> in that case — never <tool_call>, never bare name{...}, never any other tag shape.',
+    'Each result comes back as <tool_result tool="..." id="...">...</tool_result>.',
     'NEVER write <tool_result> or <tool_call> yourself and NEVER invent tool output — results arrive on their own; roleplayed results are lies.',
+    '',
     'To ask the user something blocking, emit <ask question="...">a|b|c</ask> (omit choices for free text).',
-    'RULES: never narrate intent ("I will look", "hazırlıyorum", "bakıyorum") — emit the tool block immediately, then report the result.',
-    'Never call the same tool twice in a row with the same input. Chain: list/search → read → write/run, one turn at a time.',
     'To create or change a file: read_file first (it returns the sha), then write_file with {"path": ..., "content": ..., "expectedSha": "<sha>"}; new files omit expectedSha.',
     'To run a command: {"command": "bun", "args": ["run", "build"]}. Shell syntax (|, &&, $) is refused — one binary plus args only.',
+    'Never call the same tool twice in a row with the same input. Chain: list/search → read → write/run.',
+    '',
     'Available tools:',
     ...lines,
   ].join('\n');

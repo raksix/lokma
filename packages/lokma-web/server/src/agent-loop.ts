@@ -295,7 +295,13 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
     let thinkingText = '';
     // REQ-118 FAZ B: gateway-typed native calls bypass the text filter —
     // collected per attempt, merged into runEnd.toolCalls below.
-    let nativeCalls: { tool: string; input: unknown; callId: string; parseError?: string }[] = [];
+    let nativeCalls: {
+      tool: string;
+      input: unknown;
+      callId: string;
+      argumentsJson?: string;
+      parseError?: string;
+    }[] = [];
     let streamFailed: unknown = null;
     // REQ-077: retry attempts loop — a dead upstream re-tries the same turn
     // with backoff instead of killing the run. `attempt` counts tries (1 =
@@ -352,12 +358,18 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
             // execution below; the live tool_start row fires at execution
             // time like the text path (no double rows).
             if (chunk.parseError === undefined) {
-              nativeCalls.push({ tool: chunk.tool, input: chunk.input, callId: chunk.callId });
+              nativeCalls.push({
+                tool: chunk.tool,
+                input: chunk.input,
+                callId: chunk.callId,
+                argumentsJson: chunk.argumentsJson,
+              });
             } else {
               nativeCalls.push({
                 tool: chunk.tool,
                 input: chunk.input,
                 callId: chunk.callId,
+                argumentsJson: chunk.argumentsJson,
                 parseError: chunk.parseError,
               });
             }
@@ -487,8 +499,23 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
         // REQ-118 FAZ B.2: keep the gateway call id so the follow-up can
         // answer natively (`function_call_output`); the transcript still
         // uses the minted execution id below.
-        if (n.parseError === undefined) runEnd.toolCalls.push({ tool: n.tool, input: n.input, nativeCallId: n.callId });
-        else runEnd.toolCalls.push({ tool: n.tool, input: n.input, parseError: n.parseError, nativeCallId: n.callId });
+        // REQ-128: the raw argument string rides along for an exact replay.
+        if (n.parseError === undefined) {
+          runEnd.toolCalls.push({
+            tool: n.tool,
+            input: n.input,
+            nativeCallId: n.callId,
+            nativeArgs: n.argumentsJson,
+          });
+        } else {
+          runEnd.toolCalls.push({
+            tool: n.tool,
+            input: n.input,
+            parseError: n.parseError,
+            nativeCallId: n.callId,
+            nativeArgs: n.argumentsJson,
+          });
+        }
       }
     }
     outputChars += clean.length;
@@ -524,7 +551,53 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
       }
     };
 
-    const followUps: string[] = [];
+    /**
+     * REQ-128: one result handed back to the model. `native` is present when
+     * the call arrived as a gateway function call — that pair is replayed
+     * exactly (assistant.tool_calls + one `tool` row per result), the shape
+     * Claude Code uses; text-parsed calls feed back as one `<tool_result>`
+     * user blob, which every upstream reads.
+     */
+    type FollowUp = {
+      tool: string;
+      input: unknown;
+      /** Text-mode payload: the full `<tool_result …>body</tool_result>` block. */
+      text: string;
+      /** Native-mode payload: the bare result body (the id links it already). */
+      body: string;
+      isError: boolean;
+      native?: { id: string; name: string; arguments: string };
+    };
+    const results: FollowUp[] = [];
+    /** Blocking-question answers — plain text, never tool rows. */
+    const answers: string[] = [];
+
+    /** Record one result (text blob always; native pair when the call had one). */
+    const pushResult = (
+      call: { tool: string; input: unknown; nativeCallId?: string; nativeArgs?: string },
+      resultId: string,
+      body: string,
+      isError: boolean,
+    ): void => {
+      const nativeId = typeof call.nativeCallId === 'string' ? call.nativeCallId.trim() : '';
+      const nativeArgs = typeof call.nativeArgs === 'string' && call.nativeArgs.trim() ? call.nativeArgs : '';
+      results.push({
+        tool: call.tool || 'unknown',
+        input: call.input,
+        text: `<tool_result tool="${call.tool || 'unknown'}" id="${resultId}">${body}</tool_result>`,
+        body,
+        isError,
+        ...(nativeId
+          ? {
+              native: {
+                id: nativeId,
+                name: call.tool || 'unknown',
+                arguments: nativeArgs || JSON.stringify(call.input ?? {}),
+              },
+            }
+          : {}),
+      });
+    };
 
     // ── Tool calls (in model order, one at a time) ──────────────────────────
     for (const call of runEnd.toolCalls) {
@@ -547,7 +620,7 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
         opts.send({ type: 'tool_start', tool: call.tool || 'unknown', input: null, callId, sessionId: opts.sessionId });
         opts.send({ type: 'tool_result', callId, result: { code: 'bad_tool_block', message }, isError: true, sessionId: opts.sessionId });
         await opts.store.append(opts.sessionId, toolRecord(callId, call.tool || 'unknown', { callId, ok: false, code: 'bad_tool_block', message }, call.input));
-        followUps.push(`<tool_result tool="${call.tool || 'unknown'}" id="${resultId}">ERROR bad_tool_block: ${message}</tool_result>`);
+        pushResult(call, resultId, `ERROR bad_tool_block: ${message}`, true);
         continue;
       }
       const outcome = await executeToolCall(registry, {
@@ -576,15 +649,15 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
           const result = { code: 'denied', message: `Denied by permissions: ${outcome.tool}` };
           opts.send({ type: 'tool_result', callId, result, isError: true, sessionId: opts.sessionId });
           await opts.store.append(opts.sessionId, toolRecord(callId, outcome.tool, { callId, ok: false, ...result }, call.input));
-          followUps.push(`<tool_result tool="${outcome.tool}" id="${resultId}">ERROR denied: ${result.message}</tool_result>`);
+          pushResult(call, resultId, `ERROR denied: ${result.message}`, true);
         } else {
           const ran = await runApprovedCall(registry, { tool: outcome.tool, input: call.input, callId, onEvent: forwardEvent });
           if (ran.outcome === 'ok') {
             await opts.store.append(opts.sessionId, toolRecord(callId, outcome.tool, { callId, ok: true, result: ran.result }, call.input));
-            followUps.push(`<tool_result tool="${outcome.tool}" id="${resultId}">${JSON.stringify(ran.result)}</tool_result>`);
+            pushResult(call, resultId, JSON.stringify(ran.result), false);
           } else {
             await opts.store.append(opts.sessionId, toolRecord(callId, outcome.tool, { callId, ok: false, code: ran.code, message: ran.message }, call.input));
-            followUps.push(`<tool_result tool="${outcome.tool}" id="${resultId}">ERROR ${ran.code}: ${ran.message}</tool_result>`);
+            pushResult(call, resultId, `ERROR ${ran.code}: ${ran.message}`, true);
           }
         }
       } else if (outcome.outcome === 'denied') {
@@ -592,13 +665,13 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
         const result = { code: 'denied', message: `Denied by permissions: ${outcome.tool}` };
         opts.send({ type: 'tool_result', callId, result, isError: true, sessionId: opts.sessionId });
         await opts.store.append(opts.sessionId, toolRecord(callId, outcome.tool, { callId, ok: false, ...result }, call.input));
-        followUps.push(`<tool_result tool="${outcome.tool}" id="${resultId}">ERROR denied: ${result.message}</tool_result>`);
+        pushResult(call, resultId, `ERROR denied: ${result.message}`, true);
       } else if (outcome.outcome === 'ok') {
         await opts.store.append(opts.sessionId, toolRecord(callId, call.tool, { callId, ok: true, result: outcome.result }, call.input));
-        followUps.push(`<tool_result tool="${call.tool}" id="${resultId}">${JSON.stringify(outcome.result)}</tool_result>`);
+        pushResult(call, resultId, JSON.stringify(outcome.result), false);
       } else {
         await opts.store.append(opts.sessionId, toolRecord(callId, call.tool, { callId, ok: false, code: outcome.code, message: outcome.message }, call.input));
-        followUps.push(`<tool_result tool="${call.tool}" id="${resultId}">ERROR ${outcome.code}: ${outcome.message}</tool_result>`);
+        pushResult(call, resultId, `ERROR ${outcome.code}: ${outcome.message}`, true);
       }
     }
 
@@ -623,10 +696,10 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
         if (e instanceof LoopAborted || opts.signal.aborted) return { outcome: 'aborted', inputChars, outputChars, turns };
         throw e;
       }
-      followUps.push(`<answer question="${ask.question}">${answer}</answer>`);
+      answers.push(`<answer question="${ask.question}">${answer}</answer>`);
     }
 
-    if (followUps.length === 0) {
+    if (results.length === 0 && answers.length === 0) {
       // REQ-116 FAZ A: explicit stop_reason verdict. tool_use/ask turns
       // always produce followUps above, so reaching here with calls means
       // an internal wiring break — but the observed invariant holds, and
@@ -650,9 +723,37 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
       }
       return { outcome: 'complete', inputChars, outputChars, turns };
     }
-    const followUp = followUps.join('\n');
-    inputChars += followUp.length;
-    messages.push({ role: 'user', content: followUp });
+    // ── Feed the results back (REQ-128) ─────────────────────────────────────
+    // Claude-Code shape first: a turn whose calls arrived as gateway
+    // function calls is replayed WITH its calls (`assistant.tool_calls[]`)
+    // and answered by one `tool` row per result — the model sees the same
+    // pairing it produced. Text-parsed calls in the same turn get synthetic
+    // ids, because an unanswered call id is an instant upstream 400.
+    const nativeTurn = results.some((r) => r.native !== undefined);
+    if (nativeTurn) {
+      const calls = results.map((r, i) => ({
+        id: r.native?.id ?? `call_text_${turns}_${i}`,
+        name: r.tool,
+        arguments: r.native?.arguments ?? JSON.stringify(r.input ?? {}),
+      }));
+      inputChars += clean.length;
+      messages.push({ role: 'assistant', content: clean, toolCalls: calls });
+      results.forEach((r, i) => {
+        const id = calls[i]?.id ?? `call_text_${turns}_${i}`;
+        inputChars += r.body.length;
+        messages.push({ role: 'tool', content: r.body, toolCallId: id, name: r.tool });
+      });
+      // Question answers stay plain conversation, after the tool pair.
+      if (answers.length > 0) {
+        const blob = answers.join('\n');
+        inputChars += blob.length;
+        messages.push({ role: 'user', content: blob });
+      }
+    } else {
+      const followUp = [...results.map((r) => r.text), ...answers].join('\n');
+      inputChars += followUp.length;
+      messages.push({ role: 'user', content: followUp });
+    }
   }
 
   // REQ-116 FAZ A: a maxed-out run leaves a machine-readable stop marker

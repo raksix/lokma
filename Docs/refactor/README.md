@@ -153,3 +153,4 @@
 - [REQ-132](finished/REQ-132-duplicate-answer-live-trace.md) — A finished run no longer paints its answer (and thinking) twice — done
 - [REQ-133](finished/REQ-133-composer-thinking-budget.md) — Thinking budget (Off/Low/Medium/High) is settable from the composer input — done
 - [REQ-134](finished/REQ-134-ask-question-system.md) — Ask-the-user questions render as visual question cards (attribute + unclosed `<ask>` shapes included) — done
+- [REQ-135](finished/REQ-135-native-ask-tool.md) — Native `ask_user` tool (aliases `ask`/`clarify`, gate-exempt, loop-owned) so tool-calling models stop hitting "Unknown tool: ask" — done

@@ -1,4 +1,6 @@
 import {
+  AskUserInput,
+  buildAskTools,
   buildBuiltinTools,
   buildTodoTools,
   buildToolSystemPrompt,
@@ -350,6 +352,12 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
   for (const tool of buildTodoTools({ sessionId: opts.sessionId, userId: opts.userId })) {
     registry.register(tool);
   }
+  // REQ-135: the blocking ask. Native models call `ask_user` as a function;
+  // the loop intercepts it below (it owns the wait). `ask` is the name models
+  // reach for first — alias it rather than answering `Unknown tool: ask`.
+  for (const tool of buildAskTools()) registry.register(tool);
+  registry.alias('ask', 'ask_user');
+  registry.alias('clarify', 'ask_user');
   const toolSystem = buildToolSystemPrompt(registry.list().map((t) => ({ name: t.name, description: t.description })));
   const preamble = opts.systemPreamble?.trim() ? `${opts.systemPreamble.trim()}\n\n` : '';
   const system = `${preamble}${toolSystem}`;
@@ -706,6 +714,49 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
       const call = runEnd.toolCalls[callIdx];
       if (!call) continue;
       if (opts.signal.aborted) return { outcome: 'aborted', inputChars, outputChars, turns };
+
+      // REQ-135: a native `ask_user` call IS the blocking question. The loop
+      // publishes the card, waits for the answer and feeds it back as the tool
+      // result, so it never reaches the executor (whose handler refuses it by
+      // design) and never gets a permission card of its own.
+      if (registry.get(call.tool)?.name === 'ask_user') {
+        const callId = mintCallId();
+        const parsed = AskUserInput.safeParse(call.input);
+        const question =
+          parsed.success && parsed.data.question.trim()
+            ? parsed.data.question
+            : '(the model asked an empty question)';
+        const choices = parsed.success ? parsed.data.choices : undefined;
+        opts.send({
+          type: 'tool_start',
+          tool: 'ask_user',
+          input: { question, choices },
+          callId,
+          sessionId: opts.sessionId,
+        });
+        const requestId = mintCallId('ask');
+        opts.send({ type: 'ask_user_question', requestId, question, choices, sessionId: opts.sessionId });
+        let answer: string;
+        try {
+          answer = await opts.waitAnswer({ requestId, question, choices });
+        } catch (e) {
+          if (e instanceof LoopAborted || opts.signal.aborted) {
+            return { outcome: 'aborted', inputChars, outputChars, turns };
+          }
+          throw e;
+        }
+        const result = { question, choices, answer };
+        await opts.store.append(
+          opts.sessionId,
+          toolRecord(callId, 'ask_user', { callId, ok: true, result }, call.input),
+        );
+        await flushText(runMarks[execIdx]?.at ?? clean.length);
+        execIdx++;
+        opts.send({ type: 'tool_result', callId, result, isError: false, sessionId: opts.sessionId });
+        pushResult(call, call.nativeCallId ?? callId, `<answer question="${question}">${answer}</answer>`, false);
+        continue;
+      }
+
       if (parallelizable(call)) {
         const run: ParsedToolCall[] = [];
         while (run.length < TOOL_CONCURRENCY && parallelizable(runEnd.toolCalls[callIdx + run.length])) {

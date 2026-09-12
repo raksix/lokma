@@ -140,6 +140,13 @@ assert(state.done && state.doneReason === 'complete', 'done flips the flag');
 state = applyServerFrame(state, { type: 'error', message: 'boom', sessionId: 's' });
 assert(state.lastError === 'boom', 'error records the message');
 assert(state.done && state.doneReason === 'error', 'error ends the run (no stuck sending)');
+// REQ-136: the code travels with the message — the card words itself from it.
+state = applyServerFrame(state, { type: 'error', message: 'paused', code: 'turn_limit', sessionId: 's' });
+assert(state.lastErrorCode === 'turn_limit', 'error keeps its code for the UI');
+assert(
+  applyServerFrame(initialWsUiState(), { type: 'error', message: 'x', sessionId: 's' }).lastErrorCode === null,
+  'a codeless error stays null instead of a stale value',
+);
 state = applyServerFrame(initialWsUiState(), { type: 'thinking_delta', delta: 'hmm', sessionId: 's' });
 assert(state.thinking === 'hmm' && !state.done, 'thinking accumulates without ending the run');
 

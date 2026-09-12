@@ -59,6 +59,12 @@ export type WsUiState = {
   done: boolean;
   doneReason: string | null;
   lastError: string | null;
+  /**
+   * REQ-136: machine code of the last `error` frame (`turn_limit`, `aborted`,
+   * upstream codes…). The UI picks its wording from this — a paused run is not
+   * a failed send.
+   */
+  lastErrorCode: string | null;
 };
 
 /** Max auto-reconnect attempts before the hook gives up with status `error`. */
@@ -196,6 +202,7 @@ export function initialWsUiState(): WsUiState {
     done: false,
     doneReason: null,
     lastError: null,
+    lastErrorCode: null,
   };
 }
 
@@ -268,7 +275,7 @@ export function applyServerFrame(state: WsUiState, msg: ServerMessage): WsUiStat
       // "sending…" forever — the server sends `error` with NO following
       // `done`, and pending rows only clear on `done`. Ending the run here
       // drops the optimistic row; the message stays visible via lastError.
-      return { ...state, lastError: msg.message, done: true, doneReason: 'error' };
+      return { ...state, lastError: msg.message, lastErrorCode: msg.code ?? null, done: true, doneReason: 'error' };
   }
 }
 

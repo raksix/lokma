@@ -245,6 +245,7 @@ export function SingleChatView({
   streaming,
   thinking,
   runError,
+  runErrorCode,
   costLabel,
   toolCalls,
   toolMarks,
@@ -266,6 +267,8 @@ export function SingleChatView({
   streaming: boolean;
   thinking: string;
   runError: string | null;
+  /** REQ-136: error code — `turn_limit` renders as a pause, not a failure. */
+  runErrorCode: string | null;
   costLabel: string | null;
   toolCalls: Record<string, ToolCallEntry>;
   /** REQ-111: arrival-order stream cuts — tool rows interleave with text. */
@@ -451,7 +454,7 @@ export function SingleChatView({
             {runError && (
               <div className="flex gap-3">
                 <div className="min-w-0 flex-1">
-                  <RunErrorCard message={runError} />
+                  <RunErrorCard message={runError} code={runErrorCode} />
                 </div>
               </div>
             )}

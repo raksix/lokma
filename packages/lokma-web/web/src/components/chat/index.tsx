@@ -80,7 +80,7 @@ export function Chat({
   /** REQ-104: one smart-chain resolution per session (guard, not state — never re-fires). */
   const chainResolved = React.useRef<string | null>(null);
 
-  const { status, stream, thinking, cost, done, lastError, retry, toolCalls, toolMarks, permissions, questions, sendText, interrupt, answerPermission, answerQuestion, clearLiveTrace } = ws;
+  const { status, stream, thinking, cost, done, lastError, lastErrorCode, retry, toolCalls, toolMarks, permissions, questions, sendText, interrupt, answerPermission, answerQuestion, clearLiveTrace } = ws;
   const socketOpen = status === 'open';
   // REQ-070: a backend run outlives refresh — the badge stays on while the
   // server reports running/queued even with no live stream on this socket.
@@ -263,8 +263,10 @@ export function Chat({
   React.useEffect(() => {
     if (!lastError || lastToastedError.current === lastError) return;
     lastToastedError.current = lastError;
-    emitToast(`Send failed: ${lastError}`);
-  }, [lastError]);
+    // REQ-136: a paused run (turn budget spent) is not a failed send — the
+    // wording has to match what the user is looking at.
+    emitToast(lastErrorCode === 'turn_limit' ? `Run paused: ${lastError}` : `Send failed: ${lastError}`);
+  }, [lastError, lastErrorCode]);
 
   // REQ-077: auto-retry is visible — one toast per attempt with the backoff
   // wait, so "hata alınca bekliyor" never looks like a hang.
@@ -673,6 +675,7 @@ export function Chat({
           streaming={streaming}
           thinking={thinking}
           runError={done && lastError ? lastError : null}
+          runErrorCode={done && lastError ? lastErrorCode : null}
           costLabel={costLabel}
           toolCalls={toolCalls}
           toolMarks={toolMarks}

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { BookOpenText, Brain, Check, ChevronDown, Copy, FolderOpen, HelpCircle, ListTodo, Loader2, Pencil, Search, Send, ShieldAlert, SquareTerminal, Wrench } from 'lucide-react';
+import { BookOpenText, Brain, Check, ChevronDown, Copy, FolderOpen, HelpCircle, ListTodo, Loader2, Pause, Pencil, Search, Send, ShieldAlert, SquareTerminal, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { PermissionRequest, QuestionRequest, ToolCallEntry } from '@/lib/ws';
@@ -556,14 +556,29 @@ export function ThoughtTrace({ toolCalls }: { toolCalls: Record<string, ToolCall
 
 // ─── Run error card (REQ-054, OpenCode `Error` row): a failed run leaves a
 // visible trace in the live area until the next prompt — not just a toast.
-export function RunErrorCard({ message }: { message: string }) {
+// REQ-136: the title follows the code — a turn-budget pause is not a failure,
+// and calling it "Send failed" sent the user hunting for a bug that wasn't one.
+export function RunErrorCard({ message, code }: { message: string; code?: string | null }) {
+  const paused = code === 'turn_limit';
   return (
-    <div className="mt-2 flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 px-2.5 py-2 text-xs leading-[1.6] text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
-      <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-red-500 text-[10px] text-white">
-        !
+    <div
+      className={
+        paused
+          ? 'mt-2 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs leading-[1.6] text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100'
+          : 'mt-2 flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 px-2.5 py-2 text-xs leading-[1.6] text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200'
+      }
+    >
+      <span
+        className={
+          paused
+            ? 'mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-amber-500 text-[10px] text-white'
+            : 'mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-red-500 text-[10px] text-white'
+        }
+      >
+        {paused ? <Pause className="h-2.5 w-2.5" /> : '!'}
       </span>
       <div className="min-w-0 flex-1">
-        <span className="font-medium">Send failed</span>
+        <span className="font-medium">{paused ? 'Run paused' : 'Send failed'}</span>
         <div className="mt-0.5 break-words font-mono text-[11px] opacity-90">{message}</div>
       </div>
     </div>

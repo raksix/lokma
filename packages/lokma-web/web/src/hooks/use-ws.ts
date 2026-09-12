@@ -58,6 +58,8 @@ export type UseWs = {
   retry: { attempt: number; maxAttempts: number; waitMs: number; message: string } | null;
   done: boolean;
   lastError: string | null;
+  /** REQ-136: code of the last error frame — the UI words the card from it. */
+  lastErrorCode: string | null;
   /**
    * REQ-132: drop the live trace (stream + thinking + tool rows) after the
    * finished transcript has been refetched — otherwise the answer renders
@@ -210,7 +212,7 @@ export function useWs(sessionId: string): UseWs {
     const text = prompt.trim();
     if (!text) return;
     // A new prompt starts a new run — clear the previous run's trace with it.
-    setUi((prev) => ({ ...prev, stream: '', thinking: '', done: false, doneReason: null, lastError: null, toolCalls: {}, toolMarks: [], retry: null }));
+    setUi((prev) => ({ ...prev, stream: '', thinking: '', done: false, doneReason: null, lastError: null, lastErrorCode: null, toolCalls: {}, toolMarks: [], retry: null }));
     socketSend(wsRef.current, promptMessage(text, sessionRef.current, opts));
   }, []);
 
@@ -275,6 +277,7 @@ export function useWs(sessionId: string): UseWs {
     retry: ui.retry,
     done: ui.done,
     lastError: ui.lastError,
+    lastErrorCode: ui.lastErrorCode,
     clearLiveTrace,
     sendText,
     sendPrompt: sendText,

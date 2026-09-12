@@ -70,6 +70,21 @@ export const RetryConfigSchema = z.object({
 export type RetryConfig = z.infer<typeof RetryConfigSchema>;
 
 /**
+ * Agent-loop limits (REQ-136). `maxTurns` counts the tool round-trips inside
+ * ONE run; when it is exhausted the run pauses with a `turn_limit` marker and
+ * the work stays queued, so "continue" picks it up. The old hard-coded 15 was
+ * reached by ordinary work (a page build + verification loop) and every pause
+ * read as a crash.
+ */
+export const DEFAULT_LOOP_MAX_TURNS = 100;
+
+export const LoopConfigSchema = z.object({
+  maxTurns: z.number().int().min(1).max(1000).default(DEFAULT_LOOP_MAX_TURNS),
+});
+
+export type LoopConfig = z.infer<typeof LoopConfigSchema>;
+
+/**
  * Session defaults — where new sessions land when the caller passes no
  * explicit cwd (`POST /api/sessions`, REQ-009 session-defaults piece).
  * Empty string = server default (its own working dir).
@@ -108,6 +123,7 @@ export const GlobalConfigSchema = z.object({
   }),
   sessions: SessionsConfigSchema.default({ defaultCwd: '' }),
   retry: RetryConfigSchema.default({ maxAttempts: 10, delaysSec: [3, 10, 15, 20, 30, 40, 50, 60, 90, 120] }),
+  loop: LoopConfigSchema.default({ maxTurns: DEFAULT_LOOP_MAX_TURNS }),
   locks: z
     .object({ heartbeatMs: z.number().default(30_000), leaseMs: z.number().default(60_000), dir: z.string().default('.agentlocks/locks') })
     .default({ heartbeatMs: 30_000, leaseMs: 60_000, dir: '.agentlocks/locks' }),

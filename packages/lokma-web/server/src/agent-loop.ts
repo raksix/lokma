@@ -10,6 +10,7 @@ import {
   formatToolResult,
   heartbeatSession,
   mintCallId,
+  parseAskBlocks,
   parseToolBlocks,
   runApprovedCall,
   SessionStore,
@@ -858,6 +859,19 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
       } else {
         await opts.store.append(opts.sessionId, toolRecord(callId, call.tool, { callId, ok: false, code: outcome.code, message: outcome.message }, call.input));
         pushResult(call, resultId, `ERROR ${outcome.code}: ${outcome.message}`, true);
+      }
+    }
+
+    // REQ-134: models routinely drop the closing tag (`<ask question="…" choices="a|b">`),
+    // and an unclosed block never reaches the streaming filter — it fail-opens
+    // as chat text. Sweep the visible text, promote it to a real question and
+    // drop the raw markup before the transcript is flushed.
+    if (runEnd.asks.length === 0) {
+      const swept = parseAskBlocks(clean);
+      if (swept.length > 0) {
+        const at = clean.search(/<ask\b/i);
+        if (at >= 0) clean = clean.slice(0, at).trimEnd();
+        runEnd.asks.push(...swept);
       }
     }
 

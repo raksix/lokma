@@ -24,6 +24,7 @@ import {
   type ToolResultCarrier,
 } from '@lokma/core';
 import { ProviderError, stream as aiStream, zodToJsonSchema, type ProviderMessage } from '@lokma/ai';
+import { DEFAULT_LOOP_MAX_TURNS } from '@lokma/shared';
 import type { Permissions, ReasoningEffort, ServerMessage } from '@lokma/shared';
 
 /**
@@ -108,7 +109,12 @@ export type AgentLoopResult = {
   turns: number;
 };
 
-export const LOOP_DEFAULT_MAX_TURNS = 15;
+/**
+ * REQ-136: tool round-trips per run. Lives in the shared config schema
+ * (`loop.maxTurns`), this is only the fallback when a caller passes none.
+ * 15 used to be the ceiling; ordinary page-build work hit it.
+ */
+export const LOOP_DEFAULT_MAX_TURNS = DEFAULT_LOOP_MAX_TURNS;
 export const LOOP_DEFAULT_TURN_TIMEOUT_MS = 180_000;
 /** REQ-077: retries after the first try (default 10, 0 = fail fast). */
 export const LOOP_DEFAULT_MAX_RETRIES = 10;

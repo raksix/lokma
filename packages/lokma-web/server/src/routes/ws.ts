@@ -527,6 +527,8 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
           prompt: effectivePrompt,
           systemPreamble: botCtx?.systemPreamble || undefined,
           reasoningEffort: item.reasoningEffort,
+          // REQ-136: the per-run tool-turn budget (config `loop.maxTurns`).
+          maxTurns: config?.loop?.maxTurns ?? LOOP_DEFAULT_MAX_TURNS,
           permissions: config?.permissions,
           maxRetries: config?.retry?.maxAttempts,
           retryDelaysMs: config?.retry?.delaysSec ? config.retry.delaysSec.map((s) => s * 1000) : undefined,

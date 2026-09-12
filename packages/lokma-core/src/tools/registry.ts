@@ -27,6 +27,12 @@ export type ToolDefinition = {
 
 export class ToolRegistry {
   private tools = new Map<string, ToolDefinition>();
+  /**
+   * REQ-135: model-facing aliases. A model that learned a name in a sibling
+   * harness (`clarify` in Hermes, or a bare `ask`) calls it by that name; we
+   * resolve it to the real tool instead of answering `Unknown tool`.
+   */
+  private aliases = new Map<string, string>();
 
   register(tool: ToolDefinition): void {
     if (this.tools.has(tool.name)) {
@@ -35,8 +41,16 @@ export class ToolRegistry {
     this.tools.set(tool.name, tool);
   }
 
+  /** Point an extra name at a registered tool (`ask` → `ask_user`). */
+  alias(alias: string, target: string): void {
+    if (!this.tools.has(target)) {
+      throw new Error(`Cannot alias ${alias}: tool ${target} is not registered`);
+    }
+    this.aliases.set(alias, target);
+  }
+
   get(name: string): ToolDefinition | undefined {
-    return this.tools.get(name);
+    return this.tools.get(this.aliases.get(name) ?? name);
   }
 
   list(): ToolDefinition[] {
@@ -49,10 +63,15 @@ export class ToolRegistry {
   }
 
   async call(name: string, input: unknown, ctx: unknown): Promise<unknown> {
-    const tool = this.tools.get(name);
+    const tool = this.get(name);
     if (!tool) throw new Error(`Unknown tool: ${name}`);
     const parsed = tool.inputSchema.parse(input);
     return tool.handler(parsed, ctx);
+  }
+
+  /** True when the name (or one of its aliases) is a registered tool. */
+  has(name: string): boolean {
+    return this.get(name) !== undefined;
   }
 }
 

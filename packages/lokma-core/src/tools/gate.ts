@@ -29,6 +29,13 @@ export const WRITE_TOOLS: ReadonlySet<string> = new Set([
   'complete_todo',
 ]);
 
+/**
+ * REQ-135: tools whose whole point is talking to the user. Gating them would
+ * ask the user to approve being asked — the loop answers with a question card
+ * instead. An explicit `deny` entry still wins (operator intent).
+ */
+export const INTERACTIVE_TOOLS: ReadonlySet<string> = new Set(['ask_user']);
+
 /** Exact or prefix match: `write` covers `write_file`, `read` covers reads. */
 function listed(entries: readonly string[], tool: string): boolean {
   return entries.some((entry) => entry.length > 0 && (entry === tool || tool.startsWith(entry)));
@@ -67,6 +74,9 @@ export function decideToolCall(
     defaultMode: permissions?.defaultMode ?? ('auto' as const),
   };
   if (listed(perms.deny, tool)) return 'deny';
+  // Talking to the user is never a permission question (REQ-135) — but the
+  // deny-list above still outranks it.
+  if (INTERACTIVE_TOOLS.has(tool)) return 'allow';
   if (listed(perms.allow, tool)) return 'allow';
   return fallbackFor(tool, perms.defaultMode);
 }

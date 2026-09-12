@@ -16,6 +16,7 @@ import { buildBuiltinTools, BUILTIN_TOOL_NAMES } from './builtins';
 import { capToolResult, executeToolCall, mintCallId, runApprovedCall, type ToolEvent } from './executor';
 import { globToRegExp, WorkspaceFiles } from '../files/files';
 import { decideToolCall, describeToolCall, READ_TOOLS, WRITE_TOOLS } from './gate';
+import { buildAskTools } from './ask';
 import {
   emptyResultPlaceholder,
   isEmptyResultText,
@@ -79,9 +80,46 @@ async function main(): Promise<void> {
   );
   assert(decideToolCall(undefined, 'read_file') === 'allow', 'gate undefined perms fall back to auto');
   assert(decideToolCall(null, 'run_command') === 'ask', 'gate null perms fall back to auto');
+
+  // REQ-135: asking the user is never itself a permission question…
+  assert(decideToolCall(AUTO, 'ask_user') === 'allow', 'gate auto: ask_user allowed');
+  assert(
+    decideToolCall({ allow: [], deny: [], defaultMode: 'manual' }, 'ask_user') === 'allow',
+    'gate manual: ask_user still allowed (no approval to be asked)',
+  );
+  assert(
+    decideToolCall({ allow: [], deny: [], defaultMode: 'plan' }, 'ask_user') === 'allow',
+    'gate plan: ask_user allowed (it mutates nothing)',
+  );
+  // …but an explicit deny is still the operator's call.
+  assert(
+    decideToolCall({ allow: [], deny: ['ask_user'], defaultMode: 'auto' }, 'ask_user') === 'deny',
+    'gate: explicit deny outranks the interactive exemption',
+  );
   assert(describeToolCall('read_file', { path: 'a.txt' }) === 'Read a.txt', 'gate describe read_file');
   assert(describeToolCall('run_command', { command: 'ls' }) === 'Run `ls`', 'gate describe run_command');
   assert(describeToolCall('mystery', null) === 'Run mystery', 'gate describe unknown tool');
+
+  // REQ-135: the registry resolves the names models reach for.
+  {
+    const reg = new ToolRegistry();
+    for (const tool of buildAskTools()) reg.register(tool);
+    reg.alias('ask', 'ask_user');
+    reg.alias('clarify', 'ask_user');
+    assert(reg.get('ask')?.name === 'ask_user', 'alias: ask resolves to ask_user');
+    assert(reg.get('clarify')?.name === 'ask_user', 'alias: clarify resolves to ask_user');
+    assert(reg.get('ask_user')?.name === 'ask_user', 'the canonical name resolves too');
+    assert(reg.has('ask') && !reg.has('nope'), 'has() follows aliases');
+    assert(reg.names().length === 1, 'aliases are not listed as separate tools');
+    assert(reg.get('ask_user')?.readOnly !== true, 'ask_user is never batched as read-only');
+    let threw = false;
+    try {
+      reg.alias('ghost', 'not_a_tool');
+    } catch {
+      threw = true;
+    }
+    assert(threw, 'aliasing an unknown target is rejected at registration');
+  }
 
   // --- builtins against a real temp workspace ---
   const cwd = await mkdtemp(join(tmpdir(), 'lokma-tools-'));

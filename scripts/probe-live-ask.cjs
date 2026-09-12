@@ -149,6 +149,32 @@ function chatText(frames) {
   );
   check(!chatText(closed.frames).includes('<ask'), 'closed block markup never reached the chat text');
 
+  // 3. REQ-135: the NATIVE tool path — the model calls `ask_user` as a function
+  //    instead of writing markup (this is what "Unknown tool: ask" broke).
+  const native = await runAskTurn(
+    sessionId,
+    token,
+    'Use your ask_user tool — the native function call, NOT any text markup — to ask me which of three ' +
+      'options to work on next. After I answer, reply with ONLY the word ASK3-OK.',
+    'the second one',
+  );
+  const nativeAsk = native.asks[0];
+  check(!!nativeAsk, 'a native ask_user call produced a question frame');
+  check(
+    nativeAsk && typeof nativeAsk.question === 'string' && nativeAsk.question.length > 3,
+    `the native question text arrived (got "${nativeAsk ? nativeAsk.question : '-'}")`,
+  );
+  const askRows = native.frames.filter((f) => f.type === 'tool_start' && f.tool === 'ask_user').length;
+  check(askRows >= 1, `the native call shows as an ask_user tool row (x${askRows})`);
+  const unknownErr = native.frames.filter(
+    (f) => f.type === 'error' || (f.type === 'tool_result' && /unknown tool/i.test(JSON.stringify(f))),
+  );
+  check(unknownErr.length === 0, `no "Unknown tool" error on the native path (got ${JSON.stringify(unknownErr).slice(0, 200)})`);
+  check(
+    native.frames.some((f) => f.type === 'done' || f.type === 'run_end'),
+    'native ask turn finished after the answer',
+  );
+
   console.log(`\nlive ask probe: ${passed} checks passed`);
   process.exit(0);
 })().catch((err) => {

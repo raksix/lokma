@@ -693,6 +693,9 @@ export function PermissionCard({
 
 // ─── AskUserQuestion card (real ask_user_question frame) ─────────────────────
 
+/** Stable empty list — keeps the key handler from re-binding every render. */
+const NO_CHOICES: string[] = [];
+
 export function QuestionCard({
   req,
   onAnswer,
@@ -701,47 +704,88 @@ export function QuestionCard({
   onAnswer: (requestId: string, answer: string) => void;
 }) {
   const [draft, setDraft] = React.useState('');
-  const choices = req.choices ?? [];
+  const [sent, setSent] = React.useState<string | null>(null);
+  const choices = req.choices ?? NO_CHOICES;
+
+  // 1..9 pick a choice without touching the mouse — the card sits in the
+  // reading flow, so the keyboard stays where the user left it.
+  React.useEffect(() => {
+    if (choices.length === 0) return;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const n = Number(e.key);
+      if (Number.isInteger(n) && n >= 1 && n <= choices.length) {
+        setSent(choices[n - 1] ?? null);
+        onAnswer(req.requestId, choices[n - 1] ?? '');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [choices, onAnswer, req.requestId]);
+
+  const submit = (answer: string) => {
+    const text = answer.trim();
+    if (!text) return;
+    setSent(text);
+    onAnswer(req.requestId, text);
+  };
+
   return (
-    <div className="mt-3 rounded-lg border border-line bg-white p-2.5 dark:bg-[#1E1E21]">
-      <div className="flex items-center gap-1.5 text-xs font-semibold">
-        <HelpCircle className="h-3.5 w-3.5 text-terracotta" />
-        {req.question}
-      </div>
-      {choices.length > 0 ? (
-        <div className="mt-2 grid grid-cols-1 gap-1">
-          {choices.map((o) => (
-            <button
-              key={o}
-              onClick={() => onAnswer(req.requestId, o)}
-              className="flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1.5 text-left text-xs hover:border-terracotta/30 hover:bg-[#FDF0E6] dark:hover:bg-[#2A1E15]"
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-terracotta" /> {o}
-            </button>
-          ))}
+    <div className="mt-3 overflow-hidden rounded-xl border border-terracotta/25 bg-white shadow-sm dark:bg-[#1E1E21]">
+      <div className="flex items-start gap-2 border-b border-line bg-[#FDF0E6] px-3 py-2 dark:bg-[#2A1E15]">
+        <HelpCircle className="mt-0.5 h-4 w-4 shrink-0 text-terracotta" />
+        <div className="min-w-0">
+          <div className="text-[10px] font-semibold tracking-widest text-terracotta/80 uppercase">Question</div>
+          <div className="text-[13px] font-semibold leading-snug">{req.question}</div>
         </div>
-      ) : (
+      </div>
+      <div className="p-3">
+        {choices.length > 0 && (
+          <div className="grid grid-cols-1 gap-1.5">
+            {choices.map((o, i) => (
+              <button
+                key={o}
+                onClick={() => submit(o)}
+                disabled={sent !== null}
+                className="group flex items-center gap-2 rounded-lg border border-line px-2.5 py-2 text-left text-[13px] transition hover:border-terracotta/40 hover:bg-[#FDF0E6] disabled:opacity-60 dark:hover:bg-[#2A1E15]"
+              >
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-line bg-[#FAF9F5] text-[10px] font-semibold text-zinc-500 group-hover:border-terracotta/30 group-hover:text-terracotta dark:bg-[#26262A]">
+                  {i + 1}
+                </span>
+                <span className="flex-1">{o}</span>
+                {sent === o && <Check className="h-3.5 w-3.5 shrink-0 text-terracotta" />}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="mt-2 flex gap-1.5">
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && draft.trim()) onAnswer(req.requestId, draft.trim());
+              if (e.key === 'Enter') submit(draft);
             }}
-            placeholder="Type your answer…"
-            className="h-7 flex-1 rounded-md border border-line bg-white px-2 text-xs focus:border-terracotta/30 focus:outline-none dark:bg-[#0F0F11]"
+            disabled={sent !== null}
+            placeholder={choices.length > 0 ? 'Or type your own answer…' : 'Type your answer…'}
+            className="h-8 flex-1 rounded-md border border-line bg-white px-2 text-xs focus:border-terracotta/30 focus:outline-none dark:bg-[#0F0F11]"
           />
           <Button
             size="sm"
-            className="h-7 bg-[#C96442] text-xs text-white hover:bg-[#B85736]"
-            disabled={!draft.trim()}
-            onClick={() => draft.trim() && onAnswer(req.requestId, draft.trim())}
+            className="h-8 bg-[#C96442] text-xs text-white hover:bg-[#B85736]"
+            disabled={!draft.trim() || sent !== null}
+            onClick={() => submit(draft)}
           >
             <Send className="mr-1 h-3 w-3" /> Send
           </Button>
         </div>
-      )}
-      <div className="mt-1 text-[11px] text-zinc-400">The run waits for your answer.</div>
+        <div className="mt-1.5 text-[11px] text-zinc-400">
+          {sent !== null
+            ? 'Answer sent — the run continues.'
+            : `The run waits for your answer${choices.length > 0 ? ' · press 1-9 to pick' : ''}.`}
+        </div>
+      </div>
     </div>
   );
 }

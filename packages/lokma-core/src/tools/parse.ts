@@ -149,14 +149,39 @@ function toToolCall(attrs: string, body: string | undefined, selfClosing: boolea
   }
 }
 
-/** Parse one complete `<ask ...>` match (never throws). */
-function toAsk(attrs: string, body: string | undefined, selfClosing: boolean): ParsedAsk {
-  const question = (attr(attrs, 'question') ?? '').trim();
-  if (selfClosing || body === undefined || !body.trim()) return { question };
-  const choices = body
+/** Split `a|b|c`, `["a","b"]` or `a, b` into clean choice labels (never throws). */
+function toChoices(raw: string): string[] {
+  const text = raw.trim();
+  if (!text) return [];
+  if (text.startsWith('[')) {
+    try {
+      const parsed: unknown = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        return parsed.map((c) => String(c).trim()).filter((c) => c.length > 0);
+      }
+    } catch {
+      /* fall through to pipe splitting */
+    }
+  }
+  return text
     .split('|')
     .map((c) => c.trim())
     .filter((c) => c.length > 0);
+}
+
+/**
+ * Parse one `<ask …>` match (never throws). Completeness is the caller's
+ * business: REQ-134 feeds unclosed blocks here too, because models routinely
+ * drop the closing tag.
+ */
+function toAsk(attrs: string, body: string | undefined, selfClosing: boolean): ParsedAsk {
+  const question = (attr(attrs, 'question') ?? attr(attrs, 'q') ?? '').trim();
+  // REQ-134: models often put the options on an attribute instead of the body
+  // — `<ask question="…" choices="a|b|c">` with nothing between the tags.
+  const attrChoices = toChoices(attr(attrs, 'choices') ?? attr(attrs, 'options') ?? '');
+  if (attrChoices.length > 0) return { question, choices: attrChoices };
+  if (selfClosing || body === undefined || !body.trim()) return { question };
+  const choices = toChoices(body);
   return choices.length ? { question, choices } : { question };
 }
 
@@ -217,11 +242,43 @@ export function parseToolBlocks(text: string): ParsedToolCall[] {
   return calls;
 }
 
-/** Parse every complete ask block in finished text. */
+/** Unclosed `<ask …>` opener — REQ-134 (models drop the closing tag). */
+const DANGLING_ASK = /<ask\b([^>]*?)\/?>/g;
+
+/**
+ * REQ-134: an `<ask …>` that owns a whole line and never closes — the shape
+ * CommandCode/DeepSeek models actually emit. Matched only once the line ENDS,
+ * and only when no `</ask>` follows on that line, so a properly closed block
+ * still wins the race in `drain()`.
+ */
+const DANGLING_ASK_LINE = /<ask\b([^>]*?)>((?![^\n]*<\/ask>)[^\n]*)\n/g;
+
+/**
+ * Parse every ask block in finished text, closed or not.
+ *
+ * REQ-134: a bare `<ask question="…" choices="a|b|c">` with no `</ask>` is the
+ * shape CommandCode/DeepSeek models actually emit, and the streaming filter
+ * fail-opens it as chat text — this sweep is what turns it back into a real
+ * question card.
+ */
 export function parseAskBlocks(text: string): ParsedAsk[] {
   const asks: ParsedAsk[] = [];
+  const consumed: Array<[number, number]> = [];
   for (const m of text.matchAll(COMPLETE_BLOCK)) {
-    if (m[1] === 'ask') asks.push(toAsk(m[2] ?? '', m[4], m[3] === '/>'));
+    if (m[1] !== 'ask') continue;
+    asks.push(toAsk(m[2] ?? '', m[4], m[3] === '/>'));
+    const at = m.index ?? 0;
+    consumed.push([at, at + m[0].length]);
+  }
+  for (const m of text.matchAll(DANGLING_ASK)) {
+    const at = m.index ?? 0;
+    if (consumed.some(([start, end]) => at >= start && at < end)) continue;
+    // An unclosed body can only be trusted for the rest of its own line —
+    // anything further is prose that must stay visible.
+    const restLine = (text.slice(at + m[0].length).split('\n', 1)[0] ?? '').trim();
+    const body = restLine.includes('|') ? restLine : undefined;
+    const ask = toAsk(m[1] ?? '', body, false);
+    if (ask.question) asks.push(ask);
   }
   return asks;
 }
@@ -234,6 +291,9 @@ export function stripModelBlocks(text: string): string {
     .replace(DSML_INVOKE_BLOCK, '')
     .replace(DSML_TAG, '')
     .replace(COMPLETE_BLOCK, '')
+    // REQ-134: an unclosed `<ask …>` never matches COMPLETE_BLOCK; everything
+    // from the opener on is block markup, not chat text.
+    .replace(/<ask\b[^>]*>[\s\S]*$/, '')
     .replace(/[ \t]+\n/g, '\n')
     .trim();
 }
@@ -261,7 +321,7 @@ export function createBlockFilter(): {
       // All shapes compete by EARLIEST match index (REQ-119 lesson: a fixed
       // priority order lets a trailing markup drop flush a preceding complete
       // invoke as visible text before the invoke parser ever sees it).
-      type Cand = { index: number; len: number; kind: 'fake' | 'callsTag' | 'tool' | 'toolCall' | 'dsml'; m: RegExpExecArray };
+      type Cand = { index: number; len: number; kind: 'fake' | 'callsTag' | 'tool' | 'toolCall' | 'dsml' | 'askLine'; m: RegExpExecArray };
       const cands: Cand[] = [];
       const take = (rx: RegExp, kind: Cand['kind']): void => {
         rx.lastIndex = 0;
@@ -273,6 +333,7 @@ export function createBlockFilter(): {
       take(COMPLETE_BLOCK, 'tool'); // kind refined below via m[1]
       take(TOOL_CALL_BLOCK, 'toolCall');
       take(DSML_INVOKE_BLOCK, 'dsml');
+      take(DANGLING_ASK_LINE, 'askLine');
       if (!cands.length) break;
       cands.sort((a, b) => a.index - b.index);
       const win = cands[0]!;
@@ -291,6 +352,11 @@ export function createBlockFilter(): {
         // COMPLETE_BLOCK serves tool + ask (m[1] disambiguates).
         if (win.m[1] === 'tool') toolCalls.push(toToolCall(win.m[2] ?? '', win.m[4], win.m[3] === '/>'));
         else asks.push(toAsk(win.m[2] ?? '', win.m[4], win.m[3] === '/>'));
+      } else if (win.kind === 'askLine') {
+        // REQ-134: `<ask …>` with no `</ask>` on its own finished line — the
+        // question the model meant to ask, not chat text.
+        const body = (win.m[2] ?? '').trim();
+        asks.push(toAsk(win.m[1] ?? '', body.includes('|') ? body : undefined, false));
       } else if (win.kind === 'toolCall') {
         toolCalls.push(toToolCallShape(win.m[1] ?? ''));
       } else {
@@ -301,6 +367,19 @@ export function createBlockFilter(): {
       // Unclosed fake-result tail is roleplay, not chat — drop it; an
       // unclosed real block stays visible text (fail-open, no phantom call).
       buffer = buffer.replace(FAKE_RESULT_OPEN, '');
+      // REQ-134: an `<ask …>` still open at end-of-stream is a question — no
+      // more text is coming that could close it, so it must not stay chat text.
+      const askAt = buffer.search(/<ask\b/i);
+      if (askAt >= 0 && !/<\/ask/i.test(buffer)) {
+        const raw = buffer.slice(askAt);
+        const head = /^<ask\b([^>]*?)\/?>/.exec(raw);
+        if (head) {
+          const rest = (raw.slice(head[0].length).split('\n', 1)[0] ?? '').trim();
+          const ask = toAsk(head[1] ?? '', rest.includes('|') ? rest : undefined, false);
+          if (ask.question) asks.push(ask);
+          buffer = buffer.slice(0, askAt);
+        }
+      }
       out += buffer;
       buffer = '';
       emitted += out.length;

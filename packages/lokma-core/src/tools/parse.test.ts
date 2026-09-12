@@ -254,4 +254,64 @@ function assert(cond: boolean, label: string): void {
   assert((s1 + s3 + s4 + end.tail).includes('Hello') && (s1 + s3 + s4 + end.tail).includes('end'), 'text around marked blocks streams');
 }
 
+// ─── REQ-134: the `<ask>` shapes models actually emit ────────────────────────
+{
+  // Choices on an attribute, no body — the exact shape seen in the screenshot.
+  const asks = parseAskBlocks(
+    '<ask question="Nereden devam edelim?" choices="sayfayı iyileştir|metinleri düzelt|özellik ekle|öneri listesi ver">',
+  );
+  assert(asks.length === 1, 'bodyless attribute ask is parsed');
+  assert(asks[0]?.question === 'Nereden devam edelim?', 'attribute ask keeps the question');
+  assert(asks[0]?.choices?.length === 4, `attribute ask splits pipe choices, got ${JSON.stringify(asks[0]?.choices)}`);
+}
+{
+  // Closed but bodyless — the attribute must still carry the options.
+  const asks = parseAskBlocks('<ask question="Q?" choices="x|y"></ask>');
+  assert(asks.length === 1 && asks[0]?.choices?.length === 2, 'closed bodyless ask keeps attribute choices');
+}
+{
+  // JSON array body tolerance.
+  const asks = parseAskBlocks('<ask question="Q?">["a","b"]</ask>');
+  assert(JSON.stringify(asks[0]?.choices) === '["a","b"]', 'JSON array body is accepted');
+}
+{
+  // Unclosed body still yields question + choices.
+  const asks = parseAskBlocks('Hazırım <ask question="Devam?">evet|hayır');
+  assert(asks.length === 1 && asks[0]?.choices?.length === 2, 'unclosed ask body still offers choices');
+}
+{
+  // The dangling sweep must not double-count a proper closed block.
+  const asks = parseAskBlocks('<ask question="Q?">a|b</ask>');
+  assert(asks.length === 1, `closed ask counted once, got ${asks.length}`);
+}
+{
+  // Display/storage strip handles the unclosed shape too.
+  const stripped = stripModelBlocks('Merhaba <ask question="Q?" choices="a|b">');
+  assert(stripped === 'Merhaba', `strip removes an unclosed ask, got ${JSON.stringify(stripped)}`);
+}
+
+{
+  // REQ-134 stream shape: a one-line `<ask …>` with no closing tag must be
+  // swallowed live (not shown) and surface as a question.
+  const f = createBlockFilter();
+  let shown = '';
+  shown += f.push('Şu an ortada bir talimat yok.\n');
+  shown += f.push('<ask question="Nereden devam edelim?" choices="a|b|c">\n');
+  shown += f.push('devam eden metin');
+  const end = f.finish();
+  const visible = shown + end.tail;
+  assert(!visible.includes('<ask'), `dangling ask never shows, got ${JSON.stringify(visible)}`);
+  assert(end.asks.length === 1, `dangling ask surfaced as a question, got ${end.asks.length}`);
+  assert(end.asks[0]?.choices?.length === 3, `dangling ask kept its choices, got ${JSON.stringify(end.asks[0]?.choices)}`);
+  assert(visible.includes('devam eden metin'), 'text after the ask line stays visible');
+}
+{
+  // End-of-stream with no trailing newline must not leak either.
+  const f = createBlockFilter();
+  const shown = f.push('tamam <ask question="Q?" choices="x|y">');
+  const end = f.finish();
+  assert(!(shown + end.tail).includes('<ask'), `trailing dangling ask never shows, got ${JSON.stringify(shown + end.tail)}`);
+  assert(end.asks.length === 1 && end.asks[0]?.choices?.length === 2, 'trailing dangling ask surfaced');
+}
+
 console.log(`\nparse probe: ${passed} passed`);

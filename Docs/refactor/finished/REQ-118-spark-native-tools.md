@@ -172,3 +172,15 @@ GÖNDERME — gateway toleranssız olabilir). Tool SONUÇLARI bu fazda mevcut
   Follow-up pins §8c/§8d into adapters.test.ts (committed probe, 75/75 total).
 - **Kesik-tick kurtarma:** önceki tick kodu yazıp commit'leyemeden kesilmişti
   (4 dosya dirty); bu tick devraldı, doğruladı, kapattı — ağaç temiz.
+
+## 9) Loop closure (2026-09-13)
+
+- Cron loop `lokma-spark-native-tools` (4448e7dbd834) is paused: the
+  close-outs in sections 6-8 are shipped, this file sits under
+  `finished/` and the README status is done - no unfinished step remains
+  for a loop tick to pick up.
+- The one open item is environmental, not harness code: the live FAZ B.2
+  pass (real spark `function_call_output` round-trip) needs opencode-go
+  credits - 429 `Monthly usage limit reached. Resets in 7 days.`
+  observed 2026-09-13. Resume the paused job for ONE verification run
+  when the quota resets (~2026-09-18+), then re-pause.

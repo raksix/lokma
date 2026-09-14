@@ -157,3 +157,4 @@
 - [REQ-136](finished/REQ-136-run-turn-budget.md) — Run turn budget is configurable (`loop.maxTurns`, default 100) and a paused run reads as "Run paused", not "Send failed" — done
 - [REQ-137](finished/REQ-137-html-preview-stability.md) — HTML previews run their scripts by default (isolated `allow-scripts`, never `allow-same-origin`) and stop resetting on every session poll — done
 - [REQ-138](finished/REQ-138-home-project-group.md) — Sessions with no project record live under a virtual Home group, pinned first and expanded by default — done
+- [REQ-139](finished/REQ-139-hermes-effort-ladder-and-compact-reasoning.md) — Effort picker follows Hermes' ladder (off→max) with per-wire clamping, and reasoning traces render compact (5 lines + "N more") — done

@@ -25,6 +25,7 @@ import { usePaneStore, useSessionStore } from '@/stores';
 import { SEEN_EVENT, isSessionUnread, markSessionSeen, readSeenMap, seedSeenMap } from '@/stores/session';
 import { emitToast, isMobileViewport, useIsMobile } from '@/components/shell';
 import { ProjectModal } from './project-modal';
+import { readExpandedGroups, writeExpandedGroups } from './group-storage';
 import {
   HOME_PROJECT,
   activityBadge,
@@ -696,7 +697,11 @@ export function SessionsSidebar({
     return () => window.clearInterval(t);
   }, [refreshSessionsQuiet]);
   // REQ-138 — Home is the default landing group, so it starts expanded.
-  const [expandedProjects, setExpandedProjects] = React.useState<Set<string>>(new Set([HOME_KEY]));
+  // REQ-141 — ...unless the user folded something before: the layout is read
+  // back from storage so F5 keeps Home exactly as they left it.
+  const [expandedProjects, setExpandedProjects] = React.useState<Set<string>>(() =>
+    readExpandedGroups(undefined, [HOME_KEY]),
+  );
   const [creatingProjectCwd, setCreatingProjectCwd] = React.useState<string | null>(null);
   // REQ-080 — project records (visible even with zero sessions) + modal.
   // Replaces the REQ-058 inline form (its silent failures read as "does
@@ -741,8 +746,17 @@ export function SessionsSidebar({
     setShowAll(false);
     setOpenAction(null);
     // REQ-138 — collapse everything, then re-open Home: it is the default view.
-    setExpandedProjects(new Set([HOME_KEY]));
+    // REQ-141 — only while searching. Clearing the query must bring back the
+    // layout the user actually chose, not a forced-open Home.
+    setExpandedProjects(query.trim() ? new Set() : readExpandedGroups(undefined, [HOME_KEY]));
   }, [query, groupBy]);
+
+  // REQ-141 — fold state is the user's, so it outlives the tab. Written only
+  // for a settled (non-search) layout: the search-time collapse above is
+  // transient and must not overwrite the stored preference.
+  React.useEffect(() => {
+    if (!query.trim()) writeExpandedGroups(expandedProjects);
+  }, [query, expandedProjects]);
 
   // REQ-138 — sessions that match no project record belong to Home. The lists
   // below carry only the filed ones, so a session never renders twice.

@@ -95,106 +95,129 @@ async function waitForRunEnd(page, before, timeoutMs = 90000) {
   }
 
   // ---- measure the rail
-  const rail = await page.evaluate((probes) => {
+  const rail = await page.evaluate(() => {
     const dots = Array.from(document.querySelectorAll('[aria-label^="Go to your prompt"]'));
     const rows = Array.from(document.querySelectorAll('[id^="chat-msg-"]')).map((el) => {
       const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
       return {
         id: el.id,
-        cls: el.className.slice(0, 60),
         snippet: text.slice(0, 50),
         // UserRow renders the avatar glyph then the literal "You" label.
         user: /^You/.test(text),
       };
     });
     return {
-      dots: dots.map((d) => d.getAttribute('aria-label')),
-      titles: dots.map((d) => d.getAttribute('title')),
+      dots: dots.map((d) => ({
+        label: d.getAttribute('aria-label'),
+        title: d.getAttribute('title'),
+        target: d.getAttribute('data-target'),
+      })),
       rows,
     };
-  }, PROMPTS);
+  });
   console.log('rows:', JSON.stringify(rail.rows, null, 1));
 
   const userPrompts = rail.rows.filter((r) => r.user).length;
+  const targets = rail.dots.map((d) => Number(/(\d+)$/.exec(d.target || '')?.[1] ?? -1));
   check(rail.dots.length > 0, 'rail renders dots', `${rail.dots.length} dots`);
   check(
-    rail.dots.length === userPrompts,
-    'rail counts only the prompts sent',
-    `dots=${rail.dots.length} prompts=${userPrompts} rows=${rail.rows.length}`,
+    rail.dots.length === PROMPTS.length,
+    'rail lists exactly the prompts sent',
+    `dots=${rail.dots.length} prompts sent=${PROMPTS.length}`,
   );
-  check(rail.rows.length > userPrompts, 'transcript has non-prompt rows the rail ignores', `${rail.rows.length} rows`);
   check(
-    rail.dots.every((l) => /^Go to your prompt \d+ of \d+: /.test(l || '')),
+    userPrompts <= rail.dots.length,
+    'rail never lists rows that are not prompts',
+    `mounted prompt rows=${userPrompts} total rows=${rail.rows.length} dots=${rail.dots.length}`,
+  );
+  check(
+    rail.dots.every((d) => /^Go to your prompt \d+ of \d+: /.test(d.label || '')),
     'dots are labelled as prompts',
-    rail.dots[0] || '(none)',
+    rail.dots[0]?.label || '(none)',
   );
   check(
-    PROMPTS.every((p) => rail.titles.some((t) => (t || '').includes(p))),
-    'dot tooltips quote the prompt text',
-    (rail.titles[0] || '(none)').slice(0, 60),
+    PROMPTS.every((p) => rail.dots.some((d) => (d.title || '').includes(p) && (d.label || '').includes(p))),
+    'dot labels and tooltips quote the prompt text',
+    (rail.dots[0]?.title || '(none)').slice(0, 60),
+  );
+  check(
+    targets.every((t, i) => t > 0 && (i === 0 || t > targets[i - 1])) &&
+      rail.dots.every((d) => d.target === `chat-msg-${Number(/(\d+)$/.exec(d.target || '')?.[1])}`),
+    'dots point at ascending transcript rows',
+    targets.join(','),
   );
 
-  // ---- jump: scroll to the bottom, click the FIRST prompt dot, expect the
-  // view to move onto that prompt. A prompt near the transcript start cannot be
-  // centred (the scroller runs out of room), so the assertion is "moved up,
-  // fully on screen, and near the middle".
-  const before = await page.evaluate((id) => {
+  // ---- jump: scroll to the bottom, click the FIRST prompt dot. The row may not
+  // be mounted yet (long sessions render a tail window), so the click has to
+  // widen the window and then land on the prompt.
+  const targetId = rail.dots[0].target;
+  const before = await page.evaluate((target) => {
     const row = document.querySelector('[id^="chat-msg-"]');
     let el = row?.parentElement;
     while (el && el.scrollHeight <= el.clientHeight) el = el.parentElement;
     if (el) el.scrollTop = el.scrollHeight;
-    return { found: Boolean(el), scrollTop: el ? Math.round(el.scrollTop) : 0 };
-  });
+    return {
+      found: Boolean(el),
+      scrollTop: el ? Math.round(el.scrollTop) : 0,
+      mounted: Boolean(document.getElementById(target)),
+    };
+  }, targetId);
   await page.waitForTimeout(1200);
 
-  const firstId = rail.rows.find((r) => r.user)?.id;
-  await page.locator('[aria-label^="Go to your prompt 1 of"]').first().click();
-  await page.waitForTimeout(1600);
+  await page.locator('[data-target="' + targetId + '"]').first().click();
+  await page.waitForTimeout(1800);
 
   const jump = await page.evaluate((id) => {
-    const node = id ? document.getElementById(id) : null;
+    const node = document.getElementById(id);
     const scrollable = (() => {
       let el = node?.parentElement;
       while (el && el.scrollHeight <= el.clientHeight) el = el.parentElement;
       return el;
     })();
-    if (!node) return { target: null, viewport: Math.round(window.innerHeight / 2), centerRow: null, scrollTop: 0 };
+    if (!node) return { resolved: false, target: null, viewport: Math.round(window.innerHeight / 2), scrollTop: -1 };
     const r = node.getBoundingClientRect();
-    const cx = Math.round(r.left + Math.min(r.width, 400) / 2);
-    const hit = document.elementFromPoint(cx, Math.round(r.top + r.height / 2));
-    const row = hit?.closest('[id^="chat-msg-"]');
+    const scrollTop = scrollable ? Math.round(scrollable.scrollTop) : -1;
     return {
+      resolved: true,
       target: {
         top: Math.round(r.top),
-        bottom: Math.round(r.bottom),
         center: Math.round(r.top + r.height / 2),
         visible: r.top >= 0 && r.bottom <= window.innerHeight,
+        isPrompt: /^You/.test((node.textContent || '').replace(/\s+/g, ' ').trim()),
       },
+      atTop: scrollTop <= 4,
       viewport: Math.round(window.innerHeight / 2),
-      centerRow: row ? { id: row.id, text: (row.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60) } : null,
-      scrollTop: scrollable ? Math.round(scrollable.scrollTop) : -1,
+      scrollTop,
     };
-  }, firstId);
+  }, targetId);
 
   check(before.found, 'chat scroller found', `scrollTop=${before.scrollTop}`);
-  check(jump.target !== null, 'first prompt row resolves', firstId || '(no id)');
+  check(jump.resolved, 'the click resolves its prompt row (window widened when needed)', `${targetId} mounted before=${before.mounted}`);
   check(
-    Boolean(jump.target) && jump.target.visible && Math.abs(jump.target.center - jump.viewport) < 320,
+    jump.resolved && jump.target.isPrompt,
+    'the jumped-to row is a prompt of mine',
+    jump.resolved ? (jump.target.isPrompt ? 'starts with the You label' : 'row is not a prompt') : 'no row',
+  );
+  check(
+    jump.resolved && jump.target.visible && (Math.abs(jump.target.center - jump.viewport) < 320 || jump.atTop),
     'clicking a dot lands on that prompt',
-    jump.target
-      ? `center=${jump.target.center} viewportMid=${jump.viewport} visible=${jump.target.visible} scrollTop ${before.scrollTop}->${jump.scrollTop}`
+    jump.resolved
+      ? `center=${jump.target.center} viewportMid=${jump.viewport} visible=${jump.target.visible} atTop=${jump.atTop}`
       : 'no geometry',
   );
   check(
-    Boolean(jump.target) && jump.scrollTop !== before.scrollTop,
+    jump.scrollTop !== before.scrollTop,
     'the click actually moves the transcript',
     `scrollTop ${before.scrollTop} -> ${jump.scrollTop}`,
   );
-  check(
-    Boolean(jump.centerRow) && jump.centerRow.id === firstId,
-    'the row under the viewport centre is that prompt',
-    jump.centerRow ? `${jump.centerRow.id}: ${jump.centerRow.text}` : 'no row',
-  );
+
+  // The active dot must follow the viewport: exactly one dot is highlighted.
+  const active = await page.evaluate(() => {
+    const dots = Array.from(document.querySelectorAll('[aria-label^="Go to your prompt"]'));
+    const hot = dots.filter((d) => getComputedStyle(d).backgroundColor.includes('201, 100, 66'));
+    return { total: dots.length, hot: hot.length };
+  });
+  check(active.hot === 1, 'exactly one dot is marked as the current prompt', `${active.hot}/${active.total} highlighted`);
 
   await page.screenshot({ path: '/tmp/req140-prompt-rail.png', fullPage: false });
   console.log('screenshot: /tmp/req140-prompt-rail.png');

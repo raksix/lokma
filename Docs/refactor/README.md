@@ -159,3 +159,4 @@
 - [REQ-138](finished/REQ-138-home-project-group.md) — Sessions with no project record live under a virtual Home group, pinned first and expanded by default — done
 - [REQ-139](finished/REQ-139-hermes-effort-ladder-and-compact-reasoning.md) — Effort picker follows Hermes' ladder (off→max) with per-wire clamping, and reasoning traces render compact (5 lines + "N more") — done
 - [REQ-140](finished/REQ-140-prompt-rail-jump-list.md) — Chat dot rail lists only the user's own prompts (whole transcript, prompts above the render window included) and a click widens the window then lands on that prompt — done
+- [REQ-141](finished/REQ-141-sidebar-group-persistence.md) — Sidebar group folding (Home included) is stored in `localStorage` under `lokma-sidebar-groups` and comes back after a reload; the search-time collapse stays transient and never overwrites the user's layout — done

@@ -3,6 +3,7 @@
  * Run: `bun src/components/sessions/sessions.test.ts` (no DOM, no server).
  */
 import {
+  DAY_GROUP_ORDER,
   HOME_PROJECT,
   activityBadge,
   dayGroup,
@@ -44,11 +45,19 @@ const list: SessionSummary[] = [
   sess({ id: 'sess_bare' }),
 ];
 
-// dayGroup
+// dayGroup (REQ-142 buckets: Today · Yesterday · Last week · Last month · Older)
 check('today buckets Today', dayGroup(iso(NOW - 60_000), NOW) === 'Today');
 check('yesterday buckets Yesterday', dayGroup(iso(NOW - 26 * 3_600_000), NOW) === 'Yesterday');
-check('old buckets Earlier', dayGroup(iso(NOW - 5 * 86_400_000), NOW) === 'Earlier');
-check('missing/NaN buckets Earlier', dayGroup(undefined, NOW) === 'Earlier' && dayGroup('nope', NOW) === 'Earlier');
+check('2 days buckets Last week', dayGroup(iso(NOW - 2 * 86_400_000), NOW) === 'Last week');
+check('7 days still Last week', dayGroup(iso(NOW - 7 * 86_400_000), NOW) === 'Last week');
+check('8 days buckets Last month', dayGroup(iso(NOW - 8 * 86_400_000), NOW) === 'Last month');
+check('30 days still Last month', dayGroup(iso(NOW - 30 * 86_400_000), NOW) === 'Last month');
+check('31 days buckets Older', dayGroup(iso(NOW - 31 * 86_400_000), NOW) === 'Older');
+check('missing/NaN buckets Older', dayGroup(undefined, NOW) === 'Older' && dayGroup('nope', NOW) === 'Older');
+check(
+  'every bucket has a place in the render order',
+  DAY_GROUP_ORDER.join(',') === 'Today,Yesterday,Last week,Last month,Older',
+);
 
 // relativeTime
 check('minutes', relativeTime(iso(NOW - 2 * 60_000), NOW) === '2m ago');
@@ -74,7 +83,9 @@ check('no match empty', filterSessions(list, 'zzz').length === 0);
 const timeGroups = groupSessions(list, 'time', NOW);
 check(
   'time groups skip empties in order',
-  timeGroups.map((g) => g.key).join(',') === 'Today,Yesterday,Earlier',
+  // REQ-142 — sess_old is 5 days old (Last week) and the timestamp-less
+  // sess_bare falls to Older, so the two new buckets both show up here.
+  timeGroups.map((g) => g.key).join(',') === 'Today,Yesterday,Last week,Older',
 );
 check('today holds newest', timeGroups[0].items[0].id === 'sess_today');
 const projGroups = groupSessions(list, 'project', NOW);
@@ -100,12 +111,18 @@ check('badge missing is empty', activityBadge(undefined, NOW) === '' && activity
 const shuffled: SessionSummary[] = [list[2], sess({ id: 'sess_bare' }), list[1], list[0]];
 const sortedToday = groupSessions(shuffled, 'time', NOW).find((g) => g.key === 'Today');
 check('time group sorts newest first', (sortedToday?.items.map((s) => s.id) ?? []).join(',') === 'sess_today');
-const earlierGroup = groupSessions(
-  [sess({ id: 'e_old', updatedAt: iso(NOW - 9 * 86_400_000) }), sess({ id: 'e_new', updatedAt: iso(NOW - 4 * 86_400_000) })],
+const lastMonthGroup = groupSessions(
+  [sess({ id: 'lm_old', updatedAt: iso(NOW - 20 * 86_400_000) }), sess({ id: 'lm_new', updatedAt: iso(NOW - 9 * 86_400_000) })],
   'time',
   NOW,
-).find((g) => g.key === 'Earlier');
-check('earlier group sorts newest first', (earlierGroup?.items.map((s) => s.id) ?? []).join(',') === 'e_new,e_old');
+).find((g) => g.key === 'Last month');
+check('last month group sorts newest first', (lastMonthGroup?.items.map((s) => s.id) ?? []).join(',') === 'lm_new,lm_old');
+const olderGroup = groupSessions(
+  [sess({ id: 'e_old', updatedAt: iso(NOW - 120 * 86_400_000) }), sess({ id: 'e_new', updatedAt: iso(NOW - 40 * 86_400_000) })],
+  'time',
+  NOW,
+).find((g) => g.key === 'Older');
+check('older group sorts newest first', (olderGroup?.items.map((s) => s.id) ?? []).join(',') === 'e_new,e_old');
 const projLokma = groupSessions(
   [sess({ id: 'p_old', cwd: '/x/lokma', updatedAt: iso(NOW - 9 * 86_400_000) }), sess({ id: 'p_new', cwd: '/x/lokma', updatedAt: iso(NOW - 60_000) })],
   'project',

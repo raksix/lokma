@@ -3,11 +3,14 @@
  * be confused with "the user folded everything".
  */
 import {
+  GROUP_MODE_KEY,
   GROUP_STORAGE_KEY,
   parseGroupKeys,
   readExpandedGroups,
+  readGroupBy,
   serializeGroupKeys,
   writeExpandedGroups,
+  writeGroupBy,
 } from './group-storage';
 
 const assert = (cond: boolean, label: string) => {
@@ -84,4 +87,16 @@ assert(readExpandedGroups(hostile, ['home']).size === 1, 'a throwing read falls 
 writeExpandedGroups(['home'], hostile);
 assert(true, 'a throwing write is swallowed');
 
-console.log('group-storage.test.ts: all REQ-141 checks passed');
+// 8. REQ-142 — the grouping mode persists too (default: the normal day list).
+assert(readGroupBy(fakeStorage()) === 'time', 'no stored mode means the day list');
+assert(readGroupBy(fakeStorage({ [GROUP_MODE_KEY]: 'nonsense' })) === 'time', 'an unknown mode falls back to the day list');
+const modeStore = fakeStorage();
+writeGroupBy('project', modeStore);
+assert(readGroupBy(modeStore) === 'project', 'switching to the project view is remembered');
+writeGroupBy('time', modeStore);
+assert(readGroupBy(modeStore) === 'time', 'switching back is remembered too');
+assert(readGroupBy(hostile) === 'time', 'a throwing mode read falls back');
+writeGroupBy('project', hostile);
+assert(true, 'a throwing mode write is swallowed');
+
+console.log('group-storage.test.ts: all REQ-141/142 checks passed');

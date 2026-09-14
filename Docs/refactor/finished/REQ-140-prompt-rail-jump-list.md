@@ -28,12 +28,13 @@ Ek olarak ray yalnızca **render edilen pencereyi** tarıyordu; uzun bir session
 ## Kanıt
 
 - `bun packages/lokma-web/web/src/components/chat/single-chat-view.test.ts` → REQ-140 için **9/9 PASS**: sadece user satırları anchor oluyor, mutlak index korunuyor, pencere dışı promptlar kapsanıyor, prompt yoksa ray yok, satır sonu tek satıra iniyor, 48 karakter + `…`, boş prompt etiketi. (Dosyadaki REQ-111 interleave testleri de aynı koşuda 11/11 geçiyor.)
-- **Canlı prob** `scripts/probe-prompt-rail.cjs` → `https://lokma.fermag.com.tr` üzerinde **13 passed, 0 failed** (2026-09-14 14:00; ilk koşu 13:52'de 11/11 idi, aşağıdaki iki ek doğrulama sonradan eklendi):
-  - Yeni session'da `PROMPT RAIL PROBE ONE/TWO/THREE` gönderildi; DOM'da **7 satır** var (3 kullanıcı + 3 asistan + 1 session-created satırı), ray tam **3 nokta** çizdi.
-  - Nokta etiketleri `Go to your prompt 1 of 3: PROMPT RAIL PROBE ONE`, tooltip'ler prompt metnini taşıyor.
-  - Transcript en alta kaydırıldı (`scrollTop=1257`), ilk noktaya tıklandı → hedef satır (`chat-msg-1`) görünür, viewport merkezinde (`center=276`, `viewportMid=450`, üstte kaldığı için `atTop=true`), `scrollTop 1257 → 0`; nokta hedefleri transcript index'leriyle birebir (`data-target="chat-msg-<index>"`, artan sırada `1,16,18`).
-  - **Tam olarak bir nokta** aktif prompt olarak işaretli (`1/3 highlighted`); ray asla "konum yok" göstermiyor.
+- **Canlı prob** `scripts/probe-prompt-rail.cjs` → `https://lokma.fermag.com.tr` üzerinde **13 passed, 0 failed** (2026-09-14 14:06; ilk koşu 13:52'de 11/11 idi, nokta hedefi + aktif nokta doğrulamaları sonradan eklendi):
+  - Yeni session'da 3 prompt gönderildi: `PROMPT RAIL PROBE ONE`, `PROMPT RAIL PROBE TWO`, `PROMPT RAIL PROBE TWO` — **sonuncu bilerek tekrar**: aynı metin bile kendi noktasını almalı, çünkü nokta hedefleri prompt metni değil **transcript index'i** (`chat-msg-<index>`). Prob bu yüzden "nokta sayısı = gönderilen prompt sayısı" ve "hedefler artan sırada" kontrollerini yapar; o koşuda tekrar eden iki prompt ayrı satırlara (`chat-msg-24` / `chat-msg-25`) düştü.
+  - Her noktanın etiketi `Go to your prompt N of M: <prompt metni>` kalıbında; tooltip'i prompt metnini taşıyor.
+  - Transcript en alta kaydırılıp ilk noktaya tıklandı → hedef satır `chat-msg-1` çözüldü ve kaydırma gerçekten gitti (`scrollTop 2268 → 0`); varılan satır bir prompt satırı (`You` etiketiyle başlıyor) ve görünür.
+  - **Tam olarak bir nokta** aktif prompt olarak işaretli (`1/3 highlighted`); beklenti sabit bir RGB değil, canlı `--color-terracotta` token'ından okunuyor (o koşuda `#c96442`) — palet yeniden temalansa da kontrol yanlış sebepten düşmez. Ray asla "konum yok" göstermiyor.
   - Başarısız istek yok (favicon + yeni session transcript 404'ü tasarım gereği ayıklanıyor).
+  - Aksiyon yarışını önlemek için prob `reducedMotion: 'reduce'` emüle eder (`scrollBehavior()` `'auto'`ya düşer, tıklama animasyonla yarışmaz) ve tarayıcı/sunucu gerektirmeyen bir **`--self-test`** modu taşır: DOM'suz yardımcılar (`accentTriplet`, `benign`) 9/9 PASS.
   - Ekran görüntüsü: `/tmp/req140-prompt-rail.png`.
 - Kapı: `bun x tsc --noEmit` 0 hata (commit `1368107` kapsamında).
 

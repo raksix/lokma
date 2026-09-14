@@ -84,11 +84,19 @@ export function displayTitle(s: SessionSummary): string {
   return t || s.id;
 }
 
+/**
+ * REQ-138 — the virtual project that holds every session belonging to no
+ * project record: a session with no cwd, or one whose cwd matches no project.
+ * It renders like any other project group (top of the sidebar, first in
+ * "By project" mode) instead of being scattered across Today/Yesterday.
+ */
+export const HOME_PROJECT = 'Home';
+
 /** Project label from the session cwd (last path segment, `~`-aware). */
 export function projectOf(s: SessionSummary): string {
   const cwd = (s.cwd ?? '').replace(/\/+$/, '');
-  if (!cwd) return 'default';
-  if (cwd === '~' || cwd === '~/') return 'Home';
+  if (!cwd) return HOME_PROJECT;
+  if (cwd === '~') return HOME_PROJECT;
   const parts = cwd.split('/');
   return parts[parts.length - 1] || cwd;
 }
@@ -111,6 +119,29 @@ export function sameCwd(a: string | null | undefined, b: string | null | undefin
 /** Sidebar count label with correct singular (`1 msg`, otherwise `N msgs`). */
 export function messageCountLabel(count: number): string {
   return count === 1 ? '1 msg' : `${count} msgs`;
+}
+
+/**
+ * REQ-138 — split the session list against the known project records:
+ * `home` holds everything that matches no project (no cwd at all, or a cwd
+ * nobody has claimed), `inProjects` holds the rest. The sidebar renders `home`
+ * as the Home project and keeps `inProjects` for the time/by-project lists, so
+ * a session shows up exactly once.
+ */
+export function splitByProjects(
+  sessions: SessionSummary[],
+  projectCwds: (string | null | undefined)[],
+): { home: SessionSummary[]; inProjects: SessionSummary[] } {
+  // A project record with no cwd is not a location: it must not claim every
+  // cwd-less session, because `sameCwd('', '')` is true by design.
+  const cwds = projectCwds.filter((c): c is string => Boolean((c ?? '').trim()));
+  const home: SessionSummary[] = [];
+  const inProjects: SessionSummary[] = [];
+  for (const s of sessions) {
+    if (cwds.some((c) => sameCwd(s.cwd, c))) inProjects.push(s);
+    else home.push(s);
+  }
+  return { home, inProjects };
 }
 
 /** Case-insensitive substring match over title + id + model. */
@@ -146,7 +177,13 @@ export function groupSessions(
     }
     return [...byProject.entries()]
       .map(([key, items]) => ({ key, label: key, items: [...items].sort(byRecency) }))
-      .sort((a, b) => b.items.length - a.items.length || a.key.localeCompare(b.key));
+      // REQ-138 — Home is pinned first, like a real project: it is the default
+      // landing group, not just the biggest pile.
+      .sort((a, b) => {
+        if (a.key === HOME_PROJECT) return -1;
+        if (b.key === HOME_PROJECT) return 1;
+        return b.items.length - a.items.length || a.key.localeCompare(b.key);
+      });
   }
   const buckets: Record<DayGroup, SessionSummary[]> = { Today: [], Yesterday: [], Earlier: [] };
   for (const s of sessions) buckets[dayGroup(s.updatedAt, now)].push(s);

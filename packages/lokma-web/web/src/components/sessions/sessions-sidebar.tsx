@@ -8,6 +8,7 @@ import {
   FolderPlus,
   GitFork,
   GitMerge,
+  Home,
   LayoutGrid,
   MoreVertical,
   Pencil,
@@ -25,12 +26,14 @@ import { SEEN_EVENT, isSessionUnread, markSessionSeen, readSeenMap, seedSeenMap 
 import { emitToast, isMobileViewport, useIsMobile } from '@/components/shell';
 import { ProjectModal } from './project-modal';
 import {
+  HOME_PROJECT,
   activityBadge,
   displayTitle,
   filterSessions,
   groupSessions,
   relativeTime,
   sameCwd,
+  splitByProjects,
 } from './grouping';
 
 /**
@@ -47,6 +50,13 @@ import {
  */
 
 const RENDER_CAP = 120;
+
+/**
+ * REQ-138 — expansion key of the virtual Home group. Kept separate from the
+ * `entity:<id>` keys project records use so Home can start expanded without
+ * touching any real project's state.
+ */
+const HOME_KEY = 'home';
 
 /** Live read of the seen-map; re-renders dots on `markSessionSeen`. */
 function useSeenMap(): Record<string, string> {
@@ -451,6 +461,7 @@ function ProjectGroup({
   onNewSession,
   onDeleteProject,
   onDeleteEntity,
+  icon,
   rowProps,
 }: {
   label: string;
@@ -461,9 +472,12 @@ function ProjectGroup({
   sessions: SessionSummary[];
   onToggle: () => void;
   onNewSession: () => void;
-  onDeleteProject: () => void;
+  /** REQ-138: Home is a virtual project — no cwd, no bulk delete. */
+  onDeleteProject?: () => void;
   /** REQ-080: entity delete (project records only — cwd groups pass nothing). */
   onDeleteEntity?: () => void;
+  /** REQ-138: leading glyph (Home renders a house instead of a bare name). */
+  icon?: React.ReactNode;
   rowProps: (s: SessionSummary) => {
     onAction: (a: Exclude<RowAction, null>) => void;
     onResume: () => void;
@@ -505,7 +519,8 @@ function ProjectGroup({
           title={expanded ? 'Collapse — show recent 5' : `Show all ${items.length} sessions in ${label}`}
           aria-expanded={expanded}
         >
-          {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />} {label}
+          {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
+          {icon ? <span className="shrink-0">{icon}</span> : null} {label}
         </button>
         <span className="text-[10px] font-normal normal-case tracking-normal shrink-0">
           {items.length}
@@ -542,22 +557,26 @@ function ProjectGroup({
               >
                 <Plus className="w-3 h-3 shrink-0" /> New session here
               </button>
-              <button
-                role="menuitem"
-                className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                onClick={() => {
-                  setMenuOpen(false);
-                  try {
-                    void navigator.clipboard.writeText(cwd);
-                    emitToast('Project path copied');
-                  } catch {
-                    emitToast('Copy failed');
-                  }
-                }}
-              >
-                <Check className="w-3 h-3 shrink-0" /> Copy project path
-              </button>
-              {confirmingDelete ? (
+              {cwd ? (
+                <button
+                  role="menuitem"
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    try {
+                      void navigator.clipboard.writeText(cwd);
+                      emitToast('Project path copied');
+                    } catch {
+                      emitToast('Copy failed');
+                    }
+                  }}
+                >
+                  <Check className="w-3 h-3 shrink-0" /> Copy project path
+                </button>
+              ) : null}
+              {/* REQ-138: Home has no cwd and no bulk delete — it is a view of
+                  the sessions nobody has filed under a project record. */}
+              {onDeleteProject && confirmingDelete ? (
                 <div className="flex items-center gap-1 px-2.5 py-1.5">
                   <span className="text-[11px] text-red-600 flex-1">Delete all {items.length}?</span>
                   <Button
@@ -581,29 +600,28 @@ function ProjectGroup({
                     Delete
                   </Button>
                 </div>
-              ) : (
-                <>
-                  <button
-                    role="menuitem"
-                    className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
-                    onClick={() => setConfirmingDelete(true)}
-                  >
-                    <Trash2 className="w-3 h-3 shrink-0" /> Delete all sessions…
-                  </button>
-                  {onDeleteEntity ? (
-                    <button
-                      role="menuitem"
-                      className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        onDeleteEntity();
-                      }}
-                    >
-                      <Trash2 className="w-3 h-3 shrink-0" /> Delete project
-                    </button>
-                  ) : null}
-                </>
-              )}
+              ) : null}
+              {onDeleteProject && !confirmingDelete ? (
+                <button
+                  role="menuitem"
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                  onClick={() => setConfirmingDelete(true)}
+                >
+                  <Trash2 className="w-3 h-3 shrink-0" /> Delete all sessions…
+                </button>
+              ) : null}
+              {onDeleteEntity ? (
+                <button
+                  role="menuitem"
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onDeleteEntity();
+                  }}
+                >
+                  <Trash2 className="w-3 h-3 shrink-0" /> Delete project
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -677,7 +695,8 @@ export function SessionsSidebar({
     const t = window.setInterval(() => void refreshSessionsQuiet(), 4000);
     return () => window.clearInterval(t);
   }, [refreshSessionsQuiet]);
-  const [expandedProjects, setExpandedProjects] = React.useState<Set<string>>(new Set());
+  // REQ-138 — Home is the default landing group, so it starts expanded.
+  const [expandedProjects, setExpandedProjects] = React.useState<Set<string>>(new Set([HOME_KEY]));
   const [creatingProjectCwd, setCreatingProjectCwd] = React.useState<string | null>(null);
   // REQ-080 — project records (visible even with zero sessions) + modal.
   // Replaces the REQ-058 inline form (its silent failures read as "does
@@ -721,10 +740,18 @@ export function SessionsSidebar({
   React.useEffect(() => {
     setShowAll(false);
     setOpenAction(null);
-    setExpandedProjects(new Set());
+    // REQ-138 — collapse everything, then re-open Home: it is the default view.
+    setExpandedProjects(new Set([HOME_KEY]));
   }, [query, groupBy]);
 
-  const filtered = React.useMemo(() => filterSessions(sessions, query), [sessions, query]);
+  // REQ-138 — sessions that match no project record belong to Home. The lists
+  // below carry only the filed ones, so a session never renders twice.
+  const { home, inProjects } = React.useMemo(
+    () => splitByProjects(sessions, projects.map((p) => p.cwd)),
+    [sessions, projects],
+  );
+  const filtered = React.useMemo(() => filterSessions(inProjects, query), [inProjects, query]);
+  const homeItems = React.useMemo(() => filterSessions(home, query), [home, query]);
   const groups = React.useMemo(() => groupSessions(filtered, groupBy), [filtered, groupBy]);
   const totalShown = showAll ? filtered.length : Math.min(filtered.length, RENDER_CAP);
 
@@ -916,15 +943,30 @@ export function SessionsSidebar({
             {lastError}
           </div>
         ) : null}
-        {projects.length > 0 ? (
-          <div>
-            <div className="px-1 py-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-400 flex items-center gap-1">
-              Projects
-              <span className="ml-auto text-[10px] font-normal normal-case tracking-normal">
-                {projects.length}
-              </span>
-            </div>
-            {projects.map((p) => {
+        <div>
+          <div className="px-1 py-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-400 flex items-center gap-1">
+            Projects
+            <span className="ml-auto text-[10px] font-normal normal-case tracking-normal">
+              {projects.length + 1}
+            </span>
+          </div>
+          {/* REQ-138 — Home is pinned first and expanded by default: every
+              session with no project record lives here, so the sidebar always
+              has a usable default group. It is a virtual project (no cwd, no
+              bulk delete) rendered with the same component as real ones. */}
+          <ProjectGroup
+            label={HOME_PROJECT}
+            icon={<Home className="w-3 h-3" />}
+            items={homeItems}
+            expanded={expandedProjects.has(HOME_KEY)}
+            activeId={activeId}
+            openAction={openAction}
+            sessions={sessions}
+            onToggle={() => toggleProject(HOME_KEY)}
+            onNewSession={handleCreate}
+            rowProps={makeRowProps}
+          />
+          {projects.map((p) => {
               // REQ-087: tolerant cwd match — a session whose stored cwd has
               // a trailing slash still belongs to this project entity.
               const inProject = sessions.filter((s) => sameCwd(s.cwd, p.cwd));
@@ -947,9 +989,8 @@ export function SessionsSidebar({
                   rowProps={makeRowProps}
                 />
               );
-            })}
-          </div>
-        ) : null}
+          })}
+        </div>
         {groups.map(({ key, label, items }) =>
           groupBy === 'project' ? (
             <ProjectGroup
@@ -994,7 +1035,7 @@ export function SessionsSidebar({
           </div>
           ),
         )}
-        {filtered.length === 0 && !(loading && sessions.length === 0) ? (
+        {filtered.length === 0 && homeItems.length === 0 && !(loading && sessions.length === 0) ? (
           <div className="p-4 text-center text-xs text-zinc-400">
             {query ? 'No matching sessions' : 'No sessions yet — create one above.'}
           </div>

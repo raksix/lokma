@@ -39,12 +39,20 @@ type QueuedPrompt = { key: number; text: string };
 
 const MODE_KEY = 'lokma-composer-mode';
 const THINKING_KEY = 'lokma-composer-thinking';
-/** Composer thinking picker (REQ-133) — `off` sends no reasoning field. */
+/**
+ * Composer thinking picker (REQ-133 → REQ-139) — `off` sends no reasoning
+ * field. The list is Hermes' EFFORT_LADDER verbatim (minimal → max) rather
+ * than a per-model menu: adapters clamp the pick down to the nearest level the
+ * model accepts, so the list can stay honest without lying about the model.
+ */
 const THINKING_LEVELS: { id: ReasoningEffort; label: string; hint: string }[] = [
   { id: 'off', label: 'Off', hint: 'Answer straight away — fastest, fewest tokens.' },
+  { id: 'minimal', label: 'Minimal', hint: 'A nudge of reasoning — still quick.' },
   { id: 'low', label: 'Low', hint: 'Short reasoning pass before the answer.' },
   { id: 'medium', label: 'Medium', hint: 'Balanced reasoning budget (recommended).' },
-  { id: 'high', label: 'High', hint: 'Deep reasoning — slowest, most tokens.' },
+  { id: 'high', label: 'High', hint: 'Deep reasoning — slower, more tokens.' },
+  { id: 'xhigh', label: 'Extra High', hint: 'Very deep reasoning — much slower.' },
+  { id: 'max', label: 'Max', hint: 'Top tier — slowest, most tokens.' },
 ];
 
 /** Persisted pick; unknown/stale values fall back to `off`. */
@@ -726,9 +734,9 @@ export function Composer({
             {thinkOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setThinkOpen(false)} />
-                <div className="absolute bottom-[calc(100%+8px)] left-0 z-50 w-[250px] overflow-hidden rounded-xl border border-line bg-white p-1 shadow-2xl dark:border-[#2A2A2E] dark:bg-[#111113]">
+                <div className="absolute bottom-[calc(100%+8px)] left-0 z-50 max-h-[340px] w-[250px] overflow-y-auto rounded-xl border border-line bg-white p-1 shadow-2xl dark:border-[#2A2A2E] dark:bg-[#111113]">
                   <div className="px-2.5 pt-2 pb-1 text-[10px] font-semibold tracking-widest text-zinc-500 uppercase">
-                    Thinking budget
+                    Effort
                   </div>
                   {THINKING_LEVELS.map((l) => (
                     <button

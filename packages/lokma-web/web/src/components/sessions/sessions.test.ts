@@ -3,6 +3,7 @@
  * Run: `bun src/components/sessions/sessions.test.ts` (no DOM, no server).
  */
 import {
+  HOME_PROJECT,
   activityBadge,
   dayGroup,
   displayTitle,
@@ -12,6 +13,7 @@ import {
   projectOf,
   relativeTime,
   sameCwd,
+  splitByProjects,
 } from './grouping';
 import type { SessionSummary } from '@/lib/api';
 
@@ -59,7 +61,7 @@ check('missing is empty', relativeTime(undefined, NOW) === '');
 check('title wins', displayTitle(list[0]) === 'Refactor auth middleware');
 check('id fallback', displayTitle(list[3]) === 'sess_bare');
 check('project basename', projectOf(list[0]) === 'lokma' && projectOf(list[1]) === 'bounty');
-check('project default', projectOf(list[3]) === 'default');
+check('project default', projectOf(list[3]) === 'Home');
 
 // filterSessions
 check('title match', filterSessions(list, 'webhook').map((s) => s.id).join() === 'sess_yesterday');
@@ -78,7 +80,8 @@ check('today holds newest', timeGroups[0].items[0].id === 'sess_today');
 const projGroups = groupSessions(list, 'project', NOW);
 check(
   'project groups by cwd basename, biggest first',
-  projGroups.map((g) => `${g.key}:${g.items.length}`).join(',') === 'lokma:2,bounty:1,default:1',
+  // REQ-138 — the cwd-less session now lands in Home, which is pinned first.
+  projGroups.map((g) => `${g.key}:${g.items.length}`).join(',') === 'Home:1,lokma:2,bounty:1',
 );
 
 // messageCountLabel (area C screenshot review: `1 msgs` read wrong)
@@ -117,6 +120,35 @@ check('sameCwd both slashed', sameCwd('/x/proj//', '/x/proj/') === true);
 check('sameCwd different', sameCwd('/x/proj', '/x/other') === false);
 check('sameCwd empty vs set', sameCwd('', '/x/proj') === false && sameCwd(null, undefined) === true);
 check('sameCwd home', sameCwd('~', '~/') === true);
+
+// splitByProjects (REQ-138 — Home is "every session with no project record")
+const split = splitByProjects(list, ['/mnt/apopic/lokma']);
+check(
+  'split: filed sessions stay in their project',
+  split.inProjects.map((s) => s.id).join() === 'sess_today,sess_old',
+);
+check(
+  'split: unfiled sessions land in Home',
+  split.home.map((s) => s.id).join() === 'sess_yesterday,sess_bare',
+);
+check(
+  'split: tolerant cwd match (trailing slash)',
+  splitByProjects(list, ['/mnt/apopic/lokma/']).home.map((s) => s.id).join() === 'sess_yesterday,sess_bare',
+);
+check(
+  'split: no projects means everything is Home',
+  splitByProjects(list, []).home.length === 4 && splitByProjects(list, []).inProjects.length === 0,
+);
+check(
+  'split: `~` sessions are Home',
+  splitByProjects([sess({ id: 'h', cwd: '~' })], ['/x/proj']).home.map((s) => s.id).join() === 'h',
+);
+check(
+  'split: cwd-less project records do not swallow cwd-less sessions',
+  // A project with no cwd must not claim every cwd-less session (sameCwd('' , '') is true).
+  splitByProjects([sess({ id: 'h' })], [null, undefined]).home.map((s) => s.id).join() === 'h',
+);
+check('home label is a constant', HOME_PROJECT === 'Home');
 
 console.log(`sessions probe: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

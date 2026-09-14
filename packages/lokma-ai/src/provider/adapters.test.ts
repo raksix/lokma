@@ -11,7 +11,7 @@ import { type AddressInfo } from 'node:net';
 import { AnthropicAdapter, toAnthropicMessages, toAnthropicTools } from './anthropic';
 import { ProviderError } from './errors';
 import { nativeCallInput, nativeCallToToolBlock, nativeToolsBlocked, looksLikeToolPairingError, looksLikeToolsUnsupported, OpenAIAdapter, responsesHttpError, shortModelId, toChatMessages, toChatTools, ToolCallAccumulator, toResponsesInput, toResponsesTools, unseenSuffix, usesResponsesApi } from './openai';
-import { activeEffort, anthropicThinkingBudget, looksLikeReasoningUnsupported, reasoningBlocked, reasoningKey, resetReasoningMemory } from './reasoning';
+import { OPENAI_COMPAT_WIRE_EFFORTS, RESPONSES_WIRE_EFFORTS, activeEffort, anthropicThinkingBudget, clampEffort, looksLikeReasoningUnsupported, reasoningBlocked, reasoningKey, resetReasoningMemory } from './reasoning';
 import { zodToJsonSchema } from './tools-schema';
 import { stream } from '../stream';
 
@@ -909,8 +909,18 @@ resetReasoningMemory();
 // 13a. Pure helpers — the level map and the narrow probe wording.
 assert(activeEffort('off') === null && activeEffort(undefined) === null, 'off/undefined ask for no reasoning field');
 assert(activeEffort('medium') === 'medium', 'a real level passes through');
-assert(anthropicThinkingBudget('low') === 1024, 'low maps to the Anthropic thinking floor');
+assert(anthropicThinkingBudget('low') === 2048, 'low keeps a short reasoning pass');
 assert(anthropicThinkingBudget('high') === 6144, 'high stays under max_tokens');
+// REQ-139 — the top rungs are clamped under max_tokens instead of 400-ing.
+assert(anthropicThinkingBudget('minimal') === 1024, 'minimal sits on the floor');
+assert(anthropicThinkingBudget('xhigh') === 7168, 'xhigh clamps under the 8192 max_tokens ceiling');
+assert(anthropicThinkingBudget('max') === 7168, 'max clamps under the same ceiling');
+assert(anthropicThinkingBudget('max', 32768) === 12288, 'a bigger max_tokens lets max reach its budget');
+assert(clampEffort('minimal', OPENAI_COMPAT_WIRE_EFFORTS) === 'minimal', 'a supported rung passes through');
+assert(clampEffort('xhigh', RESPONSES_WIRE_EFFORTS) === 'xhigh', 'Responses accepts xhigh verbatim');
+assert(clampEffort('minimal', RESPONSES_WIRE_EFFORTS) === 'low', 'an unsupported rung falls to the nearest stronger one');
+assert(clampEffort('xhigh', ['low', 'medium', 'high']) === 'high', 'an unsupported rung falls to the nearest weaker one');
+assert(clampEffort('max', ['minimal']) === 'minimal', 'the weakest declared level wins when nothing weaker exists');
 assert(looksLikeReasoningUnsupported(400, 'reasoning_effort is not supported'), 'reasoning wording is a probe hit');
 assert(!looksLikeReasoningUnsupported(400, 'invalid api key'), 'an unrelated 400 is never a reasoning probe');
 assert(!looksLikeReasoningUnsupported(401, 'reasoning_effort not supported'), 'non-capability statuses are not probes');

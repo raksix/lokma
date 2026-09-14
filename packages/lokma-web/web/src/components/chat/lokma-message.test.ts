@@ -5,7 +5,7 @@
  * Not imported by app code, so the Vite bundle ignores it.
  */
 import { applyServerFrame, dropRequest, initialWsUiState, permissionAnswer, questionAnswer } from '@/lib/ws';
-import { describeToolCall, formatBytes, parseMarkdownBlocks, sanitizeMdUrl, splitCodeFences, stripThinkingMarkup, summarizeInput, summarizeResult, transcriptToolEntry } from './lokma-message';
+import { describeToolCall, formatBytes, parseMarkdownBlocks, reasoningPreview, sanitizeMdUrl, splitCodeFences, stripThinkingMarkup, summarizeInput, summarizeResult, transcriptToolEntry } from './lokma-message';
 
 function assert(cond: boolean, label: string): void {
   if (!cond) throw new Error(`FAIL: ${label}`);
@@ -139,3 +139,21 @@ console.log('lokma-message.test.ts: all W1-2 checks passed');
   assert(stripThinkingMarkup('a\n\n\n\nb') === 'a\n\nb', 'blank runs collapsed');
 }
 console.log('lokma-message.test.ts: REQ-124 thinking-strip checks passed');
+
+// REQ-139 — compact reasoning preview (Hermes `_emit_reasoning_preview` parity).
+{
+  const multi = reasoningPreview('one\ntwo\n\nthree\n\nfour\n\nfive\n\nsix\n\nseven');
+  assert(multi.lines.length === 5, 'preview keeps at most five lines');
+  assert(multi.more === 1, 'the cut remainder is reported');
+  assert(multi.lines[0] === 'one two', 'a paragraph collapses to one wrapped line');
+  assert(multi.lines[1] === 'three', 'paragraphs keep their order');
+
+  const short = reasoningPreview('just one thought');
+  assert(short.more === 0 && short.lines.length === 1, 'a short trace is shown whole');
+
+  const capped = reasoningPreview('a\n\nb\n\nc', 2);
+  assert(capped.lines.length === 2 && capped.more === 1, 'the cap is a parameter');
+
+  assert(reasoningPreview('   \n\n  \n\n').lines.length === 0, 'blank-only reasoning yields no lines');
+}
+console.log('lokma-message.test.ts: REQ-139 reasoning-preview checks passed');

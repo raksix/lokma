@@ -33,11 +33,17 @@ assert(readThinking() === 'off', 'an empty store defaults to off');
 store.set('lokma-composer-thinking', 'high');
 assert(readThinking() === 'high', 'a stored level is honoured');
 
-// 3. A stale value (older pick, typo, hand-edited storage) degrades to off.
+// 3. Every rung of the REQ-139 ladder survives a reload (Hermes parity).
+for (const level of ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const) {
+  store.set('lokma-composer-thinking', level);
+  assert(readThinking() === level, `the ${level} rung is honoured`);
+}
+
+// 4. A stale value (older pick, typo, hand-edited storage) degrades to off.
 store.set('lokma-composer-thinking', 'ultra');
 assert(readThinking() === 'off', 'a stale value degrades to off');
 
-// 4. Private mode / blocked storage must not break the composer.
+// 5. Private mode / blocked storage must not break the composer.
 globals.localStorage = {
   getItem: () => {
     throw new Error('storage denied');

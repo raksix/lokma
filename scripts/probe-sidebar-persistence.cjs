@@ -89,6 +89,16 @@ function clickHome(page) {
   await page.goto(`${BASE}/?token=${encodeURIComponent(TOKEN)}`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(7000);
 
+  // REQ-142 — Home is a project-view group; the normal view groups every
+  // session by day. Switch the sidebar over (a fresh context starts in day mode).
+  const switched = await page.evaluate(() => {
+    const btn = document.querySelector('button[aria-label="Group by project"]');
+    if (btn) btn.click();
+    return Boolean(btn);
+  });
+  check(switched, 'the sidebar can be switched to the project view (REQ-142)');
+  await page.waitForTimeout(1200);
+
   const initial = await homeState(page);
   check(initial.found, 'the Home group is rendered', initial.label);
   check(initial.expanded === true, 'a fresh browser starts with Home open (default layout)');
@@ -110,6 +120,12 @@ function clickHome(page) {
   const afterReload = await homeState(page);
   check(afterReload.expanded === false, 'F5 keeps Home folded', `aria-expanded=${afterReload.expanded}`);
   check(afterReload.stored === '[]', 'the stored layout survived the reload', `stored=${afterReload.stored}`);
+  // REQ-142 — the mode is remembered as well: the reload must not drop the
+  // user back into the day list (the toggle would offer "Group by project" again).
+  const modeAfterReload = await page.evaluate(() =>
+    document.querySelector('button[aria-label="Group by day"]') ? 'project' : 'time',
+  );
+  check(modeAfterReload === 'project', 'the project view survived the reload', modeAfterReload);
 
   // ---- search folds everything while it runs; clearing must restore the fold
   const search = page.locator('input[type="search"], input[placeholder*="Search" i]').first();

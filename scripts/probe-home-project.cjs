@@ -55,6 +55,20 @@ const ok = (name, pass, detail) => {
   await page.goto(`${BASE}/?token=${TOKEN}`, { waitUntil: 'domcontentloaded' });
   await sleep(6000);
 
+  // REQ-142 — the normal view groups *every* session by day; Home only exists
+  // in the project view. Switch over before snapshotting, and make sure the
+  // stored preference from an earlier run cannot decide the mode for us.
+  await page.evaluate(() => {
+    try {
+      localStorage.removeItem('lokma-sidebar-groupby');
+    } catch {
+      /* ignore */
+    }
+    const btn = document.querySelector('button[aria-label="Group by project"]');
+    if (btn) btn.click();
+  });
+  await sleep(1500);
+
   const snapshot = await page.evaluate(() => {
     // A group is a header button plus the block that holds its list. Group
     // headers carry a chevron plus a count badge as siblings — composer

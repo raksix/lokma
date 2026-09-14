@@ -253,6 +253,7 @@ function DotNav({
         <button
           key={anchor.index}
           onClick={() => onJump(anchor.index)}
+          data-target={`chat-msg-${anchor.index}`}
           className={cn(
             'h-2 w-2 shrink-0 rounded-full transition hover:scale-[1.4]',
             i === activeIndex ? 'bg-terracotta shadow' : 'bg-zinc-300 hover:bg-terracotta dark:bg-zinc-600',

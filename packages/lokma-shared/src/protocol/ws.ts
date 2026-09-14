@@ -15,8 +15,20 @@ import { z } from 'zod';
  * (Anthropic). Kept as one shared union so the client picker, the wire
  * schema and the adapters cannot drift apart.
  */
-export const REASONING_EFFORTS = ['off', 'low', 'medium', 'high'] as const;
+/**
+ * REQ-139 — the reasoning ladder, mirroring Hermes' `EFFORT_LADDER`.
+ *
+ * One shared vocabulary, wider than any single wire accepts; each adapter
+ * clamps the pick down to the nearest level its model supports instead of the
+ * composer having to know per-model capabilities. `off` is not a wire level:
+ * it means "send no reasoning field at all".
+ */
+export const REASONING_EFFORTS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
+/** The ladder without `off`, weakest → strongest (clamping order). */
+export const REASONING_LADDER = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
+export type ActiveReasoningEffort = (typeof REASONING_LADDER)[number];
 
 export const ClientMessageSchema = z.discriminatedUnion('type', [
   z.object({

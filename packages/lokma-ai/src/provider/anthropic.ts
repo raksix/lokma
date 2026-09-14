@@ -150,7 +150,7 @@ export class AnthropicAdapter implements ProviderAdapter {
           ...(system.length ? { system: system.join('\n') } : {}),
           messages: toAnthropicMessages(turns),
           ...(tools.length > 0 ? { tools, tool_choice: { type: 'auto' } } : {}),
-          ...(effort ? { thinking: { type: 'enabled', budget_tokens: anthropicThinkingBudget(effort) } } : {}),
+          ...(effort ? { thinking: { type: 'enabled', budget_tokens: anthropicThinkingBudget(effort, MAX_TOKENS) } } : {}),
         }),
       });
     let res: Response;

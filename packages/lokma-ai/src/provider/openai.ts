@@ -1,10 +1,14 @@
 import { ProviderError } from './errors.js';
 import { isLocalBaseUrl, readErrorSnippet, readSse } from './sse.js';
 import {
+  OPENAI_COMPAT_WIRE_EFFORTS,
+  RESPONSES_WIRE_EFFORTS,
+  clampEffort,
   looksLikeReasoningUnsupported,
   markReasoningRejected,
   reasoningBlocked,
   reasoningKey,
+  type ActiveReasoning,
 } from './reasoning.js';
 import type { ReasoningEffort } from '@lokma/shared/protocol/ws';
 import type { AdapterStreamOpts, ProviderAdapter, ProviderMessage, ProviderToolSchema, StreamChunk } from './types.js';
@@ -482,10 +486,15 @@ export class OpenAIAdapter implements ProviderAdapter {
     // REQ-133: thinking budget for this request. `off`/undefined means "no
     // reasoning field"; pairs already known to refuse it are skipped up
     // front, and the probe below clears it for the retry.
-    let effort: ReasoningEffort | null =
+    // REQ-139 — clamp the ladder pick to what this wire accepts, so a level the
+    // model never heard of costs nothing (Hermes' EFFORT_LADDER + clamp_effort).
+    const pickedEffort: ActiveReasoning | null =
       opts.reasoningEffort && opts.reasoningEffort !== 'off' && !reasoningBlocked(reasoningKey(base, shortModelId(opts.model)))
         ? opts.reasoningEffort
         : null;
+    let effort: ActiveReasoning | null = pickedEffort
+      ? clampEffort(pickedEffort, viaResponses ? RESPONSES_WIRE_EFFORTS : OPENAI_COMPAT_WIRE_EFFORTS)
+      : null;
     const buildBody = (): Record<string, unknown> =>
       viaResponses
         ? {

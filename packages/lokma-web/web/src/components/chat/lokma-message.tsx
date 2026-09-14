@@ -609,13 +609,29 @@ export function stripThinkingMarkup(text: string): string {
       .trim()
   );
 }
+/**
+ * REQ-139 — Hermes-style compact reasoning preview (`_emit_reasoning_preview`):
+ * collapse every paragraph down to one wrapped line, keep the head, and report
+ * how much was cut instead of dumping the whole trace into the transcript.
+ */
+export const REASONING_PREVIEW_LINES = 5;
+export function reasoningPreview(text: string, maxLines = REASONING_PREVIEW_LINES): { lines: string[]; more: number } {
+  const lines = text
+    .split(/\n{2,}/)
+    .map((p) => p.replace(/\s*\n\s*/g, ' ').trim())
+    .filter(Boolean);
+  return { lines: lines.slice(0, maxLines), more: Math.max(0, lines.length - maxLines) };
+}
+
 export function ThinkingTrace({ thinking, streaming }: { thinking: string; streaming: boolean }) {
+  const [expanded, setExpanded] = React.useState(false);
   if (!thinking) return null;
   // REQ-124: reasoning models echo tool markup into thinking — show the
   // human-readable remainder (whole-string strip, never per-delta fragments).
   const readable = stripThinkingMarkup(thinking);
   if (!readable && !streaming) return null;
   const shown = readable || thinking;
+  const { lines, more } = reasoningPreview(shown);
   return (
     <details
       open={streaming}
@@ -628,8 +644,20 @@ export function ThinkingTrace({ thinking, streaming }: { thinking: string; strea
           {shown.length > 120 ? `${shown.slice(0, 120)}…` : shown}
         </span>
       </summary>
-      <div className="max-h-48 overflow-auto border-t border-line px-3 py-2 text-xs leading-[1.6] text-zinc-500 whitespace-pre-wrap">
-        {shown}
+      {/* REQ-139: preview is capped at REASONING_PREVIEW_LINES lines — the rest
+          stays one click away instead of pushing the answer off screen. */}
+      <div className="border-t border-line px-3 py-2 text-xs leading-[1.6] text-zinc-500">
+        <div className="max-h-48 overflow-auto whitespace-pre-wrap">
+          {expanded ? shown : lines.join('\n')}
+        </div>
+        {more > 0 && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="mt-1 text-[11px] font-medium text-zinc-500 underline decoration-dotted hover:text-terracotta"
+          >
+            {expanded ? 'Show less' : `${more} more line${more === 1 ? '' : 's'}`}
+          </button>
+        )}
       </div>
     </details>
   );

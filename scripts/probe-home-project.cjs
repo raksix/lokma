@@ -11,8 +11,12 @@
  *   4. its sessions do not reappear in the lists below (no duplicates).
  *
  * Usage:
- *   TOKEN=... NODE_PATH=/root/test-hermes/node_modules \
- *     xvfb-run -a node scripts/probe-home-project.cjs [--url https://lokma.fermag.com.tr]
+ *   TK=$(HOME=/root bun scripts/mint-e2e-token.mjs | tail -1)
+ *   NODE_PATH=/root/test-hermes/node_modules \
+ *     xvfb-run -a node scripts/probe-home-project.cjs --url https://lokma.fermag.com.tr --token "$TK"
+ *
+ * (TOKEN=... in the environment still works.) The probe switches the sidebar
+ * to the project view first — REQ-142 moved Home out of the normal day list.
  *
  * Exit code 0 = Home behaves like a project; 1 = regression.
  */
@@ -22,7 +26,10 @@ const BASE = process.argv.includes('--url')
   ? process.argv[process.argv.indexOf('--url') + 1]
   : 'https://lokma.fermag.com.tr';
 const CHROME = process.env.LOKMA_CHROME || '/root/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome';
-const TOKEN = process.env.TOKEN;
+// Accept the flag like the other probes; TOKEN= still works for old muscle memory.
+const TOKEN =
+  (process.argv.includes('--token') ? process.argv[process.argv.indexOf('--token') + 1] : '') ||
+  process.env.TOKEN;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 if (!TOKEN) {

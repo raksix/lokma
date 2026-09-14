@@ -7,7 +7,21 @@ import type { SessionSummary } from '@/lib/api';
  * + by-project), now operating on real `GET /api/sessions` summaries.
  */
 
-export type DayGroup = 'Today' | 'Yesterday' | 'Earlier';
+/**
+ * REQ-142 — day buckets for the *normal* (non-project) list. Coarser than
+ * before on purpose: a sidebar is scanned, not read, so "4d ago" and "19d ago"
+ * do not deserve their own headings.
+ */
+export type DayGroup = 'Today' | 'Yesterday' | 'Last week' | 'Last month' | 'Older';
+
+/** Render order, oldest bucket last (missing timestamps land in `Older`). */
+export const DAY_GROUP_ORDER: DayGroup[] = [
+  'Today',
+  'Yesterday',
+  'Last week',
+  'Last month',
+  'Older',
+];
 
 const DAY_MS = 86_400_000;
 
@@ -18,15 +32,21 @@ function startOfDay(ts: number): number {
   return d.getTime();
 }
 
-/** Bucket one ISO timestamp into Today / Yesterday / Earlier. */
+/**
+ * Bucket one ISO timestamp: Today · Yesterday · Last week (2–7 days) ·
+ * Last month (8–30 days) · Older. Anything unparseable is `Older` — a session
+ * with no usable timestamp is never recent.
+ */
 export function dayGroup(iso: string | undefined, now: number = Date.now()): DayGroup {
-  if (!iso) return 'Earlier';
+  if (!iso) return 'Older';
   const ts = Date.parse(iso);
-  if (Number.isNaN(ts)) return 'Earlier';
+  if (Number.isNaN(ts)) return 'Older';
   const diffDays = Math.round((startOfDay(now) - startOfDay(ts)) / DAY_MS);
   if (diffDays <= 0) return 'Today';
   if (diffDays === 1) return 'Yesterday';
-  return 'Earlier';
+  if (diffDays <= 7) return 'Last week';
+  if (diffDays <= 30) return 'Last month';
+  return 'Older';
 }
 
 /** Short relative label: `2m ago`, `3h ago`, `Yesterday`, `4d ago`, `12 Jan`. */
@@ -185,9 +205,19 @@ export function groupSessions(
         return b.items.length - a.items.length || a.key.localeCompare(b.key);
       });
   }
-  const buckets: Record<DayGroup, SessionSummary[]> = { Today: [], Yesterday: [], Earlier: [] };
+  // REQ-142 — ordered buckets: the empty ones drop out, the rest stay in
+  // Today → Older order (never `Object.keys` order, which is insertion order).
+  const buckets: Record<DayGroup, SessionSummary[]> = {
+    Today: [],
+    Yesterday: [],
+    'Last week': [],
+    'Last month': [],
+    Older: [],
+  };
   for (const s of sessions) buckets[dayGroup(s.updatedAt, now)].push(s);
-  return (Object.keys(buckets) as DayGroup[])
-    .filter((g) => buckets[g].length > 0)
-    .map((g) => ({ key: g, label: g, items: buckets[g].sort(byRecency) }));
+  return DAY_GROUP_ORDER.filter((g) => buckets[g].length > 0).map((g) => ({
+    key: g,
+    label: g,
+    items: buckets[g].sort(byRecency),
+  }));
 }

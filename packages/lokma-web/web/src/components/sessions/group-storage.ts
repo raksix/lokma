@@ -57,3 +57,32 @@ export function writeExpandedGroups(keys: Iterable<string>, storage?: Storage | 
     /* quota / disabled storage — the layout just will not persist */
   }
 }
+
+/**
+ * REQ-142 — the grouping *mode* is part of the same preference: a user who
+ * switched to "by project" should not land back in the day list after F5.
+ * `time` (the normal, date-grouped list) is the default.
+ */
+export const GROUP_MODE_KEY = 'lokma-sidebar-groupby';
+
+export type GroupByMode = 'time' | 'project';
+
+export function readGroupBy(storage?: Storage | null): GroupByMode {
+  const store = storage === undefined ? safeStorage() : storage;
+  let raw: string | null = null;
+  try {
+    raw = store ? store.getItem(GROUP_MODE_KEY) : null;
+  } catch {
+    return 'time';
+  }
+  return raw === 'project' ? 'project' : 'time';
+}
+
+export function writeGroupBy(mode: GroupByMode, storage?: Storage | null): void {
+  const store = storage === undefined ? safeStorage() : storage;
+  try {
+    store?.setItem(GROUP_MODE_KEY, mode);
+  } catch {
+    /* quota / disabled storage — the mode just will not persist */
+  }
+}

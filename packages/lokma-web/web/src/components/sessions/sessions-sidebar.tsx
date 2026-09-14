@@ -23,9 +23,19 @@ import { cn } from '@/lib/utils';
 import { api, type AuthProject, type SessionSummary } from '@/lib/api';
 import { usePaneStore, useSessionStore } from '@/stores';
 import { SEEN_EVENT, isSessionUnread, markSessionSeen, readSeenMap, seedSeenMap } from '@/stores/session';
-import { emitToast, isMobileViewport, useIsMobile } from '@/components/shell';
+import {
+  emitToast,
+  isMobileViewport,
+  useIsMobile,
+} from '@/components/shell';
 import { ProjectModal } from './project-modal';
-import { readExpandedGroups, writeExpandedGroups } from './group-storage';
+import {
+  readExpandedGroups,
+  readGroupBy,
+  writeExpandedGroups,
+  writeGroupBy,
+  type GroupByMode,
+} from './group-storage';
 import {
   HOME_PROJECT,
   activityBadge,
@@ -682,7 +692,7 @@ export function SessionsSidebar({
   const mergeSessions = useSessionStore((s) => s.mergeSessions);
 
   const [query, setQuery] = React.useState('');
-  const [groupBy, setGroupBy] = React.useState<'time' | 'project'>('time');
+  const [groupBy, setGroupBy] = React.useState<GroupByMode>(() => readGroupBy());
   const [openAction, setOpenAction] = React.useState<{ id: string; action: RowAction } | null>(null);
   const [showAll, setShowAll] = React.useState(false);
   const [creating, setCreating] = React.useState(false);
@@ -766,8 +776,29 @@ export function SessionsSidebar({
   );
   const filtered = React.useMemo(() => filterSessions(inProjects, query), [inProjects, query]);
   const homeItems = React.useMemo(() => filterSessions(home, query), [home, query]);
-  const groups = React.useMemo(() => groupSessions(filtered, groupBy), [filtered, groupBy]);
-  const totalShown = showAll ? filtered.length : Math.min(filtered.length, RENDER_CAP);
+  // REQ-142 — the normal (time) list is not a project view: it shows EVERY
+  // session, Home ones included, and only splits them by day. The project view
+  // keeps the split, because there Home is a group of its own.
+  const allFiltered = React.useMemo(() => filterSessions(sessions, query), [sessions, query]);
+  const groups = React.useMemo(
+    () => groupSessions(groupBy === 'project' ? filtered : allFiltered, groupBy),
+    [allFiltered, filtered, groupBy],
+  );
+  // Counts and the render cap follow the list actually on screen.
+  const listed = groupBy === 'project' ? filtered.length : allFiltered.length;
+  const totalShown = showAll ? listed : Math.min(listed, RENDER_CAP);
+  // Project mode always renders the Projects section (Home included), so the
+  // list can look "empty" while Home still has rows to show.
+  const emptyList = listed === 0 && (groupBy === 'project' ? homeItems.length === 0 : true);
+  const toggleGroupMode = React.useCallback(() => {
+    setGroupBy((prev) => (prev === 'time' ? 'project' : 'time'));
+  }, []);
+
+  // REQ-142 — remember the mode itself: switching to "by project" and hitting
+  // F5 should not silently drop you back into the day list.
+  React.useEffect(() => {
+    writeGroupBy(groupBy);
+  }, [groupBy]);
 
   const handleCreate = React.useCallback(() => {
     setCreating(true);
@@ -928,16 +959,18 @@ export function SessionsSidebar({
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            onClick={() => setGroupBy(groupBy === 'time' ? 'project' : 'time')}
-            title={groupBy === 'time' ? 'Group by project' : 'Group by time'}
-           aria-label={groupBy === 'time' ? 'Group by project' : 'Group by time'}>
+            onClick={toggleGroupMode}
+            title={groupBy === 'time' ? 'Group by project' : 'Group by day'}
+           aria-label={groupBy === 'time' ? 'Group by project' : 'Group by day'}>
             <LayoutGrid className="w-3 h-3" />
           </Button>
         </div>
         <div className="flex items-center gap-1 text-[11px] text-zinc-500">
           <Clock className="w-3 h-3" />
-          {groupBy === 'time' ? 'Today / Yesterday / Earlier' : 'By project'} · {filtered.length}{' '}
-          session{filtered.length === 1 ? '' : 's'}
+          <span title={groupBy === 'time' ? 'Today / Yesterday / Last week / Last month / Older' : 'One group per project'}>
+            {groupBy === 'time' ? 'By day' : 'By project'}
+          </span>{' '}
+          · {listed}{' '}session{listed === 1 ? '' : 's'}
           <button
             className="ml-auto underline underline-offset-2 hover:text-terracotta"
             onClick={() => void refreshSessions()}
@@ -957,6 +990,10 @@ export function SessionsSidebar({
             {lastError}
           </div>
         ) : null}
+        {/* REQ-142 — the Projects section (Home included) belongs to the project
+            view only. In the normal view every session is in a day bucket, so
+            rendering Home as well would list those sessions twice. */}
+        {groupBy === 'project' ? (
         <div>
           <div className="px-1 py-1 text-[10px] font-semibold tracking-widest uppercase text-zinc-400 flex items-center gap-1">
             Projects
@@ -1005,6 +1042,7 @@ export function SessionsSidebar({
               );
           })}
         </div>
+        ) : null}
         {groups.map(({ key, label, items }) =>
           groupBy === 'project' ? (
             <ProjectGroup
@@ -1049,19 +1087,19 @@ export function SessionsSidebar({
           </div>
           ),
         )}
-        {filtered.length === 0 && homeItems.length === 0 && !(loading && sessions.length === 0) ? (
+        {emptyList && !(loading && sessions.length === 0) ? (
           <div className="p-4 text-center text-xs text-zinc-400">
             {query ? 'No matching sessions' : 'No sessions yet — create one above.'}
           </div>
         ) : null}
-        {!showAll && filtered.length > RENDER_CAP ? (
+        {!showAll && listed > RENDER_CAP ? (
           <Button
             variant="outline"
             size="sm"
             className="w-full h-7 text-xs"
             onClick={() => setShowAll(true)}
           >
-            Show all {filtered.length} ({totalShown} shown)
+            Show all {listed} ({totalShown} shown)
           </Button>
         ) : null}
         {/* Fork shortcut row: double-click a title forks; single click resumes. */}

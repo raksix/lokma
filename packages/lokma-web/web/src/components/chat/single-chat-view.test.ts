@@ -5,7 +5,8 @@
  * Not imported by app code, so the Vite bundle ignores it.
  */
 import type { ToolCallEntry } from '@/lib/ws';
-import { interleaveLiveBlocks } from './single-chat-view';
+import { interleaveLiveBlocks, promptAnchors, promptLabel } from './single-chat-view';
+import type { TranscriptMessage } from './single-chat-view';
 
 function assert(cond: boolean, label: string): void {
   if (!cond) throw new Error(`FAIL: ${label}`);
@@ -57,3 +58,40 @@ blocks = interleaveLiveBlocks('hi', [], { c9: call('read') });
 assert(blocks.length === 2 && blocks[1].kind === 'tool' && blocks[1].callId === 'c9', 'unmarked call trails, never lost');
 
 console.log('single-chat-view.test.ts: all REQ-111 interleave checks passed');
+
+// ---------------------------------------------------------------- REQ-140
+// The rail lists the user's own prompts only, and a click must land on the
+// prompt row — which only user/assistant rows carry (`chat-msg-<index>`).
+
+function msg(role: string, content: string): TranscriptMessage {
+  return { role, content };
+}
+
+// 8. Only `user` rows become anchors — assistant/tool/thinking rows are skipped.
+const mixed = [
+  msg('user', 'first prompt'),
+  msg('assistant', 'answer'),
+  msg('thinking', 'thought'),
+  msg('tool', '{"tool":"read"}'),
+  msg('user', 'second prompt'),
+];
+let anchors = promptAnchors(mixed);
+assert(anchors.length === 2, 'anchors cover user prompts only');
+assert(anchors[0].index === 0 && anchors[1].index === 4, 'anchors keep absolute transcript indices');
+assert(anchors[0].label === 'first prompt', 'anchor label is the prompt text');
+
+// 9. Rails read the whole transcript, so a prompt above the render window still
+//    gets a dot; its index stays the scroll target.
+anchors = promptAnchors([msg('user', 'old prompt'), msg('assistant', 'x'), msg('user', 'later prompt')]);
+assert(anchors.length === 2 && anchors[1].index === 2, 'anchors cover prompts outside the render window too');
+
+// 10. No prompts → no rail (empty sessions stay clean).
+assert(promptAnchors([msg('assistant', 'a'), msg('tool', 'b')]).length === 0, 'no user rows means no dots');
+
+// 11. Labels are single-line and capped, so long prompts stay readable.
+assert(promptLabel('line one\nline two') === 'line one line two', 'newlines collapse to one line');
+assert(promptLabel('x'.repeat(80)).length === 48, 'long prompt is capped at 48 chars');
+assert(promptLabel('x'.repeat(80)).endsWith('…'), 'capped label ends with an ellipsis');
+assert(promptLabel('   ') === 'Empty prompt', 'blank prompt still gets a label');
+
+console.log('single-chat-view.test.ts: all REQ-140 prompt-rail checks passed');

@@ -75,9 +75,9 @@ function check(cond, label, extra = '') {
   check(header.trim().toLowerCase() === 'effort', 'picker header reads Effort', header.trim());
 
   const labels = await page.evaluate(() => {
-    // Picker rows carry a hint line (`block pl-3`) — the composer trigger does
-    // not, so this picks rows without depending on aria attributes.
-    const rows = Array.from(document.querySelectorAll('button')).filter((b) => b.querySelector('span.block.pl-3'));
+    // Rows carry `data-effort-option={id}` (REQ-143 dropped the hint line the
+    // old selector keyed on) — the composer trigger has no such attribute.
+    const rows = Array.from(document.querySelectorAll('button[data-effort-option]'));
     return rows.map((b) => (b.textContent || '').trim());
   });
   const seen = EXPECTED.filter((l) => labels.some((t) => t.startsWith(l)));
@@ -87,6 +87,31 @@ function check(cond, label, extra = '') {
     `saw ${JSON.stringify(seen)}`,
   );
   check(labels.length === EXPECTED.length, 'no duplicate rows in the picker', `${labels.length} rows`);
+
+  // REQ-143: the picker dropped its per-rung descriptions and got compact.
+  const menu = await page.evaluate(() => {
+    const el = document.querySelector('[data-effort-menu]');
+    if (!el) return null;
+    const rows = Array.from(el.querySelectorAll('button[data-effort-option]'));
+    const rect = el.getBoundingClientRect();
+    const texts = rows.map((r) => (r.textContent || '').trim());
+    return {
+      h: Math.round(rect.height),
+      w: Math.round(rect.width),
+      rowHeights: rows.map((r) => Math.round(r.getBoundingClientRect().height)),
+      maxWords: Math.max(...texts.map((t) => t.split(/\s+/).length)),
+      texts,
+    };
+  });
+  if (!menu) {
+    check(false, 'the effort menu is addressable', 'data-effort-menu not found');
+  } else {
+    const tallest = Math.max(...menu.rowHeights);
+    check(tallest <= 32, 'every rung is one compact line', `tallest ${tallest}px [${menu.rowHeights.join(',')}]`);
+    check(menu.h <= 240, 'the menu stays short', `${menu.h}px tall`);
+    check(menu.w <= 200, 'the menu stays narrow', `${menu.w}px wide`);
+    check(menu.maxWords <= 2, 'no description text under the labels', JSON.stringify(menu.texts));
+  }
 
   // 3. Pick the top rung and confirm persistence.
   await page.locator('button', { hasText: /^Max/ }).first().click();

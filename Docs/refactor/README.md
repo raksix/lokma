@@ -155,3 +155,4 @@
 - [REQ-134](finished/REQ-134-ask-question-system.md) — Ask-the-user questions render as visual question cards (attribute + unclosed `<ask>` shapes included) — done
 - [REQ-135](finished/REQ-135-native-ask-tool.md) — Native `ask_user` tool (aliases `ask`/`clarify`, gate-exempt, loop-owned) so tool-calling models stop hitting "Unknown tool: ask" — done
 - [REQ-136](finished/REQ-136-run-turn-budget.md) — Run turn budget is configurable (`loop.maxTurns`, default 100) and a paused run reads as "Run paused", not "Send failed" — done
+- [REQ-137](finished/REQ-137-html-preview-stability.md) — HTML previews run their scripts by default (isolated `allow-scripts`, never `allow-same-origin`) and stop resetting on every session poll — done

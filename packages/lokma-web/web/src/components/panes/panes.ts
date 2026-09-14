@@ -174,6 +174,17 @@ export function filePreviewKind(path: string): FilePreviewKind {
 }
 
 /**
+ * Does this page need scripts to become what its author meant? (REQ-137) The
+ * html preview runs sandboxed without script permission — safe, but a
+ * self-contained demo (WebGL scene, loader-driven UI) then just sits on its
+ * loading screen and reads as broken. Detecting the tag lets the pane explain
+ * why and offer the opt-in instead of looking dead.
+ */
+export function htmlNeedsScripts(html: string): boolean {
+  return /<script[\s>]/i.test(html);
+}
+
+/**
  * Open-or-focus a file tab in a pane state (REQ-002): the same path owned by
  * the same session focuses its existing tab instead of duplicating it;
  * anything else appends a fresh live file tab and activates it.

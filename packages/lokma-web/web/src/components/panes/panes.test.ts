@@ -19,6 +19,7 @@ import {
   filePreviewKind,
   findLayoutNode,
   findParentNode,
+  htmlNeedsScripts,
   inspectorLabel,
   isInspectorTabId,
   isPaneOnlyTab,
@@ -269,6 +270,17 @@ check("ts is text", filePreviewKind("src/a.ts") === "text");
 check("no ext is text", filePreviewKind("Makefile") === "text");
 
 console.log(`panes-075: ${passed} passed, ${failed} failed`);
+if (failed > 0) process.exit(1);
+
+/* REQ-137 — htmlNeedsScripts: pages that stay dead in a scriptless preview. */
+check("a script tag needs scripts", htmlNeedsScripts("<script>1</script>"));
+check("script with attributes needs scripts", htmlNeedsScripts('<script src="a.js" defer></script>'));
+check("uppercase script tag needs scripts", htmlNeedsScripts("<SCRIPT>x</SCRIPT>"));
+check("plain markup does not", !htmlNeedsScripts("<h1>hi</h1>"));
+check("the word script in prose does not", !htmlNeedsScripts("<p>use a script</p>"));
+check("empty html does not", !htmlNeedsScripts(""));
+
+console.log(`panes-137: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
 
 /* 11 — REQ-089: fullscreen modal subtree helpers (live view, never a copy). */

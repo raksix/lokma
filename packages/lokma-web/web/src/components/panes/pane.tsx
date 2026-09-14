@@ -11,16 +11,19 @@ import {
   GitFork,
   GitMerge,
   GripVertical,
+  Info,
   Loader2,
   Maximize,
   MessageSquare,
   Pencil,
   PenLine,
   PictureInPicture2,
+  Play,
   Plus,
   Rows2,
   Save,
   Search,
+  Square,
   Trash2,
   Wrench,
   X,
@@ -45,6 +48,7 @@ import {
   dropZoneFor,
   encodeTabMove,
   filePreviewKind,
+  htmlNeedsScripts,
   isInspectorTabId,
   isValidRelPath,
   makeFileTab,
@@ -74,7 +78,8 @@ import { TAB_ICONS } from './tab-icons';
 //
 // REQ-075: preview mode for markdown/html/pdf/images — rendered output
 // instead of raw bytes, with an Edit toggle back to source. Markdown reuses
-// the chat renderer; html is scriptless (`sandbox=""`); pdf/images load raw
+// the chat renderer; html previews start scriptless (`sandbox=""`) and carry
+// an explicit Run opt-in (REQ-137); pdf/images load raw
 // bytes as an object URL (never decoded as text).
 export function PaneFilePreview({
   sessionId,
@@ -111,6 +116,16 @@ export function PaneFilePreview({
   const previewable = kind !== 'text';
   const [mode, setMode] = React.useState<'preview' | 'source'>(previewable ? 'preview' : 'source');
   const [blobUrl, setBlobUrl] = React.useState<string | null>(null);
+  // REQ-137: HTML previews run their scripts by default - a self-contained page
+  // (WebGL scene, loader-driven UI) is dead weight on its loading screen without
+  // them. They stay isolated: the frame gets `allow-scripts` and NOT
+  // `allow-same-origin`, so it keeps an opaque origin and can never reach the
+  // app's DOM, storage or cookies. The opt-out is one click away (toolbar Stop +
+  // the banner below) for pages you don't want running.
+  const [runScripts, setRunScripts] = React.useState(true);
+  const htmlPreview = kind === 'html' && mode === 'preview';
+  const scriptsOn = htmlPreview && runScripts;
+  const scriptsPaused = htmlPreview && !runScripts && htmlNeedsScripts(content);
 
   const dirty = editing && status === 'ok' && draft !== content;
   const dirtyKey = tabId ?? `${sessionId}:${path}`;
@@ -124,6 +139,13 @@ export function PaneFilePreview({
   // cwd comes from the cached server list — never a detail GET (fresh
   // sessions used to 404 here once per mounted file tab).
   const known = useKnownSession(sessionId);
+  // REQ-137: a live run re-polls the session list, and every poll returns fresh
+  // summary objects. Keying the loader off the `known` object itself made it re-run
+  // every few seconds, which reset the preview (back to "loading", scripts off)
+  // while the user was reading it. Depend on the primitives that actually matter:
+  // the workspace path and whether the list has arrived yet.
+  const knownCwd = known && known !== 'loading' ? (known.cwd ?? '') : null;
+  const listReady = known !== 'loading';
   const load = React.useCallback(async () => {
     setStatus('loading');
     setError('');
@@ -134,8 +156,8 @@ export function PaneFilePreview({
       if (prev) URL.revokeObjectURL(prev);
       return null;
     });
-    if (known === 'loading') return;
-    if (!known) {
+    if (!listReady) return;
+    if (knownCwd === null) {
       setError('Session has no workspace yet');
       setStatus('error');
       return;
@@ -144,7 +166,7 @@ export function PaneFilePreview({
     // binary) — raw bytes become an object URL instead.
     if (kind === 'pdf' || kind === 'image') {
       try {
-        const blob = await api.readWorkspaceFileRaw(known.cwd ?? '', path);
+        const blob = await api.readWorkspaceFileRaw(knownCwd, path);
         setBlobUrl(URL.createObjectURL(blob));
         setMeta({ sha: '', size: blob.size, truncated: false });
         setStatus('ok');
@@ -155,7 +177,7 @@ export function PaneFilePreview({
       return;
     }
     try {
-      const file = await api.readWorkspaceFile(known.cwd ?? '', path);
+      const file = await api.readWorkspaceFile(knownCwd, path);
       setContent(file.content);
       setMeta({ sha: file.sha, size: file.size, truncated: file.truncated });
       setStatus('ok');
@@ -163,7 +185,7 @@ export function PaneFilePreview({
       setError(err instanceof Error ? err.message : 'Could not load the file');
       setStatus('error');
     }
-  }, [sessionId, path, known, kind]);
+  }, [sessionId, path, knownCwd, listReady, kind]);
 
   React.useEffect(() => {
     void load();
@@ -379,6 +401,23 @@ export function PaneFilePreview({
             )}
           </div>
         ) : null}
+        {htmlPreview ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-pressed={scriptsOn}
+            className={`h-6 px-1.5 text-[11px] ${scriptsOn ? 'bg-muted font-medium' : ''}`}
+            title={
+              scriptsOn
+                ? 'Scripts run in an isolated sandbox - click to stop them'
+                : 'Run the scripts of this page in an isolated sandbox (no access to the app)'
+            }
+            onClick={() => setRunScripts((v) => !v)}
+          >
+            {scriptsOn ? <Square className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+            {scriptsOn ? 'Stop' : 'Run'}
+          </Button>
+        ) : null}
         {editing ? (
           <>
             <Button
@@ -514,7 +553,35 @@ export function PaneFilePreview({
             />
           </div>
         ) : kind === 'html' ? (
-          <iframe sandbox="" srcDoc={content} title={`Preview of ${path}`} className="min-h-0 flex-1 border-0 bg-white" />
+          <div className="flex min-h-0 flex-1 flex-col">
+            {/* REQ-137: the scripts are blocked, not broken - say so and keep
+                the opt-in one click away instead of showing a dead page. */}
+            {scriptsPaused ? (
+              <div className="flex shrink-0 items-center gap-2 border-b border-line bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground">
+                <Info className="h-3 w-3 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">
+                  Scripts are paused in this preview - this page stops on its loading screen without them.
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 shrink-0 px-1.5 text-[11px]"
+                  title="Run the scripts of this page in an isolated sandbox"
+                  onClick={() => setRunScripts(true)}
+                >
+                  <Play className="h-3 w-3" />
+                  Run
+                </Button>
+              </div>
+            ) : null}
+            <iframe
+              key={scriptsOn ? 'html-run' : 'html-static'}
+              sandbox={scriptsOn ? 'allow-scripts' : ''}
+              srcDoc={content}
+              title={`Preview of ${path}`}
+              className="min-h-0 flex-1 border-0 bg-white"
+            />
+          </div>
         ) : kind === 'pdf' ? (
           blobUrl ? (
             <iframe src={blobUrl} title={`Preview of ${path}`} className="min-h-0 flex-1 border-0 bg-white" />

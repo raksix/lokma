@@ -28,10 +28,11 @@ Ek olarak ray yalnızca **render edilen pencereyi** tarıyordu; uzun bir session
 ## Kanıt
 
 - `bun packages/lokma-web/web/src/components/chat/single-chat-view.test.ts` → REQ-140 için **9/9 PASS**: sadece user satırları anchor oluyor, mutlak index korunuyor, pencere dışı promptlar kapsanıyor, prompt yoksa ray yok, satır sonu tek satıra iniyor, 48 karakter + `…`, boş prompt etiketi. (Dosyadaki REQ-111 interleave testleri de aynı koşuda 11/11 geçiyor.)
-- **Canlı prob** `scripts/probe-prompt-rail.cjs` → `https://lokma.fermag.com.tr` üzerinde **11 passed, 0 failed** (2026-09-14 13:52):
+- **Canlı prob** `scripts/probe-prompt-rail.cjs` → `https://lokma.fermag.com.tr` üzerinde **13 passed, 0 failed** (2026-09-14 14:00; ilk koşu 13:52'de 11/11 idi, aşağıdaki iki ek doğrulama sonradan eklendi):
   - Yeni session'da `PROMPT RAIL PROBE ONE/TWO/THREE` gönderildi; DOM'da **7 satır** var (3 kullanıcı + 3 asistan + 1 session-created satırı), ray tam **3 nokta** çizdi.
   - Nokta etiketleri `Go to your prompt 1 of 3: PROMPT RAIL PROBE ONE`, tooltip'ler prompt metnini taşıyor.
-  - Transcript en alta kaydırıldı (`scrollTop=4039`), ilk noktaya tıklandı → hedef satır (`chat-msg-1`) görünür, viewport merkezinde (`center=276`, `viewportMid=450`), `scrollTop 4039 → 0`; viewport merkezinin altındaki satır da o prompt.
+  - Transcript en alta kaydırıldı (`scrollTop=1257`), ilk noktaya tıklandı → hedef satır (`chat-msg-1`) görünür, viewport merkezinde (`center=276`, `viewportMid=450`, üstte kaldığı için `atTop=true`), `scrollTop 1257 → 0`; nokta hedefleri transcript index'leriyle birebir (`data-target="chat-msg-<index>"`, artan sırada `1,16,18`).
+  - **Tam olarak bir nokta** aktif prompt olarak işaretli (`1/3 highlighted`); ray asla "konum yok" göstermiyor.
   - Başarısız istek yok (favicon + yeni session transcript 404'ü tasarım gereği ayıklanıyor).
   - Ekran görüntüsü: `/tmp/req140-prompt-rail.png`.
 - Kapı: `bun x tsc --noEmit` 0 hata (commit `1368107` kapsamında).
@@ -41,6 +42,8 @@ Ek olarak ray yalnızca **render edilen pencereyi** tarıyordu; uzun bir session
 - `1368107` feat(web): turn the chat dot rail into a prompt-only jump list
 - `d7c09bc` test(web): cover the prompt-only rail anchors
 - `00a6f5c` chore(scripts): live probe for the prompt rail
+- `fd1ff29` feat(web): expose each rail dot's scroll target as `data-target`
+- `ce374d5` test(scripts): assert the rail's dot count, targets and active dot
 
 ## Tuzaklar
 

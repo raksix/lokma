@@ -45,14 +45,14 @@ const THINKING_KEY = 'lokma-composer-thinking';
  * than a per-model menu: adapters clamp the pick down to the nearest level the
  * model accepts, so the list can stay honest without lying about the model.
  */
-const THINKING_LEVELS: { id: ReasoningEffort; label: string; hint: string }[] = [
-  { id: 'off', label: 'Off', hint: 'Answer straight away — fastest, fewest tokens.' },
-  { id: 'minimal', label: 'Minimal', hint: 'A nudge of reasoning — still quick.' },
-  { id: 'low', label: 'Low', hint: 'Short reasoning pass before the answer.' },
-  { id: 'medium', label: 'Medium', hint: 'Balanced reasoning budget (recommended).' },
-  { id: 'high', label: 'High', hint: 'Deep reasoning — slower, more tokens.' },
-  { id: 'xhigh', label: 'Extra High', hint: 'Very deep reasoning — much slower.' },
-  { id: 'max', label: 'Max', hint: 'Top tier — slowest, most tokens.' },
+const THINKING_LEVELS: { id: ReasoningEffort; label: string }[] = [
+  { id: 'off', label: 'Off' },
+  { id: 'minimal', label: 'Minimal' },
+  { id: 'low', label: 'Low' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'high', label: 'High' },
+  { id: 'xhigh', label: 'Extra High' },
+  { id: 'max', label: 'Max' },
 ];
 
 /** Persisted pick; unknown/stale values fall back to `off`. */
@@ -734,13 +734,17 @@ export function Composer({
             {thinkOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setThinkOpen(false)} />
-                <div className="absolute bottom-[calc(100%+8px)] left-0 z-50 max-h-[340px] w-[250px] overflow-y-auto rounded-xl border border-line bg-white p-1 shadow-2xl dark:border-[#2A2A2E] dark:bg-[#111113]">
-                  <div className="px-2.5 pt-2 pb-1 text-[10px] font-semibold tracking-widest text-zinc-500 uppercase">
+                <div
+                  data-effort-menu
+                  className="absolute bottom-[calc(100%+8px)] left-0 z-50 max-h-[240px] w-[168px] overflow-y-auto rounded-xl border border-line bg-white p-0.5 shadow-2xl dark:border-[#2A2A2E] dark:bg-[#111113]"
+                >
+                  <div className="px-2 pt-1.5 pb-0.5 text-[9.5px] font-semibold tracking-widest text-zinc-500 uppercase">
                     Effort
                   </div>
                   {THINKING_LEVELS.map((l) => (
                     <button
                       key={l.id}
+                      data-effort-option={l.id}
                       onClick={() => {
                         setThinking(l.id);
                         setThinkOpen(false);
@@ -751,15 +755,14 @@ export function Composer({
                         }
                       }}
                       className={cn(
-                        'w-full rounded-lg px-2.5 py-1.5 text-left hover:bg-muted dark:hover:bg-white/10',
-                        thinking === l.id && 'bg-muted dark:bg-white/10',
+                        'flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-[12.5px] leading-5 text-ink hover:bg-muted dark:text-white dark:hover:bg-white/10',
+                        thinking === l.id && 'bg-muted font-medium dark:bg-white/10',
                       )}
                     >
-                      <span className="flex items-center gap-1.5 text-[13px] text-ink dark:text-white">
+                      <span className="flex w-2 shrink-0 justify-center">
                         {thinking === l.id && <span className="h-1.5 w-1.5 rounded-full bg-terracotta" />}
-                        {l.label}
                       </span>
-                      <span className="mt-0.5 block pl-3 text-[11px] leading-snug text-zinc-500">{l.hint}</span>
+                      {l.label}
                     </button>
                   ))}
                 </div>

@@ -41,6 +41,23 @@ const row = {
 const sessionsFrame = ServerMessageSchema.safeParse({ type: 'sessions', sessions: [row] });
 assert.ok(sessionsFrame.success, 'sessions frame parses');
 
+// REQ-149 run flags (REQ-121 parity): an enriched row keeps them, and a row
+// without them still parses (they are optional on purpose).
+const runRow = { ...row, running: true, queued: 2 };
+const runFrame = ServerMessageSchema.safeParse({ type: 'sessions', sessions: [runRow] });
+assert.ok(runFrame.success, 'sessions frame parses with run flags');
+assert.equal(
+  runFrame.success && runFrame.data.type === 'sessions' ? runFrame.data.sessions[0]?.running : null,
+  true,
+  'running survives the parse',
+);
+assert.equal(
+  runFrame.success && runFrame.data.type === 'sessions' ? runFrame.data.sessions[0]?.queued : null,
+  2,
+  'queued survives the parse',
+);
+assert.ok(ServerMessageSchema.safeParse({ type: 'sessions', sessions: [row] }).success, 'run flags stay optional');
+
 const transcriptFrame = ServerMessageSchema.safeParse({
   type: 'transcript',
   sessionId: 'sess_abc',
@@ -62,4 +79,4 @@ assert.equal(ServerMessageSchema.safeParse({ type: 'transcript', sessionId: 's' 
 const encoded = encodeServerMessage({ type: 'sessions', sessions: [row] });
 assert.deepEqual(JSON.parse(encoded), { type: 'sessions', sessions: [row] });
 
-console.log('REQ-149 ws protocol frames: 12/12 checks passed');
+console.log('REQ-149 ws protocol frames: 16/16 checks passed');

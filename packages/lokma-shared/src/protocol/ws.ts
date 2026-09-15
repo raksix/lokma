@@ -63,6 +63,12 @@ export const SessionRowSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   ownerId: z.string().nullable(),
+  /**
+   * REQ-121/REQ-149: live run flags ride the list rows, so a socket-fed
+   * sidebar keeps the working-session badges the REST list carries.
+   */
+  running: z.boolean().optional(),
+  queued: z.number().int().min(0).optional(),
 });
 export type SessionRow = z.infer<typeof SessionRowSchema>;
 

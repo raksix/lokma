@@ -37,6 +37,7 @@ function check(cond, label) {
   check(created.status === 200 || created.status === 201, `session created over REST (HTTP ${created.status})`);
   const session = await created.json();
   const sessionId = session.id ?? session.sessionId;
+  console.log(`sessionId: ${sessionId}`);
 
   const frames = [];
   const ws = new WebSocket(`ws://127.0.0.1:3456/ws/${sessionId}?token=${token}`);

@@ -95,6 +95,14 @@ is authoritative — the gate treats a declared read-only tool as allowed in
 `auto` mode without a second edit in `gate.ts`, and the loop's parallel
 batcher reads the same marker.
 
+Alongside the eight builtins sits the **UI-control family** (REQ-057,
+REQ-147): `open_browser`, `open_terminal`, `open_session`, `send_to_session`.
+Each runs its server-side effect first and then emits a `ui_action` frame so
+attached clients open/focus the matching pane; `send_to_session` appends the
+message to the TARGET session and queues its run behind that session's own
+queue (the WS prompt path minus the socket), so the message lands and RUNS
+even when no pane is open.
+
 ### 3.4 System prompt
 
 `buildToolSystemPrompt()` leads with *"Call the tools you were given

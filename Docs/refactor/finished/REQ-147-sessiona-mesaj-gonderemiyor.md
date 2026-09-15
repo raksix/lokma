@@ -1,6 +1,6 @@
 # REQ-147 — Session'a mesaj gönderilemiyor
 
-**Status:** pending
+**Status:** done (2026-09-15) — yorum (A) uygulandı: `send_to_session` aracı + sunucu teslimi + canlı E2E probu 9/9 (`b134898`, `e1aa2bd`, `96bfa91`, `4330332`)
 **Tarih:** 2026-09-15
 **Kapsam (öngörü):** belirsiz — iki farklı yorum var (aşağıda), teşhis notları dahil
 **İlişkili:** REQ-148 (pane'de geçmiş yüklenmiyor), REQ-149 (WS'e bağlı canlı session)
@@ -64,3 +64,51 @@ sonrası durumda yoğunlaşıyor (REQ-148/149 ile birlikte ele alınmalı).
 - Bu dosya **karar bekliyor**: (A) yeni araç mı, (B) UI gönderim düzeltmesi mi —
   ikisi de olabilir. Kod değişikliği için kullanıcının "yap" demesi gerekir
   (inbox kuralı).
+
+## Sonuç (2026-09-15, done) — yorum (A) uygulandı
+
+**Karar kanıtı:** kullanıcının kendi oturum transkripti (`sess_mu2hpwyd_k9b9`,
+2026-09-15 11:29) — kullanıcı "o oturma selam naber gönder" dedi, Lokma
+"elimde var olan bir oturuma mesaj gönderen bir araç yok" diye yanıtladı;
+`open_session` her çağrıda YENİ oturum açtığı için mesaj hedefe hiç ulaşmadı.
+(B) yorumu (composer gönderimi) üç bağımsız headless koşuda yeniden
+üretilemedi — eksik olan asıl yetenek (A) idi.
+
+**Uygulama:**
+- `send_to_session` aracı (`packages/lokma-core/src/tools/ui-control.ts`):
+  `{ sessionId, message }` alır; boş mesajı, KENDİ (koşan) oturumunu ve
+  teslim kanalı olmayan yüzeyleri net hatalarla reddeder; başarıda
+  `ui_action` frame'i yayar (panel tarafı hedefi odaklar, ikinci gönderim YOK).
+- Sunucu teslimi (`packages/lokma-web/server/src/session-delivery.ts`):
+  hedef oturumun transcript'ine user satırı yazar → oturum kuyruğuna alır
+  (FIFO; hedef koşuyorsa arkasına) → pump'ı tetikler. WS prompt yolunun
+  soketsiz hali: hedef pane KAPALI olsa bile mesaj düşer ve KOŞAR.
+  Yetki: login gate açıkken yalnız aynı kullanıcının (veya superadmin'in)
+  oturumları (`canViewSession`); bilinmeyen id → `session_not_found`.
+- Bağlantı: her koşu için `deliverSessionPrompt` (`routes/ws.ts` →
+  `agent-loop.ts` → `buildUiControlTools({ deliver })`), aktör `item.userId`,
+  fallback cwd oturumun cwd'si.
+
+**Kanıt:**
+- `browser.test.ts` **34/34** (11 yeni vaka: hedefe teslim, trim, ui_action
+  frame, self-target reddi, kanal yokluğu, sunucu hatasının yüzeylenmesi).
+- `session-delivery.test.ts` **16/16** (transcript satırı, FIFO derinliği,
+  koşan hedefte `queued`, unknown id, boş mesaj, gate+forbidden yan etkisiz,
+  meta'sız oturumda fallback cwd).
+- Canlı E2E `scripts/probe-send-to-session.cjs` **9/9 PASS** (gerçek model,
+  canlı sunucu): oturum A aracı çağırdı, `ui_action` hedefi taşıdı, hedef
+  transcript'e user satırı düştü ve **hiçbir istemci bağlı değilken** hedef
+  KOŞTU (asistan cevabı yazıldı); bilinmeyen oturum turu `isError:true` +
+  `session_not_found` ile bitti.
+- Gates: root `tsc --noEmit` 0; `build:server` + `build:web` yeşil; servis
+  edilen bundle == disk (`assets/index-BORXAuAH.js`), canlı bundle'da
+  `send_to_session` mevcut; `pm2 restart lokma-server lokma-web` sonrası
+  `/api/config` 401 (gate açık, fail-closed).
+- Commit'ler: `b134898` (core tool + protokol), `e1aa2bd` (sunucu teslimi),
+  `96bfa91` (web odak), `4330332` (testler + canlı prob).
+
+## Kalan
+
+Yok — kabul kriteri 1 (araç: şema + gate + handler + net yetki hatası) ve 3
+(görünür geri bildirim: `isError` tool satırı) karşılandı. Kriter 2 (B yorumu
+— composer gönderimi) bu REQ kapsamında değildi ve yeniden üretilemedi.

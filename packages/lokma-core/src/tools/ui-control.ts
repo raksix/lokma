@@ -9,7 +9,9 @@ import type { ToolDefinition } from './registry.js';
  * `open_browser` opens a real server browser tab on a URL (REQ-146: reuses
  * the session's live tab instead of stacking a second one), `open_terminal`
  * spawns a real shell (optionally running one command), `open_session`
- * mints a real session (optionally carrying a first prompt). Every tool does
+ * mints a real session (optionally carrying a first prompt), and
+ * `send_to_session` (REQ-147) delivers a user message to an EXISTING
+ * session so it runs there. Every tool does
  * the server-side effect FIRST, then calls `emit` so the agent loop forwards
  * a `ui_action` frame — connected clients open/focus the matching pane and
  * the user watches the agent work live. Server sessions have no project
@@ -24,6 +26,10 @@ const OpenSessionInput = z.object({
   title: z.string().max(120).optional(),
   prompt: z.string().max(8000).optional(),
 });
+const SendToSessionInput = z.object({
+  sessionId: z.string().min(1).max(128),
+  message: z.string().min(1).max(8000),
+});
 
 /** Same id shape as POST /api/sessions (no central helper yet — keep in sync). */
 function newUiSessionId(): string {
@@ -31,7 +37,7 @@ function newUiSessionId(): string {
 }
 
 export type UiActionPayload = {
-  action: 'open_browser' | 'open_terminal' | 'open_session';
+  action: 'open_browser' | 'open_terminal' | 'open_session' | 'send_to_session';
   url?: string;
   tabId?: string;
   terminalId?: string;
@@ -39,11 +45,26 @@ export type UiActionPayload = {
   prompt?: string;
 };
 
+/**
+ * REQ-147: outcome of a server-side session delivery. `queued` means the
+ * target already had a run in flight, so the message waits behind it —
+ * either way it RUNS (never silently dropped).
+ */
+export type SessionDeliveryResult =
+  | { ok: true; queued: boolean }
+  | { ok: false; code: string; message: string };
+
 export type UiControlOpts = {
   /** Owning loop session — tags browser tabs + terminals for fan-out scoping. */
   sessionId: string;
   /** Forwards the payload as a `ui_action` frame (the loop binds `send`). */
   emit: (payload: UiActionPayload) => void;
+  /**
+   * REQ-147: append + run a user message in ANOTHER session. Bound by the
+   * server (it owns the run queue + auth); without it the tool fails
+   * honestly instead of pretending the message landed.
+   */
+  deliver?: (target: { sessionId: string; message: string }) => Promise<SessionDeliveryResult>;
 };
 
 /**
@@ -103,8 +124,33 @@ export function buildUiControlTools(cwd: string, opts: UiControlOpts): ToolDefin
         return { ok: true, sessionId: id, title: cleanTitle, promptSent: cleanPrompt !== null };
       },
     },
+    {
+      name: 'send_to_session',
+      description:
+        'Send a user message to an existing session by id — it is appended to that session and runs there (behind any run it already has)',
+      inputSchema: SendToSessionInput,
+      handler: async (input) => {
+        const { sessionId: targetId, message } = input as z.infer<typeof SendToSessionInput>;
+        const text = message.trim();
+        if (!text) throw new Error('send_to_session: message is empty');
+        if (targetId === opts.sessionId) {
+          throw new Error('send_to_session: cannot target the running session — answer in this chat instead');
+        }
+        if (!opts.deliver) {
+          throw new Error('send_to_session: no session delivery channel on this surface');
+        }
+        const delivered = await opts.deliver({ sessionId: targetId, message: text });
+        if (!delivered.ok) {
+          const error = new Error(delivered.message) as Error & { code?: string };
+          error.code = delivered.code;
+          throw error;
+        }
+        opts.emit({ action: 'send_to_session', targetSessionId: targetId, prompt: text });
+        return { ok: true, sessionId: targetId, queued: delivered.queued };
+      },
+    },
   ];
 }
 
 /** Names only — cheap index for the `<available_tools>` prompt section. */
-export const UI_CONTROL_TOOL_NAMES = ['open_browser', 'open_terminal', 'open_session'] as const;
+export const UI_CONTROL_TOOL_NAMES = ['open_browser', 'open_terminal', 'open_session', 'send_to_session'] as const;

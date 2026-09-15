@@ -111,6 +111,10 @@ export function describeToolCall(tool: string, input: unknown): string {
       const title = arg('title');
       return title ? `Open session "${title}"` : 'Open a new session pane';
     }
+    case 'send_to_session': {
+      const target = arg('sessionId');
+      return target ? `Send a message to session ${target}` : 'Send a message to another session';
+    }
     default:
       return `Run ${tool}`;
   }

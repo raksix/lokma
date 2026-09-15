@@ -110,7 +110,7 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('ui_action'),
     actionId: z.string().min(1).max(64),
-    action: z.enum(['open_browser', 'open_terminal', 'open_session']),
+    action: z.enum(['open_browser', 'open_terminal', 'open_session', 'send_to_session']),
     url: z.string().max(2048).optional(),
     tabId: z.string().max(64).optional(),
     terminalId: z.string().max(64).optional(),

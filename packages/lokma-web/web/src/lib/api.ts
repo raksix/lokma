@@ -521,6 +521,11 @@ export type BrowserTab = {
   sessionId: string;
   /** Workspace scope label shown under each tab. */
   cwd: string | null;
+  /**
+   * REQ-154: last time the server browser engine acted on this tab — the
+   * pane shows an "engine" badge from it (engine view ≠ this iframe view).
+   */
+  lastAgentUseAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };

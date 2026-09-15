@@ -269,6 +269,18 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
             Piped
           </span>
         ) : null}
+        {selected?.lastAgentUseAt ? (
+          /* REQ-154 — the agent drives this tab through the server engine.
+             Its page and this iframe share the tab URL but render separately;
+             the chip keeps that split visible instead of silent. */
+          <span
+            title="Ajan bu sekmeyi sunucu motorundaki bir kopya üzerinden kullanıyor (scroll/tıkla/yaz). Motorun sayfası ile bu paneldeki görünüm aynı adresi gösterir ama ayrı renderlardır."
+            className="shrink-0 rounded border border-line px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-500"
+            data-engine-chip="1"
+          >
+            Ajan motoru
+          </span>
+        ) : null}
         {selected && selected.url !== BROWSER_BLANK_URL ? (
           <a
             href={selected.url}

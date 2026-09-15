@@ -703,6 +703,7 @@ export function Chat({
       <div ref={scrollRef} className="flex-1 overflow-auto p-3">
         <SingleChatView
           scrollRef={scrollRef}
+          cwd={known !== null && typeof known === 'object' ? known.cwd : undefined}
           transcript={transcript}
           pending={visiblePending}
           stream={streamVisible ? stream : ''}

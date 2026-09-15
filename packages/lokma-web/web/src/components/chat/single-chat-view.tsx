@@ -2,6 +2,7 @@ import * as React from 'react';
 import { ChevronUp, Copy, GitFork, History, Pencil, User, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { AttachmentView, type ChatAttachment } from './attachment';
 import { HeroSection } from './hero-section';
 import {
   MESSAGE_WINDOW_INITIAL,
@@ -34,7 +35,15 @@ function scrollBehavior(): ScrollBehavior {
  * on disk, and the hero cards each create a real session.
  */
 
-export type TranscriptMessage = { role: string; content: string; timestamp?: string; toolName?: string; toolCallId?: string };
+export type TranscriptMessage = {
+  role: string;
+  content: string;
+  timestamp?: string;
+  toolName?: string;
+  toolCallId?: string;
+  /** REQ-155: agent-sent files (images render inline, others get cards). */
+  attachments?: ChatAttachment[];
+};
 export type PendingMessage = { key: number; text: string };
 /** REQ-111: one stream cut per `tool_start` (arrival order, see `@/lib/ws`). */
 export type ToolMark = { callId: string; at: number };
@@ -187,12 +196,15 @@ function UserRow({
 function AssistantRow({
   index,
   message,
+  cwd,
   onCopy,
   onFork,
   onRewindTo,
 }: {
   index: number;
   message: TranscriptMessage;
+  /** REQ-155: workspace root — resolves attachment paths for preview/download. */
+  cwd?: string;
   onCopy: (text: string) => void;
   onFork: () => void;
   onRewindTo: (index: number) => void;
@@ -208,6 +220,13 @@ function AssistantRow({
           <span className="text-[11px] text-zinc-400">{formatTime(message.timestamp)}</span>
         </div>
         <AssistantBody content={message.content} onCopy={onCopy} />
+        {message.attachments?.length ? (
+          <div className="mt-1 space-y-1" data-attachments="1">
+            {message.attachments.map((a) => (
+              <AttachmentView key={`${a.path}:${a.size}`} attachment={a} cwd={cwd ?? ''} />
+            ))}
+          </div>
+        ) : null}
         <div className="mt-1 flex flex-wrap gap-1 opacity-0 transition group-hover:opacity-100">
           <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={() => onCopy(message.content)}>
             <Copy className="mr-1 h-3 w-3" /> Copy
@@ -275,6 +294,7 @@ function DotNav({
 
 export function SingleChatView({
   scrollRef,
+  cwd,
   transcript,
   pending,
   stream,
@@ -297,6 +317,8 @@ export function SingleChatView({
   onAnswerQuestion,
 }: {
   scrollRef: React.RefObject<HTMLDivElement | null>;
+  /** REQ-155: session workspace — resolves attachment paths for preview/download. */
+  cwd?: string;
   transcript: TranscriptMessage[];
   pending: PendingMessage[];
   stream: string;
@@ -457,7 +479,7 @@ export function SingleChatView({
                   </div>
                 </div>
               ) : (
-                <AssistantRow key={`${i}-${m.timestamp ?? ''}`} index={i} message={m} onCopy={onCopy} onFork={onFork} onRewindTo={onRewindTo} />
+                <AssistantRow key={`${i}-${m.timestamp ?? ''}`} index={i} message={m} cwd={cwd} onCopy={onCopy} onFork={onFork} onRewindTo={onRewindTo} />
               );
             })}
             {pending.map((p) => (

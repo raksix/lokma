@@ -171,3 +171,4 @@
 - [REQ-150](finished/REQ-150-browser-youtube-iframe-reddi.md) — YouTube (and every site that sends X-Frame-Options) renders blank in the browser pane: detect the refusal, rewrite watch links to embed URLs, and offer the external-tab fallback — done
 - [REQ-151](finished/REQ-151-pencere-alta-tasma-clamp.md) — Windowed mode overflows at the bottom: the y clamp reserves only 40px for the title bar while x keeps the whole window inside — done
 - [REQ-152](finished/REQ-152-pencere-focus-one-gelsin.md) — Clicking a floating window must raise it to the front (Windows-style z-order + focus ring, persisted) — done
+- [REQ-153](finished/REQ-153-youtube-ana-sayfa-piped.md) — YouTube pages without an embeddable form (home, channels, search) are routed through the Piped front-end, which allows framing; video links keep the no-cookie player — done

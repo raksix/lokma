@@ -1,6 +1,7 @@
 import {
   AskUserInput,
   buildAskTools,
+  buildAttachmentTools,
   buildBrowserTools,
   buildBuiltinTools,
   buildTodoTools,
@@ -379,6 +380,12 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
     sessionId: opts.sessionId,
     engine: opts.browserEngine ?? defaultBrowserEngine,
   })) {
+    registry.register(tool);
+  }
+  // REQ-155: chat attachments — the agent pushes a workspace file (image or
+  // document) into the conversation; the row persists and the socket feed
+  // (REQ-149) paints it live.
+  for (const tool of buildAttachmentTools(opts.cwd, { sessionId: opts.sessionId })) {
     registry.register(tool);
   }
   // REQ-062 Parça C (REQ-065): todo claim discipline for multi-agent

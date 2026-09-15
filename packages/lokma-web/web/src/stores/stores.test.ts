@@ -6,7 +6,7 @@
  */
 import { defaultLayout, isLayoutNode, type LayoutNode } from './layout';
 import { memoryStorage } from './storage';
-import { useSessionStore } from './session';
+import { useSessionStore, knownSessionKey, rememberKnown } from './session';
 import { usePaneStore } from './pane';
 import { PROVIDER_CACHE_TTL_MS, isCacheFresh, useProviderStore } from './provider';
 import { useAgentStore } from './agent';
@@ -67,6 +67,22 @@ globalThis.fetch = (async (url: unknown) => {
 await useSessionStore.getState().refreshSessions();
 assert(useSessionStore.getState().sessions.length === 1, 'refresh loads the session list');
 assert(useSessionStore.getState().activeSessionId === 'sess_1', 'refresh keeps a live selection');
+
+// REQ-144 — the 4 s sidebar poll re-parses the list, so an unchanged row comes
+// back as a NEW object. Panes key their loaders on `useKnownSession`, and an
+// identity that churns every tick made them reset themselves (the Files tree
+// "pressed F5" every four seconds). The cache keeps the old object while the
+// values are equal and only swaps when something really changed.
+type KnownState = Parameters<typeof rememberKnown>[1];
+const asKnown = (o: object): KnownState => o as unknown as KnownState;
+const rowA = { id: 'sess_1', title: 'One', cwd: '/repo', updatedAt: 't1', model: '' };
+const kept = rememberKnown(null, asKnown(rowA));
+assert(rememberKnown(kept, asKnown({ ...rowA })) === kept,
+  'an unchanged poll keeps the previous known-session object');
+assert(knownSessionKey('loading') === 'loading' && knownSessionKey(null) === 'missing',
+  'loading and missing keep distinct keys');
+const swapped = rememberKnown(kept, asKnown({ ...rowA, title: 'Two' }));
+assert(swapped !== kept && swapped.value !== kept.value, 'a real change still hands out the new summary');
 
 await useSessionStore.getState().loadTranscript('sess_1');
 assert(useSessionStore.getState().transcripts['sess_1']?.length === 1, 'transcript caches after load');

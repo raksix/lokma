@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { BrowserError, browserTabs } from '@lokma/core';
+import { defaultBrowserEngine } from '../browser-engine.js';
 
 /**
  * Browser tabs — per-agent tab registry for the BrowserPane (W3-12).
@@ -115,6 +116,8 @@ export async function browserRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     try {
       const result = browserTabs.close(id);
+      // REQ-154: the tab is gone — tear the engine page down with it (no leaks).
+      void defaultBrowserEngine.dispose(id);
       return { ok: true, id, ...result };
     } catch (e) {
       if (e instanceof BrowserError) return reply.status(e.status).send({ code: e.code, message: e.message });

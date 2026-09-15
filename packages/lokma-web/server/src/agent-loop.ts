@@ -1,6 +1,7 @@
 import {
   AskUserInput,
   buildAskTools,
+  buildBrowserTools,
   buildBuiltinTools,
   buildTodoTools,
   buildToolSystemPrompt,
@@ -18,6 +19,7 @@ import {
   SessionStore,
   ToolRegistry,
   toolResultCarrier,
+  type BrowserToolEngine,
   type ParsedToolCall,
   type SessionDeliveryResult,
   type SessionMessage,
@@ -27,6 +29,7 @@ import {
 import { ProviderError, stream as aiStream, zodToJsonSchema, type ProviderMessage } from '@lokma/ai';
 import { DEFAULT_LOOP_MAX_TURNS } from '@lokma/shared';
 import type { Permissions, ReasoningEffort, ServerMessage } from '@lokma/shared';
+import { defaultBrowserEngine } from './browser-engine.js';
 
 /**
  * Agent tool loop — the WS `prompt` path with real tool/permission/ask
@@ -66,6 +69,12 @@ export type AgentLoopOpts = {
   prompt: string;
   permissions: Pick<Permissions, 'allow' | 'deny' | 'defaultMode'> | undefined | null;
   store: SessionStore;
+  /**
+   * REQ-154: browser-engine override — the web server binds the live engine
+   * by default; tests inject a fake. CLI hosts leave it undefined and the
+   * browser tools fail honestly (`engine_unavailable`).
+   */
+  browserEngine?: BrowserToolEngine;
   /** Frame emitter (the caller binds `sessionId`). */
   send: (msg: ServerMessage) => void;
   /** Resolves from the client's `permission_response`; rejects on abort. */
@@ -359,6 +368,16 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
     emit: (payload) =>
       opts.send({ type: 'ui_action', actionId: mintCallId('ui'), ...payload, sessionId: opts.sessionId }),
     deliver: opts.deliverSessionPrompt,
+  })) {
+    registry.register(tool);
+  }
+  // REQ-154: browser-engine tools — the agent drives a real page on the
+  // session's browser tab (scroll/read/click/type/screenshot). The engine is
+  // host-provided: the web server binds the live Chromium engine; hosts
+  // without one get the honest `engine_unavailable` failure per call.
+  for (const tool of buildBrowserTools(opts.cwd, {
+    sessionId: opts.sessionId,
+    engine: opts.browserEngine ?? defaultBrowserEngine,
   })) {
     registry.register(tool);
   }

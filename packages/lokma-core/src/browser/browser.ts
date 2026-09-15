@@ -33,6 +33,13 @@ export type BrowserTabRecord = {
   sessionId: string;
   /** Workspace scope shown under each tab (session cwd, may be empty). */
   cwd: string | null;
+  /**
+   * REQ-154: last time the server browser engine acted on this tab
+   * (`touchAgentUse`). The pane renders an "engine" badge from it — the
+   * engine's server-side rendering is a SEPARATE view from the user's
+   * iframe, so the split is made visible instead of silent.
+   */
+  lastAgentUseAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -122,6 +129,7 @@ class BrowserTabs {
       agentId: cleanLabel(opts.agentId),
       sessionId: typeof opts.sessionId === 'string' && opts.sessionId ? opts.sessionId : '',
       cwd: cleanLabel(opts.cwd),
+      lastAgentUseAt: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -208,6 +216,20 @@ class BrowserTabs {
     const record = this.tabs.get(id);
     if (!record) throw new BrowserError('tab_not_found', 'No such browser tab', 404);
     record.updatedAt = new Date().toISOString();
+    return { record };
+  }
+
+  /**
+   * REQ-154: stamp the last browser-engine interaction on a tab. Called by
+   * the web server's engine on every tool call; the pane badge + probes read
+   * it. Touches the record only — never the URL/history (the engine does not
+   * navigate on its own).
+   */
+  touchAgentUse(id: string): { record: BrowserTabRecord } {
+    assertTabId(id);
+    const record = this.tabs.get(id);
+    if (!record) throw new BrowserError('tab_not_found', 'No such browser tab', 404);
+    record.lastAgentUseAt = new Date().toISOString();
     return { record };
   }
 

@@ -30,6 +30,19 @@ export const WRITE_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * REQ-154: browser-engine tools act on a real page (scroll/click/type) via
+ * the host browser engine — not on disk, so they are neither reads nor
+ * writes: gated like writes (ask in `auto`, refused in `plan`).
+ */
+export const BROWSER_TOOLS: ReadonlySet<string> = new Set([
+  'browser_read_page',
+  'browser_scroll',
+  'browser_click',
+  'browser_type',
+  'browser_screenshot',
+]);
+
+/**
  * REQ-135: tools whose whole point is talking to the user. Gating them would
  * ask the user to approve being asked — the loop answers with a question card
  * instead. An explicit `deny` entry still wins (operator intent).

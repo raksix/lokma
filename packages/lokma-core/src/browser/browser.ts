@@ -129,6 +129,26 @@ class BrowserTabs {
     return { record };
   }
 
+  /**
+   * Open-or-reuse (REQ-146) — agent-driven opens reuse the page the user
+   * already has instead of stacking a second tab record: when the session
+   * owns a live tab, the most recently created one is navigated in place
+   * (same id, real history push) and returned with `reused: true`; with none
+   * it falls through to `open()`. The pane's explicit blank-tab path keeps
+   * calling `open()` — a deliberate new tab is never collapsed.
+   */
+  openOrReuse(opts: OpenTabOpts = {}): { record: BrowserTabRecord; reused: boolean } {
+    const sessionId = typeof opts.sessionId === 'string' && opts.sessionId ? opts.sessionId : '';
+    const existing = sessionId ? this.list(sessionId)[0] : undefined;
+    if (!existing) return { record: this.open(opts).record, reused: false };
+    // A blank open (no url) must never navigate the live page away; touch it.
+    if (opts.url === undefined) {
+      existing.updatedAt = new Date().toISOString();
+      return { record: existing, reused: true };
+    }
+    return { record: this.navigate(existing.id, opts.url).record, reused: true };
+  }
+
   /** List tabs, newest first; filter by owning session when given. */
   list(sessionId?: string): BrowserTabRecord[] {
     const all = [...this.tabs.values()].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));

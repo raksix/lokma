@@ -6,7 +6,8 @@ import type { ToolDefinition } from './registry.js';
 
 /**
  * UI-control agent tools (REQ-057) — the harness drives its own Web UI.
- * `open_browser` opens a real server browser tab on a URL, `open_terminal`
+ * `open_browser` opens a real server browser tab on a URL (REQ-146: reuses
+ * the session's live tab instead of stacking a second one), `open_terminal`
  * spawns a real shell (optionally running one command), `open_session`
  * mints a real session (optionally carrying a first prompt). Every tool does
  * the server-side effect FIRST, then calls `emit` so the agent loop forwards
@@ -55,13 +56,15 @@ export function buildUiControlTools(cwd: string, opts: UiControlOpts): ToolDefin
   return [
     {
       name: 'open_browser',
-      description: 'Open a browser tab on a URL and show it in the Web UI browser pane',
+      description: 'Open a URL in the Web UI browser pane; reuses the session tab when one is already open (no second tab)',
       inputSchema: OpenBrowserInput,
       handler: async (input) => {
         const { url } = input as z.infer<typeof OpenBrowserInput>;
-        const { record } = browserTabs.open({ url, sessionId: opts.sessionId });
+        // REQ-146 — reuse the session's open tab (same id) instead of stacking
+        // a new record per call; `reused` tells the model the page was swapped.
+        const { record, reused } = browserTabs.openOrReuse({ url, sessionId: opts.sessionId });
         opts.emit({ action: 'open_browser', url: record.url, tabId: record.id });
-        return { ok: true, tabId: record.id, url: record.url };
+        return { ok: true, tabId: record.id, url: record.url, reused };
       },
     },
     {

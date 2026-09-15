@@ -4,7 +4,10 @@ import { BrowserError, browserTabs } from '@lokma/core';
 /**
  * Browser tabs — per-agent tab registry for the BrowserPane (W3-12).
  * `POST /api/browser/open` opens a tab (`{ tabId }` + record) tagged with the
- * owning agent/session; `GET /api/browser` lists (filter `?sessionId=`);
+ * owning agent/session; with `{ reuse: true }` it navigates the session's live
+ * tab in place (same id, `reused: true`) instead of opening a second one —
+ * the agent `open_browser` rule (REQ-146), also reachable from REST.
+ * `GET /api/browser` lists (filter `?sessionId=`);
  * `POST /api/browser/:id/navigate {url}` pushes real history (forward entries
  * dropped, like a browser); `POST /:id/back|/forward` step the history
  * pointer (409 `no_history` at the edge); `POST /:id/reload` touches the tab
@@ -19,19 +22,27 @@ type OpenBody = {
   agentId?: unknown;
   sessionId?: unknown;
   cwd?: unknown;
+  /** REQ-146 — navigate the session's live tab instead of opening a new one. */
+  reuse?: unknown;
 };
 
 export async function browserRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/browser/open', async (req, reply) => {
     const body = (req.body ?? {}) as OpenBody;
     try {
-      const { record } = browserTabs.open({
+      const opts = {
         url: typeof body.url === 'string' ? body.url : undefined,
         agentId: typeof body.agentId === 'string' ? body.agentId : undefined,
         sessionId: typeof body.sessionId === 'string' ? body.sessionId : undefined,
         cwd: typeof body.cwd === 'string' ? body.cwd : undefined,
-      });
-      return { ok: true, tabId: record.id, tab: record };
+      };
+      // Default stays an explicit new tab (the pane's blank-tab path and any
+      // deliberate second tab keep working); `reuse: true` opts into the
+      // agent's open-or-reuse rule so REST probes exercise the same path.
+      const { record, reused } = body.reuse === true
+        ? browserTabs.openOrReuse(opts)
+        : { ...browserTabs.open(opts), reused: false };
+      return { ok: true, tabId: record.id, tab: record, reused };
     } catch (e) {
       if (e instanceof BrowserError) return reply.status(e.status).send({ code: e.code, message: e.message });
       throw e;

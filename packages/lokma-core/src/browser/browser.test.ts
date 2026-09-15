@@ -28,6 +28,21 @@ function expectBrowserError(fn: () => unknown, code: string, label: string): voi
   throw new Error('FAIL: ' + label + ' (no error thrown)');
 }
 
+/** Await a tool-handler promise and assert it rejects with `match` inside the message. */
+async function expectRejects(value: Promise<unknown>, match: string, label: string): Promise<void> {
+  try {
+    await value;
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (!message.includes(match)) {
+      throw new Error('FAIL: ' + label + ' (unexpected message: ' + message + ')');
+    }
+    assert(true, label);
+    return;
+  }
+  throw new Error('FAIL: ' + label + ' (no error thrown)');
+}
+
 async function main(): Promise<void> {
   browserTabs.clearForTests();
 
@@ -93,6 +108,50 @@ async function main(): Promise<void> {
       emitted[1].action === 'open_browser' && emitted[1].url === normalizeTabUrl('https://second.example'),
       'tool: frames carry the live url',
     );
+  }
+
+  // --- REQ-147 send_to_session wiring: deliver + one ui_action frame ---
+  const deliveries: { sessionId: string; message: string }[] = [];
+  const uiTools = buildUiControlTools('/tmp', {
+    sessionId: 'sess_src',
+    emit: (payload) => emitted.push(payload),
+    deliver: async (target) => {
+      deliveries.push(target);
+      return { ok: true, queued: false };
+    },
+  });
+  const sendTool = uiTools.find((t) => t.name === 'send_to_session');
+  assert(sendTool !== undefined, 'send_to_session tool is registered');
+  if (sendTool) {
+    const r = (await sendTool.handler({ sessionId: 'sess_dst', message: '  selam  ' }, undefined)) as {
+      ok: boolean;
+      sessionId: string;
+    };
+    assert(deliveries.length === 1 && deliveries[0].sessionId === 'sess_dst', 'tool: delivery targets the asked session');
+    assert(deliveries[0].message === 'selam', 'tool: message is trimmed before delivery');
+    assert(r.ok === true && r.sessionId === 'sess_dst', 'tool: result names the target session');
+    const frame = emitted[emitted.length - 1];
+    assert(
+      frame.action === 'send_to_session' && frame.targetSessionId === 'sess_dst' && frame.prompt === 'selam',
+      'tool: one send_to_session ui_action frame',
+    );
+    // Targeting the running session is refused BEFORE any delivery (a
+    // self-send would queue a reply-loop behind the live run).
+    await expectRejects(sendTool.handler({ sessionId: 'sess_src', message: 'hi' }, undefined), 'running session', 'tool: self-target refused');
+    assert(deliveries.length === 1, 'tool: self-target never reaches delivery');
+    // No delivery channel (CLI-style surface) fails honestly.
+    const bare = buildUiControlTools('/tmp', { sessionId: 'sess_src', emit: () => {} }).find(
+      (t) => t.name === 'send_to_session',
+    );
+    assert(bare !== undefined, 'send_to_session exists without a channel too');
+    await expectRejects(bare?.handler({ sessionId: 'sess_dst', message: 'hi' }, undefined) ?? Promise.resolve(), 'delivery channel', 'tool: missing channel fails honestly');
+    // A refused delivery surfaces as a real tool error (code preserved).
+    const refusing = buildUiControlTools('/tmp', {
+      sessionId: 'sess_src',
+      emit: () => {},
+      deliver: async () => ({ ok: false, code: 'session_not_found', message: 'No such session: sess_x' }),
+    }).find((t) => t.name === 'send_to_session');
+    await expectRejects(refusing?.handler({ sessionId: 'sess_x', message: 'hi' }, undefined) ?? Promise.resolve(), 'No such session', 'tool: refused delivery surfaces the server message');
   }
 
   console.log('--- ' + passed + ' checks passed ---');

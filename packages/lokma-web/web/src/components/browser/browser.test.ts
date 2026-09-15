@@ -10,6 +10,8 @@ import {
   embedUrlFor,
   groupByAgent,
   historyPosition,
+  isPipedUrl,
+  paneUrlFor,
   shortScope,
   tabLabel,
   validateTabUrl,
@@ -102,6 +104,21 @@ check('already-embedded url stays put',
   embedUrlFor('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ') === 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
 check('other sites are untouched', embedUrlFor('https://example.com/watch?v=dQw4w9WgXcQ') === null);
 check('garbage input is null', embedUrlFor('not a url') === null && embedUrlFor('') === null);
+
+// paneUrlFor (REQ-153) — pages YouTube refuses to frame go through Piped.
+check('youtube home goes through the Piped front-end', paneUrlFor('https://www.youtube.com/') === 'https://piped.video/');
+check('a channel page keeps its path', paneUrlFor('https://www.youtube.com/@somebody') === 'https://piped.video/@somebody');
+check('a search page maps to Piped search',
+  paneUrlFor('https://www.youtube.com/results?search_query=lofi+beats') === 'https://piped.video/search?q=lofi%20beats');
+check('a playlist with a real list id prefers the no-cookie player',
+  paneUrlFor('https://www.youtube.com/playlist?list=PLabc123456') === 'https://www.youtube-nocookie.com/embed/videoseries?list=PLabc123456');
+check('a playlist without a list id falls back to Piped',
+  paneUrlFor('https://www.youtube.com/playlist') === 'https://piped.video/playlist');
+check('a watch link still prefers the no-cookie player',
+  paneUrlFor('https://www.youtube.com/watch?v=dQw4w9WgXcQ') === 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+check('non-YouTube sites are left alone', paneUrlFor('https://example.com/foo') === null);
+check('garbage is left alone', paneUrlFor('not a url') === null && paneUrlFor('') === null);
+check('isPipedUrl spots the front-end', isPipedUrl('https://piped.video/trending') === true && isPipedUrl('https://youtube.com/') === false && isPipedUrl(null) === false);
 
 console.log(`browser probe: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

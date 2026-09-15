@@ -1,6 +1,6 @@
 # REQ-149 — Sessionlar websocket'e bağlı olsun, veriler WS'ten canlı gelsin
 
-**Status:** in-progress (tick 4/5)
+**Status:** done (2026-09-15 — probes `d363cab`, close-out commit follows)
 **Tarih:** 2026-09-15
 **Kapsam (öngörü):** `packages/lokma-web/server/src/routes/ws.ts` (protokol),
 `packages/lokma-shared/src/protocol/ws.ts`, `packages/lokma-web/web/src/lib/ws.ts`,
@@ -117,3 +117,29 @@ yayılsın — poll'a bağlı kalmadan.
   (`index-Bjih_AMc.js` 574.71 kB), pm2 `lokma-web` restart + canlı bundle hash
   disk ile aynı, canlı bundle'da `wsSockets`/`noteWsOpen`/`noteWsClose` var.
 - Sıradaki: (5) canlı E2E probu (iki soket, poll'suz büyüme) + kapanış.
+
+### Tur 5/5 — canlı E2E probu + kapanış (2026-09-15)
+- Yeni canlı problar (commit `d363cab`):
+  - `scripts/probe-session-feed-ws.cjs` — **10/10 PASS**: tek sokette
+    `sessions_list` → `sessions` frame (121 ms) ve `transcript_get` →
+    `transcript` anlık görüntüsü (60 ms); aynı oturumda İKİ soket: A'dan
+    prompt gönderildi, B'ye kullanıcı satırı **61 ms'de** push edildi (4 sn
+    poll kadansının çok altında, B hiç REST'e gitmedi), aynı satır ikinci
+    sokete 0 ms'de fan-out oldu; asistan satırı da WS üzerinden düştü (tur
+    başına 15 push satırı). REST `GET /api/sessions/:id` aynı transcript'i
+    döndürmeye devam ediyor (kriter 4). Soket kapatılıp ikinci tur
+    koşulduktan sonra TAZE bir soket TEK `transcript_get` ile tüm geçmişi
+    (4 satır, iki tur) aldı — catch-up ek REST isteği gerektirmedi (kriter 5).
+  - `scripts/probe-session-feed-browser.cjs` — **4/4 PASS**: gerçek tarayıcıda
+    (canlı token + basic-auth) 15 sn'lik ölçüm penceresi — soket açıkken
+    `GET /api/sessions` poll'u **0** (hedef 0; eski davranış ~3-4/15 sn) ve
+    liste WS'ten `sessions` frame'i olarak geldi (pane açılışında gelen
+    `transcript` frame'i de WS'ten — kriter 2); negatif kontrol: soket
+    reddedilince (routeWebSocket) poll geri geliyor (15 sn'de 4) → sıfır
+    ölü poll değil, kapı gerçekten `wsSockets` sayaçına bağlı.
+- Kapanış: beş kabul kriterinin tamamı canlı kanıtlı; ek olarak root
+  `bun x tsc --noEmit` 0, steril web build yeşil, servis edilen bundle
+  (`index-Bjih_AMc.js`) disk ile aynı.
+- Commit zinciri: `b965a48` (shared wire satırları) → `2b75f69` (sunucu feed)
+  → `f39398c` (istemci plumbing) → `c68189e` (store + sidebar + sohbet) →
+  `d363cab` (canlı problar) → kapanış docs commit'i.

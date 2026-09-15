@@ -1,6 +1,6 @@
 # REQ-146 — Açık browser varsa yeni sekme/pane açmak yerine onu kullan
 
-**Status:** in-progress (2026-09-15) — tur 1: sunucu tarafı canlı (commit 74ecaa2); kalan: pane tazeleme + DOM probu
+**Status:** done (2026-09-15) — commits `9c8dab0` (pane) + `d4c3158` (probe)
 **Tarih:** 2026-09-15
 **Kapsam (öngörü):** `packages/lokma-web/web/src/components/browser/browser-pane.tsx`,
 `packages/lokma-web/server/src/routes/browser.ts` (tab açma), `components/panes/pane.tsx`
@@ -52,11 +52,36 @@ Kanıt:
   bayraksız açılış yeni tab → reuse tab sayısını büyütmüyor → temizlikte 0 tab.
   Deploy: `pm2 restart lokma-server`, `/health` 200.
 
-Kalan (tur 2):
-1. Pane **zaten açıkken** ajanın yeni URL'i adres çubuğuna/iframe'e yansısın
-   (ui_action frame → mevcut pane tazeleme): pane sayısı 1 kalmalı, ikinci URL
-   görünmeli.
-2. Canlı DOM probu + close-out (finished/ + README + Docs/00 kronoloji).
+## İlerleme (tur 2, 2026-09-15 — commit `9c8dab0` pane + `d4c3158` probe)
+
+**Pane tarafı tamam ve canlı.** Ajan `open_browser` çağırınca app-shell, pane
+store'a tek-atımlık bir `pendingBrowserOpen` sinyali bırakır (tabId + url +
+sessionId); sinyali yalnızca aynı oturuma bağlı BrowserPane tüketir: taze tab
+listesi çekilir, seçim ajanın sekmesine geçer, adres çubuğu + iframe ajanın
+URL'ine taşınır (frame nonce artırılır — aynı tab kimliği URL değişse de
+yeniden yüklenir). Sinyal asla kalıcılaşmaz (layout blob'una yazılmaz) ve
+sinyal işlenirken boş-sekme otomatik açılışı kapatılır ki yarışta ikinci bir
+sekme doğmasın.
+
+Kanıt — canlı prob `scripts/probe-browser-reuse.cjs` **18/18 PASS** (gerçek
+ajan koşusu, gerçek DOM):
+- Ajan `open_browser`'ı iki kez çağırdı (example.com → example.org); gelen
+  `ui_action` frame'inin tabId'si sunucudaki tek sekme kimliğiyle birebir aynı.
+- Pane sayısı 2 → 2 sabit kaldı (chat + browser), tarayıcı pane'i hep 1;
+  adres çubuğu A'da `https://example.com/`, B'de `https://example.org/`;
+  iframe src ajanın URL'ini taşıyor.
+- Sunucu tarafı: oturumda TEK sekme kaldı ve ikinci açılışta kimlik DEĞİŞMEDİ
+  (`tab_..._20hvjs` → aynı) — yeniden kullanım, yeni sekme yok.
+
+Probe dersleri (uygulama değil, ölçüm): sunucu çıplak host'ları normalize eder
+(`https://example.com` → `https://example.com/`) — URL karşılaştırmaları sonda
+slash'sız yapılmalı; taze (henüz transcript'siz) session detay GET'i tasarım
+gereği 404 döner ve prob bunu ayıklar.
+
+## Kalan
+
+Yok — kabul kriterlerinin dördü de karşılandı (tur 1: sunucu 24/24 + canlı REST
+11/11; tur 2: pane 18/18 canlı DOM).
 
 ## Notlar
 

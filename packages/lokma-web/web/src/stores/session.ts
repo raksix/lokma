@@ -60,6 +60,25 @@ const initial = {
   listLoaded: false,
 };
 
+/**
+ * REQ-148 — cache-prune policy for the list refresh. The list is a polled
+ * SNAPSHOT, never proof of absence: it lags a session the WS just created and
+ * it drops rows it cannot see (scoped snapshots, ownership filters), so
+ * pruning FRESH transcript caches by list membership deleted the history a
+ * pane was reading on the next 4 s poll — the pane flipped back to the empty
+ * hero mid-read (the second half of "the history does not auto-load"). A
+ * FRESH entry came from the server, so the server knows that session: keep
+ * it. Only STALE entries (refetch pending, or a gone session) may be pruned
+ * by list membership.
+ */
+export function keepSessionCacheEntry(
+  id: string,
+  listIds: ReadonlySet<string>,
+  stale: Record<string, boolean>,
+): boolean {
+  return listIds.has(id) || !stale[id];
+}
+
 export const useSessionStore = create<SessionStore>()((set, get) => ({
   ...initial,
 
@@ -70,9 +89,13 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
       const ids = new Set(res.sessions.map((s) => s.id));
       set((prev) => ({
         sessions: res.sessions,
-        // Prune transcript caches for sessions that no longer exist.
-        transcripts: Object.fromEntries(Object.entries(prev.transcripts).filter(([id]) => ids.has(id))),
-        stale: Object.fromEntries(Object.entries(prev.stale).filter(([id]) => ids.has(id))),
+        // REQ-148: never prune a FRESH transcript by list membership.
+        transcripts: Object.fromEntries(
+          Object.entries(prev.transcripts).filter(([id]) => keepSessionCacheEntry(id, ids, prev.stale)),
+        ),
+        stale: Object.fromEntries(
+          Object.entries(prev.stale).filter(([id]) => keepSessionCacheEntry(id, ids, prev.stale)),
+        ),
         activeSessionId: prev.activeSessionId && ids.has(prev.activeSessionId) ? prev.activeSessionId : null,
         loading: false,
         listLoaded: true,
@@ -90,8 +113,14 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
       const ids = new Set(res.sessions.map((s) => s.id));
       set((prev) => ({
         sessions: res.sessions,
-        transcripts: Object.fromEntries(Object.entries(prev.transcripts).filter(([id]) => ids.has(id))),
-        stale: Object.fromEntries(Object.entries(prev.stale).filter(([id]) => ids.has(id))),
+        // REQ-148: same prune policy as the loud refresh — the 4 s sidebar
+        // poll must not eat the transcript a pane is showing.
+        transcripts: Object.fromEntries(
+          Object.entries(prev.transcripts).filter(([id]) => keepSessionCacheEntry(id, ids, prev.stale)),
+        ),
+        stale: Object.fromEntries(
+          Object.entries(prev.stale).filter(([id]) => keepSessionCacheEntry(id, ids, prev.stale)),
+        ),
         activeSessionId: prev.activeSessionId && ids.has(prev.activeSessionId) ? prev.activeSessionId : null,
         listLoaded: true,
       }));

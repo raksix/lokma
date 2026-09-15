@@ -6,7 +6,7 @@
  */
 import { defaultLayout, isLayoutNode, LAYOUT_STORAGE_KEY, type LayoutNode } from './layout';
 import { memoryStorage } from './storage';
-import { useSessionStore, knownSessionKey, rememberKnown } from './session';
+import { useSessionStore, knownSessionKey, rememberKnown, keepSessionCacheEntry } from './session';
 import { usePaneStore } from './pane';
 import { PROVIDER_CACHE_TTL_MS, isCacheFresh, useProviderStore } from './provider';
 import { useAgentStore } from './agent';
@@ -135,6 +135,30 @@ assert(fetchCalls === callsAfterUnknown, 'the cached empty result does not refet
 const callsBeforeForce = fetchCalls;
 await useSessionStore.getState().loadTranscript('sess_fresh_unknown', true);
 assert(fetchCalls === callsBeforeForce + 1, 'forced reload refetches even for unknown ids');
+
+// REQ-148 (layer 2) — the 4 s sidebar poll must never prune a FRESH transcript
+// just because the list snapshot does not carry its id: the pane was reading
+// that history, and dropping the cache flipped it back to the empty hero
+// (measured live: rows 6 → 0 one poll after the switch). Only STALE entries
+// for sessions the list lost are pruned.
+assert(keepSessionCacheEntry('sess_1', new Set(['sess_1']), {}), 'a listed id is never pruned');
+assert(keepSessionCacheEntry('sess_off', new Set(), {}), 'a fresh off-list transcript is kept');
+assert(!keepSessionCacheEntry('sess_dead', new Set(), { sess_dead: true }), 'a stale gone-session entry is pruned');
+
+await useSessionStore.getState().refreshSessionsQuiet();
+assert(
+  useSessionStore.getState().transcripts['sess_offlist']?.length === 2,
+  'a fresh off-list transcript survives the 4 s sidebar poll',
+);
+assert(useSessionStore.getState().stale['sess_offlist'] === false, 'its fresh flag survives the poll too');
+
+// Bookkeeping stays tidy: a stale flag for an id the list lost is dropped.
+useSessionStore.getState().invalidateSession('sess_offlist');
+await useSessionStore.getState().refreshSessions();
+assert(
+  useSessionStore.getState().stale['sess_offlist'] === undefined,
+  'a stale flag for a lost id is pruned',
+);
 
 globalThis.fetch = (async (url: unknown) => {
   const path = String(url);

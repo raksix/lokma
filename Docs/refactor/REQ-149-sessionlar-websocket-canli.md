@@ -1,6 +1,6 @@
 # REQ-149 — Sessionlar websocket'e bağlı olsun, veriler WS'ten canlı gelsin
 
-**Status:** pending
+**Status:** in-progress (tick 1/5)
 **Tarih:** 2026-09-15
 **Kapsam (öngörü):** `packages/lokma-web/server/src/routes/ws.ts` (protokol),
 `packages/lokma-shared/src/protocol/ws.ts`, `packages/lokma-web/web/src/lib/ws.ts`,
@@ -47,3 +47,20 @@ yayılsın — poll'a bağlı kalmadan.
   duruyor: WS'e taşınırken aynı önbellek tuzaklarına düşülmemeli.
 - Kardeş oturumun çalıştığı `probe-prompt-rail.cjs` + `single-chat-view.*`
   dosyalarına dokunulmaz.
+
+## Uygulama (tick log)
+
+### Tur 1/5 — kontrat + append feed (2026-09-15)
+- `packages/lokma-shared/src/protocol/ws.ts`: yeni istemci mesajları
+  `sessions_list` + `transcript_get`; yeni sunucu frame'leri `sessions`,
+  `transcript`, `transcript_append` ve wire satırları `SessionRowSchema` /
+  `TranscriptRowSchema` (REST'e paralel, geriye dönük uyumlu).
+- `packages/lokma-core/src/session/store.ts`: `onSessionAppend(listener)`
+  kaydı — `append()` satır DISKE yazıldıktan sonra abonelere haber verir
+  (fırlatan dinleyici yutulur; CLI abone olmadığı için davranış değişmez).
+  Sunucu bu kancayla canlı soketlere push yapacak.
+- Kanıt: `lokma-shared/src/protocol/ws.test.ts` 12/12,
+  `lokma-core/src/session/append-feed.test.ts` 4/4 (HOME=$(mktemp -d) ile),
+  shared+core dist yeniden derlendi, root `tsc --noEmit` 0, concept build yeşil.
+- Sıradaki: (2) sunucu handler'ları + fan-out, (3) istemci lib/ws + use-ws,
+  (4) store/sidebar/chat wiring (4 sn poll yerine WS), (5) canlı prob + kapanış.

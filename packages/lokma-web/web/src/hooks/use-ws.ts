@@ -43,6 +43,8 @@ import {
  * REQ-149: the same forwarding feeds the session store (list pushes +
  * transcript snapshots/appends) and every (re)connect asks for the session
  * list once, so sidebar/transcript liveness rides the socket instead of a poll.
+ * The hook also publishes socket liveness (`noteWsOpen`/`noteWsClose`) — the
+ * sidebar keeps its 4 s REST poll only as a socket-less fallback.
  */
 
 export type SendOpts = { model?: string; contextPaths?: string[]; reasoningEffort?: ReasoningEffort };
@@ -108,6 +110,29 @@ export function useWs(sessionId: string): UseWs {
   const manualRef = useRef(false);
   const sessionRef = useRef(sessionId);
   sessionRef.current = sessionId;
+  /**
+   * REQ-149: last transcript this pane asked for. Kept across (re)connects so
+   * the socket re-asks the moment it opens again — one request catches the
+   * pane up instead of a REST reload or a poll.
+   */
+  const wantedTranscriptRef = useRef('');
+  /**
+   * REQ-149: socket liveness for the sidebar poll gate. Guarded by this ref so
+   * a socket that closes twice (onclose + disconnect) never decrements twice.
+   */
+  const liveRef = useRef(false);
+
+  const markLive = useCallback(() => {
+    if (liveRef.current) return;
+    liveRef.current = true;
+    useSessionStore.getState().noteWsOpen();
+  }, []);
+
+  const markDead = useCallback(() => {
+    if (!liveRef.current) return;
+    liveRef.current = false;
+    useSessionStore.getState().noteWsClose();
+  }, []);
 
   const [status, setStatus] = useState<WsStatus>('idle');
   const [messages, setMessages] = useState<ServerMessage[]>([]);
@@ -128,10 +153,15 @@ export function useWs(sessionId: string): UseWs {
       ws.onopen = () => {
         attemptRef.current = 0;
         setStatus('open');
+        markLive();
         // REQ-149: every (re)connect asks for the session list once — the
         // socket becomes a list subscriber, so a reconnect catches up with a
         // single request and the sidebar can retire its REST poll.
         ws.send(sessionsListMessage());
+        // REQ-149: and one transcript re-ask for the session this pane shows —
+        // the same single catch-up request covers a dropped socket.
+        const wanted = wantedTranscriptRef.current;
+        if (wanted && wanted === sessionRef.current) ws.send(transcriptGetMessage(wanted));
       };
       ws.onmessage = (ev: MessageEvent) => {
         const msg = decodeServerFrame(ev.data);
@@ -157,6 +187,7 @@ export function useWs(sessionId: string): UseWs {
         }
       };
       ws.onclose = () => {
+        markDead();
         if (manualRef.current) {
           setStatus('closed');
           return;
@@ -180,7 +211,7 @@ export function useWs(sessionId: string): UseWs {
         }, reconnectDelay(attempt));
       };
     },
-    [clearTimer],
+    [clearTimer, markLive, markDead],
   );
 
   const connect = useCallback(() => {
@@ -206,8 +237,9 @@ export function useWs(sessionId: string): UseWs {
       // Socket already gone.
     }
     wsRef.current = null;
+    markDead();
     setStatus('closed');
-  }, [clearTimer]);
+  }, [clearTimer, markDead]);
 
   useEffect(() => {
     manualRef.current = false;
@@ -224,8 +256,10 @@ export function useWs(sessionId: string): UseWs {
         // Socket already gone.
       }
       wsRef.current = null;
+      // REQ-149: unmounting the last chat pane must release the poll gate.
+      markDead();
     };
-  }, [connect, sessionId]);
+  }, [connect, sessionId, markDead]);
 
   const sendText = useCallback((prompt: string, opts: SendOpts = {}) => {
     const text = prompt.trim();
@@ -254,11 +288,13 @@ export function useWs(sessionId: string): UseWs {
   }, []);
 
   /**
-   * REQ-149: transcript-by-socket. The chat asks when a pane opens; a
-   * reconnect repeats the ask so one request catches the pane up.
+   * REQ-149: transcript-by-socket. The chat asks when a pane opens; the
+   * request is remembered, so a reconnect re-asks it (one catch-up request)
+   * without the caller having to know the socket died.
    */
   const requestTranscript = useCallback((id: string) => {
     if (!id) return;
+    wantedTranscriptRef.current = id;
     socketSend(wsRef.current, transcriptGetMessage(id));
   }, []);
 

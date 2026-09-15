@@ -80,8 +80,14 @@ export function Chat({
   /** REQ-104: one smart-chain resolution per session (guard, not state — never re-fires). */
   const chainResolved = React.useRef<string | null>(null);
 
-  const { status, stream, thinking, cost, done, lastError, lastErrorCode, retry, toolCalls, toolMarks, permissions, questions, sendText, interrupt, answerPermission, answerQuestion, clearLiveTrace } = ws;
+  const { status, stream, thinking, cost, done, lastError, lastErrorCode, retry, toolCalls, toolMarks, permissions, questions, sendText, interrupt, answerPermission, answerQuestion, clearLiveTrace, requestTranscript } = ws;
   const socketOpen = status === 'open';
+  /**
+   * REQ-149: the async paths below must know whether the socket is feeding
+   * rows, without re-arming their effects on every status flip.
+   */
+  const socketOpenRef = React.useRef(false);
+  socketOpenRef.current = socketOpen;
   // REQ-070: a backend run outlives refresh — the badge stays on while the
   // server reports running/queued even with no live stream on this socket.
   const [runActive, setRunActive] = React.useState(false);
@@ -125,7 +131,11 @@ export function Chat({
             return active;
           });
           if (active) {
-            void loadTranscript(sessionId, true);
+            // REQ-149: a live socket pushes every persisted row as
+            // `transcript_append`, so this reload is only the socket-down
+            // fallback. The probe itself stays — it also lights the
+            // refresh-proof "working" badge (REQ-070).
+            if (!socketOpenRef.current) void loadTranscript(sessionId, true);
             timer = setTimeout(poll, 4000);
           }
         })
@@ -141,6 +151,14 @@ export function Chat({
       if (timer !== null) clearTimeout(timer);
     };
   }, [sessionId, loadTranscript]);
+
+  // REQ-149: the pane subscribes to its session over the socket — the server
+  // answers with a `transcript` snapshot and then PUSHES every persisted row as
+  // `transcript_append`, so the conversation grows live. The hook remembers the
+  // ask and repeats it after a reconnect, so one request catches the pane up.
+  React.useEffect(() => {
+    requestTranscript(sessionId);
+  }, [sessionId, requestTranscript]);
 
   // Transcript + session model (server meta wins, tab storage is fallback).
   // While the server list is not in yet the effect re-runs when it flips —
@@ -188,6 +206,22 @@ export function Chat({
     const raw = transcripts[sessionId] ?? [];
     return raw.filter(isTranscriptMessage);
   }, [transcripts, sessionId]);
+
+  /**
+   * REQ-149: the socket pushes persisted rows live, so an optimistic pending
+   * row is hidden the moment its server twin lands — otherwise the user's own
+   * message painted twice (optimistic bubble + appended header row) until the
+   * run finished. Only the TAIL is matched: the server appends the user row
+   * right after the send, while an older identical prompt ("evet") must never
+   * hide a fresh optimistic row.
+   */
+  const visiblePending = React.useMemo(() => {
+    if (pending.length === 0) return pending;
+    const tail = transcript.slice(-(pending.length + 4));
+    const landed = new Set(tail.filter((m) => m.role === 'user').map((m) => m.content));
+    const next = pending.filter((p) => !landed.has(p.text));
+    return next.length === pending.length ? pending : next;
+  }, [pending, transcript]);
 
   // REQ-104: no session model and no stored model → smart default chain
   // (configured → most-used 30d → first enabled → built-in fallback).
@@ -670,7 +704,7 @@ export function Chat({
         <SingleChatView
           scrollRef={scrollRef}
           transcript={transcript}
-          pending={pending}
+          pending={visiblePending}
           stream={streamVisible ? stream : ''}
           streaming={streaming}
           thinking={thinking}

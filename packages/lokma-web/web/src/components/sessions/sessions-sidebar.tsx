@@ -703,7 +703,13 @@ export function SessionsSidebar({
     if (sessions.length) seedSeenMap(sessions.map((s) => s.id));
   }, [sessions.length]);
   React.useEffect(() => {
-    const t = window.setInterval(() => void refreshSessionsQuiet(), 4000);
+    // REQ-149: while a harness socket is open the server PUSHES list snapshots
+    // (debounced on every append burst), so this 4 s REST poll is only the
+    // fallback for socket-less tabs — no chat pane open, or the socket down.
+    // Reading the count at tick time keeps the interval armed exactly once.
+    const t = window.setInterval(() => {
+      if (useSessionStore.getState().wsSockets === 0) void refreshSessionsQuiet();
+    }, 4000);
     return () => window.clearInterval(t);
   }, [refreshSessionsQuiet]);
   // REQ-138 — Home is the default landing group, so it starts expanded.

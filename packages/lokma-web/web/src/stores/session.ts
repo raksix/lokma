@@ -46,6 +46,16 @@ export type SessionStore = {
   mergeSessions: (intoId: string, fromId: string) => Promise<number | null>;
   /** Fold WS lifecycle frames into cache state (stream frames stay in use-ws). */
   applyWsEvent: (msg: ServerMessage) => void;
+  /**
+   * REQ-149: number of OPEN harness sockets. While one is open the server
+   * PUSHES list snapshots + transcript rows, so the sidebar's 4 s REST poll is
+   * only the fallback for socket-less tabs.
+   */
+  wsSockets: number;
+  /** REQ-149: one socket opened (paired with `noteWsClose`). */
+  noteWsOpen: () => void;
+  /** REQ-149: one socket closed (the count floors at zero). */
+  noteWsClose: () => void;
   reset: () => void;
 };
 
@@ -58,6 +68,7 @@ const initial = {
   loading: false,
   lastError: null as string | null,
   listLoaded: false,
+  wsSockets: 0,
 };
 
 /**
@@ -270,7 +281,63 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
     }
   },
 
+  /** REQ-149: socket liveness for the sidebar poll gate (paired inc/dec). */
+  noteWsOpen: () => {
+    set((prev) => ({ wsSockets: prev.wsSockets + 1 }));
+  },
+
+  noteWsClose: () => {
+    set((prev) => ({ wsSockets: Math.max(0, prev.wsSockets - 1) }));
+  },
+
+  /**
+   * REQ-149 — fold the socket-side session feed into the caches:
+   *  - `sessions` is a list snapshot/push (same prune policy as the REST poll
+   *    it replaces), so the sidebar renders fresh rows without asking;
+   *  - `transcript` is a full snapshot (session open + reconnect catch-up);
+   *  - `transcript_append` is ONE freshly persisted row — growth lands live,
+   *    with no REST reload and no 4 s poll.
+   * A `done` frame still marks the transcript stale: the run is over and the
+   * next view may want the server's own view of the turn.
+   */
   applyWsEvent: (msg: ServerMessage) => {
+    if (msg.type === 'sessions') {
+      const ids = new Set(msg.sessions.map((s) => s.id));
+      set((prev) => ({
+        sessions: msg.sessions,
+        // REQ-148: never prune a FRESH transcript by list membership.
+        transcripts: Object.fromEntries(
+          Object.entries(prev.transcripts).filter(([id]) => keepSessionCacheEntry(id, ids, prev.stale)),
+        ),
+        stale: Object.fromEntries(
+          Object.entries(prev.stale).filter(([id]) => keepSessionCacheEntry(id, ids, prev.stale)),
+        ),
+        activeSessionId: prev.activeSessionId && ids.has(prev.activeSessionId) ? prev.activeSessionId : null,
+        listLoaded: true,
+      }));
+      return;
+    }
+    if (msg.type === 'transcript') {
+      set((prev) => ({
+        transcripts: { ...prev.transcripts, [msg.sessionId]: msg.messages },
+        stale: { ...prev.stale, [msg.sessionId]: false },
+      }));
+      return;
+    }
+    if (msg.type === 'transcript_append') {
+      set((prev) => {
+        const known = prev.transcripts[msg.sessionId];
+        // Never grow a cache we do not hold: only a `transcript` snapshot (or
+        // the REST load) owns a whole history — appending onto nothing would
+        // render a truncated conversation as if it were complete.
+        if (!known) return prev;
+        return {
+          transcripts: { ...prev.transcripts, [msg.sessionId]: [...known, msg.message] },
+          stale: { ...prev.stale, [msg.sessionId]: false },
+        };
+      });
+      return;
+    }
     // A finished stream means the server transcript grew — refetch on next view.
     if (msg.type === 'done' && msg.sessionId) {
       get().invalidateSession(msg.sessionId);

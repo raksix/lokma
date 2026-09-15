@@ -152,6 +152,73 @@ assert(
 );
 assert(useSessionStore.getState().stale['sess_offlist'] === false, 'its fresh flag survives the poll too');
 
+// ─── REQ-149: socket-fed session data ───────────────────────────────────────
+// The sidebar list and the chat transcript ride the harness socket now, so the
+// store folds those frames directly — and the sidebar only needs its REST poll
+// while NO socket is open (this counter is the gate).
+
+useSessionStore.getState().noteWsOpen();
+useSessionStore.getState().noteWsOpen();
+assert(useSessionStore.getState().wsSockets === 2, 'two open sockets count as two');
+useSessionStore.getState().noteWsClose();
+useSessionStore.getState().noteWsClose();
+useSessionStore.getState().noteWsClose();
+assert(useSessionStore.getState().wsSockets === 0, 'the socket count floors at zero');
+
+// A `sessions` push replaces the list and keeps the REQ-148 prune policy.
+useSessionStore.getState().applyWsEvent({
+  type: 'sessions',
+  sessions: [
+    {
+      id: 'sess_1',
+      cwd: '/repo',
+      title: 'One',
+      renamed: false,
+      model: null,
+      botId: null,
+      messageCount: 3,
+      createdAt: 't0',
+      updatedAt: 't1',
+      ownerId: null,
+      running: true,
+      queued: 0,
+    },
+  ],
+});
+assert(useSessionStore.getState().sessions.length === 1, 'a sessions frame feeds the sidebar list');
+assert(useSessionStore.getState().sessions[0]?.running === true, 'run flags ride the pushed row');
+assert(useSessionStore.getState().stale['sess_offlist'] === false, 'a list push keeps a fresh off-list transcript');
+
+// A `transcript` snapshot fills a cache the client never held (session open).
+useSessionStore.getState().applyWsEvent({
+  type: 'transcript',
+  sessionId: 'sess_ws',
+  messages: [{ role: 'user', content: 'hi', timestamp: 't1' }],
+});
+assert(useSessionStore.getState().transcripts['sess_ws']?.length === 1, 'a transcript frame fills the cache');
+assert(useSessionStore.getState().stale['sess_ws'] === false, 'a transcript frame marks the cache fresh');
+
+// `transcript_append` grows a known cache — this is the live-growth path that
+// lets the chat render rows without a REST reload.
+useSessionStore.getState().applyWsEvent({
+  type: 'transcript_append',
+  sessionId: 'sess_ws',
+  message: { role: 'assistant', content: 'hello', timestamp: 't2' },
+});
+assert(
+  useSessionStore.getState().transcripts['sess_ws']?.length === 2,
+  'a pushed row grows the cached transcript',
+);
+
+// An append for an unheld session is ignored: a partial cache would render a
+// truncated conversation as if it were the whole history.
+useSessionStore.getState().applyWsEvent({
+  type: 'transcript_append',
+  sessionId: 'sess_unheld',
+  message: { role: 'user', content: 'x', timestamp: 't3' },
+});
+assert(!('sess_unheld' in useSessionStore.getState().transcripts), 'an append never creates a partial cache');
+
 // Bookkeeping stays tidy: a stale flag for an id the list lost is dropped.
 useSessionStore.getState().invalidateSession('sess_offlist');
 await useSessionStore.getState().refreshSessions();

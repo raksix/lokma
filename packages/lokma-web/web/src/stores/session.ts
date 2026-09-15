@@ -4,6 +4,7 @@
  * truth; this store caches the list + per-session transcripts and marks them
  * stale when WS events signal server-side growth.
  */
+import * as React from 'react';
 import { create } from 'zustand';
 import { api, ApiError, type AuthProject, type SessionSummary } from '@/lib/api';
 import type { ServerMessage } from '@lokma/shared/protocol/ws';
@@ -267,12 +268,54 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
  */
 export type KnownSession = SessionSummary | 'loading' | null;
 
+/**
+ * REQ-144: value key for the identity cache below. Two summaries that carry the
+ * same values share a key — every 4 s the sidebar polls the list and the store
+ * swaps in freshly parsed objects for rows that did not change. An identity that
+ * churns on every tick made every `useEffect(..., [known])` in the shell re-run
+ * and reset its pane (the Files tree "pressed F5" every four seconds).
+ */
+export function knownSessionKey(state: KnownSession): string {
+  if (state === 'loading') return 'loading';
+  if (state === null) return 'missing';
+  return JSON.stringify(state);
+}
+
+/** REQ-144: keep the previous summary object while its values are unchanged. */
+export function rememberKnown(
+  prev: { key: string; value: KnownSession } | null,
+  state: KnownSession,
+): { key: string; value: KnownSession } {
+  const key = knownSessionKey(state);
+  return prev && prev.key === key ? prev : { key, value: state };
+}
+
 export function useKnownSession(id: string | undefined | null): KnownSession {
   const listLoaded = useSessionStore((s) => s.listLoaded);
   const sessions = useSessionStore((s) => s.sessions);
-  if (!id) return null;
-  if (!listLoaded) return 'loading';
-  return sessions.find((s) => s.id === id) ?? null;
+  const state: KnownSession = !id
+    ? null
+    : !listLoaded
+      ? 'loading'
+      : (sessions.find((s) => s.id === id) ?? null);
+  // REQ-144: hand out a value-stable reference so poll churn cannot re-run panes.
+  const cache = React.useRef<{ key: string; value: KnownSession } | null>(null);
+  cache.current = rememberKnown(cache.current, state);
+  return cache.current.value;
+}
+
+/**
+ * REQ-144: the workspace path a pane should bind to — a primitive string, safe
+ * in dependency arrays. `'loading'` = list not in yet, `'missing'` = the server
+ * does not know this id (fresh local-only session), otherwise the cwd (`''`
+ * when the session has no workspace yet). None of those magic values can collide
+ * with a real path, so panes can switch on them directly.
+ */
+export function useKnownCwd(id: string | undefined | null): string {
+  const known = useKnownSession(id);
+  if (known === 'loading') return 'loading';
+  if (known === null) return 'missing';
+  return known.cwd ?? '';
 }
 
 // ─── Read/unread tracking (REQ-121) ─────────────────────────────────────

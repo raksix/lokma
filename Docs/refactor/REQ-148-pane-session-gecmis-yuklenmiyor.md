@@ -24,6 +24,11 @@
 - Ek kanıt (canlı koşu): istemci `/api/sessions/sess_mu2i98sq_y03j` için **404**
   alıyor (sunucu bu id'yi tanımıyor) ve aynı anda o id için bir WS açıyor; yani
   yeni/yerel bir oturum kimliği listeye hiç girmeden görünür olabiliyor.
+- **Yanlış iz olmasın (ölçüldü):** oturum değiştirince "1 balon göründü" diye bir
+  koşu var; o oturumun (`sess_mu2hs3ft_8y67`) dosyası **o an 1 satırdı** (107 B),
+  sonradan probun kendi promptuyla 32 satıra çıktı. Yani o gözlem bug değil —
+  hedef oturum gerçekten boştu. Gerçek arıza için "listede olmayan id" koşulu
+  (yukarıdaki 404 vakası) üzerinden üretilmeli.
 
 ## Kabul kriterleri (öngörü)
 

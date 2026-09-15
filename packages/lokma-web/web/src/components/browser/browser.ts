@@ -97,3 +97,35 @@ export function shortScope(cwd: string | null): string {
   const base = trimmed.split('/').pop() ?? trimmed;
   return base || trimmed;
 }
+
+/**
+ * REQ-150 — sites that answer `X-Frame-Options: SAMEORIGIN`/`DENY` (youtube.com,
+ * google.com, x.com …) refuse to render inside the pane's iframe: the frame
+ * stays blank and no error reaches us. YouTube publishes embeddable player
+ * URLs that DO allow framing, so rewrite the common watch forms to the
+ * privacy-friendly no-cookie embed. Returns null when there is no
+ * frame-friendly equivalent (channels, home page, playlists without an id).
+ */
+export function embedUrlFor(input: string): string | null {
+  const raw = input.trim();
+  if (!raw) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+  const host = parsed.hostname.replace(/^www\./, '').replace(/^m\./, '').toLowerCase();
+  if (host !== 'youtube.com' && host !== 'youtu.be' && host !== 'youtube-nocookie.com') return null;
+  const parts = parsed.pathname.split('/').filter(Boolean);
+  const ID = /^[\w-]{6,}$/;
+  let videoId = '';
+  if (host === 'youtu.be') videoId = parts[0] ?? '';
+  else if (parts[0] === 'watch') videoId = parsed.searchParams.get('v') ?? '';
+  else if (parts[0] === 'shorts' || parts[0] === 'live' || parts[0] === 'embed') videoId = parts[1] ?? '';
+  if (videoId && ID.test(videoId)) return `https://www.youtube-nocookie.com/embed/${videoId}`;
+  const list = parsed.searchParams.get('list');
+  if (list && ID.test(list)) return `https://www.youtube-nocookie.com/embed/videoseries?list=${list}`;
+  return null;
+}

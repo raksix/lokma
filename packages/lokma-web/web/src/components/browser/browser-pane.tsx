@@ -1,9 +1,11 @@
 import * as React from 'react';
 import {
+  AlertTriangle,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
   RefreshCw,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { api, type BrowserTab } from '@/lib/api';
@@ -14,6 +16,7 @@ import {
   BROWSER_BLANK_URL,
   canGoBack,
   canGoForward,
+  embedUrlFor,
   tabLabel,
   validateTabUrl,
 } from './browser';
@@ -47,6 +50,8 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
   const [frameNonce, setFrameNonce] = React.useState(0);
   const [lastError, setLastError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [frameReady, setFrameReady] = React.useState(false);
+  const [frameHint, setFrameHint] = React.useState(false);
   const ensuredBlank = React.useRef(false);
 
   const refresh = React.useCallback(async () => {
@@ -119,6 +124,25 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
     setSelectedId(tab.id);
     setAddress(tab.url === BROWSER_BLANK_URL ? '' : tab.url);
   }, []);
+
+  // REQ-150 — YouTube watch/short/youtu.be links get the embeddable player URL
+  // (`X-Frame-Options: SAMEORIGIN` on the normal watch page refuses framing, so
+  // the pane used to sit blank with no explanation).
+  const frameSrc = React.useMemo(
+    () => embedUrlFor(selected?.url ?? '') ?? selected?.url ?? '',
+    [selected?.url],
+  );
+
+  // A refused frame never fires `onLoad`, so nothing would ever tell the user
+  // why the body is blank. After 2.5 s without a load, show a hint (honest
+  // wording — it may just be slow) with the real escape hatches.
+  React.useEffect(() => {
+    setFrameReady(false);
+    setFrameHint(false);
+    if (!frameSrc || frameSrc === BROWSER_BLANK_URL) return;
+    const t = window.setTimeout(() => setFrameHint(true), 2500);
+    return () => window.clearTimeout(t);
+  }, [frameSrc, frameNonce]);
 
   // REQ-146 — the agent opened/reused a tab for THIS session (`ui_action` →
   // pane store). Pull the fresh list and follow that tab, so the visible
@@ -266,13 +290,48 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
             </div>
           </div>
         ) : (
-          <iframe
-            key={`${selected.id}:${frameNonce}`}
-            src={selected.url}
-            title={tabLabel(selected)}
-            className="h-full w-full border-0 bg-white"
-            sandbox="allow-scripts allow-same-origin allow-forms"
-          />
+          <>
+            {frameHint && !frameReady ? (
+              <div className="absolute inset-x-2 top-2 z-10 flex items-start gap-2 rounded border border-amber-300 bg-amber-50/95 px-2.5 py-2 text-[11px] text-amber-900 shadow-sm">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium">Sayfa yüklenmedi.</div>
+                  <div className="mt-0.5">
+                    Siteler bu panelde iframe olarak açılmayı reddedebiliyor (X-Frame-Options/CSP).
+                    YouTube için video linkini <span className="font-mono">watch?v=…</span> ya da{' '}
+                    <span className="font-mono">youtu.be/…</span> biçiminde aç — gömülü oynatıcı otomatik yüklenir.
+                  </div>
+                </div>
+                <a
+                  href={selected.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 rounded border border-amber-300 bg-white px-2 py-0.5 font-medium hover:bg-amber-100"
+                >
+                  Harici sekmede aç
+                </a>
+                <button
+                  type="button"
+                  aria-label="Dismiss hint"
+                  onClick={() => setFrameHint(false)}
+                  className="shrink-0 rounded p-0.5 hover:bg-amber-100"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : null}
+            <iframe
+              key={`${selected.id}:${frameNonce}`}
+              src={frameSrc}
+              title={tabLabel(selected)}
+              className="h-full w-full border-0 bg-white"
+              sandbox="allow-scripts allow-same-origin allow-forms"
+              onLoad={() => {
+                setFrameReady(true);
+                setFrameHint(false);
+              }}
+            />
+          </>
         )}
       </div>
     </div>

@@ -400,6 +400,20 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           selectSession(id);
         }
         emitToast(entry.prompt ? 'Agent opened a session with a prompt' : 'Agent opened a new session');
+      } else if (entry.action === 'send_to_session' && entry.targetSessionId) {
+        // REQ-147: the server already appended the message to the target
+        // session and queued its run (a client-side send would double it);
+        // this frame only focuses the matching pane so the user watches it
+        // arrive.
+        const id = entry.targetSessionId;
+        void refreshSessions();
+        if (!isMobile && tiling) {
+          requestSessionTab(id, id);
+        } else {
+          setActiveId(id);
+          selectSession(id);
+        }
+        emitToast('Agent sent a message to another session');
       }
       dismissUiAction(entry.actionId);
     }

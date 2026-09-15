@@ -8,7 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { api, type BrowserTab } from '@/lib/api';
 import { emitToast } from '@/components/shell';
-import { useKnownSession } from '@/stores';
+import { useKnownCwd } from '@/stores';
 import {
   BROWSER_BLANK_URL,
   canGoBack,
@@ -61,17 +61,20 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
   // Session scope: cwd for the auto-opened tab + tab list; reset on switch.
   // cwd comes from the cached server list — never a detail GET (fresh
   // sessions used to 404 here once per mounted pane).
-  const known = useKnownSession(sessionId);
+  // REQ-144: the workspace path is a primitive dependency; keying this reset on
+  // the `known` object let the 4 s session poll clear the tab list and refetch
+  // it on every tick (the pane behaved like a reload).
+  const knownCwd = useKnownCwd(sessionId);
   React.useEffect(() => {
     setTabs([]);
     setSelectedId(null);
     setAddress('');
     setLoading(true);
     ensuredBlank.current = false;
-    if (known === 'loading') return;
-    setCwd(known?.cwd ?? '');
+    if (knownCwd === 'loading') return;
+    setCwd(knownCwd === 'missing' ? '' : knownCwd);
     void refresh().finally(() => setLoading(false));
-  }, [sessionId, refresh, known]);
+  }, [sessionId, refresh, knownCwd]);
 
   // Single visible tab: explicit selection wins, otherwise the first tab.
   // Surplus server tabs (opened before REQ-013) stay on the server untouched.
@@ -93,7 +96,7 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
   // a target. Runs once per session mount; failures surface in the banner.
   React.useEffect(() => {
     if (loading || tabs.length > 0 || ensuredBlank.current) return;
-    if (known === 'loading') return;
+    if (knownCwd === 'loading') return;
     if (lastError) return;
     ensuredBlank.current = true;
     setBusy(true);
@@ -108,7 +111,7 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
         setLastError(e instanceof Error ? e.message : 'browser open failed');
       })
       .finally(() => setBusy(false));
-  }, [loading, tabs.length, lastError, sessionId, cwd, known]);
+  }, [loading, tabs.length, lastError, sessionId, cwd, knownCwd]);
 
   const applyTab = React.useCallback((tab: BrowserTab) => {
     setTabs((prev) => prev.map((t) => (t.id === tab.id ? tab : t)));

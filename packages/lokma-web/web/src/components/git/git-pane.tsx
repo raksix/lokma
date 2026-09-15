@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { api, type GitFileChange, type GitLockRow, type GitLogEntry } from '@/lib/api';
-import { useKnownSession } from '@/stores';
+import { useKnownCwd } from '@/stores';
 import { emitToast } from '@/components/shell';
 import {
   changeBadge,
@@ -95,19 +95,21 @@ export function GitPane({ sessionId }: { sessionId?: string }) {
 
   // Session scope: resolve the repo root from the cached server list, like
   // FileBrowser. Never a detail GET (fresh sessions used to 404 once per pane).
-  const known = useKnownSession(sessionId);
+  // REQ-144: depend on the path primitive — the 4 s session poll re-ran the
+  // object-keyed version and shelled out `git status` on every tick.
+  const knownCwd = useKnownCwd(sessionId);
   React.useEffect(() => {
-    if (!sessionId || known === 'loading') {
+    if (!sessionId || knownCwd === 'loading') {
       if (!sessionId) {
         setCwd('');
         void refresh('');
       }
       return;
     }
-    const cwd = known?.cwd ?? '';
+    const cwd = knownCwd === 'missing' ? '' : knownCwd;
     setCwd(cwd);
     void refresh(cwd);
-  }, [sessionId, refresh, known]);
+  }, [sessionId, refresh, knownCwd]);
 
   const lockedPaths = React.useMemo(() => new Set(locks.map((l) => l.path)), [locks]);
   const worktreePaths = React.useMemo(() => {

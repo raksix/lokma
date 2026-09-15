@@ -27,6 +27,14 @@ export type TerminalDataFrame = Extract<ServerMessage, { type: 'terminal/data' }
 export type TerminalExitFrame = Extract<ServerMessage, { type: 'terminal/exit' }>;
 /** Agent-driven UI request (REQ-057) — queued for the shell consumer. */
 export type UiActionRequest = Extract<ServerMessage, { type: 'ui_action' }>;
+/**
+ * REQ-149: session data over the socket — a `sessions` snapshot/push feeds the
+ * sidebar, `transcript` answers a `transcript_get`, and `transcript_append`
+ * announces one freshly persisted row (no REST reload needed).
+ */
+export type SessionsFrame = Extract<ServerMessage, { type: 'sessions' }>;
+export type TranscriptFrame = Extract<ServerMessage, { type: 'transcript' }>;
+export type TranscriptAppendFrame = Extract<ServerMessage, { type: 'transcript_append' }>;
 export type ToolCallEntry = {
   tool: string;
   input: unknown;
@@ -186,6 +194,24 @@ export function terminalKill(terminalId: string): string {
   return checked({ type: 'terminal/kill', terminalId });
 }
 
+/**
+ * REQ-149: ask for the sidebar rows over the socket. The server answers with a
+ * `sessions` snapshot AND keeps pushing fresh snapshots as sessions change —
+ * the caller stops being a poller and becomes a subscriber.
+ */
+export function sessionsListMessage(): string {
+  return checked({ type: 'sessions_list' });
+}
+
+/**
+ * REQ-149: ask for one session's transcript over the socket. The answer is a
+ * `transcript` snapshot; every later persisted row arrives as
+ * `transcript_append` on the same socket.
+ */
+export function transcriptGetMessage(sessionId: string): string {
+  return checked({ type: 'transcript_get', sessionId });
+}
+
 // ─── Pure UI reducer (React state derives from this, unit-tested) ────────────
 
 export function initialWsUiState(): WsUiState {
@@ -267,6 +293,13 @@ export function applyServerFrame(state: WsUiState, msg: ServerMessage): WsUiStat
     case 'terminal/exit':
       // Terminal traffic belongs to the TerminalPane (it reads the same
       // frame log) — chat state never changes on shell output.
+      return state;
+    case 'sessions':
+    case 'transcript':
+    case 'transcript_append':
+      // REQ-149: session data belongs to the session store (sidebar rows +
+      // transcript cache, folded there via `applyWsEvent`) — the chat UI
+      // state never changes on it.
       return state;
     case 'done':
       return { ...state, done: true, doneReason: msg.reason };

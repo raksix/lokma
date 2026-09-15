@@ -16,6 +16,8 @@ import {
   promptMessage,
   questionAnswer,
   reconnectDelay,
+  sessionsListMessage,
+  transcriptGetMessage,
   withAuthToken,
   wsUrl,
 } from './ws';
@@ -77,8 +79,10 @@ const withThinking = JSON.parse(promptMessage('hi', 's', { reasoningEffort: 'med
 assert(withThinking.reasoningEffort === 'medium', 'promptMessage carries the thinking level');
 const withoutThinking = JSON.parse(promptMessage('hi', 's')) as { reasoningEffort?: string };
 assert(withoutThinking.reasoningEffort === undefined, 'an unset level stays off the wire');
+// REQ-139 widened the ladder (xhigh/max shipped after this probe), so the
+// unknown-level case uses a value the schema has never carried.
 assert(
-  !ClientMessageSchema.safeParse({ type: 'prompt', prompt: 'x', reasoningEffort: 'max' }).success,
+  !ClientMessageSchema.safeParse({ type: 'prompt', prompt: 'x', reasoningEffort: 'ultra' }).success,
   'an unknown thinking level is rejected by the schema',
 );
 
@@ -184,6 +188,63 @@ assert(settled.stream === '' && settled.thinking === '', 'finished run drops the
 assert(settled.toolMarks.length === 0 && Object.keys(settled.toolCalls).length === 0, 'finished run drops live tool rows');
 assert(settled.done === true && settled.doneReason === 'complete', 'dropping the trace keeps the run marked done');
 assert(settled.retry === null, 'dropping the trace clears a stale retry notice');
+
+// 13. REQ-149: session-data frames belong to the session store — the chat
+//     reducer must leave stream/done/cost untouched (no accidental clears).
+let feed = initialWsUiState();
+feed = applyServerFrame(feed, { type: 'text_delta', delta: 'kept', sessionId: 's' });
+const afterSessions = applyServerFrame(feed, {
+  type: 'sessions',
+  sessions: [
+    {
+      id: 'sess_a',
+      cwd: '/tmp/x',
+      title: 't',
+      renamed: false,
+      model: null,
+      botId: null,
+      messageCount: 1,
+      createdAt: 'c',
+      updatedAt: 'u',
+      ownerId: null,
+      running: true,
+      queued: 0,
+    },
+  ],
+});
+assert(afterSessions === feed, 'a sessions push leaves chat state untouched');
+const afterTranscript = applyServerFrame(feed, {
+  type: 'transcript',
+  sessionId: 'sess_a',
+  messages: [{ role: 'user', content: 'hi', timestamp: 'now' }],
+});
+assert(afterTranscript === feed, 'a transcript snapshot leaves chat state untouched');
+const afterAppend = applyServerFrame(feed, {
+  type: 'transcript_append',
+  sessionId: 'sess_a',
+  message: { role: 'assistant', content: 'done', timestamp: 'now' },
+});
+assert(afterAppend === feed, 'a transcript append leaves chat state untouched');
+
+// 14. REQ-149: the socket-side request builders validate like every other
+//     builder (the server drops anything the schema rejects).
+for (const raw of [sessionsListMessage(), transcriptGetMessage('sess_a')]) {
+  const parsed = ClientMessageSchema.safeParse(JSON.parse(raw));
+  assert(parsed.success, `session-feed builder validates: ${raw}`);
+}
+// 15. REQ-149: appends decode end-to-end (tool rows keep their call metadata).
+const decodedAppend = decodeServerFrame(
+  JSON.stringify({
+    type: 'transcript_append',
+    sessionId: 'sess_a',
+    message: { role: 'tool', content: '{}', timestamp: 'n', toolCallId: 'c1', toolName: 'read_file' },
+  }),
+);
+assert(decodedAppend?.type === 'transcript_append', 'transcript_append decodes from the wire');
+assert(
+  decodeServerFrame(JSON.stringify({ type: 'transcript_get', sessionId: 's' })) === null,
+  'a client message is not mistaken for a server frame',
+);
 
 delete (globalThis as unknown as Record<string, unknown>).window;
 console.log('ws.test.ts: all WS-client checks passed');

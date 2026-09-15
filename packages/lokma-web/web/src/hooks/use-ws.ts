@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAgentStore } from '@/stores/agent';
+import { useSessionStore } from '@/stores/session';
 import {
   MAX_RECONNECT_ATTEMPTS,
   abortMessage,
@@ -13,9 +14,11 @@ import {
   promptMessage,
   questionAnswer,
   reconnectDelay,
+  sessionsListMessage,
   terminalInput,
   terminalKill,
   terminalResize,
+  transcriptGetMessage,
   withAuthToken,
   wsUrl,
   type CostTotal,
@@ -37,6 +40,9 @@ import {
  * Single hook, reused by Chat and every future pane (no duplication).
  * Every decoded frame is also forwarded to the agent store — `agent_state`
  * frames keep the Hub + Orchestration panes live without polling (W4-14).
+ * REQ-149: the same forwarding feeds the session store (list pushes +
+ * transcript snapshots/appends) and every (re)connect asks for the session
+ * list once, so sidebar/transcript liveness rides the socket instead of a poll.
  */
 
 export type SendOpts = { model?: string; contextPaths?: string[]; reasoningEffort?: ReasoningEffort };
@@ -71,6 +77,12 @@ export type UseWs = {
   answerPermission: (requestId: string, decision: 'allow' | 'deny' | 'always') => void;
   answerQuestion: (requestId: string, answer: string) => void;
   interrupt: () => void;
+  /**
+   * REQ-149: ask for one session's transcript over the socket (session open +
+   * reconnect catch-up). The answer is a `transcript` frame; later growth
+   * arrives as `transcript_append` — no REST reload needed.
+   */
+  requestTranscript: (sessionId: string) => void;
   /** Write stdin bytes to a live shell (answer arrives as `terminal/data`). */
   sendTerminal: (terminalId: string, data: string) => void;
   /** Record the pane size for a live shell. */
@@ -116,6 +128,10 @@ export function useWs(sessionId: string): UseWs {
       ws.onopen = () => {
         attemptRef.current = 0;
         setStatus('open');
+        // REQ-149: every (re)connect asks for the session list once — the
+        // socket becomes a list subscriber, so a reconnect catches up with a
+        // single request and the sidebar can retire its REST poll.
+        ws.send(sessionsListMessage());
       };
       ws.onmessage = (ev: MessageEvent) => {
         const msg = decodeServerFrame(ev.data);
@@ -126,6 +142,9 @@ export function useWs(sessionId: string): UseWs {
         // The store ignores every non-`agent_state` frame, so this is safe
         // for chat/terminal traffic.
         useAgentStore.getState().applyWsEvent(msg);
+        // REQ-149: session data (list pushes + transcript snapshots/appends)
+        // folds into the session store — it ignores every other frame type.
+        useSessionStore.getState().applyWsEvent(msg);
       };
       ws.onerror = () => {
         // Error details arrive via onclose; just make sure a dead socket closes.
@@ -234,6 +253,15 @@ export function useWs(sessionId: string): UseWs {
     socketSend(wsRef.current, abortMessage(sessionRef.current));
   }, []);
 
+  /**
+   * REQ-149: transcript-by-socket. The chat asks when a pane opens; a
+   * reconnect repeats the ask so one request catches the pane up.
+   */
+  const requestTranscript = useCallback((id: string) => {
+    if (!id) return;
+    socketSend(wsRef.current, transcriptGetMessage(id));
+  }, []);
+
   const sendTerminal = useCallback((terminalId: string, data: string) => {
     if (!terminalId || !data) return;
     socketSend(wsRef.current, terminalInput(terminalId, data));
@@ -284,6 +312,7 @@ export function useWs(sessionId: string): UseWs {
     answerPermission,
     answerQuestion,
     interrupt,
+    requestTranscript,
     sendTerminal,
     resizeTerminal,
     killTerminal,

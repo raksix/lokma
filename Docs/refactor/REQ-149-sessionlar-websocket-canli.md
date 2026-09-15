@@ -1,6 +1,6 @@
 # REQ-149 — Sessionlar websocket'e bağlı olsun, veriler WS'ten canlı gelsin
 
-**Status:** in-progress (tick 3/5)
+**Status:** in-progress (tick 4/5)
 **Tarih:** 2026-09-15
 **Kapsam (öngörü):** `packages/lokma-web/server/src/routes/ws.ts` (protokol),
 `packages/lokma-shared/src/protocol/ws.ts`, `packages/lokma-web/web/src/lib/ws.ts`,
@@ -93,3 +93,27 @@ yayılsın — poll'a bağlı kalmadan.
 - Commit: `f39398c`.
 - Sıradaki: (4) store/sidebar/chat wiring (4 sn poll yerine WS),
   (5) canlı prob + kapanış.
+
+### Tur 4/5 — mağaza + sidebar + sohbet kablolaması (2026-09-15)
+- `stores/session.ts`: `applyWsEvent` artık oturum frame'lerini gerçekten
+  işliyor — `sessions` (liste push'u; REQ-148 prune politikası korunur),
+  `transcript` (tam anlık görüntü), `transcript_append` (tek satır büyüme).
+  Elde olmayan bir oturum için append yok sayılır (yarım geçmiş çizilmesin).
+  Yeni sayaç: `wsSockets` + `noteWsOpen`/`noteWsClose` (sidebar poll kapısı).
+- `hooks/use-ws.ts`: soket açılınca sayacı artırır, kapanışta (onclose /
+  disconnect / unmount) düşürür; `requestTranscript` istenen id'yi hatırlar ve
+  her (yeniden) bağlanışta tek `transcript_get` ile tazeler (kriter 5).
+- `sessions-sidebar.tsx`: 4 sn'lik poll artık SADECE açık soket yokken koşuyor
+  (soketsiz sekmeler için yedek) — sayaç tick anında okunur, interval bir kez
+  kurulur.
+- `chat/index.tsx`: pane açılışında transcript WS'ten istenir; bir çalışma
+  sürerken REST transcript reload'u yalnız soket kapalıyken yapılır (rozet
+  probu kalır); `visiblePending` — sunucu satırı canlı geldiğinde iyimser
+  kullanıcı balonu gizlenir (kendi mesajı iki kez çizilmez; yalnız kuyruk
+  eşleşir, eski aynı metinli prompt yenisini saklamaz).
+- Kanıt: `stores.test.ts` yeni REQ-149 bloğu PASS (2 soket sayımı, taban 0,
+  sessions/transcript/append fold'ları, yarım önbellek yok), `ws.test.ts` PASS,
+  sohbet testleri PASS, root `tsc --noEmit` 0, web build yeşil
+  (`index-Bjih_AMc.js` 574.71 kB), pm2 `lokma-web` restart + canlı bundle hash
+  disk ile aynı, canlı bundle'da `wsSockets`/`noteWsOpen`/`noteWsClose` var.
+- Sıradaki: (5) canlı E2E probu (iki soket, poll'suz büyüme) + kapanış.

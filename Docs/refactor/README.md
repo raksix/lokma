@@ -167,7 +167,7 @@
 - [REQ-146](finished/REQ-146-acik-browser-yeniden-kullan.md) — An already-open browser is reused (same tab/pane, and the open pane follows the agent's URL) instead of opening a second one — done
 - [REQ-147](finished/REQ-147-sessiona-mesaj-gonderemiyor.md) — Sending a message to a session fails: either the agent lacks a cross-session send tool or the pane send path drops it — done (send_to_session tool + server delivery, live 9/9)
 - [REQ-148](finished/REQ-148-pane-session-gecmis-yuklenmiyor.md) — A session pane does not auto-load the history when the session changes (empty-return cache shortcut) — done
-- [REQ-149](REQ-149-sessionlar-websocket-canli.md) — Sessions bound to the websocket: list + transcript requested and pushed over WS instead of the 4 s REST poll — in-progress (tick 1/5: protocol frames + core append feed)
+- [REQ-149](REQ-149-sessionlar-websocket-canli.md) — Sessions bound to the websocket: list + transcript requested and pushed over WS instead of the 4 s REST poll — in-progress (tick 4/5: store folds the pushed rows, sidebar polls only while socket-less, chat asks its transcript over the socket)
 - [REQ-150](finished/REQ-150-browser-youtube-iframe-reddi.md) — YouTube (and every site that sends X-Frame-Options) renders blank in the browser pane: detect the refusal, rewrite watch links to embed URLs, and offer the external-tab fallback — done
 - [REQ-151](finished/REQ-151-pencere-alta-tasma-clamp.md) — Windowed mode overflows at the bottom: the y clamp reserves only 40px for the title bar while x keeps the whole window inside — done
 - [REQ-152](finished/REQ-152-pencere-focus-one-gelsin.md) — Clicking a floating window must raise it to the front (Windows-style z-order + focus ring, persisted) — done

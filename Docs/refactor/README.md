@@ -168,3 +168,4 @@
 - [REQ-147](REQ-147-sessiona-mesaj-gonderemiyor.md) — Sending a message to a session fails: either the agent lacks a cross-session send tool or the pane send path drops it — pending
 - [REQ-148](REQ-148-pane-session-gecmis-yuklenmiyor.md) — A session pane does not auto-load the history when the session changes (empty-return cache shortcut) — pending
 - [REQ-149](REQ-149-sessionlar-websocket-canli.md) — Sessions bound to the websocket: list + transcript requested and pushed over WS instead of the 4 s REST poll — pending
+- [REQ-150](REQ-150-browser-youtube-iframe-reddi.md) — YouTube (and every site that sends X-Frame-Options) renders blank in the browser pane: detect the refusal, rewrite watch links to embed URLs, and offer the external-tab fallback — pending

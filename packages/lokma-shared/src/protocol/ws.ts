@@ -41,6 +41,15 @@ export type ActiveReasoningEffort = (typeof REASONING_LADDER)[number];
  */
 export const SESSION_ROLES = ['user', 'assistant', 'tool', 'thinking'] as const;
 
+/** One chat attachment on a transcript row (mirrors lokma-core `SessionAttachment`). */
+export const SessionAttachmentSchema = z.object({
+  path: z.string(),
+  name: z.string(),
+  mime: z.string(),
+  size: z.number(),
+});
+export type SessionAttachment = z.infer<typeof SessionAttachmentSchema>;
+
 /** One persisted transcript line (mirrors `SessionMessage` in lokma-core). */
 export const TranscriptRowSchema = z.object({
   role: z.enum(SESSION_ROLES),
@@ -48,6 +57,8 @@ export const TranscriptRowSchema = z.object({
   timestamp: z.string(),
   toolCallId: z.string().optional(),
   toolName: z.string().optional(),
+  /** REQ-155: agent-sent files — images inline, other files become cards. */
+  attachments: z.array(SessionAttachmentSchema).optional(),
 });
 export type TranscriptRow = z.infer<typeof TranscriptRowSchema>;
 

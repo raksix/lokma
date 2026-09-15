@@ -163,3 +163,8 @@
 - [REQ-142](finished/REQ-142-day-only-normal-view.md) — The normal sidebar view groups *every* session by day only (Today · Yesterday · Last week · Last month · Older, no Projects/Home), the project view is untouched, and the chosen view is persisted — done
 - [REQ-143](finished/REQ-143-compact-effort-menu.md) — The composer Effort menu lost its per-rung descriptions and got compact: 168px wide, one line per rung, a fixed marker column so the active dot does not shift the label; rows expose `data-effort-option`.
 - [REQ-144](finished/REQ-144-pane-poll-stability.md) — Panes stop reloading themselves: `useKnownSession` hands out a value-stable summary across the 4 s list poll and Files/Browser/Git bind to the new `useKnownCwd` primitive, so the tree no longer collapses, clears the selection or refetches while you read it — done
+- [REQ-145](REQ-145-browser-split-yan-pane.md) — Opening something in the browser splits the workspace and docks the page in a side pane — pending
+- [REQ-146](REQ-146-acik-browser-yeniden-kullan.md) — An already-open browser is reused (same tab/pane) instead of opening a second one — pending
+- [REQ-147](REQ-147-sessiona-mesaj-gonderemiyor.md) — Sending a message to a session fails: either the agent lacks a cross-session send tool or the pane send path drops it — pending
+- [REQ-148](REQ-148-pane-session-gecmis-yuklenmiyor.md) — A session pane does not auto-load the history when the session changes (empty-return cache shortcut) — pending
+- [REQ-149](REQ-149-sessionlar-websocket-canli.md) — Sessions bound to the websocket: list + transcript requested and pushed over WS instead of the 4 s REST poll — pending

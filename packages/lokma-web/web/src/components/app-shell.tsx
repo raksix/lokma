@@ -146,7 +146,9 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       return;
     }
     setTiling(true);
-    requestInspectorTab('browser');
+    // REQ-145 — dock the browser as a right-hand pane: a single-pane
+    // workspace splits for it, an already-split one reuses its side pane.
+    requestInspectorTab('browser', true);
   }, [inspectorSide, isMobile, requestInspectorTab, setTiling]);
 
   // REQ-008 — rail click reveals the panel that owns the key, then asks

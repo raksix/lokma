@@ -420,6 +420,47 @@ export function collectPaneIds(layout: LayoutNode): string[] {
   return layout.children.flatMap(collectPaneIds);
 }
 
+// ─── Side-dock planning (REQ-145) ───────────────────────────────────────────
+
+/** Pane currently holding this inspector tab, if any (REQ-145 dock reuse). */
+export function paneWithInspector(
+  states: Record<string, PaneTabState>,
+  paneIds: string[],
+  inspectorId: InspectorTabId,
+): string | null {
+  for (const pid of paneIds) {
+    const tabs = states[pid]?.tabs ?? [];
+    if (tabs.some((t) => t.kind === 'inspector' && t.inspectorId === inspectorId)) return pid;
+  }
+  return null;
+}
+
+/** What an "open to the side" request does to the current layout (REQ-145). */
+export type SideDockPlan =
+  | { kind: 'focus'; paneId: string } // already open — focus it, never duplicate
+  | { kind: 'split'; paneId: string } // single-pane workspace — split beside it
+  | { kind: 'dock'; paneId: string }; // already split — land in the right-most pane
+
+/**
+ * Plan a side-dock (REQ-145): an inspector that is already open is focused;
+ * a single-pane workspace splits once and docks the fresh pane on the right;
+ * a workspace with several panes keeps its layout and docks into the
+ * right-most pane — the pane is never split a second time.
+ */
+export function planSideDock(
+  states: Record<string, PaneTabState>,
+  paneIds: string[],
+  focusedPaneId: string,
+  inspectorId: InspectorTabId,
+): SideDockPlan | null {
+  if (paneIds.length === 0) return null;
+  const owner = paneWithInspector(states, paneIds, inspectorId);
+  if (owner) return { kind: 'focus', paneId: owner };
+  const target = paneIds.includes(focusedPaneId) ? focusedPaneId : paneIds[0];
+  if (paneIds.length === 1) return { kind: 'split', paneId: target };
+  return { kind: 'dock', paneId: paneIds[paneIds.length - 1] };
+}
+
 // ─── Fullscreen modal subtree ops (REQ-089) ────
 //
 // The fullscreen modal is a LIVE VIEW of one layout subtree, never a copy:

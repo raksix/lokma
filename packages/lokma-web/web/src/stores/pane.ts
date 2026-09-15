@@ -38,9 +38,15 @@ export type PendingFilePane = {
   sessionId: string;
 };
 
-/** One-shot inspector-open request from agent UI actions (REQ-057, consumed by TilingWorkspace, never persisted). */
+/**
+ * One-shot inspector-open request from agent UI actions (REQ-057, consumed by
+ * TilingWorkspace, never persisted). REQ-145 — `side` asks the workspace to
+ * dock the inspector as a right-hand pane ("open to the side") instead of
+ * stacking another tab into whichever pane happens to be focused.
+ */
 export type PendingInspectorTab = {
   inspectorId: 'browser' | 'terminal';
+  side?: boolean;
 };
 
 type PaneState = {
@@ -70,7 +76,7 @@ type PaneState = {
   consumeFilePane: () => void;
   requestSessionTab: (sessionId: string, title: string) => void;
   consumeSessionTab: () => void;
-  requestInspectorTab: (inspectorId: 'browser' | 'terminal') => void;
+  requestInspectorTab: (inspectorId: 'browser' | 'terminal', side?: boolean) => void;
   consumeInspectorTab: () => void;
   resetLayout: () => void;
 };
@@ -131,7 +137,8 @@ export const usePaneStore = create<PaneState>()(
       requestSessionTab: (sessionId: string, title: string) => set({ pendingSessionTab: { sessionId, title } }),
       consumeSessionTab: () => set({ pendingSessionTab: null }),
 
-      requestInspectorTab: (inspectorId: 'browser' | 'terminal') => set({ pendingInspectorTab: { inspectorId } }),
+      requestInspectorTab: (inspectorId: 'browser' | 'terminal', side = false) =>
+        set({ pendingInspectorTab: side ? { inspectorId, side: true } : { inspectorId } }),
       consumeInspectorTab: () => set({ pendingInspectorTab: null }),
 
       resetLayout: () => set({ ...initial, layout: defaultLayout(), openTabs: [] }),

@@ -26,9 +26,11 @@ import {
   isPaneTab,
   isPaneUnder,
   makeFileTab,
+  makeInspectorTab,
   makePaneId,
   makeSessionTab,
   parseTabStates,
+  planSideDock,
   resizeLayoutNode,
   serializeTabStates,
   splitLayout,
@@ -187,16 +189,25 @@ export function TilingWorkspace({
   // REQ-057: agent UI actions ("open the browser/terminal for me") land here
   // as a tab in the last-focused pane (same inspector focuses instead of
   // duplicating). One-shot: consumed even when no pane exists.
+  // REQ-145 — `side` requests (browser opens) dock instead: a single-pane
+  // workspace splits so the browser lands on the right, an already-open
+  // browser pane is focused, and a multi-pane workspace keeps its layout.
   React.useEffect(() => {
     if (!pendingInspectorTab) return;
+    const { inspectorId, side } = pendingInspectorTab;
     const target = paneIds.includes(focusedPaneId) ? focusedPaneId : paneIds[0];
-    if (target) {
-      const { inspectorId } = pendingInspectorTab;
+    const plan = side ? planSideDock(states, paneIds, focusedPaneId, inspectorId) : null;
+    if (plan && plan.kind === 'focus') {
+      focusPane(plan.paneId);
+    } else if (plan && plan.kind === 'split') {
+      split(plan.paneId, 'row', 'after', makeInspectorTab(inspectorId));
+    } else if (target) {
+      const paneId = plan ? plan.paneId : target;
       setTabStates((prev) => ({
         ...prev,
-        [target]: upsertInspectorTab(prev[target] ?? { tabs: [], active: null }, inspectorId),
+        [paneId]: upsertInspectorTab(prev[paneId] ?? { tabs: [], active: null }, inspectorId),
       }));
-      focusPane(target);
+      focusPane(paneId);
     }
     consumeInspectorTab();
   }, [pendingInspectorTab, paneIds, focusedPaneId, focusPane, consumeInspectorTab]);

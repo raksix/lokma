@@ -33,17 +33,20 @@ import {
   makePaneId,
   makeSessionTab,
   makeTabId,
+  paneWithInspector,
   parseFileDrop,
   parseInspectorDrop,
   parseSessionDrop,
   parseTabMove,
   parseTabStates,
+  planSideDock,
   resizeLayoutNode,
   serializeTabStates,
   splitForZone,
   splitLayout,
   upsertFileTab,
   upsertSessionTab,
+  type PaneTabState,
 } from "./panes";
 import type { LayoutNode } from "@/stores/layout";
 
@@ -338,6 +341,46 @@ check("REQ-109 sessions stays sidebar-capable", isPaneOnlyTab("sessions") === fa
 check("REQ-109 unknown stays sidebar-capable", isPaneOnlyTab("nope") === false && isPaneOnlyTab(null) === false);
 check("REQ-109 browser keeps its pane registry id", isInspectorTabId("browser") === true);
 check("REQ-109 browser keeps its rail drop id", isRailDropId("browser") === true);
+
+/* REQ-145 — "open to the side": the side-dock plan for the browser pane. */
+const sideStates: Record<string, PaneTabState> = {
+  a: { tabs: [makeSessionTab("sess_1")], active: null },
+  b: { tabs: [makeInspectorTab("browser")], active: null },
+  c: { tabs: [], active: null },
+};
+check("REQ-145 no panes means no plan", planSideDock({}, [], "a", "browser") === null);
+check(
+  "REQ-145 single pane splits beside the focused pane",
+  sameJson(planSideDock({ a: sideStates.a }, ["a"], "a", "browser"), { kind: "split", paneId: "a" }),
+);
+check(
+  "REQ-145 stale focus falls back to the first pane",
+  sameJson(planSideDock({ a: sideStates.a }, ["a"], "gone", "browser"), { kind: "split", paneId: "a" }),
+);
+check(
+  "REQ-145 multi-pane dock lands in the right-most pane",
+  sameJson(planSideDock({ a: sideStates.a, c: sideStates.c }, ["a", "c"], "a", "browser"), {
+    kind: "dock",
+    paneId: "c",
+  }),
+);
+check(
+  "REQ-145 an already-open browser is focused, never duplicated",
+  sameJson(planSideDock(sideStates, ["a", "b", "c"], "a", "browser"), { kind: "focus", paneId: "b" }),
+);
+check(
+  "REQ-145 open browser wins even in a single-pane workspace",
+  sameJson(planSideDock({ a: sideStates.b }, ["a"], "a", "browser"), { kind: "focus", paneId: "a" }),
+);
+check("REQ-145 paneWithInspector ignores non-inspector tabs", paneWithInspector(sideStates, ["a"], "browser") === null);
+check(
+  "REQ-145 paneWithInspector finds the owning pane",
+  paneWithInspector(sideStates, ["a", "b", "c"], "browser") === "b",
+);
+check(
+  "REQ-145 terminal docks like the browser",
+  sameJson(planSideDock({ a: sideStates.a }, ["a"], "a", "terminal"), { kind: "split", paneId: "a" }),
+);
 
 console.log(`panes-089: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

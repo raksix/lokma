@@ -155,6 +155,16 @@ usePaneStore.getState().resetLayout();
 assert(usePaneStore.getState().tiling === false, 'reset clears chrome flags');
 assert(isLayoutNode(usePaneStore.getState().layout), 'reset restores a valid layout');
 
+// REQ-145 — a side-dock request carries the flag; a plain request stays tab-style.
+usePaneStore.getState().requestInspectorTab('browser', true);
+assert(usePaneStore.getState().pendingInspectorTab?.side === true, 'side request carries the dock flag');
+assert(usePaneStore.getState().pendingInspectorTab?.inspectorId === 'browser', 'side request keeps the inspector id');
+usePaneStore.getState().consumeInspectorTab();
+assert(usePaneStore.getState().pendingInspectorTab === null, 'consume clears the side request');
+usePaneStore.getState().requestInspectorTab('terminal');
+assert(usePaneStore.getState().pendingInspectorTab?.side === undefined, 'plain request stays tab-style');
+usePaneStore.getState().consumeInspectorTab();
+
 // ─── Provider store (5m TTL) ────────────────────────────────────────────────
 
 assert(PROVIDER_CACHE_TTL_MS === 5 * 60 * 1000, 'provider TTL is 5 minutes');

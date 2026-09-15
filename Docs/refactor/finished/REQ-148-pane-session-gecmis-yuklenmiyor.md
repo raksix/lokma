@@ -1,6 +1,6 @@
 # REQ-148 — Pane'de session değiştirince mesaj geçmişi otomatik yüklenmiyor
 
-**Status:** in-progress (2026-09-15) — tur 1: store fix committed (`0bb1f8c`)
+**Status:** done (2026-09-15) — store fix `0bb1f8c` + prune fix `efa12da` + live before/after probe
 **Tarih:** 2026-09-15
 **Kapsam (öngörü):** `packages/lokma-web/web/src/components/chat/index.tsx` (`ChatWithSocket`/`Chat`),
 `components/panes/pane.tsx` (session tab), `stores/session.ts` (`loadTranscript`)
@@ -81,3 +81,45 @@ Kanıt:
   `GET /api/sessions/<id>` ≥1 ölçümü). Deploy, ağaç temizlenene kadar
   (kardeş commit'i ya da devralma) ertelendi: aksi halde commit edilmemiş
   kardeş değişiklikleri canlıya basılırdı.
+
+## İlerleme (tur 2, 2026-09-15 — commit `efa12da`, probs `9bec76d`, deploy `index-WaKqpL9U.js`)
+
+**İkinci katman bulundu ve kapatıldı: 4 sn'lik liste poll'u taze transcript'i
+siliyordu.** Tur 1 store düzeltmesiyle pane artık geçmişi YÜKLÜYORDU ama canlı
+ölçümde 1 saniye sonra kayboluyordu (satırlar 6 → 0, ekranda boş hero —
+`/tmp/req148-debug.log`). Kök neden: `refreshSessions` + `refreshSessionsQuiet`
+önbelleği liste üyeliğiyle buduyordu (`ids.has(id)` filtresi) — liste bir
+ANLIK GÖRÜNTÜ, yokluk kanıtı değil; görünür bir pane'in okuduğu taze kaydı
+sildiği için pane okuma ortasında boşalıyordu.
+
+Fix: `keepSessionCacheEntry(id, listIds, stale)` — liste görmese bile TAZE
+kayıt budanmaz (taze kayıt sunucudan geldi, sunucu o oturumu biliyor); yalnız
+STALE kayıtlar (refetch bekleyen / silinmiş oturum) liste üyeliğine göre
+budanır. `stores/session.ts` iki refresh yolu da bu politikayı kullanır.
+
+**Gates:** `bun src/stores/stores.test.ts` ALL PASS (yeni: taze off-list kayıt
+4 sn poll'una dayanır, stale kayıt budanır, policy birim assertleri) · web
+`tsc --noEmit` 0 · steril `bun run build` yeşil (`index-WaKqpL9U.js`).
+
+**Deploy:** `pm2 restart lokma-web` → servis edilen entry == disk
+(`assets/index-WaKqpL9U.js`), sourcemap'te `keepSessionCacheEntry` var.
+
+**Canlı prob (aynı sunucu, aynı URL — tek fark bundle):**
+
+| Koşu | Sonuç |
+|------|-------|
+| `--expect before` (eski bundle `index-BntVOS51.js`, `--html-entry` client-side rewrite) | BUG: geçişte **0 doğrulama isteği**, pane **boş** (rows=0); kontrol oturumu yeşil (rows=5) |
+| `--expect after` (canlı bundle) | **2× GET 200**, pane geçmişi render (rows=6, sunucu count 18), **içerik eşleşti** (son user mesajı birebir), sekme turlaması iki geçmişi de koruyor, 12/12 PASS |
+
+Prob, "liste snapshot'ı bu id'yi bilmiyor" koşulunu deterministik üretir:
+`/api/sessions` yanıtlarından gerçek bir oturum (18 mesajlık) her snaphot'ta
+çıkarılır; tab localStorage'a seed edilir, reload sonrası sekmeye tıklanır.
+
+**Notlar / takip adayları (bu REQ kapsamı dışında):**
+- Ham GET sayımı assert EDİLMEDİ: her chat mount'u ayrıca oturum meta'sı +
+  run durumu çeker ve done-sonrası yol bilerek refetch eder; URL sayımı
+  `loadTranscript` cache isabetini izole edemiyor. Kriter 3 sözleşmesi store
+  testlerinde kanıtlı ('fresh transcript skips refetch').
+- Mount başına `loadTranscript` iki kez çağrılıyor (effect1 + effect2, dedupe
+  yok) ve bir model-meta `getSession` + run poll ekleniyor → sekme başına
+  2-4 detay isteği. Ayrı bir iyileştirme adayı.

@@ -1,6 +1,6 @@
 # REQ-148 — Pane'de session değiştirince mesaj geçmişi otomatik yüklenmiyor
 
-**Status:** pending
+**Status:** in-progress (2026-09-15) — tur 1: store fix committed (`0bb1f8c`)
 **Tarih:** 2026-09-15
 **Kapsam (öngörü):** `packages/lokma-web/web/src/components/chat/index.tsx` (`ChatWithSocket`/`Chat`),
 `components/panes/pane.tsx` (session tab), `stores/session.ts` (`loadTranscript`)
@@ -50,3 +50,34 @@
 
 - REQ-144'te aynı sınıf hata (4 sn'lik listede kimlik çalkantısı) düzeltildi; bu
   istek **önbellek-boş-dönüş** yolunu hedefliyor, farklı bir kök neden.
+
+## İlerleme (tur 1, 2026-09-15 — commit `0bb1f8c`)
+
+**Store düzeltmesi commit'li.** `stores/session.ts → loadTranscript` içindeki
+"liste bu id'yi bilmiyorsa boş önbellekle, hiç istek atma" kısayolu kaldırıldı:
+`sessions` 4 sn'lik poll'un anlık görüntüsü — WS'in yeni yarattığı oturumu
+geciktirir ve göremediği satırları düşürür — yani "listede yok" yokluk kanıtı
+değil. Eski davranışta görünür pane o durumda `[]` yazıp hiç istek atmıyordu
+(kullanıcının "geçmiş oto yüklenmiyor" tablosu: 0 istek, sessiz boş). Artık her
+görünür yükleme TEK doğrulama GET'i atar; gerçek oturum geçmişini döndürür,
+gerçekten yoksa mevcut `session_not_found` dalına düşer (boş durum, hata yok).
+Kriter 3 korunuyor (taze önbellek istek atmaz), `force` (post-stream) akışı
+aynen duruyor. Kriter 4 zaten yapısal: pane session sekmesi
+`<ChatWithSocket key={tab.sessionId}>` ile remount ediyor (canlı trace taşınmaz).
+
+Kanıt:
+- `bun src/stores/stores.test.ts` PASS — yeni sözleşme: "an off-list session
+  still fires the verification GET", "off-list session loads its real history
+  instead of a cached empty", "unknown id fires one verification GET", "a true
+  miss caches an empty transcript", "the cached empty result does not refetch".
+- Tüm web test dosyaları koşuldu: yalnız main'de önceden kırık olan
+  a11y (3) + narrow-layout (5) + ws (1) FAIL — REQ-145'te stash ile doğrulanan
+  baseline, bu değişiklikle ilgisiz.
+- Root `bun x tsc --noEmit` 0 · web `bun x tsc --noEmit` 0 · vite build yeşil
+  (temp outDir `/tmp/lokma-web-gate-148`; canlı `dist` bilinçli olarak
+  dokunulmadı — ağaçta kardeş oturumun REQ-150/151/152 WIP'i var).
+- **Kalan (tur 2+):** canlı deploy (`dist` build + `pm2 restart lokma-web`) +
+  canlı prob `scripts/probe-pane-history.cjs` (A pane → B'ye geç, satırlar +
+  `GET /api/sessions/<id>` ≥1 ölçümü). Deploy, ağaç temizlenene kadar
+  (kardeş commit'i ya da devralma) ertelendi: aksi halde commit edilmemiş
+  kardeş değişiklikleri canlıya basılırdı.

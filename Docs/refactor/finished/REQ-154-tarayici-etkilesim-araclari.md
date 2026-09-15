@@ -1,6 +1,6 @@
 # REQ-154 — Agent tarayıcıyı kullanabilsin: sayfayı oku / kaydır / tıkla / yaz
 
-**Status:** pending
+**Status:** done (2026-09-15 — canlı; commit'ler `9eff39b` · `6d688f6` · `0729003` · `e71e1d8` · `83f926d` · `bbd43ea`)
 **Tarih:** 2026-09-15
 **Kapsam (öngörü):** `packages/lokma-core/src/tools/` (yeni browser araçları),
 `packages/lokma-web/server/src/routes/browser.ts` + yeni bir motor modülü,
@@ -30,67 +30,65 @@ veriyor:
   allow-same-origin allow-forms"`) — sayfalar çapraz kaynaklı olduğu için
   istemci, iframe'in içine script enjekte edip **kaydıramaz/tıklayamaz**.
   Yani "istemciden halledelim" kısayolu mimari olarak kapalı.
+- Kullanıcının KENDİ iframe scroll'u ayrıca ölçüldü: çalışıyor (gerçek
+  Chromium'da wheel ile scrollY 0→2000) — şikâyet ajanın kaydıramamasıydı.
 
-## Önerilen çözüm (iki aşamalı)
+## Çözüm (uygulandı: Aşama 2 — gerçek motor)
 
-**Aşama 1 — okuma (küçük, hemen yapılabilir):**
-`browser_read_page` aracı: sekmenin URL'ini sunucuda `fetch` eder, HTML'i
-metne çevirir (script/style atılır, başlıklar korunur, ilk ~8K karakter) ve
-modele verir. Kullanıcı "aşağıda ne var / sayfada ne yazıyor" diye sorduğunda
-cevap üretilebilir. İnteraktif sayfalarda (SPA) eksik kalır — bunu araç
-açıklamasında dürüstçe yazar.
+Aşama 1'e (fetch tabanlı okuma) gerek kalmadı — `browser_read_page` doğrudan
+motordan okuyor.
 
-**Aşama 2 — gerçek etkileşim (asıl istek):**
-Sunucuya gerçek bir tarayıcı motoru (playwright-core + mevcut
-`/root/.cache/ms-playwright/chromium-1234`) eklenir; her sekme bir motor
-oturumuna bağlanır:
+**Motor** — `packages/lokma-web/server/src/browser-engine.ts` (yeni):
+- `playwright-core@1.62.1` (sunucu bağımlılığı) + makinedeki mevcut Chromium
+  (`/root/.cache/ms-playwright/chromium-*`; `LOKMA_BROWSER_CHROME` override).
+- Lazy: ilk araç çağrısına kadar hiçbir şey başlamaz; boşta kalan sayfalar
+  10 dk sonra kapanır, son sayfa gidince tarayıcı da kapanır; SIGTERM/SIGINT
+  temizliği + sekme kapanışında (DELETE /api/browser/:id) sayfa teardown'ı.
+- Sekme başına bir sayfa; her çağrıdan önce sayfa, sekme kaydındaki GÜNCEL
+  url'e senkronlanır (pane ile tek doğruluk kaynağı: sekme kaydı).
+- SSRF guard: loopback/özel/link-local adresler ve öyle adreslere çözülen
+  host'lar `blocked_url` ile reddedilir (yalnız motor; kullanıcının iframe'i
+  etkilenmez). Timeout katmanı: nav 25 sn, op 20 sn, screenshot 30 sn.
+- Her etkileşimde `browserTabs.touchAgentUse(tabId)` → pane rozeti bunu okur.
 
-| Araç | İş |
-| --- | --- |
-| `browser_read_page` | sayfa metni/markdown (Aşama 1'in motorlu hâli) |
-| `browser_scroll` | `{ direction: up/down/top/bottom, amount? }` |
-| `browser_click` | `{ selector }` veya `{ text }` (görünür metne göre) |
-| `browser_type` | `{ selector, text, submit? }` |
-| `browser_screenshot` | PNG üretir, `.lokma/browser-shots/` altına yazar, yolu döner |
+**Araçlar** — `packages/lokma-core/src/tools/browser.ts` (yeni): 5 araç —
+`browser_read_page`, `browser_scroll`, `browser_click`, `browser_type`,
+`browser_screenshot` (PNG → `<cwd>/.lokma/browser-shots/`).
+- Hedef sekme: çağrıdaki `tabId`, yoksa oturumun EN YENİ sekmesi (pane
+  varsayılanıyla aynı); sekme yoksa dürüst `no_tab` ("önce open_browser").
+- Motor yoksa (CLI host'ları) her çağrı dürüst `engine_unavailable` döner.
+- `browser_type` parola/token alanlarını maskeler (değer sonuçta ve logda yok).
+- Gate: `BROWSER_TOOLS` read-only değil — `auto`'da onay ister, `plan`'da
+  reddedilir (canlı config `bypass` olduğundan fiilen serbest).
 
-Kurallar:
-1. Araçlar `run_command` gibi **gate'li** (varsayılan izin akışı), hepsi
-   `readOnly` değil; screenshot hariç hepsi geri besleme metni döner.
-2. Motor oturumu sekme ömrüne bağlı; sekme kapanınca motor kapanır (sızıntı yok).
-3. Panel görünümü: motor modunda pane ya (a) motorun periyodik
-   screenshot'ını gösterir ("canlı ekran") ya da (b) iframe'de kalır ve
-   panelde "ajan bu sekmeyi motor üzerinden kullanıyor" rozeti çıkar. İki
-   görünümün **ayrıştığını** dokümanda açıkça yaz — sessiz fark yaratma.
-4. Ağ: motor, kullanıcının ajanı neyi açıyorsa onu açar; iç ağ adresleri
-   (127.0.0.1, link-local, metadata IP'leri) için SSRF guard'ı şart.
-5. Kimlik bilgisi yazma yasağı: `browser_type` parola/token alanlarına
-   yazarken maskeler (log ve transkriptte değer görünmez).
+**Bağlama** — `agent-loop.ts` (`browserEngine` seam'i ile kayıt) +
+`routes/browser.ts` (DELETE'te motor sayfası teardown). Pane: motor kullanılan
+sekmeye `data-engine-chip` **"Ajan motoru"** rozeti — iki görünümün ayrıştığı
+görünür, sessiz fark yok.
 
-## Kabul kriterleri (öngörü)
+## Kanıt
 
-1. "aşağı scroll et" → `browser_scroll` çağrısı sayfayı kaydırır ve araç
-   sonucu yeni konumu (scrollY / toplam yükseklik) bildirir; kullanıcı panelde
-   kaydığıNı görür.
-2. "sayfada ne var / fiyatı kaç" → `browser_read_page` gerçek içeriği döner.
-3. "şu butona tıkla / şunu yaz" → `browser_click` / `browser_type` çalışır ve
-   sonuç metni geri beslenir.
-4. Motor erişilemezse araç **açık hata** verir; ajan "yaptım" diyemez
-   (mevcut davranış: dürüst red — bu korunur).
-5. Panel ile motor aynı sekmeyi gösterir; fark varsa kullanıcıya rozetle belli olur.
+- Birim: `bun src/tools/browser.test.ts` → **20/20** (fake engine: sekme
+  çözümü, dürüst hatalar, maskeleme, argüman geçişi, `touchAgentUse`).
+- Canlı motor probe'u `bun scripts/probe-browser-agent-tools.ts` → **16/16**:
+  gerçek Chromium + Wikipedia — başlık/metin (20 407 karakter), scroll
+  805→1525, top/bottom uçları, link tıklaması (Application_software),
+  type+submit → /wiki/Linux, gerçek PNG screenshot, loopback reddi,
+  blank sekme `no_page`.
+- Canlı AJAN E2E `node scripts/probe-agent-browser-scroll.cjs` → **7/7**:
+  deployed sunucuda gerçek model (`commandcode/deepseek/deepseek-v4.1-flash`),
+  kullanıcının şikâyet senaryosu aynen — "aşağı scroll et":
+  `open_browser, browser_scroll, browser_scroll`; yanıt: **"İkinci kaydırma
+  sonrası scrollY = 1525 … (scrollHeight 7614, viewportHeight 800)"**.
+- `bun x tsc --noEmit` core+server 0; core+server dist rebuild yeşil; canlı
+  sunucu yeni dist ile restart edildi (health 200).
 
-## Verify planı (öngörü)
+## Notlar / sınırlar
 
-- Prob (sunucu): bilinen bir sayfada `browser_scroll` sonrası
-  `scrollY` artışı + `browser_read_page` çıktısında sayfaya özgü bir metin.
-- Uçtan uca: canlı oturumda ajan "youtube ana sayfada aşağı kaydır ve ilk 5
-  video başlığını yaz" görevini araç çağrılarıyla tamamlar; transcript'te
-  `browser_scroll` + `browser_read_page` satırları görünür.
-
-## Notlar
-
-- Bu istek, "ajan tarayıcıyı kullansın" sınıfının ilk parçası; ileride
-  `browser_hover`, `browser_select`, `browser_wait_for` eklenebilir.
-- Aşama 1 tek başına da kullanıcıya değer üretir (okuma), ama asıl şikâyet
-  etkileşim — kapanış Aşama 2 ile yapılmalı.
-- Alternatif (reddedildi): sayfayı sunucu proxy'sinden geçirip iframe'de
-  göstermek — çoğu sitede script/CSP kırılır, oturum çerezleri sızar.
+- **Görünüm ayrımı bilinçli**: motor sunucuda render eder, pane kullanıcının
+  iframe'idir — aynı sekmeyi ve URL'i paylaşırlar, aynı pikselleri değil.
+  "Ajan motoru" rozeti bunu görünür kılar. Motorun canlı ekranını (screencast)
+  pane'e basmak sonraki iş; bu kapanış araçları + dürüst rozeti kapsar.
+- Deploy: sunucu tarafı (araçlar + motor) yeni dist ile canlı; pane rozeti web
+  bundle'ında yayınlandı (REQ-149 web-wiring'i tamamlanınca tam tip-kapılı
+  build tazeler).

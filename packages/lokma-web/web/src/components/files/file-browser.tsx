@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ApiError, api, type FileEntry, type FileSearchHit } from '@/lib/api';
-import { useKnownSession } from '@/stores';
+import { useKnownCwd } from '@/stores';
 import { usePaneStore } from '@/stores/pane';
 import { emitToast, isMobileViewport } from '@/components/shell';
 import {
@@ -126,7 +126,12 @@ export function FileBrowser({ sessionId }: { sessionId: string }) {
   // cached server list — never a detail GET (fresh sessions used to 404 here
   // on every boot). A fresh local-only session has no workspace yet: empty
   // tree, no error, no request.
-  const known = useKnownSession(sessionId);
+  // REQ-144: key the reset on the workspace path as a primitive. The session
+  // list is polled every 4 s and every poll hands out fresh summary objects, so
+  // depending on the `known` object itself re-ran this effect on each tick —
+  // the tree collapsed, the selection/preview was wiped and the root refetched,
+  // i.e. the pane reloaded itself while the user was reading it.
+  const knownCwd = useKnownCwd(sessionId);
   React.useEffect(() => {
     setCwd(null);
     setCwdError(null);
@@ -138,14 +143,14 @@ export function FileBrowser({ sessionId }: { sessionId: string }) {
     setConflict(null);
     setQuery('');
     setHits([]);
-    if (known === 'loading') return;
-    if (!known) {
+    if (knownCwd === 'loading') return;
+    if (knownCwd === 'missing') {
       setCwd('');
       return;
     }
-    setCwd(known.cwd ?? '');
-    void loadDir(known.cwd ?? '', '.');
-  }, [sessionId, loadDir, known]);
+    setCwd(knownCwd);
+    void loadDir(knownCwd, '.');
+  }, [sessionId, loadDir, knownCwd]);
 
   // Ctrl+P quick-open focus (dispatched by AppShell).
   React.useEffect(() => {

@@ -24,6 +24,7 @@ import {
   saveGlobal,
   terminalManager,
   userFromToken,
+  type User,
 } from '@lokma/core';
 import { decodeClientMessage, encodeServerMessage } from '@lokma/shared';
 import { LoopAborted, LOOP_DEFAULT_MAX_TURNS, buildLoopHistory, runAgentLoop, type ApprovalDecision } from '../agent-loop.js';
@@ -58,6 +59,13 @@ import {
 import { deliverToSession } from '../session-delivery.js';
 import { resolveProviderUpstream } from './providers.js';
 import { requestToken } from './auth.js';
+import {
+  listRowsFor,
+  subscribeSessionList,
+  subscribeSessionTranscript,
+  toTranscriptRow,
+  unsubscribeSocket,
+} from '../session-feed.js';
 
 /**
  * WS /ws/:sessionId — runs the agent tool loop (`../agent-loop.js`) over
@@ -694,6 +702,10 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
     // REQ-112: remember the handshake user — the prompt path re-resolves
     // per turn via headers/cookie only, which drops `?token=` sockets.
     let handshakeUserId: string | null = null;
+    // REQ-149: keep the whole user (not only the id) — the session-data
+    // handlers re-check ownership per request and the handshake already
+    // paid for the lookup; `?token=` sockets have no header fallback.
+    let handshakeUser: User | null = null;
     void (async () => {
       try {
         if (!(await loginGateActive())) return;
@@ -709,6 +721,7 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
           socket.close(4401, 'login required');
         } else {
           handshakeUserId = user.id;
+          handshakeUser = user;
           // REQ-094: the socket alone leaks nothing, but terminal fan-out
           // + agent events are session-scoped — non-owners never attach.
           // Missing meta = unattributed = superadmin-only (uniform rule).
@@ -774,6 +787,13 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
     // the run continues. Only an explicit `abort` cancels a run.
     const runState = getRunState(sessionId);
     runState.sockets.add(socket);
+
+    // REQ-149: live transcript feed — every row appended to THIS session
+    // (user prompt, assistant text, tool row, compaction marker) is pushed
+    // as a `transcript_append` frame to attached sockets, so the chat no
+    // longer waits for a REST reload to show growth. Ownership was checked
+    // at the handshake; detach happens in the close handler below.
+    subscribeSessionTranscript(sessionId, socket);
 
     socket.on('message', async (raw: Buffer) => {
       const msg = decodeClientMessage(raw.toString());
@@ -881,6 +901,50 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
         } catch (e) {
           app.log.warn(`[ws] approvals record failed session=${sessionId}: ${String(e)}`);
         }
+      } else if (msg.type === 'sessions_list') {
+        // REQ-149: sidebar rows over the socket + a live subscription
+        // (debounced pushes on append) so the client can drop its 4 s REST
+        // poll. Ownership uses the same rule as GET /api/sessions (REQ-094);
+        // the handshake user covers `?token=` sockets.
+        const viewer = (await userFromToken(requestToken(req)).catch(() => null)) ?? handshakeUser;
+        try {
+          const rows = await listRowsFor(viewer);
+          socket.send(encodeServerMessage({ type: 'sessions', sessions: rows }));
+        } catch (e) {
+          app.log.warn(`[ws] sessions_list failed session=${sessionId}: ${String(e)}`);
+          socket.send(
+            encodeServerMessage({ type: 'error', message: 'Failed to list sessions', code: 'sessions_list_failed', sessionId }),
+          );
+        }
+        subscribeSessionList(socket, viewer);
+      } else if (msg.type === 'transcript_get') {
+        // REQ-149: transcript snapshot over the socket (session open +
+        // reconnect catch-up). Mirrors GET /api/sessions/:id: unknown ids
+        // answer `session_not_found`, foreign sessions answer `forbidden`,
+        // and a reachable session also subscribes this socket for appends.
+        const viewer = (await userFromToken(requestToken(req)).catch(() => null)) ?? handshakeUser;
+        const targetCwd =
+          msg.sessionId === sessionId
+            ? await effectiveCwd()
+            : ((await locateSession(msg.sessionId).catch(() => null))?.cwd ?? (await effectiveCwd()));
+        const store = new SessionStore(targetCwd);
+        const [messages, meta] = await Promise.all([store.read(msg.sessionId), store.readMeta(msg.sessionId)]);
+        if (messages.length === 0 && meta == null) {
+          socket.send(
+            encodeServerMessage({ type: 'error', message: `No transcript for ${msg.sessionId}`, code: 'session_not_found', sessionId }),
+          );
+          return;
+        }
+        if (viewer && !canViewSession(viewer, meta?.ownerId)) {
+          socket.send(
+            encodeServerMessage({ type: 'error', message: 'forbidden: not your session', code: 'forbidden', sessionId }),
+          );
+          return;
+        }
+        socket.send(
+          encodeServerMessage({ type: 'transcript', sessionId: msg.sessionId, messages: messages.map(toTranscriptRow) }),
+        );
+        subscribeSessionTranscript(msg.sessionId, socket);
       } else if (msg.type === 'terminal/input') {
         // Stdin for a live shell — errors come back as `error` frames so the
         // pane can toast instead of hanging on a dead terminal.
@@ -930,6 +994,9 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
       offData();
       offExit();
       offAgent();
+      // REQ-149: drop this socket from every feed registry (transcript
+      // watchers + session-list subscribers).
+      unsubscribeSocket(socket);
       // REQ-070: detach only — the session run (and its gates) survive a
       // refresh. A reconnected socket reattaches to the same run state.
       runState.sockets.delete(socket);

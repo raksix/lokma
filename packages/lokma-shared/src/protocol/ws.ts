@@ -30,6 +30,42 @@ export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 export const REASONING_LADDER = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type ActiveReasoningEffort = (typeof REASONING_LADDER)[number];
 
+/**
+ * REQ-149 — session data rides the socket.
+ *
+ * The session list and the chat transcript used to arrive over REST (with a
+ * 4 s sidebar poll for liveness). These wire rows are the payload of the
+ * `sessions` / `transcript` / `transcript_append` frames, so the client can
+ * request data over WS and let the server PUSH every row it appends. The
+ * REST endpoints stay for CLI/curl callers (backward compatible).
+ */
+export const SESSION_ROLES = ['user', 'assistant', 'tool', 'thinking'] as const;
+
+/** One persisted transcript line (mirrors `SessionMessage` in lokma-core). */
+export const TranscriptRowSchema = z.object({
+  role: z.enum(SESSION_ROLES),
+  content: z.string(),
+  timestamp: z.string(),
+  toolCallId: z.string().optional(),
+  toolName: z.string().optional(),
+});
+export type TranscriptRow = z.infer<typeof TranscriptRowSchema>;
+
+/** One sidebar row (mirrors `SessionSummary` in lokma-core). */
+export const SessionRowSchema = z.object({
+  id: z.string(),
+  cwd: z.string(),
+  title: z.string(),
+  renamed: z.boolean(),
+  model: z.string().nullable(),
+  botId: z.string().nullable(),
+  messageCount: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  ownerId: z.string().nullable(),
+});
+export type SessionRow = z.infer<typeof SessionRowSchema>;
+
 export const ClientMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('prompt'),
@@ -61,6 +97,15 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('terminal/kill'),
     terminalId: z.string().min(1).max(64),
+  }),
+  // REQ-149: session data over the socket. `sessions_list` asks for the
+  // sidebar rows (the socket also becomes a live subscriber), and
+  // `transcript_get` asks for one session's history. Answers arrive as the
+  // `sessions` / `transcript` frames; growth is PUSHED as `transcript_append`.
+  z.object({ type: z.literal('sessions_list') }),
+  z.object({
+    type: z.literal('transcript_get'),
+    sessionId: z.string().min(1).max(128),
   }),
 ]);
 
@@ -117,6 +162,21 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
     targetSessionId: z.string().max(128).optional(),
     prompt: z.string().max(8000).optional(),
     sessionId: z.string(),
+  }),
+  // REQ-149: answers to `sessions_list` / `transcript_get` and the live
+  // push for every row the server appends. `transcript` is a full snapshot
+  // (open + reconnect catch-up), `transcript_append` is one new row — the
+  // client never needs the 4 s REST poll to see growth.
+  z.object({ type: z.literal('sessions'), sessions: z.array(SessionRowSchema) }),
+  z.object({
+    type: z.literal('transcript'),
+    sessionId: z.string(),
+    messages: z.array(TranscriptRowSchema),
+  }),
+  z.object({
+    type: z.literal('transcript_append'),
+    sessionId: z.string(),
+    message: TranscriptRowSchema,
   }),
   z.object({ type: z.literal('error'), message: z.string(), code: z.string().optional(), sessionId: z.string().optional() }),
 ]);

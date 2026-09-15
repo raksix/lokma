@@ -142,6 +142,35 @@ export async function listAllSummaries(): Promise<SessionSummary[]> {
   return out;
 }
 
+/**
+ * REQ-149 — append feed. Every transcript row lands on disk through
+ * `SessionStore.append`, so one listener registry here lets the harness
+ * PUSH rows to live sockets (the web server subscribes; the CLI does not).
+ * Listeners are best-effort: a throwing listener is swallowed so persistence
+ * can never be broken by a subscriber.
+ */
+export type SessionAppendEvent = { sessionId: string; message: SessionMessage };
+
+const appendListeners = new Set<(ev: SessionAppendEvent) => void>();
+
+/** Subscribe to successful appends. Returns an unsubscribe function. */
+export function onSessionAppend(listener: (ev: SessionAppendEvent) => void): () => void {
+  appendListeners.add(listener);
+  return () => {
+    appendListeners.delete(listener);
+  };
+}
+
+function emitSessionAppend(ev: SessionAppendEvent): void {
+  for (const listener of appendListeners) {
+    try {
+      listener(ev);
+    } catch {
+      // A broken subscriber never fails an append.
+    }
+  }
+}
+
 export class SessionStore {
   constructor(private cwd: string) {}
 
@@ -151,6 +180,8 @@ export class SessionStore {
     await mkdir(dir, { recursive: true });
     const line = JSON.stringify(msg) + '\n';
     await appendFile(sessionPath(this.cwd, sessionId), line, 'utf-8');
+    // REQ-149: the row is on disk — tell live subscribers (web sockets).
+    emitSessionAppend({ sessionId, message: msg });
     // REQ-121: real activity bumps updatedAt (drives newest-first order).
     // Meta patches (model/bot/title/claude-handle) must NOT bump — opening
     // a session used to catapult it to the top of the list.

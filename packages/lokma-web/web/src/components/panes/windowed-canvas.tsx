@@ -29,11 +29,46 @@ export function clampWindowPos(p: WindowPos, box: { w: number; h: number }): Win
   const w = Math.max(WINDOWED_MIN_W, Math.min(p.w, box.w - WIN_M * 2));
   const h = Math.max(WINDOWED_MIN_H, Math.min(p.h, box.h - WIN_M * 2));
   return {
+    // REQ-151: both axes keep the WHOLE window inside. The y rule used to
+    // reserve only 40px (an imagined title bar), so dragging a window down
+    // parked it below the canvas and `overflow-hidden` clipped everything but
+    // the title — the user reads that as "it sinks into the bottom".
     x: Math.max(0, Math.min(Math.round(p.x), Math.max(0, box.w - WIN_M - w))),
-    y: Math.max(0, Math.min(Math.round(p.y), Math.max(0, box.h - WIN_M - 40))),
+    y: Math.max(0, Math.min(Math.round(p.y), Math.max(0, box.h - WIN_M - h))),
     w: Math.round(w),
     h: Math.round(h),
   };
+}
+
+// ─── REQ-152: floating-window stacking (Windows-style focus) ────────────────
+// `order` lists window ids back-to-front: the LAST entry is the focused one.
+// It is persisted so a reload keeps the same stacking.
+export const WINDOWED_ORDER_KEY = 'lokma:windowed-order:v1';
+
+/** Keep the stored order, drop ids that are gone, put new ids in front. */
+export function orderWindows(order: string[], ids: string[]): string[] {
+  const kept = order.filter((id) => ids.includes(id));
+  const seen = new Set(kept);
+  const added = ids.filter((id) => !seen.has(id));
+  return [...kept, ...added];
+}
+
+/** Move `id` to the front of the stack (no-op when it already is). */
+export function raiseWindow(order: string[], id: string): string[] {
+  if (!id || order[order.length - 1] === id) return order;
+  return [...order.filter((x) => x !== id), id];
+}
+
+/** z-index for a window: 1-based position in the stack order. */
+export function windowZ(order: string[], id: string): number {
+  const i = order.indexOf(id);
+  return i < 0 ? 0 : i + 1;
+}
+
+/** Validated read of the persisted stacking order. */
+export function parseWindowOrder(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((v): v is string => typeof v === 'string' && v.length > 0);
 }
 
 export type SnapEdge = 'left' | 'right' | 'top';
@@ -94,6 +129,8 @@ export function WindowedCanvas({
   onMaximize,
   onClose,
   onBox,
+  zOf,
+  onFocus,
 }: {
   panes: { id: string; title: string }[];
   pos: Record<string, WindowPos>;
@@ -104,6 +141,10 @@ export function WindowedCanvas({
   onClose: (id: string) => void;
   /** Canvas box reporter (REQ-096): measured rect for clamp/snap/maximize. */
   onBox: (box: CanvasBox) => void;
+  /** REQ-152: stacking z-index per window (1 = back, higher = front). */
+  zOf: (id: string) => number;
+  /** REQ-152: any pointer/focus landing in a window raises it to the front. */
+  onFocus: (id: string) => void;
 }) {
   const boxEl = React.useRef<HTMLDivElement | null>(null);
   const onBoxRef = React.useRef(onBox);
@@ -140,11 +181,24 @@ export function WindowedCanvas({
           in index.css. Tiling split panes are untouched (already opaque). */}
       {panes.map((pane, i) => {
         const p = pos[pane.id] ?? { x: 24 + i * 28, y: 24 + i * 28, w: 560, h: 420 };
+        const z = zOf(pane.id);
+        // REQ-152: the focused window (highest z) is visibly in front —
+        // stronger shadow + terracotta-tinted frame; the rest recede.
+        const front = z > 0 && z === Math.max(...panes.map((x) => zOf(x.id)));
         return (
           <div
             key={pane.id}
-            className="absolute flex flex-col overflow-hidden rounded-lg border bg-white shadow-xl"
-            style={{ left: p.x, top: p.y, width: p.w, height: p.h }}
+            data-window-id={pane.id}
+            data-window-z={z}
+            className={
+              'absolute flex flex-col overflow-hidden rounded-lg bg-white ' +
+              (front
+                ? 'border border-[#E8B99E] shadow-2xl ring-1 ring-[#C96442]/30'
+                : 'border shadow-md')
+            }
+            style={{ left: p.x, top: p.y, width: p.w, height: p.h, zIndex: z }}
+            onPointerDownCapture={() => onFocus(pane.id)}
+            onFocusCapture={() => onFocus(pane.id)}
           >
             <div
               className="flex h-8 shrink-0 cursor-move items-center gap-1 border-b bg-muted/60 px-2"

@@ -7,10 +7,15 @@ import { emitToast } from '@/components/shell';
 import { SplitTree } from './split-tree';
 import { WindowedCanvas, parseWindowedPos, WINDOWED_POS_KEY, type WindowPos } from './windowed-canvas';
 import {
+  WINDOWED_ORDER_KEY,
   clampWindowPos,
   fillWindowPos,
+  orderWindows,
+  parseWindowOrder,
+  raiseWindow,
   snapEdgeForPoint,
   snapWindowPos,
+  windowZ,
   type CanvasBox,
 } from './windowed-canvas';
 import { FullscreenPlaceholder, PaneFullscreenModal } from './fullscreen-modal';
@@ -74,6 +79,9 @@ export function TilingWorkspace({
   const [tabStates, setTabStates] = React.useState<Record<string, PaneTabState>>(loadTabStates);
   // REQ-042: floating window positions+sizes persist across reloads.
   const [winPos, setWinPos] = React.useState<Record<string, WindowPos>>(loadWindowedPos);
+  // REQ-152 — stacking order (back→front) for floating windows. Focus raises a
+  // window; the order is persisted so a reload keeps the same layering.
+  const [winOrder, setWinOrder] = React.useState<string[]>(loadWindowOrder);
   // REQ-096 — measured windowed-canvas box (ResizeObserver). Windows clamp,
   // maximize and edge-snap against it; {w:0} until the first report.
   const [canvasBox, setCanvasBox] = React.useState<CanvasBox>({ left: 0, top: 0, w: 0, h: 0 });
@@ -138,6 +146,15 @@ export function TilingWorkspace({
       // Private-mode storage never breaks the workspace.
     }
   }, [winPos]);
+
+  // REQ-152: the stacking order survives reload too.
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(WINDOWED_ORDER_KEY, JSON.stringify(winOrder));
+    } catch {
+      // Private-mode storage never breaks the workspace.
+    }
+  }, [winOrder]);
 
   // REQ-002: Explorer file clicks land here as a tab in the last-focused
   // pane (same path+session focuses instead of duplicating). One-shot: the
@@ -329,6 +346,8 @@ export function TilingWorkspace({
       return { ...prev, [paneId]: { 'x': 24 + n * 28, 'y': 24 + n * 28, 'w': 560, 'h': 420 } };
     });
     focusPane(paneId);
+    // REQ-152: a freshly popped window opens in front of the stack.
+    raiseWindowFront(paneId);
     if (!windowed) {
       setWindowed(true);
       emitToast('Pane popped out — drag the title bar to move, edges to resize');
@@ -431,6 +450,18 @@ export function TilingWorkspace({
     return out;
   }, [winPos, canvasBox, paneIds]);
 
+  // REQ-152 — effective stacking order for the live windows (stale ids drop,
+  // newly popped windows land in front). Focus raises against THIS stack, never
+  // the raw persisted list: the raw list can be missing ids that orderWindows
+  // already placed in front, which made raising a silent no-op.
+  const winStack = React.useMemo(() => orderWindows(winOrder, paneIds), [winOrder, paneIds]);
+  const raiseWindowFront = React.useCallback(
+    (id: string) => {
+      setWinOrder(raiseWindow(winStack, id));
+    },
+    [winStack],
+  );
+
   const onWinDragStart = (winId: string, x: number, y: number) => {
     const box = canvasBox;
     const orig = clampWindowPos(winPos[winId] ?? { x: 24, y: 24, w: 560, h: 420 }, box);
@@ -481,6 +512,8 @@ export function TilingWorkspace({
             pos={clampedWinPos}
             renderPane={renderPane}
             onBox={handleCanvasBox}
+            zOf={(id) => windowZ(winStack, id)}
+            onFocus={raiseWindowFront}
             onDragStart={onWinDragStart}
             onResize={(winId, next) =>
               setWinPos((prev) => {
@@ -535,6 +568,15 @@ function loadWindowedPos(): Record<string, WindowPos> {
     return parseWindowedPos(JSON.parse(localStorage.getItem(WINDOWED_POS_KEY) ?? 'null'));
   } catch {
     return {};
+  }
+}
+
+/** REQ-152: validated stacking order (corrupt rows drop). */
+function loadWindowOrder(): string[] {
+  try {
+    return parseWindowOrder(JSON.parse(localStorage.getItem(WINDOWED_ORDER_KEY) ?? 'null'));
+  } catch {
+    return [];
   }
 }
 

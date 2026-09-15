@@ -133,16 +133,28 @@ WS event:
 
 ### 3.3 Browser Preview (Harness-Driven)
 
-- An `iframe` (or proxied `chrome` via `playwright` behind `/api/browser`) that the harness can open and control — like Claude Code's Chrome extension.
-- Tools: `browser_navigate`, `browser_click`, `browser_screenshot`, `browser_eval` — exposed as harness tools, visible in this pane.
-- UI: address bar (editable), `Back`/`Forward`/`Reload`, `Open in new tab`, `DevTools` toggle (later).
-- Use cases: harness opens `http://localhost:3000` to verify a fix, takes a screenshot, asserts DOM — user watches live in the right pane.
+- The pane renders pages as an `iframe` in the USER's browser; the server owns
+  tab records + history (`/api/browser/*`) — Back/Forward/Reload move a real
+  pointer (REQ-013/145/146).
+- REQ-154: the agent drives a REAL headless Chromium (Playwright) behind the
+  SAME tab record — tools `browser_read_page`, `browser_scroll`,
+  `browser_click`, `browser_type`, `browser_screenshot`. The engine syncs to
+  the tab's current url before every call, refuses loopback/private targets
+  (SSRF guard) and reaps idle pages after 10 min.
+- Honest view split: the engine renders server-side while the pane shows the
+  user's own iframe — same tab, same url, separate pixels. Engine-driven tabs
+  get a `data-engine-chip` ("Ajan motoru") badge; live-peeking the engine
+  (screencast into the pane) is future work.
+- UI: address bar (editable), `Back`/`Forward`/`Reload`, `Open in new tab`.
+- Use cases: user says "aşağı scroll et" / "sayfada ne var" — the agent
+  scrolls/reads the real page and reports position + text; screenshots land
+  in `<cwd>/.lokma/browser-shots/`.
 
 API:
 
 ```
-POST /api/browser/open   → { url } → { tabId, url }
-GET  /api/browser/tabs   → { tabs: { id, url, title }[] }
+POST /api/browser/open   → { url } → { tabId, url }   (reuse:true → same tab)
+GET  /api/browser        → { tabs: { id, url, title }[] }
 WS   /ws/:sessionId — tool events drive browser actions
 ```
 

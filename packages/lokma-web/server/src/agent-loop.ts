@@ -19,6 +19,7 @@ import {
   ToolRegistry,
   toolResultCarrier,
   type ParsedToolCall,
+  type SessionDeliveryResult,
   type SessionMessage,
   type ToolEvent,
   type ToolResultCarrier,
@@ -100,6 +101,13 @@ export type AgentLoopOpts = {
    */
   maxRetries?: number;
   retryDelaysMs?: number[];
+  /**
+   * REQ-147: server-side delivery for the `send_to_session` tool — appends
+   * the message to the target session and queues its run (the server owns
+   * the queue; the loop only forwards the call). Undefined = the tool
+   * fails honestly instead of faking a delivery.
+   */
+  deliverSessionPrompt?: (target: { sessionId: string; message: string }) => Promise<SessionDeliveryResult>;
 };
 
 export type AgentLoopResult = {
@@ -350,6 +358,7 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
     sessionId: opts.sessionId,
     emit: (payload) =>
       opts.send({ type: 'ui_action', actionId: mintCallId('ui'), ...payload, sessionId: opts.sessionId }),
+    deliver: opts.deliverSessionPrompt,
   })) {
     registry.register(tool);
   }

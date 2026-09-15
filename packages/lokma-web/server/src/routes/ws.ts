@@ -55,6 +55,7 @@ import {
   pruneRunState,
   type SessionRunState,
 } from '../session-runs.js';
+import { deliverToSession } from '../session-delivery.js';
 import { resolveProviderUpstream } from './providers.js';
 import { requestToken } from './auth.js';
 
@@ -516,6 +517,23 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
         loadConfig(cwd).catch(() => null),
       ]);
       const history = buildLoopHistory(historyMessages);
+      // REQ-147: `send_to_session` delivery — append the message to the
+      // TARGET session's transcript + queue its run (the WS prompt path's
+      // contract minus the socket), so a message aimed at a session whose
+      // pane is idle or closed still lands and runs. Ownership is
+      // re-checked inside, where the auth store lives.
+      const deliverSessionPrompt = (target: { sessionId: string; message: string }) =>
+        deliverToSession({
+          targetSessionId: target.sessionId,
+          message: target.message,
+          actorUserId: item.userId,
+          fallbackCwd: cwd,
+          pump: (targetId, targetCwd) => {
+            void pumpSessionRun(app, targetId, targetCwd).catch((e) => {
+              app.log.warn('[ws] send_to_session pump failed session=' + targetId + ': ' + String(e));
+            });
+          },
+        });
       try {
         const result = await runAgentLoop({
           cwd,
@@ -534,6 +552,7 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
           retryDelaysMs: config?.retry?.delaysSec ? config.retry.delaysSec.map((s) => s * 1000) : undefined,
           store,
           send,
+          deliverSessionPrompt,
           waitApproval: ({ requestId, tool }) =>
             new Promise<ApprovalDecision>((resolve, reject) => {
               const timer = setTimeout(() => {

@@ -112,7 +112,7 @@ check(JSON.stringify(calls.at(-1)?.args[1]) === '{"maxChars":1200}', 'read_page 
 const shotTool = byName.get('browser_screenshot');
 const shot = (await shotTool?.handler({ fullPage: true }, undefined)) as AnyResult;
 check(shot.ok === true && shot.fullPage === true, 'screenshot forwards fullPage');
-check(JSON.stringify(calls.at(-1)?.args[1]) === '{"fullPage":true}', 'screenshot forwards fullPage to the engine');
+check(JSON.stringify(calls.at(-1)?.args[1]) === '{"cwd":"/tmp/ws","fullPage":true}', 'screenshot forwards cwd + fullPage to the engine');
 
 // 10) Schema validation rejects an unknown direction.
 check(scrollTool.inputSchema.safeParse({ direction: 'sideways' }).success === false, 'schema rejects unknown direction');

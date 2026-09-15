@@ -49,6 +49,19 @@ export type PendingInspectorTab = {
   side?: boolean;
 };
 
+/**
+ * One-shot "the agent opened/reused a browser tab" signal (REQ-146, consumed
+ * by the BrowserPane bound to the same session, never persisted). The tool
+ * already did the server-side work; the open pane refreshes its list and
+ * selects `tabId` so the visible address bar + page follow the agent's URL
+ * instead of leaving a stale page (and a second tab) on screen.
+ */
+export type PendingBrowserOpen = {
+  tabId: string;
+  url: string;
+  sessionId: string;
+};
+
 type PaneState = {
   layout: LayoutNode;
   leftW: number;
@@ -62,6 +75,7 @@ type PaneState = {
   pendingFilePane: PendingFilePane | null;
   pendingSessionTab: PendingSessionTab | null;
   pendingInspectorTab: PendingInspectorTab | null;
+  pendingBrowserOpen: PendingBrowserOpen | null;
   setLayout: (layout: LayoutNode) => void;
   setSideWidth: (side: 'left' | 'right', width: number) => void;
   setTiling: (on: boolean) => void;
@@ -78,6 +92,8 @@ type PaneState = {
   consumeSessionTab: () => void;
   requestInspectorTab: (inspectorId: 'browser' | 'terminal', side?: boolean) => void;
   consumeInspectorTab: () => void;
+  requestBrowserOpen: (payload: PendingBrowserOpen) => void;
+  consumeBrowserOpen: () => void;
   resetLayout: () => void;
 };
 
@@ -94,6 +110,7 @@ const initial = {
   pendingFilePane: null as PendingFilePane | null,
   pendingSessionTab: null as PendingSessionTab | null,
   pendingInspectorTab: null as PendingInspectorTab | null,
+  pendingBrowserOpen: null as PendingBrowserOpen | null,
 };
 
 export const usePaneStore = create<PaneState>()(
@@ -140,6 +157,11 @@ export const usePaneStore = create<PaneState>()(
       requestInspectorTab: (inspectorId: 'browser' | 'terminal', side = false) =>
         set({ pendingInspectorTab: side ? { inspectorId, side: true } : { inspectorId } }),
       consumeInspectorTab: () => set({ pendingInspectorTab: null }),
+
+      // REQ-146 — the agent navigated/reused the session's browser tab; the
+      // matching pane pulls the fresh list and follows that tab.
+      requestBrowserOpen: (payload: PendingBrowserOpen) => set({ pendingBrowserOpen: payload }),
+      consumeBrowserOpen: () => set({ pendingBrowserOpen: null }),
 
       resetLayout: () => set({ ...initial, layout: defaultLayout(), openTabs: [] }),
     }),

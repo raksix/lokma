@@ -91,6 +91,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   const setWindowed = usePaneStore((s) => s.setWindowed);
   const requestSessionTab = usePaneStore((s) => s.requestSessionTab);
   const requestInspectorTab = usePaneStore((s) => s.requestInspectorTab);
+  const requestBrowserOpen = usePaneStore((s) => s.requestBrowserOpen);
   // REQ-019 — resizable sidebars: widths persist in the pane store
   // (`lokma:layout:v1`), the Sidebar handle writes back live via setSideWidth.
   const leftW = usePaneStore((s) => s.leftW);
@@ -364,6 +365,14 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     if (uiActions.length === 0) return;
     for (const entry of uiActions) {
       if (entry.action === 'open_browser') {
+        // REQ-146 — the tool already reused/opened the session's tab server
+        // side; the signal lets the open BrowserPane refresh to that URL
+        // (same tab record) instead of showing a stale page.
+        requestBrowserOpen({
+          tabId: entry.tabId ?? '',
+          url: entry.url ?? '',
+          sessionId: entry.sessionId,
+        });
         openBrowserPane();
         emitToast(`Agent opened browser: ${entry.url ?? ''}`);
       } else if (entry.action === 'open_terminal') {
@@ -394,7 +403,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       }
       dismissUiAction(entry.actionId);
     }
-  }, [uiActions, dismissUiAction, isMobile, tiling, inspectorSide, openBrowserPane, requestInspectorTab, requestSessionTab, refreshSessions, selectSession]);
+  }, [uiActions, dismissUiAction, isMobile, tiling, inspectorSide, openBrowserPane, requestBrowserOpen, requestInspectorTab, requestSessionTab, refreshSessions, selectSession]);
 
   // Global shortcuts — every combo is listed in the SHORTCUTS registry so
   // the help dialog (`?`) can never drift from what the keys actually do.

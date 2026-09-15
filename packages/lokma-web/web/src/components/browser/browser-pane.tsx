@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { api, type BrowserTab } from '@/lib/api';
 import { emitToast } from '@/components/shell';
 import { useKnownCwd } from '@/stores';
+import { usePaneStore } from '@/stores/pane';
 import {
   BROWSER_BLANK_URL,
   canGoBack,
@@ -118,6 +119,28 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
     setSelectedId(tab.id);
     setAddress(tab.url === BROWSER_BLANK_URL ? '' : tab.url);
   }, []);
+
+  // REQ-146 — the agent opened/reused a tab for THIS session (`ui_action` →
+  // pane store). Pull the fresh list and follow that tab, so the visible
+  // address bar + page show the agent's URL instead of the stale page. Never
+  // opens a second tab: the server already reused the session's record, and
+  // the blank-tab auto-open is disarmed so a race can't add one more.
+  const pendingBrowserOpen = usePaneStore((s) => s.pendingBrowserOpen);
+  const consumeBrowserOpen = usePaneStore((s) => s.consumeBrowserOpen);
+  React.useEffect(() => {
+    if (!pendingBrowserOpen) return;
+    if (pendingBrowserOpen.sessionId && pendingBrowserOpen.sessionId !== sessionId) return;
+    consumeBrowserOpen();
+    ensuredBlank.current = true;
+    if (pendingBrowserOpen.tabId) setSelectedId(pendingBrowserOpen.tabId);
+    if (pendingBrowserOpen.url) {
+      setAddress(pendingBrowserOpen.url === BROWSER_BLANK_URL ? '' : pendingBrowserOpen.url);
+    }
+    // Remount the frame: the reused tab keeps its id while its URL changes,
+    // so the iframe must reload on the new src.
+    setFrameNonce((n) => n + 1);
+    void refresh();
+  }, [pendingBrowserOpen, sessionId, refresh, consumeBrowserOpen]);
 
   const go = React.useCallback(async () => {
     if (!selected) return;

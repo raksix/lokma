@@ -4,7 +4,7 @@
  * No test framework — plain asserts so `tsc -b` stays dependency-free.
  * Not imported by app code, so the Vite bundle ignores it.
  */
-import { defaultLayout, isLayoutNode, type LayoutNode } from './layout';
+import { defaultLayout, isLayoutNode, LAYOUT_STORAGE_KEY, type LayoutNode } from './layout';
 import { memoryStorage } from './storage';
 import { useSessionStore, knownSessionKey, rememberKnown } from './session';
 import { usePaneStore } from './pane';
@@ -164,6 +164,21 @@ assert(usePaneStore.getState().pendingInspectorTab === null, 'consume clears the
 usePaneStore.getState().requestInspectorTab('terminal');
 assert(usePaneStore.getState().pendingInspectorTab?.side === undefined, 'plain request stays tab-style');
 usePaneStore.getState().consumeInspectorTab();
+
+// REQ-146 — an agent browser-open signal carries the reused tab + URL, is
+// consumable, and never lands in the persisted layout blob.
+usePaneStore.getState().requestBrowserOpen({ tabId: 'tab-x', url: 'https://example.org', sessionId: 'sess_1' });
+assert(usePaneStore.getState().pendingBrowserOpen?.tabId === 'tab-x', 'browser-open signal carries the tab id');
+assert(usePaneStore.getState().pendingBrowserOpen?.url === 'https://example.org', 'browser-open signal carries the URL');
+assert(
+  usePaneStore.getState().pendingBrowserOpen?.sessionId === 'sess_1',
+  'browser-open signal carries the session id',
+);
+const persistedLayoutRaw = String((memoryStorage.getItem(LAYOUT_STORAGE_KEY) as string | null) ?? '');
+assert(persistedLayoutRaw.includes('"layout"'), 'pane store persisted a layout blob');
+assert(!persistedLayoutRaw.includes('pendingBrowserOpen'), 'browser-open signal is never persisted');
+usePaneStore.getState().consumeBrowserOpen();
+assert(usePaneStore.getState().pendingBrowserOpen === null, 'consume clears the browser-open signal');
 
 // ─── Provider store (5m TTL) ────────────────────────────────────────────────
 

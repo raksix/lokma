@@ -136,6 +136,38 @@ const ok = (name, pass, detail) => {
   const hint = await page.evaluate(() => document.body.innerText.includes('Sayfa yüklenmedi'));
   ok('no "page did not load" hint on a working embed', hint === false);
 
+  // REQ-153 — the YouTube HOME page has no embed; it must go through Piped and
+  // actually render (measured by pixels: a refused frame stays near-white).
+  await address.fill('https://www.youtube.com/');
+  await address.press('Enter');
+  await sleep(9000);
+  const home = await page.evaluate(() => {
+    const f = document.querySelector('iframe');
+    return {
+      src: f ? f.getAttribute('src') || '' : '',
+      chip: Boolean(document.querySelector('[data-piped-chip]')),
+    };
+  });
+  ok('the YouTube home page is routed to the Piped front-end',
+    home.src.startsWith('https://piped.video'), home.src || 'no iframe');
+  ok('the pane says it is showing Piped', home.chip === true);
+  const framesNow = page.frames().filter((f) => /piped\.video/.test(f.url()));
+  ok('the Piped frame actually loaded', framesNow.length > 0,
+    framesNow.map((f) => f.url()).slice(0, 2).join(' | ') || 'no piped frame');
+  const shotBuf = await page.screenshot({ clip: { x: 420, y: 120, width: 900, height: 500 } });
+  const { PNG } = (() => { try { return require('pngjs'); } catch { return {}; } })();
+  if (PNG) {
+    const png = PNG.sync.read(shotBuf);
+    let nonWhite = 0;
+    for (let i = 0; i < png.data.length; i += 4) {
+      if (png.data[i] < 240 || png.data[i + 1] < 240 || png.data[i + 2] < 240) nonWhite += 1;
+    }
+    const ratio = nonWhite / (png.width * png.height);
+    ok('the Piped page renders real content (not a blank frame)', ratio > 0.1, `${(ratio * 100).toFixed(1)}% non-white`);
+  } else {
+    console.log('SKIP  pixel check (pngjs not installed)');
+  }
+
   const shot = '/tmp/req150-youtube-embed.png';
   await page.screenshot({ path: shot });
   console.log(`screenshot: ${shot}`);

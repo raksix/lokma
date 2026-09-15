@@ -5,6 +5,7 @@ export * from './ask.js';
 export * from './todos.js';
 export * from './ui-control.js';
 export * from './browser.js';
+export * from './attachments.js';
 export * from './executor.js';
 export * from './parse.js';
 export * from './result-budget.js';

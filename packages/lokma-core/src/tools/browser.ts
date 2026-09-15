@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { browserTabs } from '../browser/browser.js';
+import { deliverAttachment } from './attachments.js';
 import type { ToolDefinition } from './registry.js';
 
 /**
@@ -88,7 +89,7 @@ export type BrowserToolEngine = {
   scroll(tabId: string, opts: { direction: BrowserScrollDirection; amount?: number }): Promise<BrowserScrollResult>;
   click(tabId: string, opts: { selector?: string; text?: string }): Promise<BrowserClickResult>;
   type(tabId: string, opts: { selector: string; text: string; submit?: boolean }): Promise<BrowserTypeResult>;
-  screenshot(tabId: string, opts: { fullPage?: boolean }): Promise<BrowserShotResult>;
+  screenshot(tabId: string, opts: { fullPage?: boolean; cwd?: string }): Promise<BrowserShotResult>;
 };
 
 export type BrowserToolOpts = {
@@ -243,7 +244,7 @@ export function buildBrowserTools(cwd: string, opts: BrowserToolOpts): ToolDefin
     {
       name: 'browser_screenshot',
       description:
-        'Save a PNG screenshot of the page into the workspace (.lokma/browser-shots/) and return the file path — use it when the user should SEE the current page state.',
+        'Save a PNG screenshot of the page into the workspace (.lokma/browser-shots/) — use it when the user should SEE the current page state. The PNG is delivered to the chat automatically (renders inline for the user).',
       inputSchema: ScreenshotInput,
       readOnly: false,
       handler: async (input) => {
@@ -251,8 +252,31 @@ export function buildBrowserTools(cwd: string, opts: BrowserToolOpts): ToolDefin
         const target = targetTab(tabId);
         if ('ok' in target) return target;
         return withEngine(async (engine) => {
-          const shot = await engine.screenshot(target.tabId, fullPage === undefined ? {} : { fullPage });
-          return { tabId: target.tabId, ...shot, cwd };
+          const shot = await engine.screenshot(target.tabId, {
+            cwd,
+            ...(fullPage === undefined ? {} : { fullPage }),
+          });
+          // REQ-155: the shot lands in the chat as well — a bare file path made
+          // the user hunt for the file; now the image renders in the message.
+          let attachedToChat = false;
+          let attachError: string | undefined;
+          try {
+            const url = browserTabs.get(target.tabId).record.url;
+            await deliverAttachment(cwd, opts.sessionId, {
+              path: shot.file,
+              caption: `Ekran görüntüsü — ${url}`,
+            });
+            attachedToChat = true;
+          } catch (e) {
+            attachError = (e instanceof Error ? e.message : String(e)).slice(0, 200);
+          }
+          return {
+            tabId: target.tabId,
+            ...shot,
+            cwd,
+            attachedToChat,
+            ...(attachError === undefined ? {} : { attachError }),
+          };
         });
       },
     },

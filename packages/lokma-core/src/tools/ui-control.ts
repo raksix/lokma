@@ -83,7 +83,7 @@ export function buildUiControlTools(cwd: string, opts: UiControlOpts): ToolDefin
         const { url } = input as z.infer<typeof OpenBrowserInput>;
         // REQ-146 — reuse the session's open tab (same id) instead of stacking
         // a new record per call; `reused` tells the model the page was swapped.
-        const { record, reused } = browserTabs.openOrReuse({ url, sessionId: opts.sessionId });
+        const { record, reused } = browserTabs.openOrReuse({ url, sessionId: opts.sessionId, cwd });
         opts.emit({ action: 'open_browser', url: record.url, tabId: record.id });
         return { ok: true, tabId: record.id, url: record.url, reused };
       },

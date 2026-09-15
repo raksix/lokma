@@ -10,6 +10,22 @@ export type SessionMessage = {
   timestamp: string; // ISO
   toolCallId?: string;
   toolName?: string;
+  /**
+   * REQ-155: files the agent pushed into the chat (`send_file`,
+   * auto-delivered browser screenshots). Paths are workspace-relative; the
+   * web renders images inline via `/api/files/raw` and everything else as a
+   * download card. Mirrored in `lokma-shared` `TranscriptRowSchema` (the WS
+   * frame validator strips unknown keys — keep both in sync).
+   */
+  attachments?: SessionAttachment[];
+};
+
+/** One chat attachment (path relative to the session cwd). */
+export type SessionAttachment = {
+  path: string;
+  name: string;
+  mime: string;
+  size: number;
 };
 
 export type SessionMeta = {

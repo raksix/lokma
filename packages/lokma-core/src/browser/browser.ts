@@ -149,6 +149,12 @@ class BrowserTabs {
     const sessionId = typeof opts.sessionId === 'string' && opts.sessionId ? opts.sessionId : '';
     const existing = sessionId ? this.list(sessionId)[0] : undefined;
     if (!existing) return { record: this.open(opts).record, reused: false };
+    // REQ-155: backfill the workspace scope on reuse — tabs opened before the
+    // caller carried a cwd would otherwise send screenshots into the server
+    // process cwd instead of the session's workspace.
+    if (existing.cwd === null && typeof opts.cwd === 'string' && opts.cwd.trim()) {
+      existing.cwd = opts.cwd.trim();
+    }
     // A blank open (no url) must never navigate the live page away; touch it.
     if (opts.url === undefined) {
       existing.updatedAt = new Date().toISOString();

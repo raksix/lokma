@@ -27,6 +27,7 @@ export const WRITE_TOOLS: ReadonlySet<string> = new Set([
   'run_command',
   'claim_todo',
   'complete_todo',
+  'send_file',
 ]);
 
 /**

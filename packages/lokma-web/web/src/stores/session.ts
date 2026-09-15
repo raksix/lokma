@@ -114,22 +114,17 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
   },
 
   loadTranscript: async (id: string, force?: boolean) => {
-    const { transcripts, stale, sessions, listLoaded } = get();
+    const { transcripts, stale } = get();
     if (!force && transcripts[id] && !stale[id]) return;
-    // A locally generated id the server list does not know is a fresh empty
-    // session — cache it empty WITHOUT firing a doomed GET (fresh boots used
-    // to 404 here once per view). Falls through while the list never loaded
-    // (deep links) so real sessions still resolve. `force` (post-stream
-    // reload) always refetches: the WS loop creates the session server-side
-    // on the first prompt, so it exists even when the list cache predates it.
-    if (!force && listLoaded && !sessions.some((s) => s.id === id)) {
-      set((prev) => ({
-        transcripts: { ...prev.transcripts, [id]: [] },
-        stale: { ...prev.stale, [id]: false },
-        loading: false,
-      }));
-      return;
-    }
+    // REQ-148: the list snapshot is never proof of absence. `sessions` is a
+    // polled summary — it lags a session the WS just created and it prunes
+    // rows the list cannot see — so "id not in the list" used to cache an
+    // EMPTY transcript without asking the server, and a pane that switched to
+    // such a session stayed permanently blank (zero requests, nothing to
+    // debug). One verification GET decides instead: a real session returns
+    // its history, a genuine miss falls through to the `session_not_found`
+    // branch below (honest empty state, no error). `force` (post-stream
+    // reload) keeps refetching; the fast-path above serves fresh hits.
     set({ loading: true, lastError: null });
     try {
       const detail = await api.getSession(id);

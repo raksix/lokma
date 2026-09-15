@@ -61,7 +61,17 @@ globalThis.fetch = (async (url: unknown) => {
   if (path === '/api/sessions/sess_1') {
     return json(200, { id: 'sess_1', cwd: '/repo', messages: [{ role: 'user' }], count: 1 });
   }
-  return json(404, { code: 'not_found', message: 'no such route in probe' });
+  // REQ-148: a real session the list snapshot missed — the verification GET
+  // must return its history instead of the pane keeping a cached empty.
+  if (path === '/api/sessions/sess_offlist') {
+    return json(200, {
+      id: 'sess_offlist',
+      cwd: '/repo',
+      messages: [{ role: 'user' }, { role: 'assistant' }],
+      count: 2,
+    });
+  }
+  return json(404, { code: 'session_not_found', message: 'No transcript for id' });
 }) as unknown as typeof fetch;
 
 await useSessionStore.getState().refreshSessions();
@@ -93,16 +103,32 @@ useSessionStore.getState().invalidateSession('sess_1');
 assert(useSessionStore.getState().stale['sess_1'] === true, 'invalidate marks stale');
 assert(!('sess_1' in useSessionStore.getState().transcripts), 'invalidate drops the cache');
 
-// Unknown ids once the list is loaded: fresh empty session, no doomed GET.
+// REQ-148 — the polled list is a snapshot, never proof of absence. An id the
+// list does not know must still get ONE verification GET: a pane that switched
+// to such a session used to stay blank forever (empty cached, zero requests).
+// Real sessions load their history; a genuine miss falls through to the honest
+// empty state with no error.
+const callsBeforeOfflist = fetchCalls;
+await useSessionStore.getState().loadTranscript('sess_offlist');
+assert(fetchCalls === callsBeforeOfflist + 1, 'an off-list session still fires the verification GET');
+assert(
+  useSessionStore.getState().transcripts['sess_offlist']?.length === 2,
+  'off-list session loads its real history instead of a cached empty',
+);
+
 const callsBeforeUnknown = fetchCalls;
 await useSessionStore.getState().loadTranscript('sess_fresh_unknown');
-assert(fetchCalls === callsBeforeUnknown, 'unknown id skips the doomed GET once the list is loaded');
+assert(fetchCalls === callsBeforeUnknown + 1, 'unknown id fires one verification GET');
 assert(
   Array.isArray(useSessionStore.getState().transcripts['sess_fresh_unknown']) &&
     useSessionStore.getState().transcripts['sess_fresh_unknown'].length === 0,
-  'unknown id caches an empty transcript',
+  'a true miss caches an empty transcript',
 );
 assert(useSessionStore.getState().lastError === null, 'unknown id surfaces no error');
+
+const callsAfterUnknown = fetchCalls;
+await useSessionStore.getState().loadTranscript('sess_fresh_unknown');
+assert(fetchCalls === callsAfterUnknown, 'the cached empty result does not refetch');
 
 // Forced reload (post-stream) always refetches — the WS loop creates the
 // session server-side on the first prompt even when the list predates it.

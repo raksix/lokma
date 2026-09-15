@@ -1,6 +1,6 @@
 # REQ-149 — Sessionlar websocket'e bağlı olsun, veriler WS'ten canlı gelsin
 
-**Status:** done (2026-09-15 — probes `d363cab`, close-out commit follows)
+**Status:** done (2026-09-15 — probes `d363cab`, close-out `9ad71fe`)
 **Tarih:** 2026-09-15
 **Kapsam (öngörü):** `packages/lokma-web/server/src/routes/ws.ts` (protokol),
 `packages/lokma-shared/src/protocol/ws.ts`, `packages/lokma-web/web/src/lib/ws.ts`,

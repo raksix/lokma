@@ -31,6 +31,13 @@ Headless ölçümler (3 ayrı koşu, canlı `lokma.fermag.com.tr`):
   düşüyor ve asistan cevabı üretiliyor.
 - Bir koşuda 6 sn sonra ölçüldüğünde satır görünmüyordu; o koşuda ek oturum
   sekmeleri/oturumlar açılmıştı (aşağıdaki REQ-148 ile aynı bölge).
+  **Kanıt (gecikmiş koşu çıktısı):** istemci `wss://.../ws/sess_mu2i98sq_y03j`
+  için soket açıyor ama bu oturum sunucuda **yok** (`404 /api/sessions/sess_mu2i98sq_y03j`),
+  composer'dan çıkan `prompt` frame'i ise **başka** bir oturuma gidiyor
+  (`"sessionId":"sess_mu2hpwyd_k9b9"`). Yani görünen oturum ile mesajın yazıldığı
+  oturum ayrışabiliyor → kullanıcı "gönderemiyor" görüyor, mesaj aslında başka
+  oturuma düşüyor. Aynı koşuda üç ayrı WS açılmış olması (`sess_mu2i98sq_y03j`,
+  `sess_mu2hpwyd_k9b9` ×2) bu kimlik karışıklığının izi.
 → Yani "gönderemiyor" şikâyeti **her zaman** üretilemiyor; pane/oturum geçişi
 sonrası durumda yoğunlaşıyor (REQ-148/149 ile birlikte ele alınmalı).
 

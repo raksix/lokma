@@ -21,6 +21,9 @@
 - `GET /api/sessions` cwd-scoped olduğu için, başka bir projeye ait (ya da liste
   yenilenmeden önce açılmış) bir oturum bu koşula takılırsa ekranda **kalıcı boş
   geçmiş** görünür ve hiç istek atılmaz — kullanıcının tarif ettiği tablo.
+- Ek kanıt (canlı koşu): istemci `/api/sessions/sess_mu2i98sq_y03j` için **404**
+  alıyor (sunucu bu id'yi tanımıyor) ve aynı anda o id için bir WS açıyor; yani
+  yeni/yerel bir oturum kimliği listeye hiç girmeden görünür olabiliyor.
 
 ## Kabul kriterleri (öngörü)
 

@@ -16,7 +16,8 @@ import {
   BROWSER_BLANK_URL,
   canGoBack,
   canGoForward,
-  embedUrlFor,
+  isPipedUrl,
+  paneUrlFor,
   tabLabel,
   validateTabUrl,
 } from './browser';
@@ -125,13 +126,15 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
     setAddress(tab.url === BROWSER_BLANK_URL ? '' : tab.url);
   }, []);
 
-  // REQ-150 — YouTube watch/short/youtu.be links get the embeddable player URL
-  // (`X-Frame-Options: SAMEORIGIN` on the normal watch page refuses framing, so
-  // the pane used to sit blank with no explanation).
+  // REQ-150/153 — decide what the iframe actually loads: video links get
+  // YouTube's own no-cookie player, other youtube.com pages (home, channels,
+  // search) go through the Piped front-end because YouTube refuses framing and
+  // has no embed for them.
   const frameSrc = React.useMemo(
-    () => embedUrlFor(selected?.url ?? '') ?? selected?.url ?? '',
+    () => paneUrlFor(selected?.url ?? '') ?? selected?.url ?? '',
     [selected?.url],
   );
+  const viaPiped = React.useMemo(() => isPipedUrl(frameSrc) && frameSrc !== selected?.url, [frameSrc, selected?.url]);
 
   // A refused frame never fires `onLoad`, so nothing would ever tell the user
   // why the body is blank. After 2.5 s without a load, show a hint (honest
@@ -257,6 +260,15 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
             Go
           </Button>
         </div>
+        {viaPiped ? (
+          <span
+            title="YouTube bu panelde iframe'e izin vermediği için Piped önyüzü üzerinden açılıyor"
+            className="shrink-0 rounded border border-line px-1.5 py-0.5 text-[10px] font-medium text-zinc-500"
+            data-piped-chip="1"
+          >
+            Piped
+          </span>
+        ) : null}
         {selected && selected.url !== BROWSER_BLANK_URL ? (
           <a
             href={selected.url}

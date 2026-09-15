@@ -129,3 +129,51 @@ export function embedUrlFor(input: string): string | null {
   if (list && ID.test(list)) return `https://www.youtube-nocookie.com/embed/videoseries?list=${list}`;
   return null;
 }
+
+/**
+ * REQ-153 — which URL the pane's iframe should actually load.
+ *
+ * YouTube's own pages (home, channels, search, playlists without an id) have no
+ * embeddable form and answer `X-Frame-Options: SAMEORIGIN`, so they render as
+ * dead space. The Piped front-end serves the same catalogue and DOES allow
+ * framing (verified: 200, no X-Frame-Options, boots inside a sandboxed iframe),
+ * so those pages are routed through it. Video links keep YouTube's own
+ * no-cookie player (better quality than a proxy front-end).
+ *
+ * Returns null when the URL is fine as-is (normal sites frame normally).
+ */
+export function paneUrlFor(input: string): string | null {
+  const embed = embedUrlFor(input);
+  if (embed) return embed;
+  const raw = input.trim();
+  if (!raw) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+  const host = parsed.hostname.replace(/^www\./, '').replace(/^m\./, '').toLowerCase();
+  if (host !== 'youtube.com' && host !== 'youtu.be') return null;
+  const parts = parsed.pathname.split('/').filter(Boolean);
+  // Search pages map to Piped's own search route.
+  if (parts[0] === 'results') {
+    const q = parsed.searchParams.get('search_query') ?? '';
+    return `https://piped.video/search${q ? `?q=${encodeURIComponent(q)}` : ''}`;
+  }
+  const path = parsed.pathname === '/' ? '/' : parsed.pathname;
+  const query = parsed.search;
+  return `https://piped.video${path}${query}`;
+}
+
+/** REQ-153: true when the pane is showing a URL through the Piped front-end. */
+export function isPipedUrl(input: string | null | undefined): boolean {
+  if (!input) return false;
+  try {
+    const host = new URL(input).hostname.replace(/^www\./, '').toLowerCase();
+    return host === 'piped.video';
+  } catch {
+    return false;
+  }
+}

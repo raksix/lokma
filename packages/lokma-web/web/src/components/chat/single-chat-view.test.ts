@@ -85,6 +85,18 @@ assert(anchors[0].label === 'first prompt', 'anchor label is the prompt text');
 anchors = promptAnchors([msg('user', 'old prompt'), msg('assistant', 'x'), msg('user', 'later prompt')]);
 assert(anchors.length === 2 && anchors[1].index === 2, 'anchors cover prompts outside the render window too');
 
+// 9b. Identical prompt text still yields one dot per send: anchors are keyed by
+//     transcript index, not by text, so a repeated prompt (the live probe sends
+//     PROMPT RAIL PROBE TWO twice) must not be collapsed into one dot.
+anchors = promptAnchors([
+  msg('user', 'PROMPT RAIL PROBE TWO'),
+  msg('assistant', 'first answer'),
+  msg('user', 'PROMPT RAIL PROBE TWO'),
+]);
+assert(anchors.length === 2, 'identical prompts each get their own dot');
+assert(anchors[0].label === anchors[1].label, 'identical prompts share the same label text');
+assert(anchors[0].index === 0 && anchors[1].index === 2, 'identical prompts keep distinct scroll targets');
+
 // 10. No prompts → no rail (empty sessions stay clean).
 assert(promptAnchors([msg('assistant', 'a'), msg('tool', 'b')]).length === 0, 'no user rows means no dots');
 

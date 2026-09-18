@@ -177,3 +177,4 @@
 - [REQ-156](finished/REQ-156-mesaj-tek-cizim.md) — A message sent once painted two or three times: the same transcript row reached the cache from more than one socket, and the composer had no double-submit guard — done
 - [REQ-157](finished/REQ-157-sohbet-tasma-duzeltmesi.md) — Long message/tool text overflowed the chat (missing min-w-0 chain on tool rows, no break-words/break-all on bodies and JSON blocks) — done
 - [REQ-158](finished/REQ-158-terminal-coklu-mesaj-bash-simgesi.md) — Terminal: duplicate typed lines + the synthetic `$` prompt glyph removed
+- [REQ-159](finished/REQ-159-terminal-yazmiyor-canli-sinir.md) — Terminal "yazmıyor": the live-terminal limit wedged (idle user shells are now handed back; agent shells survive).

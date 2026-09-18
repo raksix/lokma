@@ -86,3 +86,19 @@ koşuda PTY'ye ulaşmıyor (odak, click+focus ile verilse de), bu yüzden "yazı
 satır kaç kez boyandı" ölçümü yalnızca tuşun gerçekten ulaştığı koşularda
 alınabiliyor. Ulaştığı koşuda ölçüm **4×** idi ve interleave'e dayanıklı dedupe
 (750 ms halka) bu ölçüme karşı yazıldı.
+
+## Sunucu tarafı uçtan uca kanıt (yazan yol)
+
+Tarayıcı harness'ı sentetik tuşu PTY'ye ulaştıramadığı için yol sunucudan
+ölçüldü: `POST /api/terminal` → `POST /api/terminal/:id/input {"data":"echo <marker>\n"}`
+(HTTP 200) → `GET /api/terminal/:id` tamponu.
+
+Sonuç: marker tamponda **tam 2 kez** — kabuğun kendi yankısı (1×) + komutun
+çıktısı (1×). Yani giriş/çıkış yolunda **hiçbir çoğaltma yok**; kullanıcının
+gördüğü çoklama istemci render'ıydı ve orada (frame dedupe) düzeltildi.
+
+```
+root@furkan-openclaw:/mnt/apopic/lokma# echo LOKMA_PROOF_27600
+LOKMA_PROOF_27600
+root@furkan-openclaw:/mnt/apopic/lokma#
+```

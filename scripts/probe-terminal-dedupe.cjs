@@ -32,7 +32,7 @@ const ok = (name, pass, detail) => {
 };
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+  const browser = await chromium.launch({ executablePath: CHROME, headless: process.env.PROBE_HEADFUL !== '1', args: ['--no-sandbox', '--disable-dev-shm-usage'] });
   const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
   // Store the Bearer token before the app boots — the same pattern the other
   // live probes use; without it the app shows "Sign in to continue".
@@ -165,7 +165,14 @@ const ok = (name, pass, detail) => {
   console.log('body:', dump.body);
   console.log('--- end pane state ---');
   console.log(`shell: ${shellUp}`);
-  await page.keyboard.type(`echo ${MARKER}`);
+  // Playwright focus (not el.focus() inside evaluate) is what lands keys
+  // reliably once the shell is up; a wrapper click alone never does.
+  const viewport = page.locator('[aria-label*="click and type"]').first();
+  if (await viewport.count()) {
+    await viewport.click().catch(() => {});
+    await viewport.focus().catch(() => {});
+  }
+  await page.keyboard.type(`echo ${MARKER}`, { delay: 40 });
   await page.keyboard.press('Enter');
   await sleep(5000);
 

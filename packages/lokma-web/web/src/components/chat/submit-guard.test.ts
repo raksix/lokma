@@ -1,5 +1,5 @@
 /**
- * REQ-155 — duplicate-submit guard checks.
+ * REQ-156 — duplicate-submit guard checks.
  * Run: `bun src/components/chat/submit-guard.test.ts` (no DOM, no server).
  */
 import {

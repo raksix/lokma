@@ -74,7 +74,7 @@ export function Chat({
   const [paletteSignal, setPaletteSignal] = React.useState(0);
   const [dropSignal, setDropSignal] = React.useState<{ path: string; key: number } | null>(null);
   const keySeq = React.useRef(0);
-  /** REQ-155: last accepted submit — the duplicate-submit guard compares to it. */
+  /** REQ-156: last accepted submit — the duplicate-submit guard compares to it. */
   const lastSubmit = React.useRef<SubmitRecord>(null);
   const doneSeen = React.useRef(false);
 
@@ -227,7 +227,7 @@ export function Chat({
     if (pending.length === 0) return pending;
     const tail = transcript.slice(-(pending.length + 4));
     const landed = new Set(tail.filter((m) => m.role === 'user').map((m) => m.content));
-    // REQ-155: also collapse optimistic rows that carry the same text, so a
+    // REQ-156: also collapse optimistic rows that carry the same text, so a
     // double submit can never paint the same prompt twice.
     const unique = dedupePending(pending);
     const next = unique.filter((p) => !landed.has(p.text));
@@ -395,7 +395,7 @@ export function Chat({
 
   const send = React.useCallback(
     (s: ComposerSend) => {
-      // REQ-155: a fast second Enter (or Enter + click) leaves the composer text
+      // REQ-156: a fast second Enter (or Enter + click) leaves the composer text
       // in place and used to send the same prompt twice — the user's own message
       // then painted twice optimistically plus the server echo (three copies of
       // one transcript row). Drop the accidental repeat; a later re-ask of the

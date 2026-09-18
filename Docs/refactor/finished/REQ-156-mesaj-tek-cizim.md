@@ -1,4 +1,4 @@
-# REQ-155 — Tek gönderilen mesaj ekranda iki-üç kez çiziliyordu
+# REQ-156 — Tek gönderilen mesaj ekranda iki-üç kez çiziliyordu
 
 **Status:** done
 **Tarih:** 2026-09-18

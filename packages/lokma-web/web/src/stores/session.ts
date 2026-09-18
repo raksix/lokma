@@ -331,7 +331,7 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
         // the REST load) owns a whole history — appending onto nothing would
         // render a truncated conversation as if it were complete.
         if (!known) return prev;
-        // REQ-155: the same row can reach us more than once — the chat may hold
+        // REQ-156: the same row can reach us more than once — the chat may hold
         // more than one socket for a session, and every socket feeds this store,
         // so one persisted row was appended two or three times and the user's
         // own message painted that many times. Identical rows (role + content +
@@ -388,7 +388,7 @@ export function rememberKnown(
 }
 
 /**
- * REQ-155: two transcript entries are the same persisted line when role,
+ * REQ-156: two transcript entries are the same persisted line when role,
  * content and timestamp all match — used to drop duplicate socket pushes
  * (more than one socket can feed the same session's cache) so a message the
  * user sent once never renders twice.

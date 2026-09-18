@@ -103,21 +103,21 @@ useSessionStore.getState().invalidateSession('sess_1');
 assert(useSessionStore.getState().stale['sess_1'] === true, 'invalidate marks stale');
 assert(!('sess_1' in useSessionStore.getState().transcripts), 'invalidate drops the cache');
 
-// REQ-155 — the same persisted row can reach the cache more than once (the chat
+// REQ-156 — the same persisted row can reach the cache more than once (the chat
 // can hold more than one socket for a session, and every socket feeds the store).
 // Appending it twice painted the user's own message two or three times.
 assert(isSameTranscriptRow({ role: 'user', content: 'x', timestamp: 't' }, { role: 'user', content: 'x', timestamp: 't' }) === true,
-  'identical transcript rows are recognised as the same line (REQ-155)');
+  'identical transcript rows are recognised as the same line (REQ-156)');
 assert(isSameTranscriptRow({ role: 'user', content: 'x', timestamp: 't' }, { role: 'user', content: 'x', timestamp: 't2' }) === false,
-  'a different timestamp is a different row (REQ-155)');
+  'a different timestamp is a different row (REQ-156)');
 assert(isSameTranscriptRow({ role: 'assistant', content: 'x', timestamp: 't' }, { role: 'user', content: 'x', timestamp: 't' }) === false,
-  'a different role is a different row (REQ-155)');
-assert(isSameTranscriptRow(null, { role: 'user' }) === false, 'a missing row never matches (REQ-155)');
+  'a different role is a different row (REQ-156)');
+assert(isSameTranscriptRow(null, { role: 'user' }) === false, 'a missing row never matches (REQ-156)');
 useSessionStore.setState({ transcripts: { sess_1: [{ role: 'user', content: 'dup', timestamp: 't1' }] }, stale: {} });
 useSessionStore.getState().applyWsEvent({ type: 'transcript_append', sessionId: 'sess_1', message: { role: 'user', content: 'dup', timestamp: 't1' } });
-assert(useSessionStore.getState().transcripts['sess_1'].length === 1, 'a duplicate push does not grow the transcript (REQ-155)');
+assert(useSessionStore.getState().transcripts['sess_1'].length === 1, 'a duplicate push does not grow the transcript (REQ-156)');
 useSessionStore.getState().applyWsEvent({ type: 'transcript_append', sessionId: 'sess_1', message: { role: 'user', content: 'fresh', timestamp: 't2' } });
-assert(useSessionStore.getState().transcripts['sess_1'].length === 2, 'a genuinely new row still appends (REQ-155)');
+assert(useSessionStore.getState().transcripts['sess_1'].length === 2, 'a genuinely new row still appends (REQ-156)');
 
 
 // REQ-148 — the polled list is a snapshot, never proof of absence. An id the

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * REQ-155 live probe — a fast double submit must send ONCE and paint ONCE.
+ * REQ-156 live probe — a fast double submit must send ONCE and paint ONCE.
  *
  * Types a marker, presses Enter twice quickly (the accidental repeat), then:
  *  - counts the WS `prompt` frames carrying the marker (must be 1),

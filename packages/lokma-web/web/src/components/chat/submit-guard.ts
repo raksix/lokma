@@ -1,5 +1,5 @@
 /**
- * REQ-155 — duplicate-submit guard for the composer.
+ * REQ-156 — duplicate-submit guard for the composer.
  *
  * The composer's send path is reachable from several places at once (Enter
  * keydown, the send button, drag-and-drop of a file with a pending body) and a

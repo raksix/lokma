@@ -47,9 +47,14 @@ toast gösterdiği için kullanıcı tarafında "terminal bozuk / yazmıyor" gö
   verir.
 - Canlı: `pm2 restart lokma-server` sonrası arka arkaya 3 spawn → hepsi
   `{"ok":true, ..., "shell":"/usr/bin/bash","status":"running"}`.
-- Canlı sınır provası: `scripts/probe-terminal-idle-reap.sh` — 10+ kabuk açıp
-  boşta bırakır, 10 dk 40 sn bekler, sonra iki spawn daha yapar; ikincisi de
-  başarılıysa devir canlıda kanıtlanmış olur.
+- **Canlı sınır provası (`scripts/probe-terminal-idle-reap.sh`) — GEÇTİ:** kabuklar
+  dolduruldukça sınır gerçekten kilitleniyor (`spawn #8..#12 -> 429 terminal_limit`
+  — kullanıcının yaşadığı tablo birebir çoğaltıldı), 10 dk 40 sn boşta bekledikten
+  sonra **iki spawn da 200** döndü: boştaki kabuklar canlıda geri veriliyor.
+  ```
+  spawn #8..12            -> 429 {"code":"terminal_limit", ...}
+  post-idle spawn #1 .. 2 -> 200 {"ok":true, "shell":"/usr/bin/bash", ...}
+  ```
 - `bun x tsc --noEmit` (core + web) 0 hata; web `bun run build` temiz.
 
 ## Commit'ler

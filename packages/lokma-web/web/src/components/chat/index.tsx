@@ -3,6 +3,12 @@ import { Bot as BotIcon, GitFork, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Composer, readThinking, type ComposerSend } from './composer';
+import {
+  dedupePending,
+  isDuplicateSubmit,
+  recordSubmit,
+  type SubmitRecord,
+} from './submit-guard';
 import { SingleChatView, type PendingMessage, type TranscriptMessage } from './single-chat-view';
 import { useWs, type UseWs } from '@/hooks/use-ws';
 import { api, type Bot } from '@/lib/api';
@@ -68,6 +74,8 @@ export function Chat({
   const [paletteSignal, setPaletteSignal] = React.useState(0);
   const [dropSignal, setDropSignal] = React.useState<{ path: string; key: number } | null>(null);
   const keySeq = React.useRef(0);
+  /** REQ-155: last accepted submit — the duplicate-submit guard compares to it. */
+  const lastSubmit = React.useRef<SubmitRecord>(null);
   const doneSeen = React.useRef(false);
 
   const transcripts = useSessionStore((s) => s.transcripts);
@@ -219,8 +227,11 @@ export function Chat({
     if (pending.length === 0) return pending;
     const tail = transcript.slice(-(pending.length + 4));
     const landed = new Set(tail.filter((m) => m.role === 'user').map((m) => m.content));
-    const next = pending.filter((p) => !landed.has(p.text));
-    return next.length === pending.length ? pending : next;
+    // REQ-155: also collapse optimistic rows that carry the same text, so a
+    // double submit can never paint the same prompt twice.
+    const unique = dedupePending(pending);
+    const next = unique.filter((p) => !landed.has(p.text));
+    return next.length === unique.length && unique.length === pending.length ? pending : next;
   }, [pending, transcript]);
 
   // REQ-104: no session model and no stored model → smart default chain
@@ -384,6 +395,14 @@ export function Chat({
 
   const send = React.useCallback(
     (s: ComposerSend) => {
+      // REQ-155: a fast second Enter (or Enter + click) leaves the composer text
+      // in place and used to send the same prompt twice — the user's own message
+      // then painted twice optimistically plus the server echo (three copies of
+      // one transcript row). Drop the accidental repeat; a later re-ask of the
+      // same text is still allowed.
+      const now = Date.now();
+      if (isDuplicateSubmit(lastSubmit.current, s.text, now)) return;
+      lastSubmit.current = recordSubmit(s.text, now);
       keySeq.current += 1;
       setPending((prev) => [...prev, { key: keySeq.current, text: s.text }]);
       setStreamVisible(true);

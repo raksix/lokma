@@ -24,6 +24,14 @@ export const TERMINAL_INPUT_CAP = 64 * 1024;
 export const TERMINAL_TAIL_CAP = 64 * 1024;
 /** Grace period between SIGTERM and SIGKILL on `kill()`. */
 const KILL_GRACE_MS = 3000;
+/**
+ * REQ-158: shells nobody touched for this long are handed back when a new
+ * spawn hits the live limit — otherwise abandoned shells pile up until the
+ * pane can never open one again ("clicking does nothing").
+ */
+export const TERMINAL_SPAWN_FREE_IDLE_MS = 10 * 60_000;
+/** Idle shells older than this are reaped by the periodic sweep. */
+export const TERMINAL_SWEEP_IDLE_MS = 60 * 60_000;
 
 export type TerminalStatus = 'running' | 'exited' | 'error';
 
@@ -111,6 +119,8 @@ type LiveEntry = {
   record: TerminalRecord;
   tail: string;
   exitWaiters: Array<() => void>;
+  /** Last output/input/resize — drives idle reaping (REQ-158). */
+  lastActivityAt: number;
 };
 
 export class TerminalManager {
@@ -142,8 +152,37 @@ export class TerminalManager {
     return n;
   }
 
+  /**
+   * Kill user shells nobody has touched for `idleMs` and report their ids.
+   * Agent-managed shells (run_command, browser work) are never reaped: a long
+   * build legitimately produces no output while it works.
+   */
+  async freeIdle(idleMs: number, now = Date.now()): Promise<string[]> {
+    const doomed: string[] = [];
+    for (const [id, entry] of this.live) {
+      if (entry.record.status !== 'running') continue;
+      if (entry.record.agentId) continue;
+      if (now - entry.lastActivityAt < idleMs) continue;
+      doomed.push(id);
+    }
+    for (const id of doomed) {
+      try {
+        await this.kill(id);
+      } catch {
+        // A shell that refuses to die must not block the sweep.
+      }
+    }
+    return doomed;
+  }
+
   /** Spawn a shell in `cwd` (must be an existing dir). Throws TerminalError. */
   async spawn(opts: SpawnTerminalOpts = {}): Promise<{ record: TerminalRecord; tail: string }> {
+    if (this.runningCount() >= TERMINAL_MAX_LIVE) {
+      // REQ-158: hand back abandoned shells before refusing — a full limit of
+      // untouched shells used to make the pane look broken ("typing does
+      // nothing"), because the click surfaced only a toast.
+      await this.freeIdle(TERMINAL_SPAWN_FREE_IDLE_MS);
+    }
     if (this.runningCount() >= TERMINAL_MAX_LIVE) {
       throw new TerminalError(
         'terminal_limit',
@@ -177,7 +216,13 @@ export class TerminalManager {
       cols: clampInt(opts.cols, 80, 1, 500),
       rows: clampInt(opts.rows, 24, 1, 200),
     };
-    const entry: LiveEntry = { proc: null as unknown as ChildProcess, record, tail: '', exitWaiters: [] };
+    const entry: LiveEntry = {
+      proc: null as unknown as ChildProcess,
+      record,
+      tail: '',
+      exitWaiters: [],
+      lastActivityAt: Date.now(),
+    };
     this.live.set(id, entry);
     try {
       // REQ-059: `script -qec` gives the shell a real slave PTY while our
@@ -246,6 +291,7 @@ export class TerminalManager {
     if (data.length > TERMINAL_INPUT_CAP) {
       throw new TerminalError('too_large', `input capped at ${TERMINAL_INPUT_CAP} bytes`, 400);
     }
+    entry.lastActivityAt = Date.now();
     entry.proc.stdin.write(data);
     return { bytes: data.length };
   }
@@ -257,6 +303,7 @@ export class TerminalManager {
     if (!entry) throw new TerminalError('terminal_not_found', `No terminal ${id}`, 404);
     entry.record.cols = clampInt(cols, entry.record.cols, 1, 500);
     entry.record.rows = clampInt(rows, entry.record.rows, 1, 200);
+    entry.lastActivityAt = Date.now();
     return { cols: entry.record.cols, rows: entry.record.rows };
   }
 
@@ -317,6 +364,7 @@ export class TerminalManager {
 
   private pushData(entry: LiveEntry, chunk: string): void {
     if (!chunk) return;
+    entry.lastActivityAt = Date.now();
     entry.tail = (entry.tail + chunk).slice(-TERMINAL_TAIL_CAP);
     for (const listener of this.dataListeners) {
       try {
@@ -346,6 +394,14 @@ export class TerminalManager {
 
 /** Process-wide registry — WS routes and REST routes share the same shells. */
 export const terminalManager = new TerminalManager();
+
+// REQ-158: hourly hygiene — a shell nobody touched for an hour is not coming
+// back, and abandoned shells are what wedged the live limit. `unref` keeps the
+// timer from holding a process (CLI, tests) open.
+const terminalSweep = setInterval(() => {
+  void terminalManager.freeIdle(TERMINAL_SWEEP_IDLE_MS);
+}, 5 * 60_000);
+terminalSweep.unref?.();
 
 function clampInt(value: unknown, fallback: number, min: number, max: number): number {
   if (typeof value !== 'number' || !Number.isInteger(value)) return fallback;

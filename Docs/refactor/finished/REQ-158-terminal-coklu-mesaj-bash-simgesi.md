@@ -38,7 +38,20 @@
 | `bun run build` + pm2 restart | yeşil |
 | Canlı bundle | `index-DwxgKB3o.js` |
 | Kaldırılan `$` işareti canlı bundle'da | **0** eşleşme (`text-emerald-400">$`) |
-| `scripts/probe-terminal-dedupe.cjs` | yazıldı; headless koşuda **login kapısına** takıldığı için (ekran: "Sign in to continue") yazma davranışının canlı kanıtı bu turda alınamadı |
+| `scripts/probe-terminal-dedupe.cjs` | yazıldı ve **giriş yaparak** koşuyor (`addInitScript` ile `lokma-token`); kabuk hazır olana kadar bekliyor, frame'leri WS seviyesinde sayıyor, marker boyama sayısını ölçüyor |
+| Canlı: yapay `$` satırı ekranda | **0** |
+| Canlı: frame sayacı | headless koşuların bir kısmında kabuk hiç başlamadı (`no-bytes-arrived`, toplam 2 frame) → yazma davranışının tekrarlanabilir canlı kanıtı hâlâ tam alınamadı |
+
+## Canlı ölçüm (yetkili koşu)
+
+İlk yetkili canlı koşuda (token localStorage'a boot'tan önce seed edilerek) yazılan
+marker **4×** boyandı — yani kopyalar **interleave** oluyor (echo → çıktı → echo → çıktı)
+ve "yalnızca bir önceki frame" kontrolü bunları kaçırır. Bunun üzerine dedupe pencere
+tabanlı hâle getirildi:
+
+- `isRecentDuplicate(ring, frame, now, 750ms)` — pane son 6 teslimatı halkada tutar;
+  aynı terminal için birebir aynı baytlar pencerede **bir kez** uygulanır.
+- **8 bayttan kısa** parçalar (tek Enter, `\r\n`, resize) asla elenmez.
 
 ## Açık kalan
 

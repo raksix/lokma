@@ -6,6 +6,7 @@ import { emitToast } from '@/components/shell';
 import { useKnownSession } from '@/stores';
 import {
   appendCapped,
+  isDuplicateFrame,
   connectionNotice,
   exitSummary,
   keyToBytes,
@@ -97,13 +98,8 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
     for (let i = processedRef.current; i < messages.length; i += 1) {
       const msg = messages[i];
       if (msg.type === 'terminal/data' && msg.sessionId === sessionId) {
-        // REQ-158: the same chunk can reach us twice (more than one socket feeds
-        // one session), which painted typed lines 2-3 times. Identical bytes for
-        // the same terminal inside a few milliseconds are one delivery; a real
-        // repeat (Enter twice) is always separated by the shell's own echo.
         const now = Date.now();
-        const prevKey = lastFrameRef.current;
-        if (prevKey && prevKey.terminalId === msg.terminalId && prevKey.data === msg.data && now - prevKey.at < 80) {
+        if (isDuplicateFrame(lastFrameRef.current, msg, now)) {
           advanced = true;
           continue;
         }

@@ -3,6 +3,8 @@
  * Run: `bun src/components/terminal/terminal.test.ts` (no DOM, no server).
  */
 import {
+  FRAME_DEDUPE_MS,
+  isDuplicateFrame,
   TERMINAL_BUFFER_CAP,
   appendCapped,
   connectionNotice,
@@ -160,6 +162,22 @@ check(
   'notice texts are non-empty',
   ['idle', 'connecting', 'closed', 'error'].every((s) => (connectionNotice(s as 'idle')?.text ?? '').length > 0),
 );
+
+// --- REQ-158: duplicate frame deliveries -------------------------------------
+
+const frame = (terminalId: string, data: string) => ({ terminalId, data });
+
+check(
+  'an identical frame right after another is one delivery',
+  isDuplicateFrame({ ...frame('t1', 'echo hi\r\n'), at: 1000 }, frame('t1', 'echo hi\r\n'), 1050) === true,
+);
+check(
+  'the same bytes past the window are a real repeat',
+  isDuplicateFrame({ ...frame('t1', '\r\n'), at: 1000 }, frame('t1', '\r\n'), 1000 + FRAME_DEDUPE_MS) === false,
+);
+check('different bytes for one terminal never collide', isDuplicateFrame({ ...frame('t1', 'a'), at: 1000 }, frame('t1', 'b'), 1001) === false);
+check('another terminal never collides', isDuplicateFrame({ ...frame('t1', 'a'), at: 1000 }, frame('t2', 'a'), 1001) === false);
+check('the first frame of a terminal is kept', isDuplicateFrame(null, frame('t1', 'x'), 5) === false);
 
 console.log(`terminal: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

@@ -68,6 +68,24 @@ export function appendCapped(prev: string, chunk: string, cap: number = TERMINAL
 }
 
 /** Strip ANSI escape sequences for the plain-text scrollback view. */
+/**
+ * REQ-158: the same `terminal/data` chunk can reach the client twice when more
+ * than one socket feeds a session, which painted typed lines 2-3 times.
+ * Identical bytes for one terminal inside the window are one delivery; a real
+ * repeat (Enter twice) is always separated by the shell's own echo output.
+ */
+export const FRAME_DEDUPE_MS = 80;
+
+export function isDuplicateFrame(
+  prev: { terminalId: string; data: string; at: number } | null,
+  frame: { terminalId: string; data: string },
+  now: number,
+  windowMs: number = FRAME_DEDUPE_MS,
+): boolean {
+  if (!prev) return false;
+  return prev.terminalId === frame.terminalId && prev.data === frame.data && now - prev.at < windowMs;
+}
+
 export function stripAnsi(text: string): string {
   return text
     .replace(/\[[0-9;?]*[A-Za-z]/g, '')

@@ -176,6 +176,24 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
     }
   }, [cwd, starting, sessionId, refresh, select]);
 
+  const pendingStartRef = React.useRef(false);
+
+  /**
+   * REQ-158: clicking (or asking for a shell) while the session cwd is still
+   * loading used to be a silent no-op — the terminal simply never came up and
+   * typing went nowhere. The intent is remembered instead and honoured as soon
+   * as the cwd lands.
+   */
+  const startShell = React.useCallback(() => {
+    if (starting) return;
+    if (cwd) {
+      void create();
+      return;
+    }
+    pendingStartRef.current = true;
+    emitToast('Session cwd is still loading — the shell starts as soon as it lands');
+  }, [cwd, starting, create]);
+
   // REQ-079: a running shell auto-starts when the pane has none (one attempt
   // per session — failures toast and wait for a click instead of looping).
   React.useEffect(() => {
@@ -190,6 +208,17 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
     autoStartedRef.current = sessionId;
     void create();
   }, [sessionId, cwd, mine, starting, create]);
+
+  React.useEffect(() => {
+    if (!pendingStartRef.current || !cwd || starting) return;
+    if (mine.some((t) => t.status === 'running')) {
+      pendingStartRef.current = false;
+      return;
+    }
+    pendingStartRef.current = false;
+    autoStartedRef.current = sessionId;
+    void create();
+  }, [cwd, starting, mine, sessionId, create]);
 
   const sendRaw = React.useCallback(
     (data: string) => {
@@ -261,7 +290,7 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
         onClick={() => {
           // REQ-079: an empty/dead pane starts a fresh shell on click — no
           // menus, no buttons, just click and type.
-          if (!selectedRunning && !starting && cwd) void create();
+          if (!selectedRunning && !starting) startShell();
           else scrollRef.current?.focus({ preventScroll: true });
         }}
         className="flex-1 cursor-text space-y-0.5 overflow-auto p-3 font-mono text-xs leading-5 focus:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500/40"
@@ -302,7 +331,7 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
                 className="mt-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/60 hover:bg-white/10 hover:text-white"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (!starting && cwd) void create();
+                  startShell();
                 }}
               >
                 Shell ended — click for a fresh one

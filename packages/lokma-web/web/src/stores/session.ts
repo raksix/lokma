@@ -331,6 +331,12 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
         // the REST load) owns a whole history — appending onto nothing would
         // render a truncated conversation as if it were complete.
         if (!known) return prev;
+        // REQ-155: the same row can reach us more than once — the chat may hold
+        // more than one socket for a session, and every socket feeds this store,
+        // so one persisted row was appended two or three times and the user's
+        // own message painted that many times. Identical rows (role + content +
+        // timestamp) are the same line, never a repeat the user typed twice.
+        if (known.some((row) => isSameTranscriptRow(row, msg.message))) return prev;
         return {
           transcripts: { ...prev.transcripts, [msg.sessionId]: [...known, msg.message] },
           stale: { ...prev.stale, [msg.sessionId]: false },
@@ -379,6 +385,25 @@ export function rememberKnown(
 ): { key: string; value: KnownSession } {
   const key = knownSessionKey(state);
   return prev && prev.key === key ? prev : { key, value: state };
+}
+
+/**
+ * REQ-155: two transcript entries are the same persisted line when role,
+ * content and timestamp all match — used to drop duplicate socket pushes
+ * (more than one socket can feed the same session's cache) so a message the
+ * user sent once never renders twice.
+ */
+export function isSameTranscriptRow(a: unknown, b: unknown): boolean {
+  const rowA = a as Record<string, unknown> | null;
+  const rowB = b as Record<string, unknown> | null;
+  if (!rowA || !rowB) return false;
+  const norm = (v: unknown): string =>
+    typeof v === 'string' ? v : v === undefined || v === null ? '' : JSON.stringify(v);
+  return (
+    norm(rowA['role']) === norm(rowB['role']) &&
+    norm(rowA['timestamp']) === norm(rowB['timestamp']) &&
+    norm(rowA['content']) === norm(rowB['content'])
+  );
 }
 
 export function useKnownSession(id: string | undefined | null): KnownSession {

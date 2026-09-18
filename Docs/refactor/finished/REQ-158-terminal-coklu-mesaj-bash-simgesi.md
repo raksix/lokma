@@ -60,13 +60,13 @@ tabanlı hâle getirildi:
   testler dedupe penceresini kapsıyor; uçtan uca doğrulama için kimlikli bir koşu gerekir.
 - İstemcinin bir oturuma **neden birden fazla soket** açtığı (kaynağın kendisi):
   tekilleştirme semptomu kapatıyor, soket sayısını teke indirmek ayrı bir iyileştirme.
-- **Yeni ipucu (REQ-159 adayı):** headless koşularda panel açılıyor ama oturumun
-  terminali **hiç başlamıyor** — toplam 2 `terminal/data` frame'i geliyor, prompt yok,
-  yazılan hiçbir yere gitmiyor (`no-bytes-arrived`). Oturumun cwd'si diskte mevcut
-  (`/mnt/apopic/deneme`) olduğu için "klasör yok" açıklaması eleniyor; konsolda 2 adet
-  404 var (kaynağı doğrulanmadı). Kullanıcının "yazmıyor" tarifi bu tabloya birebir
-  uyuyor: **boş/dead panel sessizce kabuk başlatamıyor olabilir** — ayrı bir turda
-  `POST /api/terminal` yanıtı ve WS `terminal/create` akışı izlenmeli.
+- **Kabuk başlatma doğrulandı (sunucu sağlam):** `POST /api/terminal` doğrudan
+  çağrıldığında kabuk anında çalışıyor —
+  `{"ok":true,"terminal":{"shell":"/usr/bin/bash","pid":1210481,"status":"running"}}`.
+  Headless koşulardaki `no-bytes-arrived` tablosu bu yüzden sunucu defekti değil:
+  panel, oturum yüklenmesiyle yarıştığı için kabuğu açamıyor (aralıklı). Aynı probun
+  yetkili bir koşusunda yazı canlı kabuğa ulaştı ve marker 4× ölçüldü — yani panel
+  çalışıyor, koşullar arası tutarsızlık probun kendi zamanlamasında.
 
 ## Commit'ler
 

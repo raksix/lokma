@@ -38,6 +38,8 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
 
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const processedRef = React.useRef(0);
+  /** REQ-158: last folded frame — identical back-to-back deliveries are one. */
+  const lastFrameRef = React.useRef<{ terminalId: string; data: string; at: number } | null>(null);
   const refreshRef = React.useRef(() => {});
   const selectRef = React.useRef<(id: string) => void>(() => {});
   // REQ-079: auto-start guard — one attempt per session so a failing create
@@ -95,6 +97,17 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
     for (let i = processedRef.current; i < messages.length; i += 1) {
       const msg = messages[i];
       if (msg.type === 'terminal/data' && msg.sessionId === sessionId) {
+        // REQ-158: the same chunk can reach us twice (more than one socket feeds
+        // one session), which painted typed lines 2-3 times. Identical bytes for
+        // the same terminal inside a few milliseconds are one delivery; a real
+        // repeat (Enter twice) is always separated by the shell's own echo.
+        const now = Date.now();
+        const prevKey = lastFrameRef.current;
+        if (prevKey && prevKey.terminalId === msg.terminalId && prevKey.data === msg.data && now - prevKey.at < 80) {
+          advanced = true;
+          continue;
+        }
+        lastFrameRef.current = { terminalId: msg.terminalId, data: msg.data, at: now };
         const text = stripAnsi(msg.data);
         setBuffers((prev) => ({ ...prev, [msg.terminalId]: appendCapped(prev[msg.terminalId] ?? '', text) }));
       } else if (msg.type === 'terminal/exit' && msg.sessionId === sessionId) {
@@ -287,12 +300,6 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
                   {connNotice.text}
                 </div>
               )
-            ) : null}
-            {selectedRunning && wsLive ? (
-              <div className="flex items-center gap-1 text-white">
-                <span className="text-emerald-400">$</span>
-                <span className="h-4 w-2 animate-pulse bg-white/80" />
-              </div>
             ) : null}
             {!selectedRunning ? (
               <button

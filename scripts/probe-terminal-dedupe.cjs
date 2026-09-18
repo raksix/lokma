@@ -34,7 +34,44 @@ const ok = (name, pass, detail) => {
 (async () => {
   const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
   const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+  // Store the Bearer token before the app boots — the same pattern the other
+  // live probes use; without it the app shows "Sign in to continue".
+  await ctx.addInitScript((t) => {
+    try {
+      localStorage.setItem('lokma-token', t);
+    } catch {
+      /* ignore */
+    }
+    // REQ-158 diagnosis: record every terminal/data frame the app receives.
+    window.__frames = [];
+    const Native = window.WebSocket;
+    window.WebSocket = function (...args) {
+      const ws = new Native(...args);
+      ws.addEventListener('message', (ev) => {
+        try {
+          const msg = JSON.parse(typeof ev.data === 'string' ? ev.data : '');
+          if (msg && msg.type === 'terminal/data') {
+            window.__frames.push({ t: Date.now(), terminalId: msg.terminalId, data: String(msg.data), seq: msg.seq ?? null, keys: Object.keys(msg).join(',') });
+          }
+        } catch {
+          /* not json */
+        }
+      });
+      return ws;
+    };
+    window.WebSocket.prototype = Native.prototype;
+  }, TOKEN);
   const page = await ctx.newPage();
+  const errors = [];
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(`console: ${m.text().slice(0, 160)}`);
+  });
+  page.on('requestfailed', (r) => errors.push(`reqfail: ${r.url().slice(0, 120)} ${r.failure()?.errorText}`));
+  page.on('response', async (r) => {
+    if (r.url().includes('/api/terminal') && r.status() >= 400) {
+      errors.push(`http ${r.status()}: ${r.url().slice(0, 120)} ${(await r.text().catch(() => '')).slice(0, 160)}`);
+    }
+  });
   await page.goto(`${BASE}/?token=${TOKEN}`, { waitUntil: 'domcontentloaded' });
   await sleep(6000);
 
@@ -89,15 +126,56 @@ const ok = (name, pass, detail) => {
   });
   ok('the synthetic "$" prompt line is gone', promptGlyphs === 0, `${promptGlyphs} on screen`);
 
-  // Type a unique command into the focused terminal.
-  await page.evaluate(() => {
-    const cands = [...document.querySelectorAll('.font-mono, [tabindex]')].filter((el) => el.clientHeight > 60);
-    const target = cands[cands.length - 1];
-    if (target) target.click();
+  // Make sure a shell is really running before typing: click the viewport
+  // (which starts one when the pane is empty) and wait for bytes to arrive.
+  const shellUp = await page.evaluate(async () => {
+    const scroller = () =>
+      [...document.querySelectorAll('div')].find((el) => /#\s*$/.test((el.innerText || '').trim()));
+    let el = scroller();
+    if (!el) return 'no-viewport';
+    el.click();
+    for (let i = 0; i < 40; i += 1) {
+      await new Promise((r) => setTimeout(r, 500));
+      const frames = (window.__frames || []).length;
+      const now = scroller();
+      if (frames > 0 && now) {
+        // REQ-159: focus is what makes keystrokes land — click every time.
+        now.click();
+        now.focus?.();
+        window.focus();
+        return `live after ${(i + 1) * 500}ms`;
+      }
+    }
+    return 'no-bytes-arrived';
   });
+  // A missing pane would make the "$ is gone" check pass vacuously — dump it.
+  const dump = await page.evaluate(() => ({
+    labels: [...document.querySelectorAll('[aria-label]')]
+      .map((el) => el.getAttribute('aria-label') || '')
+      .filter((t) => /terminal|shell|scrollback/i.test(t))
+      .slice(0, 4),
+    body: (document.body.innerText || '').replace(/\s+/g, ' ').slice(0, 260),
+  }));
+  console.log('--- pane state ---');
+  console.log('aria labels:', JSON.stringify(dump.labels));
+  console.log('body:', dump.body);
+  console.log('--- end pane state ---');
+  console.log(`shell: ${shellUp}`);
   await page.keyboard.type(`echo ${MARKER}`);
   await page.keyboard.press('Enter');
   await sleep(5000);
+
+  const frames = await page.evaluate((m) => {
+    const all = window.__frames || [];
+    const withMarker = all.filter((f) => f.data.includes(m));
+    return {
+      total: all.length,
+      withMarker: withMarker.map((f) => ({ data: f.data.replace(/\r/g, '\\r').slice(0, 80), seq: f.seq, keys: f.keys })),
+      distinctMarkerChunks: new Set(withMarker.map((f) => f.data)).size,
+    };
+  }, MARKER);
+  console.log(`frames: ${frames.total} terminal/data total, ${frames.withMarker.length} carrying the marker, ${frames.distinctMarkerChunks} distinct`);
+  for (const f of frames.withMarker.slice(-6)) console.log(`  [seq=${f.seq}] keys=${f.keys} :: ${f.data.slice(0, 70)}`);
 
   const count = await page.evaluate((m) => {
     const text = document.body.innerText;
@@ -106,8 +184,35 @@ const ok = (name, pass, detail) => {
 
   // Legit: the shell echoes the command, then prints the result → 2 (sometimes 3
   // if the scrollback redraws). A duplicated delivery lands at 4-6.
+  ok('a live shell accepted the command', count >= 1, `shell state: ${shellUp}`);
   ok('the typed line is not repeated by duplicate deliveries', count <= 3, `marker painted ${count}× (expect 2-3)`);
   ok('the command actually ran', count >= 2, `${count}× — the shell echo and its output`);
+
+  // Dump the scrollback around the marker so the duplicated copies are visible.
+  const tailDump = await page.evaluate((m) => {
+    const hosts = [...document.querySelectorAll('*')].filter(
+      (el) => el.children.length === 0 || el.tagName === 'PRE' || el.className.toString().includes('font-mono'),
+    );
+    let best = '';
+    for (const el of hosts) {
+      const t = el.innerText || el.textContent || '';
+      if (t.includes(m) && t.length > best.length) best = t;
+    }
+    return best;
+  }, MARKER);
+  console.log('--- scrollback around the marker ---');
+  console.log(
+    tailDump
+      .split('\n')
+      .filter((l) => l.includes(MARKER) || /echo|\$|#|>/.test(l))
+      .slice(-14)
+      .join('\n')
+      .slice(0, 1800),
+  );
+  console.log('--- end ---');
+
+  console.log('--- errors seen ---');
+  console.log(errors.slice(0, 8).join('\n') || '(none)');
 
   await page.screenshot({ path: '/tmp/req158-terminal.png' });
   console.log('screenshot: /tmp/req158-terminal.png');

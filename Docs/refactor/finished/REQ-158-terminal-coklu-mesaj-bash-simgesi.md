@@ -73,3 +73,16 @@ tabanlı hâle getirildi:
 - `2ac87b9` fix(web): drop the synthetic prompt line and dedupe terminal frames
 - `c803623` test(scripts): live probe for the terminal dedupe and the removed prompt line
 - `a62079f` test(web): cover the duplicate-frame window with pure checks
+
+## Canlı doğrulama — son durum (2026-09-18)
+
+Pane canlıda **çalışıyor**: prob dökümü, panelin içinde gerçek kabuk prompt'unu
+görüyor (`root@furkan-openclaw:/mnt/apopic/lokma#`) ve kabuk 500 ms içinde
+`live` duruma geçiyor. Ayrıca sunucu tarafı bağımsız olarak kanıtlandı:
+`POST /api/terminal` → `{"ok":true,"shell":"/usr/bin/bash","status":"running"}`.
+
+Probun kalan sınırı: sentetik tuş vuruşları (`page.keyboard.type`) headless
+koşuda PTY'ye ulaşmıyor (odak, click+focus ile verilse de), bu yüzden "yazılan
+satır kaç kez boyandı" ölçümü yalnızca tuşun gerçekten ulaştığı koşularda
+alınabiliyor. Ulaştığı koşuda ölçüm **4×** idi ve interleave'e dayanıklı dedupe
+(750 ms halka) bu ölçüme karşı yazıldı.

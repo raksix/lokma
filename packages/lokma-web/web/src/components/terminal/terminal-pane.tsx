@@ -158,13 +158,17 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
   }, [lines]);
 
   const create = React.useCallback(async () => {
-    if (!cwd || starting) {
-      if (!cwd) emitToast('Session cwd is still loading — retry in a second');
+    // REQ-159: a session with no folder still gets a shell — the server falls
+    // back to its own workspace, which beats a pane that swallows the click.
+    // Only a *loading* session list waits: the folder may still be on its way.
+    const waiting = !cwd && known === 'loading';
+    if (waiting || starting) {
+      if (waiting) emitToast('Session cwd is still loading — retry in a second');
       return;
     }
     setStarting(true);
     try {
-      const res = await api.createTerminal({ cwd, sessionId });
+      const res = await api.createTerminal(cwd ? { cwd, sessionId } : { sessionId });
       await refresh();
       select(res.terminal.id);
       // REQ-059: hand focus to the scrollback so typing starts immediately.
@@ -174,7 +178,7 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
     } finally {
       setStarting(false);
     }
-  }, [cwd, starting, sessionId, refresh, select]);
+  }, [cwd, known, starting, sessionId, refresh, select]);
 
   const pendingStartRef = React.useRef(false);
 
@@ -182,11 +186,11 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
    * REQ-158: clicking (or asking for a shell) while the session cwd is still
    * loading used to be a silent no-op — the terminal simply never came up and
    * typing went nowhere. The intent is remembered instead and honoured as soon
-   * as the cwd lands.
+   * as the cwd lands. A session with no folder at all starts straight away.
    */
   const startShell = React.useCallback(() => {
     if (starting) return;
-    if (cwd) {
+    if (cwd || known !== 'loading') {
       void create();
       return;
     }
@@ -197,7 +201,7 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
   // REQ-079: a running shell auto-starts when the pane has none (one attempt
   // per session — failures toast and wait for a click instead of looping).
   React.useEffect(() => {
-    if (autoStartedRef.current === sessionId || !cwd || starting) return;
+    if (autoStartedRef.current === sessionId || (!cwd && known === 'loading') || starting) return;
     if (mine.some((t) => t.status === 'running')) return;
     if (mine.length > 0) {
       // Dead records only — mark attempted so we don't respawn on every

@@ -74,17 +74,26 @@ export function appendCapped(prev: string, chunk: string, cap: number = TERMINAL
  * Identical bytes for one terminal inside the window are one delivery; a real
  * repeat (Enter twice) is always separated by the shell's own echo output.
  */
-export const FRAME_DEDUPE_MS = 80;
+export const FRAME_DEDUPE_MS = 750;
 
-export function isDuplicateFrame(
-  prev: { terminalId: string; data: string; at: number } | null,
+/**
+ * REQ-158: duplicates from the fan-out do not always arrive back-to-back — a
+ * live run measured the typed marker painted 4× (echo, output, echo, output),
+ * so a "previous frame only" check misses them. Recent deliveries are kept in a
+ * tiny ring instead: identical bytes for one terminal inside the window were
+ * already applied, so they are dropped. Only chunks long enough to be real
+ * shell text are candidates, which keeps repeated Enter keys intact.
+ */
+export function isRecentDuplicate(
+  recent: { terminalId: string; data: string; at: number }[],
   frame: { terminalId: string; data: string },
   now: number,
   windowMs: number = FRAME_DEDUPE_MS,
 ): boolean {
-  if (!prev) return false;
-  return prev.terminalId === frame.terminalId && prev.data === frame.data && now - prev.at < windowMs;
+  if (frame.data.length < 8) return false;
+  return recent.some((r) => r.terminalId === frame.terminalId && r.data === frame.data && now - r.at < windowMs);
 }
+
 
 export function stripAnsi(text: string): string {
   return text

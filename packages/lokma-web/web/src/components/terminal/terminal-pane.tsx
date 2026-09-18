@@ -6,7 +6,7 @@ import { emitToast } from '@/components/shell';
 import { useKnownSession } from '@/stores';
 import {
   appendCapped,
-  isDuplicateFrame,
+  isRecentDuplicate,
   connectionNotice,
   exitSummary,
   keyToBytes,
@@ -40,7 +40,7 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const processedRef = React.useRef(0);
   /** REQ-158: last folded frame — identical back-to-back deliveries are one. */
-  const lastFrameRef = React.useRef<{ terminalId: string; data: string; at: number } | null>(null);
+  const recentFramesRef = React.useRef<{ terminalId: string; data: string; at: number }[]>([]);
   const refreshRef = React.useRef(() => {});
   const selectRef = React.useRef<(id: string) => void>(() => {});
   // REQ-079: auto-start guard — one attempt per session so a failing create
@@ -99,11 +99,11 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
       const msg = messages[i];
       if (msg.type === 'terminal/data' && msg.sessionId === sessionId) {
         const now = Date.now();
-        if (isDuplicateFrame(lastFrameRef.current, msg, now)) {
+        if (isRecentDuplicate(recentFramesRef.current, msg, now)) {
           advanced = true;
           continue;
         }
-        lastFrameRef.current = { terminalId: msg.terminalId, data: msg.data, at: now };
+        recentFramesRef.current = [...recentFramesRef.current, { terminalId: msg.terminalId, data: msg.data, at: now }].slice(-6);
         const text = stripAnsi(msg.data);
         setBuffers((prev) => ({ ...prev, [msg.terminalId]: appendCapped(prev[msg.terminalId] ?? '', text) }));
       } else if (msg.type === 'terminal/exit' && msg.sessionId === sessionId) {

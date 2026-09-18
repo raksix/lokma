@@ -129,7 +129,11 @@ const ok = (name, pass, detail) => {
   // Make sure a shell is really running before typing: click the viewport
   // (which starts one when the pane is empty) and wait for bytes to arrive.
   const shellUp = await page.evaluate(async () => {
+    // The focusable viewport is the one carrying the "click and type" label —
+    // a plain wrapper div takes the click but never sees the keystrokes.
     const scroller = () =>
+      document.querySelector('[aria-label*="click and type"]') ||
+      document.querySelector('[aria-label^="Terminal"]') ||
       [...document.querySelectorAll('div')].find((el) => /#\s*$/.test((el.innerText || '').trim()));
     let el = scroller();
     if (!el) return 'no-viewport';

@@ -66,3 +66,13 @@ Ekran görüntüsü: aynı `abi ss atsana` mesajı **üç kez** üst üste (`You
   bir iyileştirme (yeni REQ açılabilir).
 - Aynı koruma, ileride başka bir yoldan gelen tekrar push'ları da yutar
   (sunucu yeniden gönderim yapsa bile ekran temiz kalır).
+
+## Ara ölçüm — kısa ömürlü çakışma (geçici, kapanışı etkilemez)
+
+Aynı prob bir koşuda `samples: 2, 2, 1, 1` verdi: mesaj ilk ~2.7 sn boyunca hem
+iyimser balonda hem kalıcı satırda görünüp sonra tek satıra indi. Tekrar koşuda
+`1, 1, 1, 1` — yani kalıcı bir kopya değil, satır uçuşta (in-flight) olduğu
+sürece görünen geçici örtüşme. Soket beslemesi bağlıyken bu pencere ~60 ms
+(REQ-149 ölçümü); soket yoksa satır yedek yolla geldiği için pencere birkaç
+saniyeye çıkabiliyor. Kalıcı üçleme şikayeti bu sınıftan değildir ve kapanış
+(tek satır + tek frame) korunuyor.

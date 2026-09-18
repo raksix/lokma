@@ -176,3 +176,4 @@
 - [REQ-155](finished/REQ-155-ajan-sohbete-dosya-gondersin.md) — The agent must send files/images into the chat directly (screenshots from the browser tools) instead of printing a file path — done (send_file tool + transcript attachments + auto-delivered screenshots; live E2E 11/11, screenshot lands in the session workspace)
 - [REQ-156](finished/REQ-156-mesaj-tek-cizim.md) — A message sent once painted two or three times: the same transcript row reached the cache from more than one socket, and the composer had no double-submit guard — done
 - [REQ-157](finished/REQ-157-sohbet-tasma-duzeltmesi.md) — Long message/tool text overflowed the chat (missing min-w-0 chain on tool rows, no break-words/break-all on bodies and JSON blocks) — done
+- [REQ-158](finished/REQ-158-terminal-coklu-mesaj-bash-simgesi.md) — Terminal: duplicate typed lines + the synthetic `$` prompt glyph removed

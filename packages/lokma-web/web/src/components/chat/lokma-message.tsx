@@ -411,7 +411,7 @@ export function renderMdBlock(block: MdBlock, keyPrefix: string): React.ReactNod
     case 'p':
     default:
       return (
-        <div key={keyPrefix} className="mt-1.5 whitespace-pre-wrap first:mt-0">
+        <div key={keyPrefix} className="mt-1.5 whitespace-pre-wrap break-words first:mt-0">
           {renderInline(block.body, `${keyPrefix}p`)}
         </div>
       );
@@ -478,9 +478,9 @@ export function ToolCallRow({ entry }: { entry: ToolCallEntry }) {
           <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
         )}
         <div className="min-w-0 flex-1">
-          <span className="inline-flex items-center gap-1.5 text-[13px] text-zinc-700 dark:text-zinc-200">
+          <span className="flex min-w-0 items-center gap-1.5 text-[13px] text-zinc-700 dark:text-zinc-200">
             <ToolIcon className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-            <span className="truncate font-medium">{describeToolCall(e.tool, e.input)}</span>
+            <span className="min-w-0 flex-1 truncate font-medium">{describeToolCall(e.tool, e.input)}</span>
             {running && <span className="shrink-0 text-[11px] text-zinc-400">Running…</span>}
           </span>
           {!running && outcome && (
@@ -495,7 +495,7 @@ export function ToolCallRow({ entry }: { entry: ToolCallEntry }) {
       <div className="mt-1.5 space-y-1.5 border-t border-line pt-1.5">
         <div>
           <div className="mb-0.5 text-[10px] font-semibold tracking-wide text-zinc-400 uppercase">Input</div>
-          <pre className="max-h-64 overflow-auto rounded-md bg-black/5 p-2 font-mono text-[11px] whitespace-pre-wrap dark:bg-white/5">
+          <pre className="max-h-64 overflow-auto rounded-md bg-black/5 p-2 font-mono text-[11px] whitespace-pre-wrap break-all dark:bg-white/5">
             {dump(e.input)}
           </pre>
         </div>
@@ -504,7 +504,7 @@ export function ToolCallRow({ entry }: { entry: ToolCallEntry }) {
         ) : (
           <div>
             <div className="mb-0.5 text-[10px] font-semibold tracking-wide text-zinc-400 uppercase">Result</div>
-            <pre className="max-h-64 overflow-auto rounded-md bg-black/5 p-2 font-mono text-[11px] whitespace-pre-wrap dark:bg-white/5">
+            <pre className="max-h-64 overflow-auto rounded-md bg-black/5 p-2 font-mono text-[11px] whitespace-pre-wrap break-all dark:bg-white/5">
               {dump(e.result)}
             </pre>
           </div>
@@ -647,7 +647,7 @@ export function ThinkingTrace({ thinking, streaming }: { thinking: string; strea
       {/* REQ-139: preview is capped at REASONING_PREVIEW_LINES lines — the rest
           stays one click away instead of pushing the answer off screen. */}
       <div className="border-t border-line px-3 py-2 text-xs leading-[1.6] text-zinc-500">
-        <div className="max-h-48 overflow-auto whitespace-pre-wrap">
+        <div className="max-h-48 overflow-auto whitespace-pre-wrap break-words">
           {expanded ? shown : lines.join('\n')}
         </div>
         {more > 0 && (

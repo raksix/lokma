@@ -173,7 +173,7 @@ function UserRow({
         ) : (
           <>
             <div className="mt-1.5 rounded-2xl rounded-tl-sm border border-line bg-white p-3.5 shadow-sm transition group-hover:border-line-strong group-hover:shadow-md dark:bg-[#1E1E21]">
-              <div className="text-[13.5px] leading-[1.6] whitespace-pre-wrap">{message.content}</div>
+              <div className="text-[13.5px] leading-[1.6] whitespace-pre-wrap break-words">{message.content}</div>
             </div>
             <div className="mt-1 flex flex-wrap gap-1 opacity-0 transition group-hover:opacity-100">
               <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={() => setEditing(true)}>
@@ -493,7 +493,7 @@ export function SingleChatView({
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-semibold">You</div>
                   <div className="mt-1.5 rounded-2xl rounded-tl-sm border border-line bg-white p-3.5 shadow-sm dark:bg-[#1E1E21]">
-                    <div className="text-[13.5px] leading-[1.6] whitespace-pre-wrap">{p.text}</div>
+                    <div className="text-[13.5px] leading-[1.6] whitespace-pre-wrap break-words">{p.text}</div>
                   </div>
                 </div>
               </div>

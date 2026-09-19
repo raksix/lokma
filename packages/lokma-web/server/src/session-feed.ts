@@ -54,6 +54,10 @@ export function toTranscriptRow(message: SessionMessage): TranscriptRow {
   };
   if (message.toolCallId) row.toolCallId = message.toolCallId;
   if (message.toolName) row.toolName = message.toolName;
+  // REQ-155/REQ-160: agent-sent attachments must survive the wire mapping —
+  // the socket is the chat's primary source after a reload, so dropping them
+  // here made every screenshot vanish on refresh.
+  if (message.attachments?.length) row.attachments = message.attachments;
   return row;
 }
 

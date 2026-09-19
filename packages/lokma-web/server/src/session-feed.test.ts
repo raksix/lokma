@@ -139,5 +139,16 @@ assert.ok(anonymousRows.some((r) => r.id === aliceSession), 'gate-off legacy mod
 const plain = toTranscriptRow({ role: 'assistant', content: 'x', timestamp: 'now' });
 assert.deepEqual(Object.keys(plain).sort(), ['content', 'role', 'timestamp'], 'no empty optional keys');
 
+// 9. REQ-160: agent-sent attachments ride the wire row (they used to be
+// dropped here, so every screenshot vanished on chat reload).
+const withAttachment = toTranscriptRow({
+  role: 'assistant',
+  content: 'shot',
+  timestamp: 'now',
+  attachments: [{ path: '.lokma/browser-shots/x.png', name: 'x.png', mime: 'image/png', size: 12 }],
+});
+assert.equal(withAttachment.attachments?.length, 1, 'attachment kept on the row');
+assert.equal(withAttachment.attachments?.[0]?.mime, 'image/png', 'attachment mime kept');
+
 unsubscribeSocket(listWatcher);
-console.log('REQ-149 session feed: 8 groups, all checks passed');
+console.log('REQ-149 session feed: 9 groups, all checks passed');

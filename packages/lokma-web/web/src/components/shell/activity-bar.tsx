@@ -2,6 +2,7 @@ import { CircleUserRound, Database, FlaskConical, GitBranch, Globe, MessagesSqua
 import { cn } from '@/lib/utils';
 import { INSPECTOR_DRAG_MIME, encodeInspectorDrag, isPaneOnlyTab, type RailDropId } from '@/components/panes/panes';
 import type { InspectorTab } from '@/components/providers';
+import type { SettingsSectionId } from '@/components/settings/settings';
 import type { SidebarSide } from './responsive';
 
 /**
@@ -68,7 +69,9 @@ export function activityInspectorTab(key: ActivityKey): InspectorTab | null {
     case 'browser':
       return 'browser';
     case 'vault':
-      return 'vault';
+      // REQ-165 — vault left the panes: its icon opens Settings → Vault
+      // (see ACTIVITY_MODAL_SECTIONS), never an Inspector tab.
+      return null;
     case 'testing':
       return 'testing';
     case 'settings':
@@ -103,6 +106,23 @@ export function activityOpensPaneTab(key: ActivityKey): boolean {
   return isPaneOnlyTab(key);
 }
 
+/**
+ * REQ-165 — activity keys that open the Settings modal on a section instead
+ * of an Inspector tab (Vault left the panes, same wave as the rail). The
+ * icon stays visible; it no longer drags, because a modal surface has no
+ * pane drop target.
+ */
+export const ACTIVITY_MODAL_SECTIONS: Record<'vault', SettingsSectionId> = {
+  vault: 'vault',
+};
+
+export type ActivityModalKey = keyof typeof ACTIVITY_MODAL_SECTIONS;
+
+/** True when this activity entry opens the Settings modal, never a pane/tab. */
+export function isActivityModalKey(key: ActivityKey): key is ActivityModalKey {
+  return key in ACTIVITY_MODAL_SECTIONS;
+}
+
 function ActivityButton({
   active,
   label,
@@ -110,6 +130,7 @@ function ActivityButton({
   Icon,
   indicatorClass,
   onClick,
+  opensModal = false,
 }: {
   active: boolean;
   label: string;
@@ -117,20 +138,26 @@ function ActivityButton({
   Icon: typeof MessagesSquare;
   indicatorClass: string;
   onClick: () => void;
+  /** REQ-165 — modal entries (Vault) never drag: no pane drop target exists. */
+  opensModal?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      title={`${label} — drag to a pane to open it`}
+      title={opensModal ? label : `${label} — drag to a pane to open it`}
       aria-label={label}
       aria-pressed={active}
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData(INSPECTOR_DRAG_MIME, encodeInspectorDrag(dragId));
-        e.dataTransfer.setData('text/plain', label);
-        e.dataTransfer.effectAllowed = 'move';
-      }}
+      draggable={!opensModal}
+      onDragStart={
+        opensModal
+          ? undefined
+          : (e) => {
+              e.dataTransfer.setData(INSPECTOR_DRAG_MIME, encodeInspectorDrag(dragId));
+              e.dataTransfer.setData('text/plain', label);
+              e.dataTransfer.effectAllowed = 'move';
+            }
+      }
       className={cn(
         'relative grid h-8 w-8 place-items-center rounded-md transition',
         active
@@ -172,15 +199,15 @@ export function ActivityBar({
       )}
     >
       {TOP_ITEMS.map(({ key, label, Icon }) => (
-        <ActivityButton key={key} active={active === key} label={label} dragId={activityDragId(key)} Icon={Icon} indicatorClass={indicatorClass} onClick={() => onSelect(key)} />
+        <ActivityButton key={key} active={active === key} label={label} dragId={activityDragId(key)} Icon={Icon} indicatorClass={indicatorClass} opensModal={isActivityModalKey(key)} onClick={() => onSelect(key)} />
       ))}
       <span aria-hidden="true" className="my-1.5 h-px w-6 shrink-0 bg-line" />
       {PANE_ITEMS.map(({ key, label, Icon }) => (
-        <ActivityButton key={key} active={active === key} label={label} dragId={activityDragId(key)} Icon={Icon} indicatorClass={indicatorClass} onClick={() => onSelect(key)} />
+        <ActivityButton key={key} active={active === key} label={label} dragId={activityDragId(key)} Icon={Icon} indicatorClass={indicatorClass} opensModal={isActivityModalKey(key)} onClick={() => onSelect(key)} />
       ))}
       <span className="flex-1" />
       {BOTTOM_ITEMS.map(({ key, label, Icon }) => (
-        <ActivityButton key={key} active={active === key} label={label} dragId={activityDragId(key)} Icon={Icon} indicatorClass={indicatorClass} onClick={() => onSelect(key)} />
+        <ActivityButton key={key} active={active === key} label={label} dragId={activityDragId(key)} Icon={Icon} indicatorClass={indicatorClass} opensModal={isActivityModalKey(key)} onClick={() => onSelect(key)} />
       ))}
     </nav>
   );

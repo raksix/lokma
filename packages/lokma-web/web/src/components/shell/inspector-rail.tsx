@@ -18,12 +18,17 @@ import type { ExplorerSide, SidebarSide } from './responsive';
  * Inspector tab (Agent Hub moved out of the panes). One map, one truth: the
  * rail renders these without a drag, the desktop rail click opens the modal
  * on the mapped section, and the mobile tools strip routes the same way.
- * REQ-164 — Orchestration joined the map (same wave). Later moves
- * (vault/skills) extend this table.
+ * REQ-164 — Orchestration joined the map (same wave). REQ-165 — Vault and
+ * Memory followed (their icons stay, their pane/tab definitions are gone).
  */
-export const RAIL_MODAL_SECTIONS: Record<'agents' | 'orchestration', SettingsSectionId> = {
+export const RAIL_MODAL_SECTIONS: Record<
+  'agents' | 'orchestration' | 'vault' | 'memory',
+  SettingsSectionId
+> = {
   agents: 'agents',
   orchestration: 'orchestration',
+  vault: 'vault',
+  memory: 'memory',
 };
 
 /** Rail tabs that launch the Settings modal instead of a pane (REQ-163). */

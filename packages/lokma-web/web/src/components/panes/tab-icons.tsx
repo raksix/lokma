@@ -3,9 +3,7 @@ import {
   Activity,
   BarChart3,
   Beaker,
-  Brain,
   Clock3,
-  Folder,
   FolderOpen,
   GitBranch,
   Globe,
@@ -38,9 +36,8 @@ export const TAB_ICONS: Record<InspectorTabId, React.ReactNode> = {
   terminal: <Terminal className="h-3 w-3" />,
   git: <GitBranch className="h-3 w-3" />,
   browser: <Globe className="h-3 w-3" />,
-  // REQ-163/164 — Agent Hub and Orchestration left the pane registry
-  // (Settings modal sections).
-  vault: <Folder className="h-3 w-3" />,
+  // REQ-163/164/165 — Agent Hub, Orchestration, Vault and Memory left the
+  // pane registry (Settings modal sections).
   skills: <Puzzle className="h-3 w-3" />,
   archify: <Workflow className="h-3 w-3" />,
   design: <Paintbrush className="h-3 w-3" />,
@@ -51,6 +48,5 @@ export const TAB_ICONS: Record<InspectorTabId, React.ReactNode> = {
   observability: <Activity className="h-3 w-3" />,
   cron: <Clock3 className="h-3 w-3" />,
   extras: <Star className="h-3 w-3" />,
-  memory: <Brain className="h-3 w-3" />,
   todos: <ListTodo className="h-3 w-3" />,
 };

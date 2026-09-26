@@ -40,14 +40,16 @@ check(
 // pane/tab anymore, so it is exempt from the REQ-026 drag contract while
 // every other rail entry still drags as a valid rail drop id.
 check(
-  'REQ-163/164 the modal rail entries open their Settings sections',
+  'REQ-163/164/165 the modal rail entries open their Settings sections',
   isRailModalTab('agents') && RAIL_MODAL_SECTIONS.agents === 'agents' &&
-    isRailModalTab('orchestration') && RAIL_MODAL_SECTIONS.orchestration === 'orchestration',
+    isRailModalTab('orchestration') && RAIL_MODAL_SECTIONS.orchestration === 'orchestration' &&
+    isRailModalTab('vault') && RAIL_MODAL_SECTIONS.vault === 'vault' &&
+    isRailModalTab('memory') && RAIL_MODAL_SECTIONS.memory === 'memory',
 );
 check(
-  'REQ-163/164 exactly two non-dragging rail tabs (agent hub + orchestration)',
-  INSPECTOR_RAIL_ITEMS.filter((item) => isRailModalTab(item.tab)).length === 2 &&
-    INSPECTOR_RAIL_ITEMS.every((item) => !isRailModalTab(item.tab) || item.tab === 'agents' || item.tab === 'orchestration'),
+  'REQ-163/164/165 exactly four non-dragging rail tabs (agent hub + orchestration + vault + memory)',
+  INSPECTOR_RAIL_ITEMS.filter((item) => isRailModalTab(item.tab)).length === 4 &&
+    INSPECTOR_RAIL_ITEMS.every((item) => !isRailModalTab(item.tab) || item.tab === 'agents' || item.tab === 'orchestration' || item.tab === 'vault' || item.tab === 'memory'),
 );
 check(
   'REQ-026 every pane rail tab drags as a valid rail drop id',
@@ -70,6 +72,14 @@ check(
 check(
   'REQ-164 a stale orchestration drop is ignored (no pane definition)',
   parseInspectorDrop({ getData: (t: string) => (t === 'application/x-lokma-inspector' ? 'orchestration' : '') }) === null,
+);
+check(
+  'REQ-165 a stale vault drop is ignored (no pane definition)',
+  parseInspectorDrop({ getData: (t: string) => (t === 'application/x-lokma-inspector' ? 'vault' : '') }) === null,
+);
+check(
+  'REQ-165 a stale memory drop is ignored (no pane definition)',
+  parseInspectorDrop({ getData: (t: string) => (t === 'application/x-lokma-inspector' ? 'memory' : '') }) === null,
 );
 
 console.log(`inspector-rail.test.ts: ${passed} passed, ${failed} failed`);

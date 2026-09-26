@@ -3,7 +3,15 @@
  * Run: `bun src/components/shell/activity-bar.test.ts` (no DOM, no server —
  * only the pure `activityInspectorTab` mapper + the static item table).
  */
-import { ACTIVITY_ITEMS, activityDragId, activityInspectorTab, activityOpensPaneTab, type ActivityKey } from './activity-bar';
+import {
+  ACTIVITY_ITEMS,
+  ACTIVITY_MODAL_SECTIONS,
+  activityDragId,
+  activityInspectorTab,
+  activityOpensPaneTab,
+  isActivityModalKey,
+  type ActivityKey,
+} from './activity-bar';
 import { isRailDropId } from '@/components/panes/panes';
 
 let passed = 0;
@@ -22,7 +30,7 @@ check('sessions lives in Explorer (null tab)', activityInspectorTab('sessions') 
 check('git opens git tab', activityInspectorTab('git') === 'git');
 check('terminal opens terminal tab', activityInspectorTab('terminal') === 'terminal');
 check('browser opens browser tab', activityInspectorTab('browser') === 'browser');
-check('vault opens vault tab', activityInspectorTab('vault') === 'vault');
+check('vault opens no inspector tab (REQ-165: Settings → Vault modal section)', activityInspectorTab('vault') === null);
 check('testing opens testing tab', activityInspectorTab('testing') === 'testing');
 check('settings opens settings tab', activityInspectorTab('settings') === 'settings');
 check('account opens no inspector tab (settings modal)', activityInspectorTab('account') === null);
@@ -60,6 +68,20 @@ check(
     ),
 );
 check('REQ-109 browser drag still carries the browser drop id', activityDragId('browser') === 'browser');
+// REQ-165 — Vault left the panes: its icon opens Settings → Vault and never
+// drags (a modal surface has no pane drop target). Account's special case is
+// the same shape, but account stays a plain 'sessions' drag fallback in the
+// table while vault is registered in the modal map.
+check(
+  'REQ-165 vault is a modal entry (Settings section, no pane tab)',
+  isActivityModalKey('vault') && ACTIVITY_MODAL_SECTIONS.vault === 'vault' && activityInspectorTab('vault') === null,
+);
+check(
+  'REQ-165 no other activity key is a modal entry',
+  (['sessions', 'git', 'terminal', 'browser', 'testing', 'settings', 'account'] as ActivityKey[]).every(
+    (key) => isActivityModalKey(key) === false,
+  ),
+);
 
 console.log(`activity-bar.test.ts: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

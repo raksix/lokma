@@ -13,7 +13,6 @@ import {
   LazyDesignPane,
   LazyExtrasPane,
   LazyGitPane,
-  LazyMemoryPane,
   LazyModelsPane,
   LazyObservabilityPane,
   LazyPluginsPane,
@@ -25,7 +24,6 @@ import {
   LazyTestingPane,
   LazyTodosPane,
   LazyUsagePane,
-  LazyVaultPane,
   PaneFallback,
 } from '@/components/panes/lazy-panes';
 import type { InspectorTabId } from './panes';
@@ -80,9 +78,8 @@ function LazyTab({
   if (tab === 'models') return <LazyModelsPane />;
   if (tab === 'usage') return <LazyUsagePane onOpenSession={onOpenSession} />;
   if (tab === 'settings') return <LazySettingsPane />;
-  // REQ-163/164 — Agent Hub and Orchestration are not panes anymore
-  // (Settings modal sections).
-  if (tab === 'vault') return <LazyVaultPane />;
+  // REQ-163/164/165 — Agent Hub, Orchestration, Vault and Memory are not
+  // panes anymore (Settings modal sections).
   if (tab === 'skills') return <LazySkillsPane />;
   if (tab === 'archify') return <LazyArchifyPane />;
   if (tab === 'design') return <LazyDesignPane />;
@@ -92,7 +89,6 @@ function LazyTab({
   if (tab === 'plugins') return <LazyPluginsPane />;
   if (tab === 'observability') return <LazyObservabilityPane />;
   if (tab === 'cron') return <LazyCronApprovalsPane />;
-  if (tab === 'memory') return <LazyMemoryPane onOpenSession={onOpenSession} />;
   if (tab === 'todos') return <LazyTodosPane sessionId={sessionId} onOpenSession={onOpenSession} />;
   if (tab === 'extras') {
     return <LazyExtrasPane onOpenTab={(t: ExtrasTabId) => onOpenInspectorTab(t)} />;

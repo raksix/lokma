@@ -462,6 +462,9 @@ export const SETTINGS_SECTIONS = [
   { id: 'orchestration', label: 'Orchestration' },
   { id: 'permissions', label: 'Permissions' },
   { id: 'mcp', label: 'MCP' },
+  // REQ-165 — Vault left the panes too (Memory already had its section and
+  // now loses its pane/tab definitions alongside it).
+  { id: 'vault', label: 'Vault' },
   { id: 'memory', label: 'Memory' },
   { id: 'cron', label: 'Cron' },
   { id: 'shortcuts', label: 'Shortcuts' },

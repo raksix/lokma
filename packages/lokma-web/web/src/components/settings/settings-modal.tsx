@@ -5,6 +5,7 @@ import {
   CircleUserRound,
   Clock3,
   Cpu,
+  Folder,
   Info,
   Keyboard,
   Layers,
@@ -37,6 +38,7 @@ import {
   LazyOrchestrationPane,
   LazyPluginsPane,
   LazyProvidersPane,
+  LazyVaultPane,
   PaneFallback,
 } from '@/components/panes/lazy-panes';
 import {
@@ -75,6 +77,9 @@ const SECTION_ICONS: Record<SettingsSectionId, typeof Settings> = {
   'agents': Users,
   // REQ-164 — Orchestration section (moved out of the panes).
   'orchestration': Cpu,
+  // REQ-165 — Vault section (moved out of the panes; Memory's section
+  // already existed and keeps its Brain icon).
+  'vault': Folder,
   'permissions': Shield,
   'mcp': Boxes,
   'memory': Brain,
@@ -248,6 +253,14 @@ export function SettingsModal({
                 // area the modal body's height so the pane scrolls internally.
                 <div className="@container h-full min-h-0">
                   <LazyOrchestrationPane />
+                </div>
+              ) : section === 'vault' ? (
+                // REQ-165 — Vault is a Settings section now (REQ-164 pattern):
+                // the `@container` host gives the pane's `@min-*` rules a real
+                // query container and `h-full` hands its tree area the modal
+                // body's height so the pane scrolls internally.
+                <div className="@container h-full min-h-0">
+                  <LazyVaultPane />
                 </div>
               ) : section === 'memory' ? (
                 <LazyMemoryPane />

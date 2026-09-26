@@ -46,10 +46,9 @@ export const INSPECTOR_TABS = [
   { id: 'terminal', label: 'Terminal' },
   { id: 'git', label: 'Git' },
   { id: 'browser', label: 'Browser' },
-  // REQ-163/164 — Agent Hub and Orchestration are no longer pane/tabs:
-  // they open as Settings modal sections (rail click), so the pane
-  // registry carries neither 'agents' nor 'orchestration'.
-  { id: 'vault', label: 'Vault' },
+  // REQ-163/164/165 — Agent Hub, Orchestration, Vault and Memory are no
+  // longer pane/tabs: they open as Settings modal sections (rail click),
+  // so the pane registry carries none of them.
   { id: 'skills', label: 'Skills' },
   { id: 'archify', label: 'Archify' },
   { id: 'design', label: 'Design' },
@@ -60,7 +59,6 @@ export const INSPECTOR_TABS = [
   { id: 'observability', label: 'Observability' },
   { id: 'cron', label: 'Cron' },
   { id: 'extras', label: 'Extras' },
-  { id: 'memory', label: 'Memory' },
   { id: 'todos', label: 'Todos' },
 ] as const;
 
@@ -70,7 +68,6 @@ export type InspectorTabId = (typeof INSPECTOR_TABS)[number]['id'];
 export const TILING_BAR_TABS: InspectorTabId[] = [
   'terminal', // onOpenTerminal
   'git', // onOpenGit
-  'vault', // onOpenVault
   'archify', // onOpenArchify
   'design', // onOpenDesign
   'usage', // onOpenUsage
@@ -83,7 +80,6 @@ export const TILING_BAR_TABS: InspectorTabId[] = [
   'observability', // onOpenObservability
   'cron', // onOpenCron
   'extras', // onOpenExtras
-  'memory', // onOpenMemory
   'browser', // harness addition (W3-12 per-agent tabs)
 ];
 

@@ -21,7 +21,7 @@ function check(name: string, cond: boolean): void {
 }
 
 // Registry shape — OpenCode-style categories in display order.
-check('fifteen sections', SETTINGS_SECTIONS.length === 15);
+check('sixteen sections', SETTINGS_SECTIONS.length === 16);
 check('general first', SETTINGS_SECTIONS[0].id === 'general');
 check('account second (own profile only)', SETTINGS_SECTIONS[1].id === 'account');
 check('admin third (users/roles/projects/policy)', SETTINGS_SECTIONS[2].id === 'admin');
@@ -34,6 +34,10 @@ check('agent hub sits beside models (agent surfaces together)', SETTINGS_SECTION
 check('orchestration section present', SETTINGS_SECTIONS.some((s) => s.id === 'orchestration'));
 check('orchestration label', SETTINGS_SECTIONS.find((s) => s.id === 'orchestration')?.label === 'Orchestration');
 check('orchestration sits beside agent hub', SETTINGS_SECTIONS.findIndex((s) => s.id === 'orchestration') === SETTINGS_SECTIONS.findIndex((s) => s.id === 'agents') + 1);
+// REQ-165 — Vault joined as a new section; Memory's section already existed.
+check('vault section present', SETTINGS_SECTIONS.some((s) => s.id === 'vault'));
+check('vault label', SETTINGS_SECTIONS.find((s) => s.id === 'vault')?.label === 'Vault');
+check('vault sits beside memory (vault/memory surfaces together)', SETTINGS_SECTIONS.findIndex((s) => s.id === 'vault') === SETTINGS_SECTIONS.findIndex((s) => s.id === 'memory') - 1);
 check('about last', SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1].id === 'about');
 check('ids unique', new Set(SETTINGS_SECTIONS.map((s) => s.id)).size === SETTINGS_SECTIONS.length);
 check('labels non-empty', SETTINGS_SECTIONS.every((s) => s.label.length > 0));
@@ -57,6 +61,8 @@ check('guard accepts providers', isSettingsSection('providers'));
 check('guard accepts shortcuts', isSettingsSection('shortcuts'));
 check('guard accepts agents (REQ-163)', isSettingsSection('agents'));
 check('guard accepts orchestration (REQ-164)', isSettingsSection('orchestration'));
+check('guard accepts vault (REQ-165)', isSettingsSection('vault'));
+check('guard accepts memory (REQ-165)', isSettingsSection('memory'));
 check('guard rejects unknown', !isSettingsSection('neon'));
 check('guard rejects empty', !isSettingsSection(''));
 check('guard rejects non-string', !isSettingsSection(42));

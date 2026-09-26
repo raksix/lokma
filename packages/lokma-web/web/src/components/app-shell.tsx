@@ -21,6 +21,7 @@ import { useSessionStore } from '@/stores';
 import {
   FooterBar,
   ActivityBar,
+  ACTIVITY_MODAL_SECTIONS,
   InspectorRail,
   MobileSingleView,
   OfflineBanner,
@@ -37,6 +38,7 @@ import {
   emitToast,
   initialSidebarVisibility,
   inspectorRailSide,
+  isActivityModalKey,
   isEditableTarget,
   isRailModalTab,
   mobileQuery,
@@ -180,6 +182,13 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         // REQ-072 + REQ-101: own profile lives in Settings → Account;
         // users/roles/projects/policy live in Settings → Admin.
         setSettingsSection('account');
+        setSettingsOpen(true);
+        return;
+      }
+      if (isActivityModalKey(key)) {
+        // REQ-165 — Vault left the panes: its icons open Settings → Vault
+        // (same section map the rail uses through openSettingsSection).
+        setSettingsSection(ACTIVITY_MODAL_SECTIONS[key]);
         setSettingsOpen(true);
         return;
       }

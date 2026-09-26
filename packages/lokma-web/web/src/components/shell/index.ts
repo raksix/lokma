@@ -5,10 +5,13 @@
 export { FooterBar } from './footer-bar';
 export {
   ACTIVITY_ITEMS,
+  ACTIVITY_MODAL_SECTIONS,
   ActivityBar,
   activityInspectorTab,
   activityOpensPaneTab,
+  isActivityModalKey,
   type ActivityKey,
+  type ActivityModalKey,
 } from './activity-bar';
 export {
   INSPECTOR_RAIL_ITEMS,

@@ -1,6 +1,6 @@
 # REQ-161 — Bots ayrı bir mod olsun: üstte lokma/Bots geçişi + Grok tarzı bot listesi ve sohbet UX'i
 
-**Status:** in-progress (tick 2, 2026-09-26 — mode switch + bot list + bot chat landed (tick 1); the scattered Bots entries are now gone (rails, pane registry, Inspector panel/host, lazy loader, tab icons, extras tab union) and the chat's bot picker is removed (tick 2); gallery action re-homing still pending)
+**Status:** done (2026-09-26 — tick 1 mode switch + bot list + bot chat; tick 2 scattered Bots entries + chat picker removed; tick 3 gallery actions re-homed behind the header menu, commit `9110700`, live probe 43/43)
 **Tarih:** 2026-09-26
 **Kaynak:** Kullanıcı mesajı (26 Eyl 2026, 3 ekran görüntüsüyle) — birebir:
 
@@ -84,4 +84,9 @@
   - `scripts/probe-bots-mode.cjs` — new checks: no 'Bots' button in either rail and no bot picker in the chat header, asserted at boot and after returning from the Bots mode.
   - Gates: `bun x tsc --noEmit` 0; sterilized build green (`index-C6D56Qoo.js`); served bundle == disk; live probe 24/24 PASS; tokenless `/api/auth/me` 401 (gate ON).
   - Note: `narrow-layout.test.ts` keeps 5 pre-existing failures (skills-pane header, onboarding-wizard/todo-pane/header toolbars, browser-pane/terminal-pane allowlist snippets) — verified present at HEAD before this tick, unrelated to these edits.
-- **pending (next tick)** — re-home the gallery actions (fork / publish / delete / bot.json / run-agent) into the Bots mode layout, then the close-out.
+- **tick 3 (2026-09-26)** — landed (commit 9110700):
+  - `components/bots/bot-actions.tsx` (new) — one `BotActionDialog` for the entries that need input: run (task 1-2000, mirrors the server rule), fork (optional id, empty = `<id>-fork`), publish (private/shared/public radio rows), delete (confirm, states bundled is read-only). Mounted only while open (BotDialog's focus-trap pattern), local validation via the shared `./bots` helpers.
+  - `components/bots/bots-mode.tsx` — the selected bot's header gets a kebab (`data-bot-menu`) that opens the shared ContextMenu (`Bot actions`): Run agent… / Fork bot… / Publish… `(<visibility>)` (disabled for bundled) / Copy bot.json / Delete bot… (`deleteBlockReason` guard). Every submit hits the same real endpoints the old pane used (`api.runBot` / `forkBot` / `publishBot` / `deleteBot`); a fresh fork is selected (and its chat minted) automatically, deleting the selected bot clears the selection + stored id, and a row's right-click opens the same menu.
+  - `scripts/probe-bots-mode.cjs` — tick 3 checks: menu items + bundled disabled guards; Copy bot.json → real clipboard JSON; menu-built fork → row appears + becomes selected; a message typed into the fork's composer LANDS in that bot-bound session's JSONL on disk + paints in the DOM; run dialog validates an empty task then spawns a real agent (HTTP 200 + agentId); publish flips visibility (server-confirmed); delete removes the row + 404 server-side. Full self-cleanup (sessions/agent/fork; file-checked re-delete against the sent message's run).
+  - Gates: `bun x tsc --noEmit` 0; sterilized web build green (`index-D7J--Mgg.js`); served bundle == disk; live probe **43/43 PASS**; tokenless `/api/auth/me` 401 (gate ON); probe left 0 agents / 0 bots behind.
+  - Note (future cleanup candidate): `bots-pane.tsx` is now unreachable dead code (no rail entry, no pane registry, no lazy loader) — kept for this close-out, can be deleted in a later hygiene pass with its narrow-layout test entry.

@@ -179,7 +179,7 @@
 - [REQ-158](finished/REQ-158-terminal-coklu-mesaj-bash-simgesi.md) — Terminal: duplicate typed lines + the synthetic `$` prompt glyph removed
 - [REQ-159](finished/REQ-159-terminal-yazmiyor-canli-sinir.md) — Terminal "yazmıyor": the live-terminal limit wedged (idle user shells are now handed back; agent shells survive).
 - [REQ-160](finished/REQ-160-ekler-yenilemede-kayboluyor.md) — Agent-sent chat attachments vanished on reload: `toTranscriptRow` dropped them from socket rows
-- [REQ-161](REQ-161-bots-ayri-mod-grok-ux.md) — Bots ayrı bir mod olsun: üstte lokma/Bots geçişi, oturum paneli yerine bot listesi (+ New Bot), Grok tarzı sohbet UX'i ve iki rail girişinin kaldırılması — pending
+- [REQ-161](finished/REQ-161-bots-ayri-mod-grok-ux.md) — Bots ayrı bir mod olsun: üstte lokma/Bots geçişi, oturum paneli yerine bot listesi (+ New Bot), Grok tarzı sohbet UX'i ve iki rail girişinin kaldırılması — done
 - [REQ-162](REQ-162-terminal-gercek-emulator.md) — Terminal gerçek emülatör olsun: yanıp sönen imleç, silmenin ekrana yansıması, renkler ve vim/htop (xterm.js) — pending
 - [REQ-163](REQ-163-agent-hub-modal-settings.md) — Agent Hub pane değil: Settings modalına bölüm olarak taşınsın; rail ikonu modalı açar — pending
 - [REQ-164](REQ-164-orchestration-modal-settings.md) — Orchestration pane değil: Settings modalına bölüm olarak taşınsın; rail ikonu modalı açar (REQ-163 deseni) — pending

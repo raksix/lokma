@@ -183,7 +183,7 @@
 - [REQ-162](finished/REQ-162-terminal-gercek-emulator.md) — Terminal gerçek emülatör olsun: yanıp sönen imleç, silmenin ekrana yansıması, renkler ve vim/htop (xterm.js) — done
 - [REQ-163](finished/REQ-163-agent-hub-modal-settings.md) — Agent Hub pane değil: Settings modalına bölüm olarak taşınsın; rail ikonu modalı açar — done (live probe 29/29)
 - [REQ-164](finished/REQ-164-orchestration-modal-settings.md) — Orchestration pane değil: Settings modalına bölüm olarak taşınsın; rail ikonu modalı açar (REQ-163 deseni) — done (live probe 30/30)
-- [REQ-165](REQ-165-vault-memory-modal-settings.md) — Vault ve Memory panelleri de Settings modalına bölüm olarak taşınsın; rail ikonları modalı açar (REQ-163/164 deseni) — pending
+- [REQ-165](finished/REQ-165-vault-memory-modal-settings.md) — Vault ve Memory panelleri de Settings modalına bölüm olarak taşınsın; rail ikonları modalı açar (REQ-163/164 deseni) — done (live probe 40/40)
 - [REQ-166](REQ-166-skills-modal-settings.md) — Skills pane değil: Settings modalına bölüm olarak taşınsın; rail ikonu modalı açar (REQ-163/164/165 deseni) — pending
 - [REQ-167](REQ-167-archify-ayri-modal.md) — Archify apayrı bir modal olsun (Settings'e bölüm değil, kendi başına modal); rail ikonu modalı açar — pending
 - [REQ-168](REQ-168-design-studio-ayri-sayfa.md) — Design Studio apayrı bir SAYFA olsun (Claude Design gibi: sol brief + sağ canvas); üst geçişe lokma · Bots · Design eklenir — pending

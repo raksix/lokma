@@ -8,9 +8,9 @@
  *   TK=$(HOME=/root bun scripts/mint-e2e-token.mjs | tail -1)
  *   NODE_PATH=/root/test-hermes/node_modules xvfb-run -a node scripts/probe-bots-mode.cjs --url http://127.0.0.1:3457 --token "$TK"
  *
- * Non-goals (later ticks of REQ-161): rail-entry removal, gallery action
- * re-homing, and the composer picker removal are asserted by their own
- * checks as they land.
+ * REQ-161 tick 2 adds: no Bots entry survives in either rail, and the normal
+ * chat's header carries no bot picker. Still a later tick: the gallery action
+ * re-homing (fork / publish / delete / bot.json / run-agent).
  */
 const { chromium } = require('playwright-core');
 
@@ -61,6 +61,24 @@ function surfaceState(page) {
         const ta = document.querySelector('textarea[aria-label="Message Lokma"]');
         return ta ? ta.getAttribute('placeholder') || '' : null;
       })(),
+      railBotsEntries: (() => {
+        var rails = ['nav[aria-label="Activity bar"]', 'nav[aria-label="Inspector rail"]'];
+        var n = 0;
+        rails.forEach(function (sel) {
+          var rail = document.querySelector(sel);
+          if (!rail) return;
+          Array.prototype.forEach.call(rail.querySelectorAll('button'), function (b) {
+            if (b.getAttribute('aria-label') === 'Bots') n += 1;
+          });
+        });
+        return n;
+      })(),
+      composerBotPicker: Boolean(
+        document.querySelector('button[aria-label="Pick a bot for this chat"], button[aria-label^="Active bot "]'),
+      ),
+      noBotChip: Array.prototype.some.call(document.querySelectorAll('button'), function (b) {
+        return (b.textContent || '').trim() === 'No bot';
+      }),
     };
   });
 }
@@ -72,6 +90,15 @@ function clickMode(page, mode) {
     btn.click();
     return true;
   }, mode);
+}
+
+/** REQ-161 tick 2 — the scattered Bots entries were removed from the chrome. */
+function checkNoScatteredBots(s, where) {
+  check(s.railBotsEntries === 0, 'no Bots entry in either rail (' + where + ')', 'entries=' + s.railBotsEntries);
+  check(
+    !s.composerBotPicker && !s.noBotChip,
+    'no bot picker in the normal chat header (' + where + ')',
+  );
 }
 
 (async () => {
@@ -96,6 +123,9 @@ function clickMode(page, mode) {
     check(s.hasChatSwitch && s.hasBotsSwitch, 'header shows the lokma | Bots switch', `chat=${s.chatActive} bots=${s.botsActive}`);
     check(s.chatActive === true && s.botsMode === false, 'boots into the normal chat mode');
     check(s.chromeToggles > 0, 'normal mode keeps the sidebar toggles', `toggles=${s.chromeToggles}`);
+
+    // ── REQ-161 tick 2: the scattered Bots entries are gone from chat mode ──
+    checkNoScatteredBots(s, 'chat mode boot');
 
     // ── Switch to Bots ──
     check(await clickMode(page, 'bots'), 'clicked the Bots switch');
@@ -147,6 +177,7 @@ function clickMode(page, mode) {
     await wait(1500);
     s = await surfaceState(page);
     check(s.botsMode === false && s.chatActive === true, 'normal mode returns');
+    checkNoScatteredBots(s, 'back from the Bots mode');
     check(s.chromeToggles > 0, 'normal mode chrome is back (toggles visible)', `toggles=${s.chromeToggles}`);
 
     await page.reload({ waitUntil: 'domcontentloaded' });

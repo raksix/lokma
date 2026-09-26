@@ -8,7 +8,6 @@ import { usePaneStore } from '@/stores/pane';
 import {
   LazyAgentsPane,
   LazyArchifyPane,
-  LazyBotsPane,
   LazyBrowserPane,
   LazyCronApprovalsPane,
   LazyDesignPane,
@@ -62,7 +61,7 @@ import {
  * viewer + Code/Critique/Export tabs + real file downloads), Testing the
  * real W5-19 pane (Plan→Run→Classify→Report over live handlers +
  * Shannon scan over `GET/POST /api/tests/*`, per-test rows + real
- * `junit.xml` download), Bots the real W5-20 pane (Bot Gallery over
+ * `junit.xml` download), Bots lives in its own mode since REQ-161 (the gallery over
  * `GET /api/bots` + create/fork/publish/run over `POST/PATCH`
  * `/api/bots/*`, playground runs spawn a real agent + session), Auth the
  * real W6-21 pane (login + RBAC matrix + projects + members over
@@ -114,7 +113,6 @@ export type InspectorTab =
   | 'archify'
   | 'design'
   | 'testing'
-  | 'bots'
   | 'setup'
   | 'plugins'
   | 'observability'
@@ -177,8 +175,6 @@ export function InspectorPanel({
         <LazyPluginsPane />
       ) : tab === 'setup' ? (
         <LazySetupPane />
-      ) : tab === 'bots' ? (
-        <LazyBotsPane onOpenSession={onOpenSession} />
       ) : tab === 'testing' ? (
         <LazyTestingPane />
       ) : tab === 'design' ? (

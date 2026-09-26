@@ -107,7 +107,7 @@ check(
   'shipped tab targets are real Inspector tabs',
   EXTRAS.filter((e) => e.tab !== undefined).every((e) =>
     [
-      'bots', 'agents', 'testing', 'cron', 'observability', 'browser',
+      'agents', 'testing', 'cron', 'observability', 'browser',
       'skills', 'git', 'setup', 'vault', 'plugins', 'orchestration',
     ].includes(e.tab!),
   ),

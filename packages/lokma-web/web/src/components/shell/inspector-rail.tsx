@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Beaker, Bot, Brain, Clock3, Cpu, Folder, FolderOpen, GitBranch, Globe, HardDrive, Info, Layers, ListTodo, Package, Paintbrush, Plug2, Puzzle, Settings, Star, Terminal, Users, Workflow } from 'lucide-react';
+import { Activity, BarChart3, Beaker, Brain, Clock3, Cpu, Folder, FolderOpen, GitBranch, Globe, HardDrive, Info, Layers, ListTodo, Package, Paintbrush, Plug2, Puzzle, Settings, Star, Terminal, Users, Workflow } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { INSPECTOR_DRAG_MIME, encodeInspectorDrag } from '@/components/panes/panes';
 import type { InspectorTab } from '@/components/providers';
@@ -36,7 +36,6 @@ export const INSPECTOR_RAIL_ITEMS: InspectorRailItem[] = [
   { tab: 'archify', label: 'Archify', Icon: Workflow },
   { tab: 'design', label: 'Design', Icon: Paintbrush },
   { tab: 'testing', label: 'Testing', Icon: Beaker },
-  { tab: 'bots', label: 'Bots', Icon: Bot },
   { tab: 'setup', label: 'Setup', Icon: HardDrive },
   { tab: 'plugins', label: 'Plugins', Icon: Package },
   { tab: 'observability', label: 'Observability', Icon: Activity },

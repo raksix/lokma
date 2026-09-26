@@ -24,12 +24,11 @@ check('terminal opens terminal tab', activityInspectorTab('terminal') === 'termi
 check('browser opens browser tab', activityInspectorTab('browser') === 'browser');
 check('vault opens vault tab', activityInspectorTab('vault') === 'vault');
 check('testing opens testing tab', activityInspectorTab('testing') === 'testing');
-check('bots opens bots tab', activityInspectorTab('bots') === 'bots');
 check('settings opens settings tab', activityInspectorTab('settings') === 'settings');
 check('account opens no inspector tab (settings modal)', activityInspectorTab('account') === null);
 
 const keys = ACTIVITY_ITEMS.map((item) => item.key);
-check('nine rail items', keys.length === 9);
+check('eight rail items', keys.length === 8);
 check('rail keys unique', new Set(keys).size === keys.length);
 check(
   'sessions first, settings+account last',
@@ -37,7 +36,7 @@ check(
 );
 check(
   'every key maps without throwing',
-  (['sessions', 'git', 'terminal', 'browser', 'vault', 'testing', 'bots', 'settings', 'account'] as ActivityKey[]).every(
+  (['sessions', 'git', 'terminal', 'browser', 'vault', 'testing', 'settings', 'account'] as ActivityKey[]).every(
     (key) => activityInspectorTab(key) === null || typeof activityInspectorTab(key) === 'string',
   ),
 );
@@ -47,7 +46,7 @@ check(
 );
 check(
   'REQ-026 every key drags as a valid rail drop id',
-  (['sessions', 'git', 'terminal', 'browser', 'vault', 'testing', 'bots', 'settings', 'account'] as ActivityKey[]).every(
+  (['sessions', 'git', 'terminal', 'browser', 'vault', 'testing', 'settings', 'account'] as ActivityKey[]).every(
     (key) => isRailDropId(activityDragId(key)),
   ),
 );
@@ -56,7 +55,7 @@ check('REQ-026 mapped keys drag as their inspector tab', activityDragId('git') =
 check(
   'REQ-109 only the browser key opens a pane tab on click',
   activityOpensPaneTab('browser') === true &&
-    (['sessions', 'git', 'terminal', 'vault', 'testing', 'bots', 'settings', 'account'] as ActivityKey[]).every(
+    (['sessions', 'git', 'terminal', 'vault', 'testing', 'settings', 'account'] as ActivityKey[]).every(
       (key) => activityOpensPaneTab(key) === false,
     ),
 );

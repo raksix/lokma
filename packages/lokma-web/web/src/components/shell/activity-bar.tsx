@@ -1,4 +1,4 @@
-import { Bot, CircleUserRound, Database, FlaskConical, GitBranch, Globe, MessagesSquare, Settings, Terminal } from 'lucide-react';
+import { CircleUserRound, Database, FlaskConical, GitBranch, Globe, MessagesSquare, Settings, Terminal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { INSPECTOR_DRAG_MIME, encodeInspectorDrag, isPaneOnlyTab, type RailDropId } from '@/components/panes/panes';
 import type { InspectorTab } from '@/components/providers';
@@ -21,7 +21,6 @@ export type ActivityKey =
   | 'browser'
   | 'vault'
   | 'testing'
-  | 'bots'
   | 'settings'
   | 'account';
 
@@ -41,7 +40,6 @@ const PANE_ITEMS: ActivityItem[] = [
   { key: 'browser', label: 'Browser', Icon: Globe },
   { key: 'vault', label: 'Vault', Icon: Database },
   { key: 'testing', label: 'Testing Lab', Icon: FlaskConical },
-  { key: 'bots', label: 'Bots', Icon: Bot },
 ];
 
 const BOTTOM_ITEMS: ActivityItem[] = [
@@ -73,8 +71,6 @@ export function activityInspectorTab(key: ActivityKey): InspectorTab | null {
       return 'vault';
     case 'testing':
       return 'testing';
-    case 'bots':
-      return 'bots';
     case 'settings':
       return 'settings';
     case 'account':

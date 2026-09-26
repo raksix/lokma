@@ -13,7 +13,6 @@
 /** Inspector tabs a shipped extra can open. */
 export type ExtrasTabId =
   | 'agents'
-  | 'bots'
   | 'browser'
   | 'cron'
   | 'git'
@@ -51,7 +50,7 @@ export type ExtraItem = {
  * whose surface exists in this checkout are marked.
  */
 export const EXTRAS: ExtraItem[] = [
-  { n: 1, slug: 'agent-templates', title: 'Agent templates marketplace', why: 'Clone reviewer/planner in 1 click', how: 'bot.json + Registry + Hub', where: 'Bots tab → Featured / Mine / Shared', shipped: true, tab: 'bots' },
+  { n: 1, slug: 'agent-templates', title: 'Agent templates marketplace', why: 'Clone reviewer/planner in 1 click', how: 'bot.json + Registry + Hub', where: 'Bots mode → bot list + chat', shipped: true },
   { n: 2, slug: 'per-agent-budgets', title: 'Per-agent budgets (hard 80% alert)', why: 'Stop runaway spend', how: 'TokenLedger agentId + 80% toast', where: 'Agents tab → budget editor', shipped: true, tab: 'agents' },
   { n: 3, slug: 'eval-harness', title: 'Eval harness', why: 'Score agents on real tasks', how: '20-task suite + Cron weekly-eval', where: 'Cron tab (when the runner daemon lands)', shipped: false, flag: 'extras.eval-harness', milestone: 'Phase 3 — needs the Cron runner daemon + a 20-task suite' },
   { n: 4, slug: 'time-travel-fork', title: 'Time-travel fork', why: 'Branch from any message', how: 'Fork button → new session from checkpoint', where: 'Sessions sidebar → Fork', shipped: true },

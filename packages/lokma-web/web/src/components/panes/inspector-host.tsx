@@ -9,7 +9,6 @@ import {
   LazyAgentsPane,
   LazyArchifyPane,
   LazyAdminPane,
-  LazyBotsPane,
   LazyBrowserPane,
   LazyCronApprovalsPane,
   LazyDesignPane,
@@ -90,7 +89,6 @@ function LazyTab({
   if (tab === 'archify') return <LazyArchifyPane />;
   if (tab === 'design') return <LazyDesignPane />;
   if (tab === 'testing') return <LazyTestingPane />;
-  if (tab === 'bots') return <LazyBotsPane onOpenSession={onOpenSession} />;
   if (tab === 'auth') return <LazyAdminPane />;
   if (tab === 'setup') return <LazySetupPane />;
   if (tab === 'plugins') return <LazyPluginsPane />;

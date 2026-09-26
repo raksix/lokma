@@ -53,7 +53,6 @@ export const INSPECTOR_TABS = [
   { id: 'archify', label: 'Archify' },
   { id: 'design', label: 'Design' },
   { id: 'testing', label: 'Testing' },
-  { id: 'bots', label: 'Bots' },
   { id: 'auth', label: 'Auth' },
   { id: 'setup', label: 'Setup' },
   { id: 'plugins', label: 'Plugins' },
@@ -66,7 +65,7 @@ export const INSPECTOR_TABS = [
 
 export type InspectorTabId = (typeof INSPECTOR_TABS)[number]['id'];
 
-/** The 18 concept TilingBar entries (concept prop names kept as comments). */
+/** The concept TilingBar entries (concept prop names kept as comments). */
 export const TILING_BAR_TABS: InspectorTabId[] = [
   'terminal', // onOpenTerminal
   'orchestration', // onOpenAgents (concept opens OrchestrationPane)
@@ -78,7 +77,6 @@ export const TILING_BAR_TABS: InspectorTabId[] = [
   'settings', // onOpenSettings
   'skills', // onOpenSkills
   'testing', // onOpenTesting
-  'bots', // onOpenBots
   'agents', // onOpenHub (concept opens AgentHubPane)
   'auth', // onOpenAuth
   'setup', // onOpenSetup

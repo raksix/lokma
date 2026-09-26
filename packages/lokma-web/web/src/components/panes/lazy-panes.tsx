@@ -53,9 +53,6 @@ export const LazyDesignPane = React.lazy(() =>
 export const LazyTestingPane = React.lazy(() =>
   import('@/components/testing/testing-pane').then((m) => ({ default: m.TestingPane })),
 );
-export const LazyBotsPane = React.lazy(() =>
-  import('@/components/bots/bots-pane').then((m) => ({ default: m.BotsPane })),
-);
 export const LazyAccountPane = React.lazy(() =>
   import('@/components/auth/account-pane').then((m) => ({ default: m.AccountPane })),
 );

@@ -11,6 +11,7 @@ import {
   publishBot,
   runBotAsAgent,
 } from '@lokma/core';
+import { attachLastSessions } from '../bot-sessions.js';
 
 /**
  * Bots — shareable `bot.json` packages for the BotsPane (W5-20, Docs/35).
@@ -43,7 +44,12 @@ function optCwd(req: { query?: unknown }): string | undefined {
 export async function botsRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/bots', async (req) => {
     const { bots, count } = await listBots(optCwd(req));
-    return { bots, count };
+    // REQ-161 — the Bots mode list needs each bot's latest chat (time +
+    // last-message preview). `?sessions=1` opts into the join; the gallery's
+    // plain call stays as cheap as before.
+    const query = req.query as { sessions?: unknown } | undefined;
+    if (query?.sessions !== '1' && query?.sessions !== 'true') return { bots, count };
+    return { bots: await attachLastSessions(bots), count };
   });
 
   app.get('/api/bots/:id', async (req, reply) => {

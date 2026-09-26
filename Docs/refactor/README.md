@@ -183,3 +183,4 @@
 - [REQ-162](REQ-162-terminal-gercek-emulator.md) — Terminal gerçek emülatör olsun: yanıp sönen imleç, silmenin ekrana yansıması, renkler ve vim/htop (xterm.js) — pending
 - [REQ-163](REQ-163-agent-hub-modal-settings.md) — Agent Hub pane değil: Settings modalına bölüm olarak taşınsın; rail ikonu modalı açar — pending
 - [REQ-164](REQ-164-orchestration-modal-settings.md) — Orchestration pane değil: Settings modalına bölüm olarak taşınsın; rail ikonu modalı açar (REQ-163 deseni) — pending
+- [REQ-165](REQ-165-vault-memory-modal-settings.md) — Vault ve Memory panelleri de Settings modalına bölüm olarak taşınsın; rail ikonları modalı açar (REQ-163/164 deseni) — pending

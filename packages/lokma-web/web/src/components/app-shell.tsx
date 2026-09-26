@@ -41,6 +41,7 @@ import {
   isActivityModalKey,
   isEditableTarget,
   isRailModalTab,
+  isRailStandaloneModalTab,
   mobileQuery,
   nextSidebarVisibility,
   readExplorerSide,
@@ -65,6 +66,15 @@ import type { SettingsSectionId } from '@/components/settings/settings';
  */
 const LazySettingsModal = React.lazy(() =>
   import('@/components/settings/settings-modal').then((m) => ({ default: m.SettingsModal })),
+);
+
+/**
+ * REQ-167 — the Archify modal ships as its own lazy chunk as well: the
+ * rail icon / mobile tools strip load the dialog (and with it the diagram
+ * surface) on first open, never in the initial bundle.
+ */
+const LazyArchifyModal = React.lazy(() =>
+  import('@/components/archify/archify-modal').then((m) => ({ default: m.ArchifyModal })),
 );
 
 /**
@@ -118,6 +128,10 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   // REQ-072: account rail icon opens the modal on the Account section.
   const [settingsSection, setSettingsSection] = React.useState<SettingsSectionId>('general');
+  // REQ-167 — Archify opens as its OWN standalone modal (not a pane, not a
+  // Settings section): the rail icon and the mobile tools strip are the
+  // launchers and this flag is the single source of truth for the surface.
+  const [archifyOpen, setArchifyOpen] = React.useState(false);
   const [serverUp, setServerUp] = React.useState<boolean | null>(null);
   // REQ-018 — status-bar numbers: gateway round-trip, host metrics, stream rate.
   const [latencyMs, setLatencyMs] = React.useState<number | null>(null);
@@ -234,6 +248,12 @@ export function AppShell({ sessionId }: { sessionId: string }) {
       // section; they are never tiling panes or sidebar tabs.
       if (isRailModalTab(tab)) {
         openSettingsSection(RAIL_MODAL_SECTIONS[tab]);
+        return;
+      }
+      // REQ-167 — the Archify rail icon opens its standalone modal (the
+      // icon stays, the pane/tab definition is gone).
+      if (isRailStandaloneModalTab(tab)) {
+        setArchifyOpen(true);
         return;
       }
       // REQ-109 — the rail browser entry opens a pane tab, never the sidebar.
@@ -618,6 +638,12 @@ export function AppShell({ sessionId }: { sessionId: string }) {
             />
           </React.Suspense>
         ) : null}
+        {/* REQ-167 — the standalone Archify modal rides its own lazy chunk. */}
+        {archifyOpen ? (
+          <React.Suspense fallback={null}>
+            <LazyArchifyModal open={archifyOpen} onClose={() => setArchifyOpen(false)} />
+          </React.Suspense>
+        ) : null}
         <ToastHost />
       </div>
     );
@@ -663,6 +689,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
               onSelectSession={switchSession}
               requestedTab={inspectorTab}
               onOpenSettingsSection={openSettingsSection}
+              onOpenArchifyModal={() => setArchifyOpen(true)}
             />
           </PaneErrorBoundary>
         </div>
@@ -711,6 +738,12 @@ export function AppShell({ sessionId }: { sessionId: string }) {
               explorerSide={explorerSide}
               initialSection={settingsSection}
             />
+          </React.Suspense>
+        ) : null}
+        {/* REQ-167 — the standalone Archify modal rides its own lazy chunk. */}
+        {archifyOpen ? (
+          <React.Suspense fallback={null}>
+            <LazyArchifyModal open={archifyOpen} onClose={() => setArchifyOpen(false)} />
           </React.Suspense>
         ) : null}
         <ToastHost />
@@ -849,6 +882,12 @@ export function AppShell({ sessionId }: { sessionId: string }) {
             explorerSide={explorerSide}
             initialSection={settingsSection}
           />
+        </React.Suspense>
+      ) : null}
+      {/* REQ-167 — the standalone Archify modal rides its own lazy chunk. */}
+      {archifyOpen ? (
+        <React.Suspense fallback={null}>
+          <LazyArchifyModal open={archifyOpen} onClose={() => setArchifyOpen(false)} />
         </React.Suspense>
       ) : null}
       <ToastHost />

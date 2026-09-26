@@ -33,10 +33,35 @@ export const RAIL_MODAL_SECTIONS: Record<
   skills: 'skills',
 };
 
+/**
+ * REQ-167 — rail entries that launch their OWN standalone modal (neither a
+ * pane/tab nor a Settings section): the Archify icon opens the Archify
+ * modal. The icon stays, never drags and never becomes a tiling tab; the
+ * AppShell owns the modal state and the mobile tools strip routes here too.
+ */
+export const RAIL_STANDALONE_MODALS = ['archify'] as const;
+
+/** Rail tabs that launch a standalone modal (REQ-167). */
+export type RailStandaloneModalTab = (typeof RAIL_STANDALONE_MODALS)[number];
+
+/** True when this rail entry opens a standalone modal (REQ-167). */
+export function isRailStandaloneModalTab(tab: InspectorRailTab): tab is RailStandaloneModalTab {
+  return (RAIL_STANDALONE_MODALS as readonly string[]).includes(tab);
+}
+
+/**
+ * Any rail entry that opens a modal instead of a pane/tab — a Settings
+ * section (REQ-163/164/165/166) or a standalone modal (REQ-167). These
+ * never drag and never become tiling tabs.
+ */
+export function isRailNonPaneTab(tab: InspectorRailTab): tab is RailModalTab | RailStandaloneModalTab {
+  return isRailModalTab(tab) || isRailStandaloneModalTab(tab);
+}
+
 /** Rail tabs that launch the Settings modal instead of a pane (REQ-163). */
 export type RailModalTab = keyof typeof RAIL_MODAL_SECTIONS;
 
-export type InspectorRailTab = InspectorTab | RailModalTab;
+export type InspectorRailTab = InspectorTab | RailModalTab | RailStandaloneModalTab;
 
 /** True when this rail entry opens the Settings modal, never a pane/tab. */
 export function isRailModalTab(tab: InspectorRailTab): tab is RailModalTab {
@@ -99,9 +124,10 @@ function InspectorRailButton({
   indicatorClass: string;
   onClick: () => void;
 }) {
-  // REQ-163 — modal entries (Agent Hub) have no Inspector tab to drop, so
-  // they never start a drag and keep a plain tooltip.
-  const opensModal = isRailModalTab(tab);
+  // REQ-163/167 — modal entries (Agent Hub and the standalone Archify
+  // modal) have no Inspector tab to drop, so they never start a drag and
+  // keep a plain tooltip.
+  const opensModal = isRailNonPaneTab(tab);
   return (
     <button
       type="button"

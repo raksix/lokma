@@ -10,6 +10,7 @@ import {
   Share2,
   Trash2,
   Workflow,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,6 +47,10 @@ import {
  * real files (SVG/HTML/IR/card/PNG/WebM — the pane only offers what the
  * server actually serves, so there are no dead buttons).
  * Delete removes the real dir (`DELETE /api/archify/:id`, two-click arm).
+ * REQ-167 — Archify is its own standalone modal now (`archify-modal.tsx`):
+ * the modal passes `onRequestClose` and the header row gains the X close
+ * button; without the prop the pane keeps its plain pane header (no modal
+ * chrome leaks into a bare render).
  */
 
 const inputClass =
@@ -66,7 +71,7 @@ function saveBlob(filename: string, blob: Blob): void {
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
-export function ArchifyPane() {
+export function ArchifyPane({ onRequestClose }: { onRequestClose?: () => void } = {}) {
   const [items, setItems] = React.useState<NormalizedDiagram[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -332,6 +337,22 @@ export function ArchifyPane() {
             <Trash2 className="w-3 h-3" />
             {confirmDelete === selected ? 'Confirm?' : deleting ? 'Deleting…' : 'Delete'}
           </Button>
+          {/* REQ-167 — modal chrome: the X lives in the pane's own header
+              row (single header, no stacked modal bar) and carries
+              `data-autofocus` for the shared focus trap. */}
+          {onRequestClose ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0"
+              data-autofocus
+              aria-label="Close Archify"
+              title="Close Archify (Esc)"
+              onClick={onRequestClose}
+            >
+              <X className="w-3 h-3" />
+            </Button>
+          ) : null}
         </span>
       </div>
 

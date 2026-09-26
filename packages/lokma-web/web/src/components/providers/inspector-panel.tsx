@@ -6,7 +6,6 @@ import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
 import { usePaneStore } from '@/stores/pane';
 import {
-  LazyArchifyPane,
   LazyBrowserPane,
   LazyCronApprovalsPane,
   LazyDesignPane,
@@ -78,7 +77,8 @@ import {
  * entries + live usage meter over `GET/POST/PATCH/DELETE /api/memory`).
  * Agent Hub (REQ-163), Orchestration (REQ-164), Vault + Memory
  * (REQ-165) and Skills (REQ-166) moved OUT of the tabs: their rail icons
- * open the Settings modal's sections instead.
+ * open the Settings modal's sections instead. Archify (REQ-167) left the
+ * tabs too — its rail icon opens its own standalone modal.
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
  *
@@ -102,7 +102,6 @@ export type InspectorTab =
   | 'terminal'
   | 'git'
   | 'browser'
-  | 'archify'
   | 'design'
   | 'testing'
   | 'setup'
@@ -168,8 +167,6 @@ export function InspectorPanel({
         <LazyTestingPane />
       ) : tab === 'design' ? (
         <LazyDesignPane />
-      ) : tab === 'archify' ? (
-        <LazyArchifyPane />
       ) : tab === 'providers' ? (
         <LazyProvidersPane />
       ) : tab === 'models' ? (

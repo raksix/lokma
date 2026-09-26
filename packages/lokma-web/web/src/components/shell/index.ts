@@ -17,10 +17,14 @@ export {
   INSPECTOR_RAIL_ITEMS,
   InspectorRail,
   RAIL_MODAL_SECTIONS,
+  RAIL_STANDALONE_MODALS,
   inspectorRailSide,
   isRailModalTab,
+  isRailNonPaneTab,
+  isRailStandaloneModalTab,
   type InspectorRailTab,
   type RailModalTab,
+  type RailStandaloneModalTab,
 } from './inspector-rail';
 export { OfflineBanner } from './offline-banner';
 export { PaneErrorBoundary } from './pane-error-boundary';

@@ -4,7 +4,15 @@
  * server — only the pure `inspectorRailSide` mapper + the static item
  * table).
  */
-import { INSPECTOR_RAIL_ITEMS, RAIL_MODAL_SECTIONS, inspectorRailSide, isRailModalTab } from './inspector-rail';
+import {
+  INSPECTOR_RAIL_ITEMS,
+  RAIL_MODAL_SECTIONS,
+  RAIL_STANDALONE_MODALS,
+  inspectorRailSide,
+  isRailModalTab,
+  isRailNonPaneTab,
+  isRailStandaloneModalTab,
+} from './inspector-rail';
 import { encodeInspectorDrag, isRailDropId, parseInspectorDrop } from '@/components/panes/panes';
 
 let passed = 0;
@@ -23,7 +31,7 @@ check('rail sits opposite the Explorer (left)', inspectorRailSide('left') === 'r
 check('rail sits opposite the Explorer (right)', inspectorRailSide('right') === 'left');
 
 const tabs = INSPECTOR_RAIL_ITEMS.map((item) => item.tab);
-check('twenty-two rail items (17 Inspector menus + the 5 Settings-modal entries)', tabs.length === 22);
+check('twenty-two rail items (16 Inspector menus + the 5 Settings-modal entries + the standalone Archify modal entry)', tabs.length === 22);
 check('rail tabs unique', new Set(tabs).size === tabs.length);
 check('files first (VS Code Explorer position), todos last', tabs[0] === 'files' && tabs[tabs.length - 1] === 'todos');
 check(
@@ -47,20 +55,28 @@ check(
     isRailModalTab('memory') && RAIL_MODAL_SECTIONS.memory === 'memory' &&
     isRailModalTab('skills') && RAIL_MODAL_SECTIONS.skills === 'skills',
 );
+// REQ-167 — Archify launches its OWN standalone modal: not a Settings
+// section, not a pane/tab; the rail icon stays as the launcher only.
 check(
-  'REQ-163/164/165/166 exactly five non-dragging rail tabs (agent hub + orchestration + vault + memory + skills)',
-  INSPECTOR_RAIL_ITEMS.filter((item) => isRailModalTab(item.tab)).length === 5 &&
-    INSPECTOR_RAIL_ITEMS.every((item) => !isRailModalTab(item.tab) || item.tab === 'agents' || item.tab === 'orchestration' || item.tab === 'vault' || item.tab === 'memory' || item.tab === 'skills'),
+  'REQ-167 Archify is a standalone-modal rail entry (not a Settings section)',
+  isRailStandaloneModalTab('archify') &&
+    (RAIL_STANDALONE_MODALS as readonly string[]).includes('archify') &&
+    !isRailModalTab('archify'),
+);
+check(
+  'REQ-163/164/165/166/167 exactly six non-dragging rail tabs (agent hub + orchestration + vault + memory + skills + archify)',
+  INSPECTOR_RAIL_ITEMS.filter((item) => isRailNonPaneTab(item.tab)).length === 6 &&
+    INSPECTOR_RAIL_ITEMS.every((item) => !isRailNonPaneTab(item.tab) || item.tab === 'agents' || item.tab === 'orchestration' || item.tab === 'vault' || item.tab === 'memory' || item.tab === 'skills' || item.tab === 'archify'),
 );
 check(
   'REQ-026 every pane rail tab drags as a valid rail drop id',
-  INSPECTOR_RAIL_ITEMS.every((item) => isRailModalTab(item.tab) || isRailDropId(item.tab)),
+  INSPECTOR_RAIL_ITEMS.every((item) => isRailNonPaneTab(item.tab) || isRailDropId(item.tab)),
 );
 check(
   'REQ-026 rail drag payload round-trips',
   INSPECTOR_RAIL_ITEMS.every((item) => {
     const tab = item.tab;
-    if (isRailModalTab(tab)) return true; // modal entry: never drags
+    if (isRailNonPaneTab(tab)) return true; // modal entry: never drags
     return (
       parseInspectorDrop({ getData: (t: string) => (t === 'application/x-lokma-inspector' ? encodeInspectorDrag(tab) : '') }) === tab
     );
@@ -85,6 +101,10 @@ check(
 check(
   'REQ-166 a stale skills drop is ignored (no pane definition)',
   parseInspectorDrop({ getData: (t: string) => (t === 'application/x-lokma-inspector' ? 'skills' : '') }) === null,
+);
+check(
+  'REQ-167 a stale archify drop is ignored (no pane definition, standalone modal)',
+  parseInspectorDrop({ getData: (t: string) => (t === 'application/x-lokma-inspector' ? 'archify' : '') }) === null,
 );
 
 console.log(`inspector-rail.test.ts: ${passed} passed, ${failed} failed`);

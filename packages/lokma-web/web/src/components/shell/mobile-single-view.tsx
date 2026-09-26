@@ -7,7 +7,7 @@ import { FileBrowser } from '@/components/files';
 import { InspectorPanel, type InspectorTab } from '@/components/providers';
 import { SessionsSidebar } from '@/components/sessions';
 import type { SettingsSectionId } from '@/components/settings/settings';
-import { INSPECTOR_RAIL_ITEMS, RAIL_MODAL_SECTIONS, isRailModalTab } from './inspector-rail';
+import { INSPECTOR_RAIL_ITEMS, RAIL_MODAL_SECTIONS, isRailModalTab, isRailStandaloneModalTab } from './inspector-rail';
 import { MOBILE_TABS, mobileTabLabel, type MobileTab } from './responsive';
 
 /**
@@ -64,6 +64,7 @@ export function MobileSingleView({
   onSelectSession,
   requestedTab,
   onOpenSettingsSection,
+  onOpenArchifyModal,
 }: {
   activeId: string;
   ws: UseWs;
@@ -71,6 +72,8 @@ export function MobileSingleView({
   requestedTab?: InspectorTab | null;
   /** REQ-163 — modal entries (Agent Hub) open the Settings modal, not a tab. */
   onOpenSettingsSection?: (section: SettingsSectionId) => void;
+  /** REQ-167 — the Archify entry opens its own standalone modal. */
+  onOpenArchifyModal?: () => void;
 }) {
   const [tab, setTab] = React.useState<MobileTab>('chat');
   const [toolTab, setToolTab] = React.useState<InspectorTab>(requestedTab ?? 'files');
@@ -121,6 +124,12 @@ export function MobileSingleView({
                     // there is no Inspector tab to select here anymore.
                     if (isRailModalTab(itemTab)) {
                       onOpenSettingsSection?.(RAIL_MODAL_SECTIONS[itemTab]);
+                      return;
+                    }
+                    // REQ-167 — Archify opens its own standalone modal (it
+                    // is not a pane tab anymore either).
+                    if (isRailStandaloneModalTab(itemTab)) {
+                      onOpenArchifyModal?.();
                       return;
                     }
                     setToolTab(itemTab);

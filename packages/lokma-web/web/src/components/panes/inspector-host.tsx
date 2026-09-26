@@ -6,7 +6,6 @@ import { useSessionStore } from '@/stores/session';
 import { emitToast } from '@/components/shell';
 import type { ExtrasTabId } from '@/components/extras/extras';
 import {
-  LazyArchifyPane,
   LazyAdminPane,
   LazyBrowserPane,
   LazyCronApprovalsPane,
@@ -78,8 +77,8 @@ function LazyTab({
   if (tab === 'usage') return <LazyUsagePane onOpenSession={onOpenSession} />;
   if (tab === 'settings') return <LazySettingsPane />;
   // REQ-163/164/165/166 — Agent Hub, Orchestration, Vault, Memory and
-  // Skills are not panes anymore (Settings modal sections).
-  if (tab === 'archify') return <LazyArchifyPane />;
+  // Skills are not panes anymore (Settings modal sections); REQ-167 — the
+  // Archify pane path is gone too (its rail icon opens a standalone modal).
   if (tab === 'design') return <LazyDesignPane />;
   if (tab === 'testing') return <LazyTestingPane />;
   if (tab === 'auth') return <LazyAdminPane />;

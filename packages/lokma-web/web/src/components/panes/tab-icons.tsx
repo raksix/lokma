@@ -17,7 +17,6 @@ import {
   Shield,
   Star,
   Terminal,
-  Workflow,
 } from 'lucide-react';
 import type { InspectorTabId } from './panes';
 
@@ -36,8 +35,8 @@ export const TAB_ICONS: Record<InspectorTabId, React.ReactNode> = {
   git: <GitBranch className="h-3 w-3" />,
   browser: <Globe className="h-3 w-3" />,
   // REQ-163/164/165/166 — Agent Hub, Orchestration, Vault, Memory and
-  // Skills left the pane registry (Settings modal sections).
-  archify: <Workflow className="h-3 w-3" />,
+  // Skills left the pane registry (Settings modal sections); REQ-167 —
+  // Archify left too (standalone modal, no pane tab icon needed).
   design: <Paintbrush className="h-3 w-3" />,
   testing: <Beaker className="h-3 w-3" />,
   auth: <Shield className="h-3 w-3" />,

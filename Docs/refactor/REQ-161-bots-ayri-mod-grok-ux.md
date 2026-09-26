@@ -1,6 +1,6 @@
 # REQ-161 — Bots ayrı bir mod olsun: üstte lokma/Bots geçişi + Grok tarzı bot listesi ve sohbet UX'i
 
-**Status:** pending
+**Status:** in-progress (tick 1, 2026-09-26 — mode switch + bot list + bot chat landed; rail/panes/composer removals + gallery action re-homing still pending)
 **Tarih:** 2026-09-26
 **Kaynak:** Kullanıcı mesajı (26 Eyl 2026, 3 ekran görüntüsüyle) — birebir:
 
@@ -65,3 +65,15 @@
 - Referans: Grok Bot (x.ai/bot) — "AI teammates" düzeni: sol = botların listesi (avatar/ad/zaman/önizleme), ana alan = seçili botla sohbet; koyu tema; yuvarlak avatarlar; sıcak tonlu sistem metinleri; altta composer.
 - Görseller: vision MCP'leri 26 Eyl'de kotalı ("insufficient credits"); gerekirse doğrudan CommandCode `chat/completions`'a `image_url` (data URL; model `deepseek/deepseek-v4.1-flash`) ile sorulabilir.
 - Belirsizlikler: composer bot seçicisinin akıbeti (tercih: kaldır — "tamamen ayrı"); okunmadı noktası basit tutulur; klavye kısayolu istenmedi.
+
+## İlerleme (tick log)
+
+- **tick 1 (2026-09-26)** — landed:
+  - `components/bots/mode.ts` — `AppMode` (`chat` | `bots`) + `lokma-app-mode:v1` / `lokma-bots-selected:v1` storage helpers.
+  - `header.tsx` — `lokma | Bots` segmented switch beside the brand (`data-mode-switch` hooks); active chip ink-filled; `lokma` always returns to the normal mode.
+  - `app-shell.tsx` — app-level mode state + a dedicated Bots branch (no rails/sidebars/tiling; header + footer keep status); the normal mode's stores stay untouched.
+  - `components/bots/bots-mode.tsx` — Grok-style surface: left `+ New Bot` + search + rows (avatar / name / relative time / last-message preview, live run dot), right = the selected bot's chat with a `Message <bot name>` composer; the real create dialog is re-used and the first open mints the bot-bound session (`POST /api/sessions { botId, model }`).
+  - `server/src/bot-sessions.ts` + `GET /api/bots?sessions=1` — joins each bot's newest session (`lastSession: { id, title, updatedAt, preview, running, queued }`).
+  - `scripts/probe-bots-mode.cjs` — live gate 20/20 PASS (switch both ways, list, row → chat, reload persistence, chrome-free Bots surface).
+  - Deployed: served bundle `index-DpkKeraQ.js` == disk; tokenless `/api/auth/me` still 401 (gate ON).
+- **pending (next ticks)** — remove the rail/panes entries (activity-bar, inspector-rail, panes.ts, inspector-host, inspector-panel, extras), remove the composer bot picker, re-home the gallery actions (fork / publish / delete / bot.json / run-agent) into the new layout, then the close-out.

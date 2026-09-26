@@ -186,3 +186,4 @@
 - [REQ-165](REQ-165-vault-memory-modal-settings.md) — Vault ve Memory panelleri de Settings modalına bölüm olarak taşınsın; rail ikonları modalı açar (REQ-163/164 deseni) — pending
 - [REQ-166](REQ-166-skills-modal-settings.md) — Skills pane değil: Settings modalına bölüm olarak taşınsın; rail ikonu modalı açar (REQ-163/164/165 deseni) — pending
 - [REQ-167](REQ-167-archify-ayri-modal.md) — Archify apayrı bir modal olsun (Settings'e bölüm değil, kendi başına modal); rail ikonu modalı açar — pending
+- [REQ-168](REQ-168-design-studio-ayri-sayfa.md) — Design Studio apayrı bir SAYFA olsun (Claude Design gibi: sol brief + sağ canvas); üst geçişe lokma · Bots · Design eklenir — pending

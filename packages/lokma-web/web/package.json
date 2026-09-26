@@ -12,14 +12,16 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@lokma/shared": "workspace:*",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.469.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "zod": "^3.23.8",
-    "zustand": "^5.0.2",
-    "lucide-react": "^0.469.0",
-    "clsx": "^2.1.1",
     "tailwind-merge": "^2.5.4",
-    "@lokma/shared": "workspace:*"
+    "zod": "^3.23.8",
+    "zustand": "^5.0.2"
   },
   "devDependencies": {
     "typescript": "^5.7.3",

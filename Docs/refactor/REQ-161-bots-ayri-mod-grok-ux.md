@@ -1,6 +1,6 @@
 # REQ-161 — Bots ayrı bir mod olsun: üstte lokma/Bots geçişi + Grok tarzı bot listesi ve sohbet UX'i
 
-**Status:** in-progress (tick 1, 2026-09-26 — mode switch + bot list + bot chat landed; rail/panes/composer removals + gallery action re-homing still pending)
+**Status:** in-progress (tick 2, 2026-09-26 — mode switch + bot list + bot chat landed (tick 1); the scattered Bots entries are now gone (rails, pane registry, Inspector panel/host, lazy loader, tab icons, extras tab union) and the chat's bot picker is removed (tick 2); gallery action re-homing still pending)
 **Tarih:** 2026-09-26
 **Kaynak:** Kullanıcı mesajı (26 Eyl 2026, 3 ekran görüntüsüyle) — birebir:
 
@@ -76,4 +76,12 @@
   - `server/src/bot-sessions.ts` + `GET /api/bots?sessions=1` — joins each bot's newest session (`lastSession: { id, title, updatedAt, preview, running, queued }`).
   - `scripts/probe-bots-mode.cjs` — live gate 20/20 PASS (switch both ways, list, row → chat, reload persistence, chrome-free Bots surface).
   - Deployed: served bundle `index-DpkKeraQ.js` == disk; tokenless `/api/auth/me` still 401 (gate ON).
-- **pending (next ticks)** — remove the rail/panes entries (activity-bar, inspector-rail, panes.ts, inspector-host, inspector-panel, extras), remove the composer bot picker, re-home the gallery actions (fork / publish / delete / bot.json / run-agent) into the new layout, then the close-out.
+- **tick 2 (2026-09-26)** — landed (commit a76d999):
+  - `components/shell/activity-bar.tsx` + `inspector-rail.tsx` — the 'Bots' rail buttons are gone (key union, item tables, tab-switch case, icon imports); both rail tests updated (8 activity items, 22 rail items).
+  - `components/panes/panes.ts` — bots pane registry entry + tiling-bar action removed (23 tabs / 19 actions); `panes/inspector-host.tsx`, `providers/inspector-panel.tsx`, `panes/lazy-panes.tsx`, `panes/tab-icons.tsx` — bots tab branch, lazy loader and icon removed, so a bots pane cannot open in the normal mode.
+  - `components/extras/extras.ts` — the agent-templates row no longer points at a bots tab (informational row, `where` = "Bots mode → bot list + chat").
+  - `components/chat/index.tsx` — the REQ-027 "switch bot in chat" picker is removed from the normal chat header (state, bot list fetch, pick/clear handlers); bot-bound sessions keep working via the Bots mode (`POST /api/sessions { botId }`).
+  - `scripts/probe-bots-mode.cjs` — new checks: no 'Bots' button in either rail and no bot picker in the chat header, asserted at boot and after returning from the Bots mode.
+  - Gates: `bun x tsc --noEmit` 0; sterilized build green (`index-C6D56Qoo.js`); served bundle == disk; live probe 24/24 PASS; tokenless `/api/auth/me` 401 (gate ON).
+  - Note: `narrow-layout.test.ts` keeps 5 pre-existing failures (skills-pane header, onboarding-wizard/todo-pane/header toolbars, browser-pane/terminal-pane allowlist snippets) — verified present at HEAD before this tick, unrelated to these edits.
+- **pending (next tick)** — re-home the gallery actions (fork / publish / delete / bot.json / run-agent) into the Bots mode layout, then the close-out.

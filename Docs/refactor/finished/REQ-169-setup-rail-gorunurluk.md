@@ -1,6 +1,6 @@
 # REQ-169 — Setup girişi kurulum bittikten sonra sidebar'larda görünmesin
 
-**Status:** pending
+**Status:** done (2026-09-26) — commits `0825ac9` + `df0684f`
 **Tarih:** 2026-09-26
 **Kaynak:** Kullanıcı mesajı (26 Eyl 2026):
 > "setup kısmı kuurlum bititkten sonra sidevbardalar görünmesine gerek yok"
@@ -46,3 +46,11 @@
 - Tamamlanma = **bootstrapped** (ilk admin). Ek koşul (feature seçimlerinin kaydedilmiş olması vb.) İSTENMEDİ — kullanıcı, tamamlanmış instance'ta bu girişi görmek istemiyor.
 - Pane tamamen kaldırılmıyor ve başka bir yere (Settings vb.) taşınmıyor — yalnız sidebar görünürlüğü. Taşıma gerekirse ayrı REQ.
 - `concept/` prototipi kapsam dışı — yalnız `packages/lokma-web`.
+
+## Sonuç (done 2026-09-26)
+
+- **Uygulama:** Setup girişi artık KOŞULLU — tek doğruluk kaynağı sunucunun `bootstrapped` biti (`GET /api/auth/settings`). App boot gate'i AYNI fetch'ten yeni `lib/bootstrapped.ts` store'unu tohumlar (ekstra istek yok; her sayfa yenilemesinde tekrar doğrulanır). `visibleInspectorRailItems(bootstrapped)` display listesini filtreler: bootstrapped instance'ta Setup ikonu desktop rail'den VE mobil 'tools' şeridinden düşer (20/21). Canonical `INSPECTOR_RAIL_ITEMS` tablosu + pane kaydı dokunulmadan kalır. Bilinmeyen durum (yükleniyor/hata) bootstrapped SAYILMAZ → taze kurulumda liste eskisi gibi; gizleme yalnız gerçek `true`'da olur.
+- **Pane erişilebilirliği:** rail girişi yokken de Setup panesine ulaşılıyor — Extras → `lokma doctor --agents` satırındaki Open, Inspector'ı rail'siz Setup sekmesine geçiriyor ve pane render ediyor (`1 Init`/`4 Cloud`); `GET /api/setup` + `GET /api/doctor` 200.
+- **Kanıt:** yeni canlı prob `scripts/probe-setup-visibility.cjs` **16/16 PASS** (canlı app :3457, minted Bearer — gate ON): settings `bootstrapped:true`; rail 20/21 (Setup yok, Todos sanity); mobil şeritte Setup pili yok; Extras→Open ile Setup panesi render; negatif kontrol (settings `bootstrapped:false` stub'ı) rail'de Setup'ı GERİ getiriyor (21/21); iki bağlamda 0 konsol hatası; prob oturumu POST /api/sessions ile açılıp silindi ve GET→404 ile re-check edildi (prob-oluşturulan durum temiz).
+- **Kapılar:** root `bun x tsc --noEmit` 0; sterilize web build yeşil (`index-BYjhiqz2.js`); concept build yeşil; `pm2 restart lokma-web` sonrası servis edilen bundle == disk hash. Testler: inspector-rail 24/24 (4 yeni REQ-169 koşullu-liste kontrolü) + bootstrapped store 6/6.
+- **Commitler:** `0825ac9` (refactor web) + `df0684f` (probe) + bu kapanış docs commit'i.

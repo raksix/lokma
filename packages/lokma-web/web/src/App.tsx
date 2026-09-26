@@ -4,6 +4,7 @@ import { InvitePage } from '@/components/auth/invite-page';
 import { LoginGate } from '@/components/auth/login-gate';
 import { OnboardingWizard } from '@/components/auth/onboarding-wizard';
 import { api } from '@/lib/api';
+import { setInstanceBootstrapped } from '@/lib/bootstrapped';
 import './index.css';
 
 /**
@@ -42,6 +43,11 @@ function useGate(): { gate: GateState; refresh: () => void } {
     void (async () => {
       try {
         const settingsRes = await api.getAuthSettings();
+        // REQ-169 — seed the shell-wide bootstrapped flag from this SAME
+        // fetch (no extra request): once the first admin exists, the Setup
+        // rail entry hides. This runs again on every reload, so the state
+        // is re-verified on each boot.
+        setInstanceBootstrapped(settingsRes.bootstrapped);
         if (!settingsRes.bootstrapped) {
           // Fresh instance (REQ-066): first launch shows the onboarding
           // wizard; a fresh-but-onboarded-open instance (owner picked

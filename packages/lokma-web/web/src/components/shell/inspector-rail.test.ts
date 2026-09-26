@@ -12,6 +12,7 @@ import {
   isRailModalTab,
   isRailNonPaneTab,
   isRailStandaloneModalTab,
+  visibleInspectorRailItems,
 } from './inspector-rail';
 import { encodeInspectorDrag, isRailDropId, parseInspectorDrop } from '@/components/panes/panes';
 
@@ -111,6 +112,25 @@ check(
   'REQ-168 a stale design drop is ignored (no pane definition, Design is its own page)',
   parseInspectorDrop({ getData: (t: string) => (t === 'application/x-lokma-inspector' ? 'design' : '') }) === null,
 );
+
+// REQ-169 — the DISPLAY list is conditional: a bootstrapped instance drops
+// the Setup entry; not-bootstrapped (and unknown → false) keeps the legacy
+// list. The canonical table itself stays complete in both states.
+const unbootedItems = visibleInspectorRailItems(false);
+const bootedItems = visibleInspectorRailItems(true);
+check('REQ-169 not bootstrapped keeps the legacy list (Setup present)', unbootedItems.length === INSPECTOR_RAIL_ITEMS.length && unbootedItems.some((item) => item.tab === 'setup'));
+check(
+  'REQ-169 bootstrapped drops exactly the Setup entry',
+  bootedItems.length === unbootedItems.length - 1 && !bootedItems.some((item) => item.tab === 'setup'),
+);
+check(
+  'REQ-169 bootstrapped list equals the full list minus Setup, order preserved',
+  bootedItems.every((item, index) => {
+    const expected = unbootedItems.filter((candidate) => candidate.tab !== 'setup');
+    return item.tab === expected[index].tab && item.label === expected[index].label;
+  }),
+);
+check('REQ-169 canonical table still carries Setup (pane registration untouched)', INSPECTOR_RAIL_ITEMS.some((item) => item.tab === 'setup'));
 
 console.log(`inspector-rail.test.ts: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

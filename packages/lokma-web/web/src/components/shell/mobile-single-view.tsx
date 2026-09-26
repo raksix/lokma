@@ -7,7 +7,8 @@ import { FileBrowser } from '@/components/files';
 import { InspectorPanel, type InspectorTab } from '@/components/providers';
 import { SessionsSidebar } from '@/components/sessions';
 import type { SettingsSectionId } from '@/components/settings/settings';
-import { INSPECTOR_RAIL_ITEMS, RAIL_MODAL_SECTIONS, isRailModalTab, isRailStandaloneModalTab } from './inspector-rail';
+import { RAIL_MODAL_SECTIONS, isRailModalTab, isRailStandaloneModalTab, visibleInspectorRailItems } from './inspector-rail';
+import { useInstanceBootstrapped } from '@/lib/bootstrapped';
 import { MOBILE_TABS, mobileTabLabel, type MobileTab } from './responsive';
 
 /**
@@ -77,6 +78,9 @@ export function MobileSingleView({
 }) {
   const [tab, setTab] = React.useState<MobileTab>('chat');
   const [toolTab, setToolTab] = React.useState<InspectorTab>(requestedTab ?? 'files');
+  // REQ-169 — the tools strip hides the Setup pill once the instance is
+  // bootstrapped (same shared flag the desktop rail reads).
+  const bootstrapped = useInstanceBootstrapped();
 
   // An outside request (activity affordance, deep-link) lands on Tools and
   // selects the tab — same contract as the desktop Inspector rail.
@@ -112,7 +116,7 @@ export function MobileSingleView({
         ) : (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-line px-2 py-1.5" role="tablist" aria-label="Inspector tools">
-              {INSPECTOR_RAIL_ITEMS.map(({ tab: itemTab, label }) => (
+              {visibleInspectorRailItems(bootstrapped).map(({ tab: itemTab, label }) => (
                 <button
                   key={itemTab}
                   type="button"

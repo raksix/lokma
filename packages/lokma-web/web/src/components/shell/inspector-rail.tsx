@@ -93,6 +93,9 @@ export const INSPECTOR_RAIL_ITEMS: InspectorRailItem[] = [
   // REQ-168 — Design left the rail: it is the third top-level mode and lives
   // behind the header `lokma · Bots · Design` switch as its own page.
   { tab: 'testing', label: 'Testing', Icon: Beaker },
+  // REQ-169 — Setup is conditional at render time: hidden once the instance
+  // is bootstrapped (first admin registered). It stays in this canonical
+  // list so the pane registration + programmatic access are unchanged.
   { tab: 'setup', label: 'Setup', Icon: HardDrive },
   { tab: 'plugins', label: 'Plugins', Icon: Package },
   { tab: 'observability', label: 'Observability', Icon: Activity },
@@ -101,6 +104,18 @@ export const INSPECTOR_RAIL_ITEMS: InspectorRailItem[] = [
   { tab: 'memory', label: 'Memory', Icon: Brain },
   { tab: 'todos', label: 'Todos', Icon: ListTodo },
 ];
+
+/**
+ * REQ-169 — the displayed rail list is conditional: once the instance is
+ * bootstrapped (first admin registered) the Setup entry has nothing left to
+ * offer, so it leaves the rail. The canonical `INSPECTOR_RAIL_ITEMS` table
+ * stays complete — pane/tab registration and programmatic access are
+ * untouched; this filters the DISPLAY list only. Unknown state counts as
+ * not bootstrapped (legacy list) so a loading/failed fetch never hides it.
+ */
+export function visibleInspectorRailItems(bootstrapped: boolean): InspectorRailItem[] {
+  return bootstrapped ? INSPECTOR_RAIL_ITEMS.filter((item) => item.tab !== 'setup') : INSPECTOR_RAIL_ITEMS;
+}
 
 /**
  * Which physical side hosts the Inspector rail — always the opposite of
@@ -170,10 +185,13 @@ export function InspectorRail({
   active,
   onSelect,
   side,
+  bootstrapped = false,
 }: {
   active: InspectorTab;
   onSelect: (tab: InspectorRailTab) => void;
   side: SidebarSide;
+  /** REQ-169 — hide the Setup entry once the instance is bootstrapped. */
+  bootstrapped?: boolean;
 }) {
   // Full literal classes — Tailwind v4 never compiles dynamic `border-${x}`.
   const borderClass = side === 'left' ? 'border-r border-line' : 'border-l border-line';
@@ -183,7 +201,7 @@ export function InspectorRail({
       aria-label="Inspector rail"
       className={cn('hidden w-11 shrink-0 flex-col items-center gap-0.5 overflow-y-auto bg-card py-2 md:flex', borderClass)}
     >
-      {INSPECTOR_RAIL_ITEMS.map(({ tab, label, Icon }) => (
+      {visibleInspectorRailItems(bootstrapped).map(({ tab, label, Icon }) => (
         <InspectorRailButton
           key={tab}
           active={active === tab}

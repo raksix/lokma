@@ -18,6 +18,7 @@ import { DEFAULT_LEFT_WIDTH, DEFAULT_RIGHT_WIDTH } from '@/stores/layout';
 import { HealthBadge } from '@/components/status/health-badge';
 import { useWs } from '@/hooks/use-ws';
 import { api, type MetricsRes } from '@/lib/api';
+import { useInstanceBootstrapped } from '@/lib/bootstrapped';
 import { useSessionStore } from '@/stores';
 import {
   FooterBar,
@@ -102,6 +103,10 @@ const LazyArchifyModal = React.lazy(() =>
 export function AppShell({ sessionId }: { sessionId: string }) {
   const [activeId, setActiveId] = React.useState(sessionId);
   const tiling = usePaneStore((s) => s.tiling);
+  // REQ-169 — Setup rail entry hides once the instance is bootstrapped (the
+  // App boot gate seeds this shared flag from its settings fetch; unknown
+  // state stays not-bootstrapped, so the entry is visible on a fresh install).
+  const bootstrapped = useInstanceBootstrapped();
   // REQ-024 — mobile is single-view only: the effect below forces these
   // flags off, so a persisted desktop `tiling:true` can never strand a
   // phone viewport inside the pane system.
@@ -858,7 +863,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         {explorerSide === 'left' ? (
           <ActivityBar active={activity} onSelect={handleActivitySelect} side="left" />
         ) : (
-          <InspectorRail active={inspectorTab ?? 'files'} onSelect={handleInspectorRailSelect} side="left" />
+          <InspectorRail active={inspectorTab ?? 'files'} onSelect={handleInspectorRailSelect} side="left" bootstrapped={bootstrapped} />
         )}
         {sidebars.left ? (
           isMobile ? (
@@ -925,7 +930,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
             bar (REQ-008 rail now travels with its panel instead of staying
             pinned far right). */}
         {explorerSide === 'left' ? (
-          <InspectorRail active={inspectorTab ?? 'files'} onSelect={handleInspectorRailSelect} side="right" />
+          <InspectorRail active={inspectorTab ?? 'files'} onSelect={handleInspectorRailSelect} side="right" bootstrapped={bootstrapped} />
         ) : (
           <ActivityBar active={activity} onSelect={handleActivitySelect} side="right" />
         )}

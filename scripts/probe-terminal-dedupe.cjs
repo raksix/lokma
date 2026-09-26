@@ -45,7 +45,10 @@ const ok = (name, pass, detail) => {
     // REQ-158 diagnosis: record every terminal/data frame the app receives.
     window.__frames = [];
     const Native = window.WebSocket;
-    window.WebSocket = function (...args) {
+    // TRAP: keep the native statics (`WebSocket.OPEN`) — the app's send guard
+    // compares against them, so a wrapper that only sets `.prototype` makes
+    // every app send silently drop (input probes then measure themselves).
+    const Patched = function (...args) {
       const ws = new Native(...args);
       ws.addEventListener('message', (ev) => {
         try {
@@ -59,7 +62,9 @@ const ok = (name, pass, detail) => {
       });
       return ws;
     };
-    window.WebSocket.prototype = Native.prototype;
+    Object.setPrototypeOf(Patched, Native);
+    Patched.prototype = Native.prototype;
+    window.WebSocket = Patched;
   }, TOKEN);
   const page = await ctx.newPage();
   const errors = [];

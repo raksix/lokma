@@ -1,6 +1,6 @@
 # REQ-168 — Design Studio apayrı bir sayfa olsun; üst geçişe "Design" eklensin (Claude Design gibi)
 
-**Status:** pending
+**Status:** done (2026-09-26) — commits `8553d41` + `64af3ee`
 **Tarih:** 2026-09-26
 **Kaynak:** Kullanıcı mesajı (26 Eyl 2026):
 > "design studio ayrı bir sayfa olcak demiştim ya yukarda lokma - bots vardı onun yanına da design ekle o tamamen apayarı bir sayfa olcak işte. claude design gibi olcak"
@@ -55,3 +55,12 @@ Claude Design (claude.ai/design, Anthropic): **sol sohbet + sağ canvas** — br
 
 - REQ-161 ile koordineli: üst geçiş üç girişe çıkarken aktif-mod mantığı tek yerden yönetilmeli (lokma/Bots/Design).
 - `concept/` prototipi kapsam dışı — yalnız `packages/lokma-web`.
+
+## Sonuç (done 2026-09-26)
+
+- **Uygulama:** Design artık üçüncü üst-seviye MOD: header'daki `lokma · Bots · Design` geçişinin Design çipi tam sayfa Design Studio'yu açıyor (pane yok, modal yok, Settings bölümü yok — Bots deseni). Yeni `components/design/design-page.tsx`: solda brief kolonu (tip + sistem + brief + Generate + DESIGN.md guard çipi + arama/filtre + artifact listesi), sağda canvas (gerçek `/api/design/:id/view` iframe'i + Code/Critique/Export sekmeleri + footer kartları). Tüm işlevler korundu — liste, generate, viewer, Code tab kaydetme, 5 boyutlu Critique, export indirmeleri (html/zip/json/png/webm), iki tıkla silme — hepsi gerçek uçlarla; mantık yeni `use-design-studio.ts` hook'unda (pane'in bire bir portu). Sayfa durumu `lokma-design-page:v1` snapshot'ıyla (seçili artifact + form) yeniden açılışta ve reload'da geri geliyor. `AppMode` = chat | bots | design.
+- **Pane yolu TAMAMEN kalktı:** registry 17→16, `TILING_BAR_TABS` 13→12, `inspector-host`/`inspector-panel` dalları, `LazyDesignPane` ve `TAB_ICONS` girişi silindi; rail'deki Design ikonu KALMADI (sayfa olan şey rail'de durmaz); `design-pane.tsx` emekliye ayrıldı; eski sekmeler/drag payload'ları registry-miss ile düşüyor.
+- **Yol üstünde bulunan bug + fix:** `loadList` ve `loadDetail` tek `runRef` paylaşıyordu → seçili artifact geri yüklenerek açılan bir Design boot'unda detail çağrısı list çağrısını iptal ediyor, `loading` hiç kapanmıyor ve liste sonsuza dek "Loading artifacts…" da kalıyordu. Ayrı guard'lar (`listRunRef`/`detailRunRef`) ile düzeltildi (canlı doğrulandı: reload sonrası satır aktif çiziliyor).
+- **Kanıt:** yeni canlı prob `scripts/probe-design-page.cjs` **45/45 PASS** (https://lokma.fermag.com.tr, bundle `index-bYn6bTIX.js`): üçlü geçiş; Design sayfası railsiz/chromesiz/panesiz açılıyor; sol kolon 400px + canvas 1071×763, sıfır yatay taşma; BOŞ store'da generate FORM üzerinden üretildi (`probe-pricing-section-…`), satır seçildi, viewer iframe'i gerçek build'i render etti (`page.frames` ile okundu, bodyLen 775), Code tab kaydı server'dan doğrulandı, Critique 5 boyut + 7/10 rozet, HTML export gerçek dosya indirdi; `lokma`ya dönüşte chrome geri geldi + tiling snapshot'ları bayt-bayt aynı; yeniden açılışta ve reload'da seçim geri yüklendi; prob artifact'ı iki-tık silmeyle silinip liste üzerinden re-check edildi (store boş bırakıldı); 0 JS hatası; tokenless `/api/auth/me` 401 (gate ON).
+- **Kapılar:** root `bun x tsc --noEmit` 0 + web `bun x tsc --noEmit` 0; sterilize web build yeşil (`index-bYn6bTIX.js`); `pm2 restart lokma-web` sonrası servis edilen bundle == disk hash (canlı site de aynı). Testler: panes 120/126/159, inspector-rail 20/20, design 35/35.
+- **Commitler:** `8553d41` (refactor web) + `64af3ee` (probe) + bu kapanış docs commit'i.

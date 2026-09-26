@@ -186,5 +186,5 @@
 - [REQ-165](finished/REQ-165-vault-memory-modal-settings.md) — Vault ve Memory panelleri de Settings modalına bölüm olarak taşınsın; rail ikonları modalı açar (REQ-163/164 deseni) — done (live probe 40/40)
 - [REQ-166](finished/REQ-166-skills-modal-settings.md) — Skills pane değil: Settings modalına bölüm olarak taşınsın; rail ikonu modalı açar (REQ-163/164/165 deseni) — done (live probe 35/35)
 - [REQ-167](finished/REQ-167-archify-ayri-modal.md) — Archify apayrı bir modal olsun (Settings'e bölüm değil, kendi başına modal); rail ikonu modalı açar — done (live probe 41/41)
-- [REQ-168](REQ-168-design-studio-ayri-sayfa.md) — Design Studio apayrı bir SAYFA olsun (Claude Design gibi: sol brief + sağ canvas); üst geçişe lokma · Bots · Design eklenir — pending
+- [REQ-168](finished/REQ-168-design-studio-ayri-sayfa.md) — Design Studio apayrı bir SAYFA olsun (Claude Design gibi: sol brief + sağ canvas); üst geçişe lokma · Bots · Design eklenir — done (full page + snapshot restore; live probe 45/45)
 - [REQ-169](REQ-169-setup-rail-gorunurluk.md) — Setup girişi kurulum bitince (bootstrapped) sidebar'da görünmesin; pane gizli kalır, silinmez — pending

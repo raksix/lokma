@@ -103,14 +103,14 @@ check("upsert session ignores file tabs", v4.tabs.length === 2);
 check("tab id prefix", makeTabId("tab-x").startsWith("tab-x-"));
 check("pane id prefix unique", makePaneId().startsWith("p-") && makePaneId() !== makePaneId());
 
-/* 2 — registry mirrors the left Inspector (23 tabs incl. REQ-062 Todos; REQ-161 moved Bots to its own mode); tiling bar keeps the 19 open actions. */
-check("registry has 23 entries", INSPECTOR_TABS.length === 23);
+/* 2 — registry mirrors the left Inspector (22 tabs incl. REQ-062 Todos; REQ-161 moved Bots to its own mode; REQ-163 moved Agent Hub to the Settings modal); tiling bar keeps the 18 open actions. */
+check("registry has 22 entries", INSPECTOR_TABS.length === 22);
 check("registry has files first", INSPECTOR_TABS[0].id === "files");
 check("registry has browser", INSPECTOR_TABS.some((t) => t.id === "browser"));
-check("registry has orchestration+agents pair", INSPECTOR_TABS.some((t) => t.id === "orchestration") && INSPECTOR_TABS.some((t) => t.id === "agents"));
+check("registry keeps orchestration, agents left the registry (REQ-163)", INSPECTOR_TABS.some((t) => t.id === "orchestration") && !INSPECTOR_TABS.some((t) => (t.id as string) === "agents"));
 check("registry has memory", INSPECTOR_TABS.some((t) => t.id === "memory"));
 check("registry has todos", INSPECTOR_TABS.some((t) => t.id === "todos"));
-check("tiling bar has 19 entries", TILING_BAR_TABS.length === 19);
+check("tiling bar has 18 entries", TILING_BAR_TABS.length === 18);
 check("tiling bar all in registry", TILING_BAR_TABS.every(isInspectorTabId));
 check("inspectorLabel known", inspectorLabel("git") === "Git");
 check("isInspectorTabId rejects unknown", !isInspectorTabId("nope"));
@@ -235,11 +235,12 @@ check("parse rail rejects unknown id", parseInspectorDrop(stubData({ [INSPECTOR_
 check("parse rail ignores empty", parseInspectorDrop(stubData({})) === null);
 check("parse rail ignores label-only text", parseInspectorDrop(stubData({ "text/plain": "Terminal" })) === null);
 check("rail drop makes a live tool tab", (() => {
-  const got = parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: "agents" }));
+  const got = parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: "vault" }));
   if (!got || got === "sessions" || !isInspectorTabId(got)) return false;
   const tab = makeInspectorTab(got);
-  return tab.kind === "inspector" && tab.inspectorId === "agents";
+  return tab.kind === "inspector" && tab.inspectorId === "vault";
 })());
+check("a stale agents drop is ignored (REQ-163: Agent Hub is a modal section)", parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: "agents" })) === null);
 
 /* 10 — REQ-029: dropEffect must stay compatible with the source's
  * effectAllowed (Chrome silently rejects mismatched drops: no drop event).

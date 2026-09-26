@@ -2,6 +2,7 @@ import { Activity, BarChart3, Beaker, Brain, Clock3, Cpu, Folder, FolderOpen, Gi
 import { cn } from '@/lib/utils';
 import { INSPECTOR_DRAG_MIME, encodeInspectorDrag } from '@/components/panes/panes';
 import type { InspectorTab } from '@/components/providers';
+import type { SettingsSectionId } from '@/components/settings/settings';
 import type { ExplorerSide, SidebarSide } from './responsive';
 
 /**
@@ -12,8 +13,29 @@ import type { ExplorerSide, SidebarSide } from './responsive';
  * presentational: the parent owns the active tab and reveals the Inspector
  * panel on select. Follows the REQ-007 swap via the `side` prop.
  */
+/**
+ * REQ-163 — rail entries that open a Settings modal SECTION instead of an
+ * Inspector tab (Agent Hub moved out of the panes). One map, one truth: the
+ * rail renders these without a drag, the desktop rail click opens the modal
+ * on the mapped section, and the mobile tools strip routes the same way.
+ * Later moves (orchestration/vault/skills) extend this table.
+ */
+export const RAIL_MODAL_SECTIONS: Record<'agents', SettingsSectionId> = {
+  agents: 'agents',
+};
+
+/** Rail tabs that launch the Settings modal instead of a pane (REQ-163). */
+export type RailModalTab = keyof typeof RAIL_MODAL_SECTIONS;
+
+export type InspectorRailTab = InspectorTab | RailModalTab;
+
+/** True when this rail entry opens the Settings modal, never a pane/tab. */
+export function isRailModalTab(tab: InspectorRailTab): tab is RailModalTab {
+  return tab in RAIL_MODAL_SECTIONS;
+}
+
 interface InspectorRailItem {
-  tab: InspectorTab;
+  tab: InspectorRailTab;
   label: string;
   Icon: typeof Info;
 }
@@ -63,24 +85,31 @@ function InspectorRailButton({
 }: {
   active: boolean;
   label: string;
-  tab: InspectorTab;
+  tab: InspectorRailTab;
   Icon: typeof Info;
   indicatorClass: string;
   onClick: () => void;
 }) {
+  // REQ-163 — modal entries (Agent Hub) have no Inspector tab to drop, so
+  // they never start a drag and keep a plain tooltip.
+  const opensModal = isRailModalTab(tab);
   return (
     <button
       type="button"
       onClick={onClick}
-      title={`${label} — drag to a pane to open it`}
+      title={opensModal ? label : `${label} — drag to a pane to open it`}
       aria-label={label}
       aria-pressed={active}
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData(INSPECTOR_DRAG_MIME, encodeInspectorDrag(tab));
-        e.dataTransfer.setData('text/plain', label);
-        e.dataTransfer.effectAllowed = 'move';
-      }}
+      draggable={!opensModal}
+      onDragStart={
+        opensModal
+          ? undefined
+          : (e) => {
+              e.dataTransfer.setData(INSPECTOR_DRAG_MIME, encodeInspectorDrag(tab));
+              e.dataTransfer.setData('text/plain', label);
+              e.dataTransfer.effectAllowed = 'move';
+            }
+      }
       className={cn(
         'relative grid h-8 w-8 shrink-0 place-items-center rounded-md transition',
         active
@@ -107,7 +136,7 @@ export function InspectorRail({
   side,
 }: {
   active: InspectorTab;
-  onSelect: (tab: InspectorTab) => void;
+  onSelect: (tab: InspectorRailTab) => void;
   side: SidebarSide;
 }) {
   // Full literal classes — Tailwind v4 never compiles dynamic `border-${x}`.

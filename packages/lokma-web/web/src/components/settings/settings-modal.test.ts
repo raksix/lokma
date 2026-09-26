@@ -21,11 +21,15 @@ function check(name: string, cond: boolean): void {
 }
 
 // Registry shape — OpenCode-style categories in display order.
-check('thirteen sections', SETTINGS_SECTIONS.length === 13);
+check('fourteen sections', SETTINGS_SECTIONS.length === 14);
 check('general first', SETTINGS_SECTIONS[0].id === 'general');
 check('account second (own profile only)', SETTINGS_SECTIONS[1].id === 'account');
 check('admin third (users/roles/projects/policy)', SETTINGS_SECTIONS[2].id === 'admin');
 check('admin label', SETTINGS_SECTIONS[2].label === 'Admin');
+// REQ-163 — Agent Hub moved out of the panes into its own Settings section.
+check('agent hub section present', SETTINGS_SECTIONS.some((s) => s.id === 'agents'));
+check('agent hub label', SETTINGS_SECTIONS.find((s) => s.id === 'agents')?.label === 'Agent Hub');
+check('agent hub sits beside models (agent surfaces together)', SETTINGS_SECTIONS.findIndex((s) => s.id === 'agents') === SETTINGS_SECTIONS.findIndex((s) => s.id === 'models') + 1);
 check('about last', SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1].id === 'about');
 check('ids unique', new Set(SETTINGS_SECTIONS.map((s) => s.id)).size === SETTINGS_SECTIONS.length);
 check('labels non-empty', SETTINGS_SECTIONS.every((s) => s.label.length > 0));
@@ -47,6 +51,7 @@ check('default is general', DEFAULT_SETTINGS_SECTION === 'general');
 check('guard accepts admin', isSettingsSection('admin'));
 check('guard accepts providers', isSettingsSection('providers'));
 check('guard accepts shortcuts', isSettingsSection('shortcuts'));
+check('guard accepts agents (REQ-163)', isSettingsSection('agents'));
 check('guard rejects unknown', !isSettingsSection('neon'));
 check('guard rejects empty', !isSettingsSection(''));
 check('guard rejects non-string', !isSettingsSection(42));

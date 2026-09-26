@@ -6,7 +6,6 @@ import { useSessionStore } from '@/stores/session';
 import { emitToast } from '@/components/shell';
 import type { ExtrasTabId } from '@/components/extras/extras';
 import {
-  LazyAgentsPane,
   LazyArchifyPane,
   LazyAdminPane,
   LazyBrowserPane,
@@ -82,7 +81,7 @@ function LazyTab({
   if (tab === 'models') return <LazyModelsPane />;
   if (tab === 'usage') return <LazyUsagePane onOpenSession={onOpenSession} />;
   if (tab === 'settings') return <LazySettingsPane />;
-  if (tab === 'agents') return <LazyAgentsPane />;
+  // REQ-163 — Agent Hub is not a pane anymore (Settings modal section).
   if (tab === 'orchestration') return <LazyOrchestrationPane />;
   if (tab === 'vault') return <LazyVaultPane />;
   if (tab === 'skills') return <LazySkillsPane />;

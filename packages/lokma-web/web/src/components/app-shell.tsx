@@ -25,6 +25,7 @@ import {
   MobileSingleView,
   OfflineBanner,
   PaneErrorBoundary,
+  RAIL_MODAL_SECTIONS,
   SearchModal,
   ShortcutsDialog,
   SHOW_SHORTCUTS_EVENT,
@@ -37,6 +38,7 @@ import {
   initialSidebarVisibility,
   inspectorRailSide,
   isEditableTarget,
+  isRailModalTab,
   mobileQuery,
   nextSidebarVisibility,
   readExplorerSide,
@@ -46,6 +48,7 @@ import {
   writeExplorerSide,
   type ActivityKey,
   type ExplorerSide,
+  type InspectorRailTab,
   type SidebarSide,
   type SidebarVisibility,
 } from '@/components/shell';
@@ -204,12 +207,26 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     [explorerSide, inspectorSide, isMobile, openBrowserPane],
   );
 
+  // REQ-163 — a rail entry that opens a Settings modal section (Agent Hub)
+  // instead of a pane/tab. Single callback so every launcher (desktop rail,
+  // mobile tools strip) uses the same path.
+  const openSettingsSection = React.useCallback((section: SettingsSectionId) => {
+    setSettingsSection(section);
+    setSettingsOpen(true);
+  }, []);
+
   // REQ-010 — rail click asks the Inspector for the tab (prop-driven, same
   // as REQ-008) and reveals the wide Inspector panel next to the rail.
   // REQ-022 — the settings rail icon opens the modal instead (the Inspector
   // 'settings' tab itself stays reachable for deep-links).
   const handleInspectorRailSelect = React.useCallback(
-    (tab: InspectorTab) => {
+    (tab: InspectorRailTab) => {
+      // REQ-163 — modal entries (Agent Hub) open the Settings modal on their
+      // section; they are never tiling panes or sidebar tabs.
+      if (isRailModalTab(tab)) {
+        openSettingsSection(RAIL_MODAL_SECTIONS[tab]);
+        return;
+      }
       // REQ-109 — the rail browser entry opens a pane tab, never the sidebar.
       if (isPaneOnlyTab(tab)) {
         openBrowserPane();
@@ -226,7 +243,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           : { ...current, [inspectorSide]: true },
       );
     },
-    [inspectorSide, isMobile, openBrowserPane],
+    [inspectorSide, isMobile, openBrowserPane, openSettingsSection],
   );
 
   const ws = useWs(activeId);
@@ -636,6 +653,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
               ws={ws}
               onSelectSession={switchSession}
               requestedTab={inspectorTab}
+              onOpenSettingsSection={openSettingsSection}
             />
           </PaneErrorBoundary>
         </div>

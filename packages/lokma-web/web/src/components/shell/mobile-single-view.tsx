@@ -6,7 +6,8 @@ import { Chat } from '@/components/chat';
 import { FileBrowser } from '@/components/files';
 import { InspectorPanel, type InspectorTab } from '@/components/providers';
 import { SessionsSidebar } from '@/components/sessions';
-import { INSPECTOR_RAIL_ITEMS } from './inspector-rail';
+import type { SettingsSectionId } from '@/components/settings/settings';
+import { INSPECTOR_RAIL_ITEMS, RAIL_MODAL_SECTIONS, isRailModalTab } from './inspector-rail';
 import { MOBILE_TABS, mobileTabLabel, type MobileTab } from './responsive';
 
 /**
@@ -62,11 +63,14 @@ export function MobileSingleView({
   ws,
   onSelectSession,
   requestedTab,
+  onOpenSettingsSection,
 }: {
   activeId: string;
   ws: UseWs;
   onSelectSession: (id: string) => void;
   requestedTab?: InspectorTab | null;
+  /** REQ-163 — modal entries (Agent Hub) open the Settings modal, not a tab. */
+  onOpenSettingsSection?: (section: SettingsSectionId) => void;
 }) {
   const [tab, setTab] = React.useState<MobileTab>('chat');
   const [toolTab, setToolTab] = React.useState<InspectorTab>(requestedTab ?? 'files');
@@ -111,7 +115,16 @@ export function MobileSingleView({
                   type="button"
                   role="tab"
                   aria-selected={toolTab === itemTab}
-                  onClick={() => setToolTab(itemTab)}
+                  onClick={() => {
+                    // REQ-163 — modal entries (Agent Hub) open the Settings
+                    // modal on their section, exactly like the desktop rail;
+                    // there is no Inspector tab to select here anymore.
+                    if (isRailModalTab(itemTab)) {
+                      onOpenSettingsSection?.(RAIL_MODAL_SECTIONS[itemTab]);
+                      return;
+                    }
+                    setToolTab(itemTab);
+                  }}
                   title={label}
                   className={cn(
                     'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition',

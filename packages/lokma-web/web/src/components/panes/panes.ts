@@ -46,7 +46,8 @@ export const INSPECTOR_TABS = [
   { id: 'terminal', label: 'Terminal' },
   { id: 'git', label: 'Git' },
   { id: 'browser', label: 'Browser' },
-  { id: 'agents', label: 'Agents' },
+  // REQ-163 — Agent Hub is no longer a pane/tab: it opens as a Settings
+  // modal section (rail click), so the pane registry has no 'agents' entry.
   { id: 'orchestration', label: 'Orchestration' },
   { id: 'vault', label: 'Vault' },
   { id: 'skills', label: 'Skills' },
@@ -77,7 +78,6 @@ export const TILING_BAR_TABS: InspectorTabId[] = [
   'settings', // onOpenSettings
   'skills', // onOpenSkills
   'testing', // onOpenTesting
-  'agents', // onOpenHub (concept opens AgentHubPane)
   'auth', // onOpenAuth
   'setup', // onOpenSetup
   'plugins', // onOpenPlugins

@@ -6,7 +6,6 @@ import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
 import { usePaneStore } from '@/stores/pane';
 import {
-  LazyAgentsPane,
   LazyArchifyPane,
   LazyBrowserPane,
   LazyCronApprovalsPane,
@@ -106,7 +105,6 @@ export type InspectorTab =
   | 'terminal'
   | 'git'
   | 'browser'
-  | 'agents'
   | 'orchestration'
   | 'vault'
   | 'skills'
@@ -187,8 +185,6 @@ export function InspectorPanel({
         <LazyVaultPane />
       ) : tab === 'orchestration' ? (
         <LazyOrchestrationPane />
-      ) : tab === 'agents' ? (
-        <LazyAgentsPane />
       ) : tab === 'providers' ? (
         <LazyProvidersPane />
       ) : tab === 'models' ? (

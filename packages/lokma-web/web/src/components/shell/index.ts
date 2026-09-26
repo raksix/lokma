@@ -13,7 +13,11 @@ export {
 export {
   INSPECTOR_RAIL_ITEMS,
   InspectorRail,
+  RAIL_MODAL_SECTIONS,
   inspectorRailSide,
+  isRailModalTab,
+  type InspectorRailTab,
+  type RailModalTab,
 } from './inspector-rail';
 export { OfflineBanner } from './offline-banner';
 export { PaneErrorBoundary } from './pane-error-boundary';

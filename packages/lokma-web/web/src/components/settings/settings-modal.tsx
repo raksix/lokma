@@ -13,6 +13,7 @@ import {
   Settings,
   Shield,
   ShieldCheck,
+  Users,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ import {
 import {
   LazyAccountPane,
   LazyAdminPane,
+  LazyAgentsPane,
   LazyCronApprovalsPane,
   LazyMemoryPane,
   LazyModelsPane,
@@ -67,6 +69,8 @@ const SECTION_ICONS: Record<SettingsSectionId, typeof Settings> = {
   'appearance': Palette,
   'providers': Plug2,
   'models': Layers,
+  // REQ-163 — Agent Hub section (moved out of the panes).
+  'agents': Users,
   'permissions': Shield,
   'mcp': Boxes,
   'memory': Brain,
@@ -227,6 +231,11 @@ export function SettingsModal({
                 <LazyProvidersPane />
               ) : section === 'models' ? (
                 <LazyModelsPane />
+              ) : section === 'agents' ? (
+                // REQ-163 — Agent Hub is a Settings section now: the same
+                // live pane renders inside the modal body (its h-full root
+                // fills the body height; the body owns the scrolling).
+                <LazyAgentsPane />
               ) : section === 'memory' ? (
                 <LazyMemoryPane />
               ) : section === 'cron' ? (

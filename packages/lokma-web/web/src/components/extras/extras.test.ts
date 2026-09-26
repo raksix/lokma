@@ -107,10 +107,16 @@ check(
   'shipped tab targets are real Inspector tabs',
   EXTRAS.filter((e) => e.tab !== undefined).every((e) =>
     [
-      'agents', 'testing', 'cron', 'observability', 'browser',
+      'testing', 'cron', 'observability', 'browser',
       'skills', 'git', 'setup', 'vault', 'plugins', 'orchestration',
     ].includes(e.tab!),
   ),
+);
+// REQ-163 — the per-agent budget editor lives in the Settings modal's
+// Agent Hub section now; its row keeps no Inspector tab target.
+check(
+  '#2 budget editor points at the Settings Agent Hub (no pane tab)',
+  EXTRAS[1]?.tab === undefined && (EXTRAS[1]?.where ?? '').includes('Agent Hub'),
 );
 
 // ─── filter helpers ─────────────────────────────────────────────────────────

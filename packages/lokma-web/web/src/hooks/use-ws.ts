@@ -150,7 +150,20 @@ export function useWs(sessionId: string): UseWs {
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
+      /**
+       * REQ-162 (found while probing the terminal): a superseded socket must
+       * be INERT. `connect()` closes the previous socket and opens a new one,
+       * and the old socket's `onclose` used to fire with `manualRef` false —
+       * scheduling a spurious reconnect that left TWO live sockets feeding
+       * the same state. Every delivered frame then arrived twice: typed
+       * terminal characters painted twice ('aabbcc'), transcript rows
+       * duplicated, and a stale close could release the poll gate under a
+       * live socket. Guard every handler on "am I the current socket?".
+       */
+      const isCurrent = () => wsRef.current === ws;
+
       ws.onopen = () => {
+        if (!isCurrent()) return;
         attemptRef.current = 0;
         setStatus('open');
         markLive();
@@ -164,6 +177,7 @@ export function useWs(sessionId: string): UseWs {
         if (wanted && wanted === sessionRef.current) ws.send(transcriptGetMessage(wanted));
       };
       ws.onmessage = (ev: MessageEvent) => {
+        if (!isCurrent()) return;
         const msg = decodeServerFrame(ev.data);
         if (!msg) return;
         setMessages((prev) => [...prev, msg]);
@@ -187,6 +201,9 @@ export function useWs(sessionId: string): UseWs {
         }
       };
       ws.onclose = () => {
+        // A superseded socket closing is not a disconnect — the live one
+        // keeps the session (and must not be doubled by a stale reconnect).
+        if (!isCurrent()) return;
         markDead();
         if (manualRef.current) {
           setStatus('closed');

@@ -12,6 +12,7 @@ import {
   Package,
   Palette,
   Plug2,
+  Puzzle,
   Settings,
   Shield,
   ShieldCheck,
@@ -38,6 +39,7 @@ import {
   LazyOrchestrationPane,
   LazyPluginsPane,
   LazyProvidersPane,
+  LazySkillsPane,
   LazyVaultPane,
   PaneFallback,
 } from '@/components/panes/lazy-panes';
@@ -86,6 +88,8 @@ const SECTION_ICONS: Record<SettingsSectionId, typeof Settings> = {
   'cron': Clock3,
   'shortcuts': Keyboard,
   'plugins': Package,
+  // REQ-166 — Skills section (moved out of the panes).
+  'skills': Puzzle,
   'about': Info,
 };
 
@@ -268,6 +272,15 @@ export function SettingsModal({
                 <LazyCronApprovalsPane />
               ) : section === 'plugins' ? (
                 <LazyPluginsPane />
+              ) : section === 'skills' ? (
+                // REQ-166 — Skills is a Settings section now (REQ-164 pattern):
+                // the `@container` host gives the pane's `@min-*`/`@max-*`
+                // rules a real query container (its list/detail stacking only
+                // resolves inside one) and `h-full` hands the columns the
+                // modal body's height so the pane scrolls internally.
+                <div className="@container h-full min-h-0">
+                  <LazySkillsPane />
+                </div>
               ) : needsConfig ? (
                 error !== null && config === null ? (
                   <div className="p-4 text-center text-xs text-zinc-400">

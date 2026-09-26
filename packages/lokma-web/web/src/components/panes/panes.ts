@@ -46,10 +46,9 @@ export const INSPECTOR_TABS = [
   { id: 'terminal', label: 'Terminal' },
   { id: 'git', label: 'Git' },
   { id: 'browser', label: 'Browser' },
-  // REQ-163/164/165 — Agent Hub, Orchestration, Vault and Memory are no
-  // longer pane/tabs: they open as Settings modal sections (rail click),
-  // so the pane registry carries none of them.
-  { id: 'skills', label: 'Skills' },
+  // REQ-163/164/165/166 — Agent Hub, Orchestration, Vault, Memory and
+  // Skills are no longer pane/tabs: they open as Settings modal sections
+  // (rail click), so the pane registry carries none of them.
   { id: 'archify', label: 'Archify' },
   { id: 'design', label: 'Design' },
   { id: 'testing', label: 'Testing' },
@@ -72,7 +71,6 @@ export const TILING_BAR_TABS: InspectorTabId[] = [
   'design', // onOpenDesign
   'usage', // onOpenUsage
   'settings', // onOpenSettings
-  'skills', // onOpenSkills
   'testing', // onOpenTesting
   'auth', // onOpenAuth
   'setup', // onOpenSetup

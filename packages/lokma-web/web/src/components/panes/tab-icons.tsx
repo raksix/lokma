@@ -13,7 +13,6 @@ import {
   Package,
   Paintbrush,
   Plug2,
-  Puzzle,
   Settings,
   Shield,
   Star,
@@ -36,9 +35,8 @@ export const TAB_ICONS: Record<InspectorTabId, React.ReactNode> = {
   terminal: <Terminal className="h-3 w-3" />,
   git: <GitBranch className="h-3 w-3" />,
   browser: <Globe className="h-3 w-3" />,
-  // REQ-163/164/165 — Agent Hub, Orchestration, Vault and Memory left the
-  // pane registry (Settings modal sections).
-  skills: <Puzzle className="h-3 w-3" />,
+  // REQ-163/164/165/166 — Agent Hub, Orchestration, Vault, Memory and
+  // Skills left the pane registry (Settings modal sections).
   archify: <Workflow className="h-3 w-3" />,
   design: <Paintbrush className="h-3 w-3" />,
   testing: <Beaker className="h-3 w-3" />,

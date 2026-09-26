@@ -19,7 +19,6 @@ import {
   LazyProvidersPane,
   LazySettingsPane,
   LazySetupPane,
-  LazySkillsPane,
   LazyTerminalPane,
   LazyTestingPane,
   LazyTodosPane,
@@ -78,9 +77,8 @@ function LazyTab({
   if (tab === 'models') return <LazyModelsPane />;
   if (tab === 'usage') return <LazyUsagePane onOpenSession={onOpenSession} />;
   if (tab === 'settings') return <LazySettingsPane />;
-  // REQ-163/164/165 — Agent Hub, Orchestration, Vault and Memory are not
-  // panes anymore (Settings modal sections).
-  if (tab === 'skills') return <LazySkillsPane />;
+  // REQ-163/164/165/166 — Agent Hub, Orchestration, Vault, Memory and
+  // Skills are not panes anymore (Settings modal sections).
   if (tab === 'archify') return <LazyArchifyPane />;
   if (tab === 'design') return <LazyDesignPane />;
   if (tab === 'testing') return <LazyTestingPane />;

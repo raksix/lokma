@@ -20,15 +20,17 @@ import type { ExplorerSide, SidebarSide } from './responsive';
  * on the mapped section, and the mobile tools strip routes the same way.
  * REQ-164 — Orchestration joined the map (same wave). REQ-165 — Vault and
  * Memory followed (their icons stay, their pane/tab definitions are gone).
+ * REQ-166 — Skills followed last (same wave: icon stays, pane definitions gone).
  */
 export const RAIL_MODAL_SECTIONS: Record<
-  'agents' | 'orchestration' | 'vault' | 'memory',
+  'agents' | 'orchestration' | 'vault' | 'memory' | 'skills',
   SettingsSectionId
 > = {
   agents: 'agents',
   orchestration: 'orchestration',
   vault: 'vault',
   memory: 'memory',
+  skills: 'skills',
 };
 
 /** Rail tabs that launch the Settings modal instead of a pane (REQ-163). */

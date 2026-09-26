@@ -18,7 +18,6 @@ import {
   LazyProvidersPane,
   LazySettingsPane,
   LazySetupPane,
-  LazySkillsPane,
   LazyTerminalPane,
   LazyTestingPane,
   LazyTodosPane,
@@ -77,9 +76,9 @@ import {
  * /api/config` `features`, shipped rows opening their real Inspector tab).
  * Memory the real memory-deep wave 2 pane (global MEMORY.md / USER.md
  * entries + live usage meter over `GET/POST/PATCH/DELETE /api/memory`).
- * Agent Hub (REQ-163), Orchestration (REQ-164) and Vault + Memory
- * (REQ-165) moved OUT of the tabs: their rail icons open the Settings
- * modal's sections instead.
+ * Agent Hub (REQ-163), Orchestration (REQ-164), Vault + Memory
+ * (REQ-165) and Skills (REQ-166) moved OUT of the tabs: their rail icons
+ * open the Settings modal's sections instead.
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
  *
@@ -103,7 +102,6 @@ export type InspectorTab =
   | 'terminal'
   | 'git'
   | 'browser'
-  | 'skills'
   | 'archify'
   | 'design'
   | 'testing'
@@ -172,8 +170,6 @@ export function InspectorPanel({
         <LazyDesignPane />
       ) : tab === 'archify' ? (
         <LazyArchifyPane />
-      ) : tab === 'skills' ? (
-        <LazySkillsPane />
       ) : tab === 'providers' ? (
         <LazyProvidersPane />
       ) : tab === 'models' ? (

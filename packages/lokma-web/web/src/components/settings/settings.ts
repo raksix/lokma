@@ -469,6 +469,9 @@ export const SETTINGS_SECTIONS = [
   { id: 'cron', label: 'Cron' },
   { id: 'shortcuts', label: 'Shortcuts' },
   { id: 'plugins', label: 'Plugins' },
+  // REQ-166 — Skills left the panes too: the live registry + curator patch
+  // surface is a section now (beside the other capability catalogs).
+  { id: 'skills', label: 'Skills' },
   { id: 'about', label: 'About' },
 ] as const;
 

@@ -103,14 +103,15 @@ check("upsert session ignores file tabs", v4.tabs.length === 2);
 check("tab id prefix", makeTabId("tab-x").startsWith("tab-x-"));
 check("pane id prefix unique", makePaneId().startsWith("p-") && makePaneId() !== makePaneId());
 
-/* 2 — registry mirrors the left Inspector (19 tabs incl. REQ-062 Todos; REQ-161 moved Bots to its own mode; REQ-163 moved Agent Hub, REQ-164 Orchestration, REQ-165 Vault + Memory to the Settings modal); tiling bar keeps the 15 open actions. */
-check("registry has 19 entries", INSPECTOR_TABS.length === 19);
+/* 2 — registry mirrors the left Inspector (18 tabs incl. REQ-062 Todos; REQ-161 moved Bots to its own mode; REQ-163 moved Agent Hub, REQ-164 Orchestration, REQ-165 Vault + Memory, REQ-166 Skills to the Settings modal); tiling bar keeps the 14 open actions. */
+check("registry has 18 entries", INSPECTOR_TABS.length === 18);
 check("registry has files first", INSPECTOR_TABS[0].id === "files");
 check("registry has browser", INSPECTOR_TABS.some((t) => t.id === "browser"));
 check("registry dropped orchestration and agents (REQ-163/164, Settings modal sections)", !INSPECTOR_TABS.some((t) => (t.id as string) === "orchestration") && !INSPECTOR_TABS.some((t) => (t.id as string) === "agents"));
 check("registry dropped vault and memory (REQ-165, Settings modal sections)", !INSPECTOR_TABS.some((t) => (t.id as string) === "vault") && !INSPECTOR_TABS.some((t) => (t.id as string) === "memory"));
+check("registry dropped skills (REQ-166, Settings modal section)", !INSPECTOR_TABS.some((t) => (t.id as string) === "skills"));
 check("registry has todos", INSPECTOR_TABS.some((t) => t.id === "todos"));
-check("tiling bar has 15 entries", TILING_BAR_TABS.length === 15);
+check("tiling bar has 14 entries", TILING_BAR_TABS.length === 14);
 check("tiling bar all in registry", TILING_BAR_TABS.every(isInspectorTabId));
 check("inspectorLabel known", inspectorLabel("git") === "Git");
 check("isInspectorTabId rejects unknown", !isInspectorTabId("nope"));
@@ -235,14 +236,15 @@ check("parse rail rejects unknown id", parseInspectorDrop(stubData({ [INSPECTOR_
 check("parse rail ignores empty", parseInspectorDrop(stubData({})) === null);
 check("parse rail ignores label-only text", parseInspectorDrop(stubData({ "text/plain": "Terminal" })) === null);
 check("rail drop makes a live tool tab", (() => {
-  const got = parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: "skills" }));
+  const got = parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: "testing" }));
   if (!got || got === "sessions" || !isInspectorTabId(got)) return false;
   const tab = makeInspectorTab(got);
-  return tab.kind === "inspector" && tab.inspectorId === "skills";
+  return tab.kind === "inspector" && tab.inspectorId === "testing";
 })());
 check("a stale agents drop is ignored (REQ-163: Agent Hub is a modal section)", parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: "agents" })) === null);
 check("a stale vault drop is ignored (REQ-165: Vault is a modal section)", parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: "vault" })) === null);
 check("a stale memory drop is ignored (REQ-165: Memory is a modal section)", parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: "memory" })) === null);
+check("a stale skills drop is ignored (REQ-166: Skills is a modal section)", parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: "skills" })) === null);
 
 /* 10 — REQ-029: dropEffect must stay compatible with the source's
  * effectAllowed (Chrome silently rejects mismatched drops: no drop event).

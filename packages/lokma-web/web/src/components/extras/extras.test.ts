@@ -108,7 +108,7 @@ check(
   EXTRAS.filter((e) => e.tab !== undefined).every((e) =>
     [
       'testing', 'cron', 'observability', 'browser',
-      'skills', 'git', 'setup', 'plugins',
+      'git', 'setup', 'plugins',
     ].includes(e.tab!),
   ),
 );
@@ -123,6 +123,12 @@ check(
 check(
   '#22 vault provenance row names the Settings Vault section (no pane tab)',
   EXTRAS[21]?.tab === undefined && (EXTRAS[21]?.where ?? '').includes('Settings → Vault'),
+);
+// REQ-166 — Skills left the pane registry (Settings modal section): its row
+// names the section instead of a pane tab.
+check(
+  '#12 skill sharing row names the Settings Skills section (no pane tab)',
+  EXTRAS[11]?.tab === undefined && (EXTRAS[11]?.where ?? '').includes('Settings → Skills'),
 );
 // REQ-163 — the per-agent budget editor lives in the Settings modal's
 // Agent Hub section now; its row keeps no Inspector tab target.

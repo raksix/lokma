@@ -18,7 +18,6 @@ export type ExtrasTabId =
   | 'observability'
   | 'plugins'
   | 'setup'
-  | 'skills'
   | 'testing';
 
 export type ExtrasFilter = 'all' | 'done' | 'todo';
@@ -58,7 +57,7 @@ export const EXTRAS: ExtraItem[] = [
   { n: 9, slug: 'auto-scaling', title: 'Auto-scaling maxConcurrent', why: 'Load-based', how: 'queue depth → scale 5→10', where: 'Agents tab → caps banner (when the runner lands)', shipped: false, flag: 'extras.auto-scale', milestone: 'Phase 3 — needs the runner queue' },
   { n: 10, slug: 'agent-sandbox', title: 'Sandbox per agent (docker|host)', why: 'Isolation', how: 'worktree + docker flag', where: 'Agents tab → sandbox badge (when worktree isolation lands)', shipped: false, flag: 'extras.agent-sandbox', milestone: 'Phase 3 — needs worktree isolation + a docker flag' },
   { n: 11, slug: 'browser-per-agent', title: 'Browser per agent', why: 'Parallel UI verify', how: 'BrowserPane per agentId', where: 'Browser tab → per-agent tabs', shipped: true, tab: 'browser' },
-  { n: 12, slug: 'skill-sharing', title: 'Skill sharing across agents', why: 'Reuse', how: 'VaultPort + skill_view', where: 'Skills tab → registry + curator patch', shipped: true, tab: 'skills' },
+  { n: 12, slug: 'skill-sharing', title: 'Skill sharing across agents', why: 'Reuse', how: 'VaultPort + skill_view', where: 'Settings → Skills → registry + curator patch', shipped: true },
   { n: 13, slug: 'voice-per-agent', title: 'Voice per agent', why: 'Hands-free', how: 'Web Speech API per Composer', where: 'Chat Composer → mic button', shipped: true },
   { n: 14, slug: 'adversarial-review', title: 'Agent-vs-agent adversarial review', why: 'Verifier vote', how: '2 agents + vote card', where: 'Chat (when the vote card lands)', shipped: false, flag: 'extras.adversarial-review', milestone: 'Phase 3 — needs a 2-agent vote card' },
   { n: 15, slug: 'delegation-model', title: 'Token-tiered delegationModel', why: 'Cheap delegation', how: 'haiku for sub-tasks', where: 'Agents tab → per-agent model (when runner routing lands)', shipped: false, flag: 'extras.delegation-model', milestone: 'Needs runner model routing' },

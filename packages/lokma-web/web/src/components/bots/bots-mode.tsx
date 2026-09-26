@@ -1,14 +1,16 @@
 import * as React from 'react';
-import { Bot as BotIcon, Plus, Search } from 'lucide-react';
-import { api, type BotWithSession } from '@/lib/api';
+import { Bot as BotIcon, Copy, GitFork, MoreHorizontal, Play, Plus, Search, Share2, Trash2 } from 'lucide-react';
+import { api, type Bot, type BotWithSession } from '@/lib/api';
 import { Chat } from '@/components/chat';
 import { useWs } from '@/hooks/use-ws';
 import { Button } from '@/components/ui/button';
+import { ContextMenu, useContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
 import { useSessionStore } from '@/stores';
 import { relativeTime } from '@/components/sessions/grouping';
 import { emitToast } from '@/components/shell';
 import { BotDialog } from './bot-dialog';
-import { emptyCreateForm, initials, type CreateBotForm } from './bots';
+import { BotActionDialog, type BotActionKind, type BotActionPayload } from './bot-actions';
+import { deleteBlockReason, emptyCreateForm, initials, type CreateBotForm } from './bots';
 import { filterPickerBots } from './bot-chat';
 import { readSelectedBot, writeSelectedBot } from './mode';
 
@@ -50,10 +52,12 @@ function BotRow({
   bot,
   active,
   onSelect,
+  onMenu,
 }: {
   bot: BotWithSession;
   active: boolean;
   onSelect: () => void;
+  onMenu: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   const last = bot.lastSession ?? null;
   return (
@@ -62,6 +66,7 @@ function BotRow({
       data-bot-row={bot.id}
       aria-current={active ? 'true' : undefined}
       onClick={onSelect}
+      onContextMenu={onMenu}
       className={`flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left ${
         active ? 'bg-paper shadow-sm ring-1 ring-line' : 'hover:bg-white/60'
       }`}
@@ -100,13 +105,15 @@ export function BotsMode({ onOpenSession }: { onOpenSession?: (id: string) => vo
   const [chatError, setChatError] = React.useState<string | null>(null);
   const openingRef = React.useRef(false);
 
-  const load = React.useCallback(async () => {
+  const load = React.useCallback(async (): Promise<BotWithSession[]> => {
     try {
       const res = await api.listBots({ sessions: true });
       setBots(res.bots);
       setError(null);
+      return res.bots;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load bots');
+      return [];
     } finally {
       setLoading(false);
     }
@@ -208,6 +215,121 @@ export function BotsMode({ onOpenSession }: { onOpenSession?: (id: string) => vo
     [load, openBot],
   );
 
+  // REQ-161 tick 3 — the Gallery's live actions re-home behind one header
+  // menu (run-agent / fork / publish / copy bot.json / delete) hitting the
+  // same real endpoints the old pane used; the shared ContextMenu primitive
+  // carries the entries, and a row's right-click opens the same menu.
+  const menu = useContextMenu<string>();
+  const openMenuKey = menu.menu?.key ?? null;
+  const menuBot = openMenuKey ? (bots.find((b) => b.id === openMenuKey) ?? null) : null;
+  const [action, setAction] = React.useState<{ kind: BotActionKind; bot: BotWithSession } | null>(null);
+  const [actionBusy, setActionBusy] = React.useState(false);
+  const [actionError, setActionError] = React.useState<string | null>(null);
+
+  const openAction = React.useCallback((kind: BotActionKind, bot: BotWithSession) => {
+    setActionError(null);
+    setAction({ kind, bot });
+  }, []);
+
+  function copyText(text: string, okLabel: string): void {
+    try {
+      void navigator.clipboard.writeText(text).then(
+        () => emitToast(okLabel),
+        () => emitToast('Copy failed — clipboard unavailable'),
+      );
+    } catch {
+      emitToast('Copy failed — clipboard unavailable');
+    }
+  }
+
+  function copyBotJson(bot: Bot): void {
+    const doc = {
+      id: bot.id,
+      name: bot.name,
+      model: bot.model,
+      fallback: bot.fallback,
+      memoryScope: bot.memoryScope,
+      budgets: bot.budgets,
+      visibility: bot.visibility,
+      version: bot.version,
+      createdFrom: bot.createdFrom,
+      tags: bot.tags,
+    };
+    copyText(JSON.stringify(doc, null, 2), 'bot.json copied');
+  }
+
+  const submitAction = React.useCallback(
+    async (payload: BotActionPayload) => {
+      if (!action) return;
+      const { kind, bot } = action;
+      setActionBusy(true);
+      setActionError(null);
+      try {
+        if (kind === 'run') {
+          const res = await api.runBot(bot.id, { task: (payload.task ?? '').trim() });
+          setAction(null);
+          emitToast(`Agent started: ${res.agentId}`);
+          await load();
+        } else if (kind === 'fork') {
+          const asId = (payload.asId ?? '').trim();
+          const res = await api.forkBot(bot.id, asId ? { as: asId } : {});
+          setAction(null);
+          emitToast(`Forked as ${res.bot.id}`);
+          const list = await load();
+          const fresh = list.find((b) => b.id === res.bot.id);
+          if (fresh) void openBot(fresh);
+        } else if (kind === 'publish') {
+          const res = await api.publishBot(bot.id, { visibility: payload.visibility ?? bot.visibility });
+          setAction(null);
+          emitToast(`Visibility: ${res.visibility ?? res.bot.visibility}`);
+          await load();
+        } else {
+          await api.deleteBot(bot.id);
+          setAction(null);
+          emitToast(`Bot deleted: ${bot.id}`);
+          if (selectedId === bot.id) {
+            setSelectedId(null);
+            writeSelectedBot(null);
+          }
+          await load();
+        }
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : 'Request failed');
+      } finally {
+        setActionBusy(false);
+      }
+    },
+    [action, load, openBot, selectedId],
+  );
+
+  const menuItems: ContextMenuEntry[] = menuBot
+    ? [
+        { type: 'header', label: `${menuBot.name} · v${menuBot.version}` },
+        { type: 'item', label: 'Run agent…', icon: Play, onSelect: () => openAction('run', menuBot) },
+        { type: 'item', label: 'Fork bot…', icon: GitFork, onSelect: () => openAction('fork', menuBot) },
+        {
+          type: 'item',
+          label: `Publish… (${menuBot.visibility})`,
+          icon: Share2,
+          disabled: menuBot.source === 'bundled',
+          hint: menuBot.source === 'bundled' ? 'read-only' : undefined,
+          onSelect: () => openAction('publish', menuBot),
+        },
+        { type: 'separator' },
+        { type: 'item', label: 'Copy bot.json', icon: Copy, onSelect: () => copyBotJson(menuBot) },
+        { type: 'separator' },
+        {
+          type: 'item',
+          label: 'Delete bot…',
+          icon: Trash2,
+          danger: true,
+          disabled: deleteBlockReason(menuBot) !== null,
+          hint: deleteBlockReason(menuBot) ?? undefined,
+          onSelect: () => openAction('delete', menuBot),
+        },
+      ]
+    : [];
+
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden" data-bots-mode>
       <aside className="flex w-[260px] shrink-0 flex-col border-r border-line bg-muted sm:w-[300px]">
@@ -248,7 +370,13 @@ export function BotsMode({ onOpenSession }: { onOpenSession?: (id: string) => vo
             </div>
           ) : null}
           {visible.map((bot) => (
-            <BotRow key={bot.id} bot={bot} active={bot.id === selectedId} onSelect={() => void openBot(bot)} />
+            <BotRow
+              key={bot.id}
+              bot={bot}
+              active={bot.id === selectedId}
+              onSelect={() => void openBot(bot)}
+              onMenu={(e) => menu.open(e, bot.id)}
+            />
           ))}
         </div>
       </aside>
@@ -259,7 +387,7 @@ export function BotsMode({ onOpenSession }: { onOpenSession?: (id: string) => vo
               <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#262624] text-[10px] font-semibold text-white">
                 {initials(selected.name)}
               </span>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="truncate text-[13px] font-semibold text-ink" data-bot-title>
                     {selected.name}
@@ -270,6 +398,16 @@ export function BotsMode({ onOpenSession }: { onOpenSession?: (id: string) => vo
                 </div>
                 <div className="truncate text-[11px] text-zinc-500">{selected.description}</div>
               </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                data-bot-menu={selected.id}
+                aria-label={`Bot actions for ${selected.name}`}
+                className="h-7 w-7 shrink-0"
+                onClick={(e) => menu.open(e, selected.id)}
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
             </div>
             {sessionId ? (
               <BotChat
@@ -321,6 +459,28 @@ export function BotsMode({ onOpenSession }: { onOpenSession?: (id: string) => vo
           error={createError}
           onCancel={() => setShowCreate(false)}
           onSubmit={(form) => void submitCreate(form)}
+        />
+      ) : null}
+      {menu.menu ? (
+        <ContextMenu
+          x={menu.menu.x}
+          y={menu.menu.y}
+          items={menuItems}
+          onClose={menu.close}
+          label="Bot actions"
+        />
+      ) : null}
+      {action ? (
+        <BotActionDialog
+          kind={action.kind}
+          bot={action.bot}
+          busy={actionBusy}
+          error={actionError}
+          onCancel={() => {
+            setAction(null);
+            setActionError(null);
+          }}
+          onSubmit={(payload) => void submitAction(payload)}
         />
       ) : null}
     </div>

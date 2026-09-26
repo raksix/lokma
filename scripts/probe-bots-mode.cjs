@@ -9,10 +9,17 @@
  *   NODE_PATH=/root/test-hermes/node_modules xvfb-run -a node scripts/probe-bots-mode.cjs --url http://127.0.0.1:3457 --token "$TK"
  *
  * REQ-161 tick 2 adds: no Bots entry survives in either rail, and the normal
- * chat's header carries no bot picker. Still a later tick: the gallery action
- * re-homing (fork / publish / delete / bot.json / run-agent).
+ * chat's header carries no bot picker. Tick 3 adds: the Gallery's live
+ * actions (run / fork / publish / copy bot.json / delete) re-homed behind
+ * the selected bot's header menu — the probe drives each one against the
+ * real endpoints (incl. a menu-built fork that is published, run and
+ * deleted again, plus the clipboard copy), proves a message typed into the
+ * fork chat lands in that bot-bound session's JSONL on disk, and cleans up
+ * after itself.
  */
 const { chromium } = require('playwright-core');
+const fs = require('fs');
+const path = require('path');
 
 const readFlag = (name, fallback) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -24,6 +31,8 @@ if (!TOKEN) {
   console.error('missing --token (mint one with scripts/mint-e2e-token.mjs)');
   process.exit(2);
 }
+// Unique per run so a crashed earlier probe can never 409 the fork step.
+const FORK_ID = `e2e-req161-fork-${Date.now().toString(36)}`;
 
 let passed = 0;
 let failed = 0;
@@ -104,6 +113,7 @@ function checkNoScatteredBots(s, where) {
 (async () => {
   const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] });
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE });
   await ctx.addInitScript((t) => {
     try {
       localStorage.setItem('lokma-token', t);
@@ -113,6 +123,12 @@ function checkNoScatteredBots(s, where) {
   }, TOKEN);
   const page = await ctx.newPage();
   page.setDefaultTimeout(15000);
+
+  // Captured during the action checks so the cleanup (finally) can never
+  // leave a probe agent/session behind, even after a crash.
+  let runAgentId = null;
+  let runSessionId = null;
+  let forkSessionId = null;
 
   try {
     // ── Boot: normal (chat) mode is the default and carries the chrome ──
@@ -165,6 +181,230 @@ function checkNoScatteredBots(s, where) {
       );
     }
 
+    // ── REQ-161 tick 3 — the gallery actions live behind the header menu ──
+    const openMenu = async () => {
+      const menu = page.locator('[role="menu"][aria-label="Bot actions"]');
+      await menu.waitFor({ state: 'visible', timeout: 5000 });
+      return menu.evaluate((el) =>
+        Array.from(el.querySelectorAll('[role="menuitem"]')).map((b) => ({
+          label: (b.textContent || '').replace(/\s+/g, ' ').trim(),
+          disabled: b.hasAttribute('disabled'),
+        })),
+      );
+    };
+
+    await page.click('[data-bot-menu="lokma-ceo"]');
+    const items = await openMenu();
+    const labels = items.map((i) => i.label);
+    check(labels.some((l) => /Run agent/.test(l)), 'header menu offers Run agent', labels.join(' | ').slice(0, 150));
+    check(labels.some((l) => /Fork bot/.test(l)), 'header menu offers Fork bot');
+    check(labels.some((l) => /Publish/.test(l)), 'header menu offers Publish');
+    check(labels.some((l) => /Copy bot\.json/.test(l)), 'header menu offers Copy bot.json');
+    check(labels.some((l) => /Delete bot/.test(l)), 'header menu offers Delete bot');
+    const publishItem = items.find((i) => /Publish/.test(i.label));
+    const deleteItem = items.find((i) => /Delete bot/.test(i.label));
+    check(Boolean(publishItem && publishItem.disabled), 'bundled bot: Publish is disabled (read-only)');
+    check(Boolean(deleteItem && deleteItem.disabled), 'bundled bot: Delete is disabled (read-only)');
+
+    // Copy bot.json → the real record lands on the clipboard.
+    await page.click('[role="menu"][aria-label="Bot actions"] [role="menuitem"]:has-text("Copy bot.json")');
+    await wait(400);
+    const clip = await page.evaluate(async () => {
+      try {
+        return await navigator.clipboard.readText();
+      } catch {
+        return '';
+      }
+    });
+    let clipDoc = null;
+    try {
+      clipDoc = JSON.parse(clip);
+    } catch {
+      clipDoc = null;
+    }
+    check(
+      Boolean(clipDoc && clipDoc.id === 'lokma-ceo' && typeof clipDoc.model === 'string'),
+      'Copy bot.json puts the real record on the clipboard',
+      clip.slice(0, 50),
+    );
+
+    // Fork from the menu → dialog → the fork appears as a row and is selected.
+    await page.click('[data-bot-menu="lokma-ceo"]');
+    await page.waitForSelector('[role="menu"][aria-label="Bot actions"]');
+    await page.click('[role="menu"][aria-label="Bot actions"] [role="menuitem"]:has-text("Fork bot")');
+    await page.waitForSelector('[data-bot-action="fork"]');
+    await page.fill('[data-bot-fork-input]', FORK_ID);
+    await page.click('[data-bot-action="fork"] [data-bot-action-submit]');
+    let forked = false;
+    for (let i = 0; i < 30 && !forked; i += 1) {
+      await wait(400);
+      forked = await page.evaluate((id) => Boolean(document.querySelector(`[data-bot-row="${id}"]`)), FORK_ID);
+    }
+    check(forked, 'Fork from the menu creates the bot (row appears)', FORK_ID);
+    let forkSelected = false;
+    for (let i = 0; i < 20 && !forkSelected; i += 1) {
+      forkSelected = await page.evaluate((id) => Boolean(document.querySelector(`[data-bot-menu="${id}"]`)), FORK_ID);
+      if (!forkSelected) await wait(400);
+    }
+    check(forkSelected, 'the fresh fork becomes the selected bot (header menu follows)');
+
+    // The fork's minted session (removed again in the cleanup below).
+    const forkedList = await ctx.request.get(`${BASE}/api/bots?sessions=1`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    });
+    const forkedBody = await forkedList.json().catch(() => null);
+    forkSessionId =
+      (forkedBody && (forkedBody.bots || []).find((b) => b.id === FORK_ID)?.lastSession?.id) || null;
+
+    // "The message is really delivered" (REQ-161 acceptance): type into the
+    // fork chat's composer and prove the row lands in THAT bot-bound session
+    // server-side (its JSONL on disk), not just somewhere in the browser.
+    const MARKER = `req161-probe-msg-${Date.now().toString(36)}`;
+    const composed = await page.evaluate(() => {
+      const ta = document.querySelector('textarea[aria-label="Message Lokma"]');
+      return ta ? ta.getAttribute('placeholder') || '' : null;
+    });
+    check(
+      typeof composed === 'string' && composed.startsWith('Message '),
+      'fork chat composer is mounted for the message check',
+      composed === null ? 'no textarea' : composed,
+    );
+    await page.fill('textarea[aria-label="Message Lokma"]', MARKER);
+    await page.press('textarea[aria-label="Message Lokma"]', 'Enter');
+    const sessionFileFor = (id) => {
+      const root = path.join(process.env.HOME || '/root', '.lokma', 'projects');
+      let projects = [];
+      try {
+        projects = fs.readdirSync(root);
+      } catch {
+        return null;
+      }
+      for (const p of projects) {
+        const f = path.join(root, p, 'sessions', `${id}.jsonl`);
+        if (fs.existsSync(f)) return f;
+      }
+      return null;
+    };
+    let deliveredFile = null;
+    for (let i = 0; i < 40 && !deliveredFile; i += 1) {
+      await wait(500);
+      const f = forkSessionId ? sessionFileFor(forkSessionId) : null;
+      if (f) {
+        try {
+          if (fs.readFileSync(f, 'utf8').includes(MARKER)) deliveredFile = f;
+        } catch {
+          /* keep polling */
+        }
+      }
+    }
+    check(
+      Boolean(deliveredFile),
+      'the sent message lands in the bot-bound session (server-side JSONL)',
+      deliveredFile || 'marker not found within 20s',
+    );
+    const domMarker = await page.evaluate((m) => {
+      return Array.prototype.some.call(document.querySelectorAll('*'), (el) => {
+        return el.children.length === 0 && (el.textContent || '').includes(m);
+      });
+    }, MARKER);
+    check(domMarker, 'the sent message paints in the fork chat (dom)');
+
+    // Run agent on the fork: an empty task validates, a real task spawns one.
+    await page.click(`[data-bot-menu="${FORK_ID}"]`);
+    await page.waitForSelector('[role="menu"][aria-label="Bot actions"]');
+    await page.click('[role="menu"][aria-label="Bot actions"] [role="menuitem"]:has-text("Run agent")');
+    await page.waitForSelector('[data-bot-action="run"]');
+    await page.click('[data-bot-action="run"] [data-bot-action-submit]');
+    const emptyRunText = await page.evaluate(() => {
+      const dlg = document.querySelector('[data-bot-action="run"]');
+      return dlg ? dlg.textContent || '' : '';
+    });
+    check(/Task must be/.test(emptyRunText), 'Run dialog validates an empty task before sending');
+
+    const runWait = page.waitForResponse(
+      (r) => r.url().includes(`/api/bots/${FORK_ID}/run`) && r.request().method() === 'POST',
+      { timeout: 15000 },
+    );
+    await page.fill('[data-bot-task-input]', 'E2E probe: confirm the bot name.');
+    await page.click('[data-bot-action="run"] [data-bot-action-submit]');
+    const runRes = await runWait.catch(() => null);
+    let runBody = null;
+    if (runRes) {
+      try {
+        runBody = await runRes.json();
+      } catch {
+        runBody = null;
+      }
+    }
+    check(
+      Boolean(runRes && runRes.status() === 200 && runBody && runBody.agentId),
+      'Run agent spawns a real agent (HTTP 200 + agentId)',
+      runRes ? `status=${runRes.status()}` : 'no response',
+    );
+    runAgentId = (runBody && runBody.agentId) || null;
+    runSessionId = (runBody && runBody.sessionId) || null;
+    let runDialogClosed = false;
+    for (let i = 0; i < 20 && !runDialogClosed; i += 1) {
+      runDialogClosed = await page.evaluate(() => !document.querySelector('[data-bot-action="run"]'));
+      if (!runDialogClosed) await wait(300);
+    }
+    check(runDialogClosed, 'Run dialog closes after a successful run');
+
+    // Publish the fork (editable) → real visibility flip, server-confirmed.
+    await page.click(`[data-bot-menu="${FORK_ID}"]`);
+    await page.waitForSelector('[role="menu"][aria-label="Bot actions"]');
+    await page.click('[role="menu"][aria-label="Bot actions"] [role="menuitem"]:has-text("Publish")');
+    await page.waitForSelector('[data-bot-action="publish"]');
+    await page.click('[data-bot-publish="shared"]');
+    await page.click('[data-bot-action="publish"] [data-bot-action-submit]');
+    let published = false;
+    for (let i = 0; i < 20 && !published; i += 1) {
+      const res = await ctx.request.get(`${BASE}/api/bots/${FORK_ID}`, {
+        headers: { Authorization: `Bearer ${TOKEN}` },
+      });
+      const body = await res.json().catch(() => null);
+      if (body && body.bot && body.bot.visibility === 'shared') published = true;
+      if (!published) await wait(400);
+    }
+    check(published, 'Publish from the menu flips visibility (server-confirmed)');
+
+    // Delete the fork from the menu → confirm dialog → row and server entry gone.
+    await page.click(`[data-bot-menu="${FORK_ID}"]`);
+    await page.waitForSelector('[role="menu"][aria-label="Bot actions"]');
+    await page.click('[role="menu"][aria-label="Bot actions"] [role="menuitem"]:has-text("Delete bot")');
+    await page.waitForSelector('[data-bot-action="delete"]');
+    await page.click('[data-bot-action="delete"] [data-bot-action-submit]');
+    let forkGone = false;
+    for (let i = 0; i < 30 && !forkGone; i += 1) {
+      await wait(400);
+      forkGone = await page.evaluate((id) => !document.querySelector(`[data-bot-row="${id}"]`), FORK_ID);
+    }
+    check(forkGone, 'Delete from the menu removes the row');
+    const goneRes = await ctx.request.get(`${BASE}/api/bots/${FORK_ID}`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    });
+    check(goneRes.status() === 404, 'deleted bot is gone server-side (404)', `status=${goneRes.status()}`);
+
+    // Cleanup this probe's session/agent state (the fork itself is gone above).
+    for (const url of [
+      runAgentId ? `${BASE}/api/agents/${runAgentId}` : null,
+      runSessionId ? `${BASE}/api/sessions/${runSessionId}` : null,
+      forkSessionId ? `${BASE}/api/sessions/${forkSessionId}` : null,
+    ]) {
+      if (url) {
+        await ctx.request.delete(url, { headers: { Authorization: `Bearer ${TOKEN}` } }).catch(() => {});
+      }
+    }
+    // A run started by the delivered message may still append rows and
+    // recreate its file — re-delete it if it came back (file-checked).
+    for (let attempt = 0; forkSessionId && attempt < 3; attempt += 1) {
+      await wait(attempt === 0 ? 600 : 5000);
+      if (!sessionFileFor(forkSessionId)) break;
+      await ctx.request.delete(`${BASE}/api/sessions/${forkSessionId}`, {
+        headers: { Authorization: `Bearer ${TOKEN}` },
+      }).catch(() => {});
+    }
+
     // ── Mode persistence across a reload ──
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-mode-switch="bots"]', { timeout: 20000 });
@@ -188,6 +428,19 @@ function checkNoScatteredBots(s, where) {
   } catch (e) {
     check(false, 'probe crashed', e instanceof Error ? e.message : String(e));
   } finally {
+    // Best-effort: never leave probe state behind, even after a crash.
+    try {
+      if (runAgentId) {
+        await ctx.request.delete(`${BASE}/api/agents/${runAgentId}`, {
+          headers: { Authorization: `Bearer ${TOKEN}` },
+        });
+      }
+      await ctx.request.delete(`${BASE}/api/bots/${FORK_ID}`, {
+        headers: { Authorization: `Bearer ${TOKEN}` },
+      });
+    } catch {
+      /* best-effort cleanup */
+    }
     await browser.close();
   }
 

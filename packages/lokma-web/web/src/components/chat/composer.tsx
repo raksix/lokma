@@ -200,6 +200,7 @@ export function Composer({
   onStop,
   onSlash,
   onPickModel,
+  placeholder,
 }: {
   model: string;
   streaming: boolean;
@@ -214,6 +215,8 @@ export function Composer({
   onStop: () => void;
   onSlash: (id: string, args: string, fullText: string) => void;
   onPickModel: (id: string) => void;
+  /** REQ-161 — caller-supplied copy (Bots mode: `Message <bot name>`). */
+  placeholder?: string;
 }) {
   const [text, setText] = React.useState('');
   const [mode, setMode] = React.useState<'steer' | 'queue'>(readMode);
@@ -613,7 +616,7 @@ export function Composer({
           ref={taRef}
           rows={1}
           aria-label="Message Lokma"
-          placeholder={socketOpen ? 'Ask Lokma — @file for context, / for commands' : 'Connecting…'}
+          placeholder={placeholder ?? (socketOpen ? 'Ask Lokma — @file for context, / for commands' : 'Connecting…')}
           value={text}
           disabled={!socketOpen && !(mode === 'queue' && streaming)}
           onChange={(e) => {

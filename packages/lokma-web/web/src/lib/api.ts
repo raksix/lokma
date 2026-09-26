@@ -764,7 +764,20 @@ export type Bot = {
   featured: boolean;
   source: BotSource;
 };
-export type BotsRes = { bots: Bot[]; count: number };
+export type BotsRes = { bots: BotWithSession[]; count: number };
+/**
+ * REQ-161 — `GET /api/bots?sessions=1` joins each bot's latest chat onto the
+ * row (time + last-message preview + live run flags) for the Bots mode list.
+ */
+export type BotLastSession = {
+  id: string;
+  title: string;
+  updatedAt: string | null;
+  preview: string;
+  running: boolean;
+  queued: number;
+};
+export type BotWithSession = Bot & { lastSession?: BotLastSession | null };
 export type BotDetailRes = { ok: boolean; bot: Bot };
 export type CreateBotBody = {
   id?: string;
@@ -1429,7 +1442,8 @@ export const api = {
   // Bots — shareable bot.json packages (W5-20). The server owns the
   // registry (`~/.lokma/bots/` + bundled lokma-ceo); run spawns a real
   // agent + a real session for playground chat.
-  listBots: () => get<BotsRes>('/api/bots'),
+  listBots: (opts?: { sessions?: boolean }) =>
+    get<BotsRes>(opts?.sessions ? '/api/bots?sessions=1' : '/api/bots'),
   getBot: (id: string) => get<BotDetailRes>(`/api/bots/${encodeURIComponent(id)}`),
   createBot: (body: CreateBotBody) => post<BotMutationRes>('/api/bots', body),
   /** Edit a user bot (bundled templates answer 400 `bundled_readonly`). */

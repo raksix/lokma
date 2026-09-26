@@ -54,7 +54,21 @@ const shell = read(join('components', 'app-shell.tsx'));
 check('shell renders MobileSingleView', shell.includes('<MobileSingleView'));
 check('shell forces tiling off on mobile', shell.includes('setTiling(false)'));
 check('shell forces windowed off on mobile', shell.includes('setWindowed(false)'));
-check('mobile header shows side toggles (REQ-091)', !shell.includes('hideSideToggles'));
+/**
+ * REQ-091 — the MOBILE header keeps real side toggles. Scanned per header
+ * usage (the bots mode in REQ-161 legitimately hides its chrome, and it is
+ * not the mobile branch, so a whole-file `!includes` would misread it).
+ */
+const mobileBranch = shell.slice(shell.lastIndexOf('if (isMobile) {'));
+const mobileHeaderStart = mobileBranch.indexOf('<Header');
+const mobileHeader = mobileBranch.slice(
+  mobileHeaderStart,
+  mobileBranch.indexOf('/>', mobileHeaderStart),
+);
+check(
+  'mobile header shows side toggles (REQ-091)',
+  mobileHeader.includes('onToggleLeft') && !mobileHeader.includes('hideSideToggles'),
+);
 check('mobile header has no noop toggles (REQ-091)', !shell.includes('onToggleLeft={noop}'));
 check('mobile branch renders drawers (REQ-091)', shell.split('<MobileDrawer').length - 1 >= 4);
 check('tiling toggle hides on mobile', shell.includes('if (isMobile) return null'));

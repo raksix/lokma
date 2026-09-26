@@ -56,10 +56,16 @@ export function Chat({
   sessionId,
   ws,
   onOpenSession,
+  composerPlaceholder,
 }: {
   sessionId: string;
   ws: UseWs;
   onOpenSession?: (id: string) => void;
+  /**
+   * REQ-161 — the Bots mode speaks in the bot's voice ("Message <bot>");
+   * plain chat keeps the default composer copy.
+   */
+  composerPlaceholder?: string;
 }) {
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const [model, setModel] = React.useState<string>('');
@@ -760,6 +766,7 @@ export function Chat({
           onStop={interrupt}
           onSlash={runSlash}
           onPickModel={pickModel}
+          placeholder={composerPlaceholder}
         />
       </div>
     </Card>

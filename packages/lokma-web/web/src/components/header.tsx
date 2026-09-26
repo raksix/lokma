@@ -4,6 +4,7 @@ import type { CostTotal, WsStatus } from '@/lib/ws';
 import { api } from '@/lib/api';
 import { applyTheme, applyThemeVars, getTheme, subscribeTheme, type ShellTheme } from '@/components/shell';
 import { sidebarPanelTitle, type ExplorerSide } from '@/components/shell/responsive';
+import type { AppMode } from '@/components/bots/mode';
 
 /**
  * Header — harness top bar ported from the concept shell (same cream/
@@ -32,6 +33,8 @@ export function Header({
   explorerSide = 'right',
   onSwapSides,
   hideSideToggles = false,
+  mode,
+  onModeChange,
 }: {
   sessionId: string;
   serverUp: boolean | null;
@@ -49,6 +52,13 @@ export function Header({
    * Search / settings / theme stay — they open modals, not sidebars.
    */
   hideSideToggles?: boolean;
+  /**
+   * REQ-161 — top-level surface: `lokma` = chat/workspace, `Bots` = the
+   * separate Bots section. Undefined keeps the switch hidden (standalone
+   * embeds that own no mode).
+   */
+  mode?: AppMode;
+  onModeChange?: (mode: AppMode) => void;
 }) {
   const [theme, setTheme] = React.useState<ShellTheme>('light');
 
@@ -113,11 +123,44 @@ export function Header({
             <PanelLeft className="h-3.5 w-3.5" />
           </button>
         )}
-        <div className="ml-1 flex items-center gap-1.5">
-          <span className="grid h-5 w-5 place-items-center rounded-md bg-[#262624] text-[10px] font-semibold text-white">
-            L
-          </span>
-          <span className="hidden font-serif text-[15px] sm:block">lokma</span>
+        {/* REQ-161 — surface switch: `lokma` is the normal chat/workspace
+            mode, `Bots` opens the separate Bots section. The active chip
+            carries the ink fill so the current mode is obvious at a glance;
+            clicking `lokma` always returns to the (untouched) normal mode. */}
+        <div className="ml-1 flex items-center gap-1" role="tablist" aria-label="Surface">
+          <button
+            type="button"
+            role="tab"
+            data-mode-switch="chat"
+            aria-selected={(mode ?? 'chat') === 'chat'}
+            title="lokma — chat & workspace"
+            onClick={() => onModeChange?.('chat')}
+            className={`flex items-center gap-1.5 rounded-md px-1.5 py-0.5 ${
+              (mode ?? 'chat') === 'chat' ? 'bg-[#F2F0EB]' : 'hover:bg-[#F2F0EB]'
+            }`}
+          >
+            <span className="grid h-5 w-5 place-items-center rounded-md bg-[#262624] text-[10px] font-semibold text-white">
+              L
+            </span>
+            <span className="hidden font-serif text-[15px] sm:block">lokma</span>
+          </button>
+          {onModeChange ? (
+            <button
+              type="button"
+              role="tab"
+              data-mode-switch="bots"
+              aria-selected={mode === 'bots'}
+              title="Bots — separate bot section"
+              onClick={() => onModeChange('bots')}
+              className={`rounded-md px-1.5 py-0.5 text-[13px] font-medium ${
+                mode === 'bots'
+                  ? 'bg-[#262624] text-white'
+                  : 'text-zinc-600 hover:bg-[#F2F0EB]'
+              }`}
+            >
+              Bots
+            </button>
+          ) : null}
         </div>
         <div className="ml-2 hidden items-center gap-1 text-xs text-zinc-500 md:flex">
           <span className="mx-1 h-4 w-px bg-[#E8E4DE]" />

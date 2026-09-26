@@ -7,6 +7,8 @@ import type { InspectorTab } from '@/components/providers';
 import { SessionsSidebar } from '@/components/sessions';
 import { FOCUS_FILES_EVENT } from '@/components/files';
 import { Chat, INITIAL_PREFIX } from '@/components/chat';
+import { BotsMode } from '@/components/bots/bots-mode';
+import { readAppMode, writeAppMode, type AppMode } from '@/components/bots/mode';
 import { TilingWorkspace, isPaneOnlyTab } from '@/components/panes';
 import { LayoutGrid, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -119,6 +121,13 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   const rateRef = React.useRef<{ tokens: number; at: number } | null>(null);
   // REQ-007 — which physical side hosts the Explorer (persisted, survives reload).
   const [explorerSide, setExplorerSide] = React.useState<ExplorerSide>(() => readExplorerSide());
+  // REQ-161 — top-level surface: the normal chat/workspace mode or the
+  // separate Bots section. Persisted, so a reload lands where the user was.
+  const [mode, setMode] = React.useState<AppMode>(() => readAppMode());
+  const switchMode = React.useCallback((next: AppMode) => {
+    setMode(next);
+    writeAppMode(next);
+  }, []);
   // REQ-010 — the Inspector always lives opposite the Explorer; the thin
   // icon rail docks on its outer edge and follows the REQ-007 swap.
   const inspectorSide: SidebarSide = inspectorRailSide(explorerSide);
@@ -516,6 +525,78 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   const leftContent = explorerSide === 'left' ? explorerContent : inspectorContent;
   const rightContent = explorerSide === 'left' ? inspectorContent : explorerContent;
 
+  // REQ-161 — the Bots section is its own surface: header + bot list + the
+  // selected bot's chat, no rails/sidebars/tiling. The normal mode's pane
+  // layout lives in the persisted stores, so switching back to `lokma`
+  // restores it untouched (and the remembered bot comes back with it).
+  if (mode === 'bots') {
+    return (
+      <div className="flex h-screen flex-col bg-background text-foreground">
+        <a
+          href="#lokma-chat"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-1 focus:left-1 focus:z-[70] focus:rounded-md focus:bg-[#262624] focus:px-3 focus:py-1.5 focus:text-xs focus:text-white"
+        >
+          Skip to chat
+        </a>
+        <Header
+          sessionId={activeId}
+          serverUp={serverUp}
+          cost={ws.cost}
+          wsStatus={ws.status}
+          onSearch={() => setSearchOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onToggleLeft={() => toggleSidebar('left')}
+          onToggleRight={() => toggleSidebar('right')}
+          explorerSide={explorerSide}
+          mode={mode}
+          onModeChange={switchMode}
+          hideSideToggles
+        />
+        <OfflineBanner status={ws.status} onRetry={ws.reconnect} />
+        <div id="lokma-chat" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <PaneErrorBoundary paneName="Bots">
+            <BotsMode
+              onOpenSession={(id) => {
+                switchSession(id);
+                switchMode('chat');
+              }}
+            />
+          </PaneErrorBoundary>
+        </div>
+        <FooterBar
+          serverUp={serverUp}
+          latencyMs={latencyMs}
+          projectName={projectName}
+          cpuPercent={metrics?.cpuPercent ?? null}
+          memUsedBytes={metrics?.memory.usedBytes ?? null}
+          memTotalBytes={metrics?.memory.totalBytes ?? null}
+          tokensPerSec={tokensPerSec}
+          version={metrics?.version ?? null}
+        />
+        <SearchModal
+          open={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          onSelectSession={(id) => {
+            switchSession(id);
+            switchMode('chat');
+          }}
+        />
+        <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} explorerSide={explorerSide} />
+        {settingsOpen ? (
+          <React.Suspense fallback={null}>
+            <LazySettingsModal
+              open={settingsOpen}
+              onClose={() => setSettingsOpen(false)}
+              explorerSide={explorerSide}
+              initialSection={settingsSection}
+            />
+          </React.Suspense>
+        ) : null}
+        <ToastHost />
+      </div>
+    );
+  }
+
   // REQ-024 — mobile single-view branch: below the breakpoint the harness
   // renders a separate simple mode (one surface + bottom tab bar) instead
   // of the desktop frame. No activity/inspector rails, no tiling toggle or
@@ -544,6 +625,8 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           onToggleLeft={() => toggleSidebar('left')}
           onToggleRight={() => toggleSidebar('right')}
           explorerSide={explorerSide}
+          mode={mode}
+          onModeChange={switchMode}
         />
         <OfflineBanner status={ws.status} onRetry={ws.reconnect} />
         <div id="lokma-chat" className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -627,6 +710,8 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         onToggleRight={() => toggleSidebar('right')}
         explorerSide={explorerSide}
         onSwapSides={swapSides}
+        mode={mode}
+        onModeChange={switchMode}
       />
       <OfflineBanner status={ws.status} onRetry={ws.reconnect} />
       <div className="flex flex-1 overflow-hidden">

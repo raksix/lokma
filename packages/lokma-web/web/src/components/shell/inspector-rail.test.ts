@@ -23,7 +23,7 @@ check('rail sits opposite the Explorer (left)', inspectorRailSide('left') === 'r
 check('rail sits opposite the Explorer (right)', inspectorRailSide('right') === 'left');
 
 const tabs = INSPECTOR_RAIL_ITEMS.map((item) => item.tab);
-check('twenty-two rail items (21 Inspector menus + the Agent Hub modal entry)', tabs.length === 22);
+check('twenty-two rail items (20 Inspector menus + the Agent Hub & Orchestration modal entries)', tabs.length === 22);
 check('rail tabs unique', new Set(tabs).size === tabs.length);
 check('files first (VS Code Explorer position), todos last', tabs[0] === 'files' && tabs[tabs.length - 1] === 'todos');
 check(
@@ -40,13 +40,14 @@ check(
 // pane/tab anymore, so it is exempt from the REQ-026 drag contract while
 // every other rail entry still drags as a valid rail drop id.
 check(
-  'REQ-163 agent hub rail entry opens the Agent Hub settings section',
-  isRailModalTab('agents') && RAIL_MODAL_SECTIONS.agents === 'agents',
+  'REQ-163/164 the modal rail entries open their Settings sections',
+  isRailModalTab('agents') && RAIL_MODAL_SECTIONS.agents === 'agents' &&
+    isRailModalTab('orchestration') && RAIL_MODAL_SECTIONS.orchestration === 'orchestration',
 );
 check(
-  'REQ-163 the agent hub entry is the only non-dragging rail tab',
-  INSPECTOR_RAIL_ITEMS.filter((item) => isRailModalTab(item.tab)).length === 1 &&
-    INSPECTOR_RAIL_ITEMS.every((item) => !isRailModalTab(item.tab) || item.tab === 'agents'),
+  'REQ-163/164 exactly two non-dragging rail tabs (agent hub + orchestration)',
+  INSPECTOR_RAIL_ITEMS.filter((item) => isRailModalTab(item.tab)).length === 2 &&
+    INSPECTOR_RAIL_ITEMS.every((item) => !isRailModalTab(item.tab) || item.tab === 'agents' || item.tab === 'orchestration'),
 );
 check(
   'REQ-026 every pane rail tab drags as a valid rail drop id',
@@ -65,6 +66,10 @@ check(
 check(
   'REQ-163 a stale agents drop is ignored (no pane definition)',
   parseInspectorDrop({ getData: (t: string) => (t === 'application/x-lokma-inspector' ? 'agents' : '') }) === null,
+);
+check(
+  'REQ-164 a stale orchestration drop is ignored (no pane definition)',
+  parseInspectorDrop({ getData: (t: string) => (t === 'application/x-lokma-inspector' ? 'orchestration' : '') }) === null,
 );
 
 console.log(`inspector-rail.test.ts: ${passed} passed, ${failed} failed`);

@@ -16,7 +16,6 @@ import {
   LazyMemoryPane,
   LazyModelsPane,
   LazyObservabilityPane,
-  LazyOrchestrationPane,
   LazyPluginsPane,
   LazyProvidersPane,
   LazySettingsPane,
@@ -81,8 +80,8 @@ function LazyTab({
   if (tab === 'models') return <LazyModelsPane />;
   if (tab === 'usage') return <LazyUsagePane onOpenSession={onOpenSession} />;
   if (tab === 'settings') return <LazySettingsPane />;
-  // REQ-163 — Agent Hub is not a pane anymore (Settings modal section).
-  if (tab === 'orchestration') return <LazyOrchestrationPane />;
+  // REQ-163/164 — Agent Hub and Orchestration are not panes anymore
+  // (Settings modal sections).
   if (tab === 'vault') return <LazyVaultPane />;
   if (tab === 'skills') return <LazySkillsPane />;
   if (tab === 'archify') return <LazyArchifyPane />;

@@ -5,7 +5,6 @@ import {
   Beaker,
   Brain,
   Clock3,
-  Cpu,
   Folder,
   FolderOpen,
   GitBranch,
@@ -39,8 +38,8 @@ export const TAB_ICONS: Record<InspectorTabId, React.ReactNode> = {
   terminal: <Terminal className="h-3 w-3" />,
   git: <GitBranch className="h-3 w-3" />,
   browser: <Globe className="h-3 w-3" />,
-  // REQ-163 — Agent Hub left the pane registry (Settings modal section).
-  orchestration: <Cpu className="h-3 w-3" />,
+  // REQ-163/164 — Agent Hub and Orchestration left the pane registry
+  // (Settings modal sections).
   vault: <Folder className="h-3 w-3" />,
   skills: <Puzzle className="h-3 w-3" />,
   archify: <Workflow className="h-3 w-3" />,

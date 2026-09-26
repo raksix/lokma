@@ -4,6 +4,7 @@ import {
   Brain,
   CircleUserRound,
   Clock3,
+  Cpu,
   Info,
   Keyboard,
   Layers,
@@ -33,6 +34,7 @@ import {
   LazyCronApprovalsPane,
   LazyMemoryPane,
   LazyModelsPane,
+  LazyOrchestrationPane,
   LazyPluginsPane,
   LazyProvidersPane,
   PaneFallback,
@@ -71,6 +73,8 @@ const SECTION_ICONS: Record<SettingsSectionId, typeof Settings> = {
   'models': Layers,
   // REQ-163 — Agent Hub section (moved out of the panes).
   'agents': Users,
+  // REQ-164 — Orchestration section (moved out of the panes).
+  'orchestration': Cpu,
   'permissions': Shield,
   'mcp': Boxes,
   'memory': Brain,
@@ -236,6 +240,15 @@ export function SettingsModal({
                 // live pane renders inside the modal body (its h-full root
                 // fills the body height; the body owns the scrolling).
                 <LazyAgentsPane />
+              ) : section === 'orchestration' ? (
+                // REQ-164 — Orchestration is a Settings section now, mirroring
+                // the pane-tab host: the `@container` wrapper gives the pane's
+                // `@min-*` rules a real query container (without one the
+                // Fan-out button stays `hidden`), and `h-full` hands its tree
+                // area the modal body's height so the pane scrolls internally.
+                <div className="@container h-full min-h-0">
+                  <LazyOrchestrationPane />
+                </div>
               ) : section === 'memory' ? (
                 <LazyMemoryPane />
               ) : section === 'cron' ? (

@@ -458,6 +458,8 @@ export const SETTINGS_SECTIONS = [
   { id: 'models', label: 'Models' },
   // REQ-163 — Agent Hub moved out of the panes: it lives here as a section.
   { id: 'agents', label: 'Agent Hub' },
+  // REQ-164 — Orchestration left the panes too (agent surfaces together).
+  { id: 'orchestration', label: 'Orchestration' },
   { id: 'permissions', label: 'Permissions' },
   { id: 'mcp', label: 'MCP' },
   { id: 'memory', label: 'Memory' },

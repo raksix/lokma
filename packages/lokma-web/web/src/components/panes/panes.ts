@@ -46,9 +46,9 @@ export const INSPECTOR_TABS = [
   { id: 'terminal', label: 'Terminal' },
   { id: 'git', label: 'Git' },
   { id: 'browser', label: 'Browser' },
-  // REQ-163 — Agent Hub is no longer a pane/tab: it opens as a Settings
-  // modal section (rail click), so the pane registry has no 'agents' entry.
-  { id: 'orchestration', label: 'Orchestration' },
+  // REQ-163/164 — Agent Hub and Orchestration are no longer pane/tabs:
+  // they open as Settings modal sections (rail click), so the pane
+  // registry carries neither 'agents' nor 'orchestration'.
   { id: 'vault', label: 'Vault' },
   { id: 'skills', label: 'Skills' },
   { id: 'archify', label: 'Archify' },
@@ -69,7 +69,6 @@ export type InspectorTabId = (typeof INSPECTOR_TABS)[number]['id'];
 /** The concept TilingBar entries (concept prop names kept as comments). */
 export const TILING_BAR_TABS: InspectorTabId[] = [
   'terminal', // onOpenTerminal
-  'orchestration', // onOpenAgents (concept opens OrchestrationPane)
   'git', // onOpenGit
   'vault', // onOpenVault
   'archify', // onOpenArchify

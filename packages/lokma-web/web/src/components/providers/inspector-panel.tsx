@@ -15,7 +15,6 @@ import {
   LazyMemoryPane,
   LazyModelsPane,
   LazyObservabilityPane,
-  LazyOrchestrationPane,
   LazyPluginsPane,
   LazyProvidersPane,
   LazySettingsPane,
@@ -44,9 +43,7 @@ import {
  * desktop sidebars show only a pane redirect card), Agents the
  * real W4-13 pane (registry CRUD + pause/resume/kill/fork/clone +
  * SOUL.md/MEMORY.md editors over `GET/POST/PATCH/DELETE /api/agents/*`),
- * Orchestration the real W4-14 pane (live state-grouped tree + fan-out
- * creation + cancel-all over the same registry, kept live by WS
- * `agent_state` frames), Vault the real W4-15 pane (live file graph +
+ * Vault the real W4-15 pane (live file graph +
  * note reader with `[[wikilink]]` navigation + ingest over
  * `GET /api/vault/graph|tree`, `GET /api/vault/note`,
  * `POST /api/vault/ingest`), Skills the real W4-16 pane (live registry
@@ -82,6 +79,8 @@ import {
  * /api/config` `features`, shipped rows opening their real Inspector tab).
  * Memory the real memory-deep wave 2 pane (global MEMORY.md / USER.md
  * entries + live usage meter over `GET/POST/PATCH/DELETE /api/memory`).
+ * Agent Hub (REQ-163) and Orchestration (REQ-164) moved OUT of the tabs:
+ * their rail icons open the Settings modal's sections instead.
  * Later waves add tabs here; the W7 pane system may relocate
  * the whole panel without touching the panes themselves.
  *
@@ -105,7 +104,6 @@ export type InspectorTab =
   | 'terminal'
   | 'git'
   | 'browser'
-  | 'orchestration'
   | 'vault'
   | 'skills'
   | 'archify'
@@ -183,8 +181,6 @@ export function InspectorPanel({
         <LazySkillsPane />
       ) : tab === 'vault' ? (
         <LazyVaultPane />
-      ) : tab === 'orchestration' ? (
-        <LazyOrchestrationPane />
       ) : tab === 'providers' ? (
         <LazyProvidersPane />
       ) : tab === 'models' ? (

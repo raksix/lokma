@@ -108,9 +108,15 @@ check(
   EXTRAS.filter((e) => e.tab !== undefined).every((e) =>
     [
       'testing', 'cron', 'observability', 'browser',
-      'skills', 'git', 'setup', 'vault', 'plugins', 'orchestration',
+      'skills', 'git', 'setup', 'vault', 'plugins',
     ].includes(e.tab!),
   ),
+);
+// REQ-164 — Orchestration left the pane registry (Settings modal section):
+// no shipped row targets it anymore.
+check(
+  '#19 coordinator row names the Settings Orchestration section (no pane tab)',
+  EXTRAS[18]?.tab === undefined && (EXTRAS[18]?.where ?? '').includes('Settings → Orchestration'),
 );
 // REQ-163 — the per-agent budget editor lives in the Settings modal's
 // Agent Hub section now; its row keeps no Inspector tab target.

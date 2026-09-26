@@ -103,14 +103,14 @@ check("upsert session ignores file tabs", v4.tabs.length === 2);
 check("tab id prefix", makeTabId("tab-x").startsWith("tab-x-"));
 check("pane id prefix unique", makePaneId().startsWith("p-") && makePaneId() !== makePaneId());
 
-/* 2 — registry mirrors the left Inspector (22 tabs incl. REQ-062 Todos; REQ-161 moved Bots to its own mode; REQ-163 moved Agent Hub to the Settings modal); tiling bar keeps the 18 open actions. */
-check("registry has 22 entries", INSPECTOR_TABS.length === 22);
+/* 2 — registry mirrors the left Inspector (21 tabs incl. REQ-062 Todos; REQ-161 moved Bots to its own mode; REQ-163 moved Agent Hub, REQ-164 Orchestration to the Settings modal); tiling bar keeps the 17 open actions. */
+check("registry has 21 entries", INSPECTOR_TABS.length === 21);
 check("registry has files first", INSPECTOR_TABS[0].id === "files");
 check("registry has browser", INSPECTOR_TABS.some((t) => t.id === "browser"));
-check("registry keeps orchestration, agents left the registry (REQ-163)", INSPECTOR_TABS.some((t) => t.id === "orchestration") && !INSPECTOR_TABS.some((t) => (t.id as string) === "agents"));
+check("registry dropped orchestration and agents (REQ-163/164, Settings modal sections)", !INSPECTOR_TABS.some((t) => (t.id as string) === "orchestration") && !INSPECTOR_TABS.some((t) => (t.id as string) === "agents"));
 check("registry has memory", INSPECTOR_TABS.some((t) => t.id === "memory"));
 check("registry has todos", INSPECTOR_TABS.some((t) => t.id === "todos"));
-check("tiling bar has 18 entries", TILING_BAR_TABS.length === 18);
+check("tiling bar has 17 entries", TILING_BAR_TABS.length === 17);
 check("tiling bar all in registry", TILING_BAR_TABS.every(isInspectorTabId));
 check("inspectorLabel known", inspectorLabel("git") === "Git");
 check("isInspectorTabId rejects unknown", !isInspectorTabId("nope"));

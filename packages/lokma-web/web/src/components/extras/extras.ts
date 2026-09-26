@@ -16,7 +16,6 @@ export type ExtrasTabId =
   | 'cron'
   | 'git'
   | 'observability'
-  | 'orchestration'
   | 'plugins'
   | 'setup'
   | 'skills'
@@ -67,7 +66,7 @@ export const EXTRAS: ExtraItem[] = [
   { n: 16, slug: 'worktree-gc', title: 'Worktree GC (ttl 7d)', why: 'Clean disk', how: '.lokma/worktrees ttl_days', where: 'Git tab → GC button (manual prune today; TTL sweeper is Phase 3)', shipped: true, tab: 'git' },
   { n: 17, slug: 'replay-rerun', title: 'Replay deterministic re-run', why: 'Reproduce bug', how: 'Observability Replay button', where: 'Observability tab → Replay', shipped: true, tab: 'observability' },
   { n: 18, slug: 'mcp-agent-template', title: 'MCP agentTemplate import', why: 'Import from MCP', how: 'PluginMarketplace + agentTemplate', where: 'Plugins tab (when the marketplace fetch wave lands)', shipped: false, flag: 'extras.mcp-agent-template', milestone: 'Needs the marketplace fetch wave (URL records own no routes yet)' },
-  { n: 19, slug: 'affinity-steal', title: 'Affinity + work-stealing', why: 'Balance', how: 'Coordinator steals idle', where: 'Orchestration tab (when the coordinator lands)', shipped: false, flag: 'extras.affinity-steal', milestone: 'Phase 3 — needs the coordinator' },
+  { n: 19, slug: 'affinity-steal', title: 'Affinity + work-stealing', why: 'Balance', how: 'Coordinator steals idle', where: 'Settings → Orchestration (when the coordinator lands)', shipped: false, flag: 'extras.affinity-steal', milestone: 'Phase 3 — needs the coordinator' },
   { n: 20, slug: 'session-drag-handoff', title: 'Session → agent drag handoff', why: 'UX', how: 'Sidebar drag → Hub', where: 'Sessions sidebar → Agent Hub (when the W7 pane system lands)', shipped: false, milestone: 'Needs the W7 pane system (drag session → agent card)' },
   { n: 21, slug: 'doctor-agents', title: 'lokma doctor --agents', why: 'Health', how: 'SetupWizard doctor 8 checks', where: 'Setup tab → Doctor terminal', shipped: true, tab: 'setup' },
   { n: 22, slug: 'vault-provenance', title: 'Vault graph provenance agentId', why: 'Who wrote what', how: 'VaultPane provenance pill', where: 'Vault tab → provenance badges', shipped: true, tab: 'vault' },

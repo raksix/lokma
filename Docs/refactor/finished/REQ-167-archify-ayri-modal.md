@@ -1,6 +1,6 @@
 # REQ-167 — Archify apayrı bir modal olsun (Settings'e bölüm değil, kendi başına modal)
 
-**Status:** pending
+**Status:** done (2026-09-26)
 **Tarih:** 2026-09-26
 **Kaynak:** Kullanıcı mesajı (26 Eyl 2026):
 > "arcfiy kısmı apayarı bir model olarak olmalı"
@@ -47,3 +47,11 @@
 
 - Kullanıcı bilinçli olarak "apayrı" dedi: Archify, Settings modalına bölüm olarak EKLENMEZ — kendi başına bir modal olur (Settings modalı nasıl kendi başına bir modalsa).
 - `concept/` prototipi kapsam dışı — yalnız `packages/lokma-web`.
+
+## Sonuç (done 2026-09-26)
+
+- **Uygulama:** Yeni `components/archify/archify-modal.tsx` — Archify artık **kendi başına bir modal** (Settings bölümü DEĞİL): ~90vw × 85vh ortalanmış panel, Settings modalı kabuk sözleşmesi (koyu backdrop, `useFocusTrap` + Esc, backdrop-tık + X ile kapatma, body scroll lock, kendi lazy chunk'ı). Gövde = mevcut canlı `ArchifyPane`, bir `@container` host içinde (`@min-[320px]`/`@max-[380px]` kuralları çözülüyor) ve `h-full` pane içi kaydırmayı sağlıyor. Pane'e opsiyonel `onRequestClose` eklendi → X pane'in kendi başlık satırında (üst üste iki başlık yok; prop'suz render eskisi gibi). Rail'deki Archify ikonu KALDI ama artık modalı açıyor: yeni `RAIL_STANDALONE_MODALS` + `isRailStandaloneModalTab` + `isRailNonPaneTab` (drag guard artık 5 Settings bölümü + 1 standalone modal = 6 girişi kapsıyor; giriş sürüklenmiyor, sekme olmuyor); `app-shell`'de `archifyOpen` + `LazyArchifyModal`, mobil 'tools' şeridi de aynı modalı açıyor (`onOpenArchifyModal`). Pane yolu TAMAMEN kalktı: registry 18→17, `TILING_BAR_TABS` 14→13, `inspector-host`/`inspector-panel` dalları + `TAB_ICONS` girişi temizlendi; eski sekmeler/drag payload'ları registry-miss ile düşüyor. İçerik korundu: liste + arama/tip filtreleri, viewer (gerçek `view` iframe'i), IR editörü (validate + save), receipt, export indirmeleri, generate, delta, delete.
+- **Kanıt:** yeni canlı prob `scripts/probe-archify-modal.cjs` **41/41 PASS** — rail ikonu kendi modalını açıyor (Settings modalı AÇILMIYOR), giriş `draggable=false` + drag ipucu yok; pane 0→0, iki tiling snapshot'ı değişmedi, rail hiç aktif sekme olmuyor; modal 1280×808 (85vh) ve viewport içinde, overflowX=0; canlı liste satırı + `+ New Diagram` + IR/receipt/export sekmeleri + başlık altyazısı GÖRÜNÜR (@container çözülüyor); satır seçilince viewer iframe gerçek build URL'ine mount oluyor (`/api/archify/<id>/view`) ve **frame'in kendisi gerçek SVG build'i render ediyor** (bodyLen 5840, çerçeve içinde `svg`, başlık IR'den — `page.frames()` + `frame.evaluate` ile okundu); IR sekmesi canlı editör textarea'sını gösteriyor; Escape + X + backdrop üçü de kapatıyor ve odak rail ikonuna geri dönüyor; prob'un yarattığı diyagram silindi + liste üzerinden yeniden doğrulandı. Ekran görüntüsü: `/tmp/req167-archify-modal.png`.
+- **Kapılar:** root `bun x tsc --noEmit` 0; 51 test dosyası koştu — panes 104/118/124/157, inspector-rail 18/18, archify 33/33 yeşil; yalnız main'de de kırık olan a11y(3) + narrow-layout(5) FAIL. Steril web build yeşil (`index-BdDKlsCN.js` + yeni `archify-modal-CnRRxqG9.js` chunk'ı); `pm2 restart lokma-web` sonrası servis edilen bundle == disk hash (canlı site `https://lokma.fermag.com.tr` de aynı hash'i servis ediyor); tokenless `/api/auth/me` 401 (gate ON).
+- **Not:** viewer iframe oturumun httpOnly `lokma_token` çerezini taşır (gerçek kullanıcı oturumu); Bearer-only prob oturumunda çerçeve 401 alıyordu — çerez ile curl 200 + gerçek HTML doğrulandı, prob artık çerezi de seed ediyor.
+- **Commitler:** `55f0cd1` (refactor web) + `716ad85` (probe) + bu kapanış docs commit'i.

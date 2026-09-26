@@ -47,9 +47,8 @@ export const LazySkillsPane = React.lazy(() =>
 export const LazyArchifyPane = React.lazy(() =>
   import('@/components/archify/archify-pane').then((m) => ({ default: m.ArchifyPane })),
 );
-export const LazyDesignPane = React.lazy(() =>
-  import('@/components/design/design-pane').then((m) => ({ default: m.DesignPane })),
-);
+// REQ-168 — the Design Studio is its own PAGE (not a pane): `LazyDesignPane`
+// is gone; the page ships in `components/design/design-page.tsx`.
 export const LazyTestingPane = React.lazy(() =>
   import('@/components/testing/testing-pane').then((m) => ({ default: m.TestingPane })),
 );

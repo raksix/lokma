@@ -103,16 +103,17 @@ check("upsert session ignores file tabs", v4.tabs.length === 2);
 check("tab id prefix", makeTabId("tab-x").startsWith("tab-x-"));
 check("pane id prefix unique", makePaneId().startsWith("p-") && makePaneId() !== makePaneId());
 
-/* 2 — registry mirrors the left Inspector (17 tabs incl. REQ-062 Todos; REQ-161 moved Bots to its own mode; REQ-163 moved Agent Hub, REQ-164 Orchestration, REQ-165 Vault + Memory, REQ-166 Skills to the Settings modal, REQ-167 Archify to its own standalone modal); tiling bar keeps the 13 open actions. */
-check("registry has 17 entries", INSPECTOR_TABS.length === 17);
+/* 2 — registry mirrors the left Inspector (16 tabs incl. REQ-062 Todos; REQ-161 moved Bots to its own mode; REQ-163 moved Agent Hub, REQ-164 Orchestration, REQ-165 Vault + Memory, REQ-166 Skills to the Settings modal, REQ-167 Archify to its own standalone modal, REQ-168 Design to its own page); tiling bar keeps the 12 open actions. */
+check("registry has 16 entries", INSPECTOR_TABS.length === 16);
 check("registry has files first", INSPECTOR_TABS[0].id === "files");
 check("registry has browser", INSPECTOR_TABS.some((t) => t.id === "browser"));
 check("registry dropped orchestration and agents (REQ-163/164, Settings modal sections)", !INSPECTOR_TABS.some((t) => (t.id as string) === "orchestration") && !INSPECTOR_TABS.some((t) => (t.id as string) === "agents"));
 check("registry dropped vault and memory (REQ-165, Settings modal sections)", !INSPECTOR_TABS.some((t) => (t.id as string) === "vault") && !INSPECTOR_TABS.some((t) => (t.id as string) === "memory"));
 check("registry dropped skills (REQ-166, Settings modal section)", !INSPECTOR_TABS.some((t) => (t.id as string) === "skills"));
 check("registry dropped archify (REQ-167, standalone modal)", !INSPECTOR_TABS.some((t) => (t.id as string) === "archify"));
+check("registry dropped design (REQ-168, standalone page)", !INSPECTOR_TABS.some((t) => (t.id as string) === "design"));
 check("registry has todos", INSPECTOR_TABS.some((t) => t.id === "todos"));
-check("tiling bar has 13 entries", TILING_BAR_TABS.length === 13);
+check("tiling bar has 12 entries", TILING_BAR_TABS.length === 12);
 check("tiling bar all in registry", TILING_BAR_TABS.every(isInspectorTabId));
 check("inspectorLabel known", inspectorLabel("git") === "Git");
 check("isInspectorTabId rejects unknown", !isInspectorTabId("nope"));
@@ -247,6 +248,7 @@ check("a stale vault drop is ignored (REQ-165: Vault is a modal section)", parse
 check("a stale memory drop is ignored (REQ-165: Memory is a modal section)", parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: "memory" })) === null);
 check("a stale skills drop is ignored (REQ-166: Skills is a modal section)", parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: "skills" })) === null);
 check("a stale archify drop is ignored (REQ-167: Archify is a standalone modal)", parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: "archify" })) === null);
+check("a stale design drop is ignored (REQ-168: Design is its own page)", parseInspectorDrop(stubData({ [INSPECTOR_DRAG_MIME]: "design" })) === null);
 
 /* 10 — REQ-029: dropEffect must stay compatible with the source's
  * effectAllowed (Chrome silently rejects mismatched drops: no drop event).

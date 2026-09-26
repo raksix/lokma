@@ -14,6 +14,7 @@ import {
   type GenerateForm,
   type NormalizedArtifact,
 } from './design';
+import { parseDesignPageSnapshot } from './design-page-state';
 
 /**
  * DesignPane probe — pure helpers only (no React, no network).
@@ -99,6 +100,23 @@ const rows: NormalizedArtifact[] = [
     6,
   );
   check('toRow keeps fields', row.id === 'x-1' && row.bytes === 512 && row.overall === 6);
+}
+
+// REQ-168 — the Design page snapshot (selected artifact + brief form) is
+// tolerant: unknown fields fall back, foreign catalogs are rejected.
+{
+  const empty = parseDesignPageSnapshot(null);
+  check('snapshot: null reads as the default', empty.selected === null && empty.form.type === 'prototype' && empty.form.system === 'stripe-linear');
+  check('snapshot: corrupt JSON reads as the default', parseDesignPageSnapshot('{oops').selected === null);
+  const restored = parseDesignPageSnapshot(
+    JSON.stringify({ selected: 'pricing-abc', form: { type: 'deck', system: 'paper-ink', brief: 'seed deck' } }),
+  );
+  check('snapshot: restores the selected artifact', restored.selected === 'pricing-abc');
+  check('snapshot: restores the brief form', restored.form.type === 'deck' && restored.form.system === 'paper-ink' && restored.form.brief === 'seed deck');
+  const foreign = parseDesignPageSnapshot(JSON.stringify({ selected: 'a', form: { type: 'nope', system: 'neon' } }));
+  check('snapshot: foreign type/system fall back to defaults', foreign.form.type === 'prototype' && foreign.form.system === 'stripe-linear');
+  check('snapshot: overlong brief dropped', parseDesignPageSnapshot(JSON.stringify({ form: { brief: 'x'.repeat(2001) } })).form.brief === '');
+  check('snapshot: non-string selection dropped', parseDesignPageSnapshot(JSON.stringify({ selected: 42 })).selected === null);
 }
 
 console.log(`\nDESIGN PROBE: ${passed} passed, ${failed} failed`);

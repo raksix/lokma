@@ -9,6 +9,7 @@ import { FOCUS_FILES_EVENT } from '@/components/files';
 import { Chat, INITIAL_PREFIX } from '@/components/chat';
 import { BotsMode } from '@/components/bots/bots-mode';
 import { readAppMode, writeAppMode, type AppMode } from '@/components/bots/mode';
+import { DesignPage } from '@/components/design';
 import { TilingWorkspace, isPaneOnlyTab } from '@/components/panes';
 import { LayoutGrid, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -607,6 +608,80 @@ export function AppShell({ sessionId }: { sessionId: string }) {
                 switchMode('chat');
               }}
             />
+          </PaneErrorBoundary>
+        </div>
+        <FooterBar
+          serverUp={serverUp}
+          latencyMs={latencyMs}
+          projectName={projectName}
+          cpuPercent={metrics?.cpuPercent ?? null}
+          memUsedBytes={metrics?.memory.usedBytes ?? null}
+          memTotalBytes={metrics?.memory.totalBytes ?? null}
+          tokensPerSec={tokensPerSec}
+          version={metrics?.version ?? null}
+        />
+        <SearchModal
+          open={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          onSelectSession={(id) => {
+            switchSession(id);
+            switchMode('chat');
+          }}
+        />
+        <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} explorerSide={explorerSide} />
+        {settingsOpen ? (
+          <React.Suspense fallback={null}>
+            <LazySettingsModal
+              open={settingsOpen}
+              onClose={() => setSettingsOpen(false)}
+              explorerSide={explorerSide}
+              initialSection={settingsSection}
+            />
+          </React.Suspense>
+        ) : null}
+        {/* REQ-167 — the standalone Archify modal rides its own lazy chunk. */}
+        {archifyOpen ? (
+          <React.Suspense fallback={null}>
+            <LazyArchifyModal open={archifyOpen} onClose={() => setArchifyOpen(false)} />
+          </React.Suspense>
+        ) : null}
+        <ToastHost />
+      </div>
+    );
+  }
+
+  // REQ-168 — the Design Studio is its own PAGE: the top switch swaps the
+  // whole workspace for it (Bots-mode pattern) — no rails, no sidebars and
+  // no panes; `lokma` returns to the untouched normal mode. The page keeps
+  // its own state (selected artifact + brief form) in a localStorage
+  // snapshot, so re-opening it lands where the user left off.
+  if (mode === 'design') {
+    return (
+      <div className="flex h-screen flex-col bg-background text-foreground">
+        <a
+          href="#lokma-chat"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-1 focus:left-1 focus:z-[70] focus:rounded-md focus:bg-[#262624] focus:px-3 focus:py-1.5 focus:text-xs focus:text-white"
+        >
+          Skip to design studio
+        </a>
+        <Header
+          sessionId={activeId}
+          serverUp={serverUp}
+          cost={ws.cost}
+          wsStatus={ws.status}
+          onSearch={() => setSearchOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onToggleLeft={() => toggleSidebar('left')}
+          onToggleRight={() => toggleSidebar('right')}
+          explorerSide={explorerSide}
+          mode={mode}
+          onModeChange={switchMode}
+          hideSideToggles
+        />
+        <OfflineBanner status={ws.status} onRetry={ws.reconnect} />
+        <div id="lokma-chat" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <PaneErrorBoundary paneName="Design">
+            <DesignPage />
           </PaneErrorBoundary>
         </div>
         <FooterBar

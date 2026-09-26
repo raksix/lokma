@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Beaker, Brain, Clock3, Cpu, Folder, FolderOpen, GitBranch, Globe, HardDrive, Info, Layers, ListTodo, Package, Paintbrush, Plug2, Puzzle, Settings, Star, Terminal, Users, Workflow } from 'lucide-react';
+import { Activity, BarChart3, Beaker, Brain, Clock3, Cpu, Folder, FolderOpen, GitBranch, Globe, HardDrive, Info, Layers, ListTodo, Package, Plug2, Puzzle, Settings, Star, Terminal, Users, Workflow } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { INSPECTOR_DRAG_MIME, encodeInspectorDrag } from '@/components/panes/panes';
 import type { InspectorTab } from '@/components/providers';
@@ -90,7 +90,8 @@ export const INSPECTOR_RAIL_ITEMS: InspectorRailItem[] = [
   { tab: 'vault', label: 'Vault', Icon: Folder },
   { tab: 'skills', label: 'Skills', Icon: Puzzle },
   { tab: 'archify', label: 'Archify', Icon: Workflow },
-  { tab: 'design', label: 'Design', Icon: Paintbrush },
+  // REQ-168 — Design left the rail: it is the third top-level mode and lives
+  // behind the header `lokma · Bots · Design` switch as its own page.
   { tab: 'testing', label: 'Testing', Icon: Beaker },
   { tab: 'setup', label: 'Setup', Icon: HardDrive },
   { tab: 'plugins', label: 'Plugins', Icon: Package },

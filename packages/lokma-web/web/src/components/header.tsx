@@ -124,7 +124,8 @@ export function Header({
           </button>
         )}
         {/* REQ-161 — surface switch: `lokma` is the normal chat/workspace
-            mode, `Bots` opens the separate Bots section. The active chip
+            mode, `Bots` opens the separate Bots section. REQ-168 adds
+            `Design` — the Design Studio's own full page. The active chip
             carries the ink fill so the current mode is obvious at a glance;
             clicking `lokma` always returns to the (untouched) normal mode. */}
         <div className="ml-1 flex items-center gap-1" role="tablist" aria-label="Surface">
@@ -159,6 +160,23 @@ export function Header({
               }`}
             >
               Bots
+            </button>
+          ) : null}
+          {onModeChange ? (
+            <button
+              type="button"
+              role="tab"
+              data-mode-switch="design"
+              aria-selected={mode === 'design'}
+              title="Design — standalone Design Studio page"
+              onClick={() => onModeChange('design')}
+              className={`rounded-md px-1.5 py-0.5 text-[13px] font-medium ${
+                mode === 'design'
+                  ? 'bg-[#262624] text-white'
+                  : 'text-zinc-600 hover:bg-[#F2F0EB]'
+              }`}
+            >
+              Design
             </button>
           ) : null}
         </div>

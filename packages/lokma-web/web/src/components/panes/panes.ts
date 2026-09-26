@@ -51,7 +51,8 @@ export const INSPECTOR_TABS = [
   // (rail click), so the pane registry carries none of them.
   // REQ-167 — Archify is not a pane/tab either: its rail icon opens its own
   // standalone modal, so the registry carries no 'archify' entry.
-  { id: 'design', label: 'Design' },
+  // REQ-168 — Design is the third top-level MODE (its own full page behind
+  // the header switch, like Bots): no pane entry, no rail entry.
   { id: 'testing', label: 'Testing' },
   { id: 'auth', label: 'Auth' },
   { id: 'setup', label: 'Setup' },
@@ -68,7 +69,6 @@ export type InspectorTabId = (typeof INSPECTOR_TABS)[number]['id'];
 export const TILING_BAR_TABS: InspectorTabId[] = [
   'terminal', // onOpenTerminal
   'git', // onOpenGit
-  'design', // onOpenDesign
   'usage', // onOpenUsage
   'settings', // onOpenSettings
   'testing', // onOpenTesting

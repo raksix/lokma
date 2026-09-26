@@ -1,22 +1,26 @@
 /**
- * REQ-161 — the harness has two top-level modes: the normal chat/workspace
- * surface (`chat`) and the separate Bots section (`bots`). The mode is an
- * app-level value persisted in `localStorage`, so a reload lands back where
- * the user was; the Bots mode additionally remembers its selected bot.
+ * REQ-161 — the harness has top-level modes: the normal chat/workspace
+ * surface (`chat`), the separate Bots section (`bots`) and (REQ-168) the
+ * standalone Design Studio page (`design`). The mode is an app-level value
+ * persisted in `localStorage`, so a reload lands back where the user was;
+ * the Bots mode additionally remembers its selected bot, and the Design
+ * page keeps its own snapshot (selected artifact + brief form).
  *
  * Pure storage helpers only — the shell owns the React state, so probes can
  * exercise parse/read/write without a DOM framework (same pattern as
  * `sessions/group-storage.ts`).
  */
 
-export type AppMode = 'chat' | 'bots';
+export type AppMode = 'chat' | 'bots' | 'design';
 
 export const APP_MODE_KEY = 'lokma-app-mode:v1';
 export const BOTS_SELECTED_KEY = 'lokma-bots-selected:v1';
 
-/** Anything that is not an explicit `bots` reads as the default chat mode. */
+/** Anything that is not one of the literal mode ids reads as the default chat mode. */
 export function parseAppMode(raw: string | null | undefined): AppMode {
-  return raw === 'bots' ? 'bots' : 'chat';
+  if (raw === 'bots') return 'bots';
+  if (raw === 'design') return 'design';
+  return 'chat';
 }
 
 export function readAppMode(): AppMode {

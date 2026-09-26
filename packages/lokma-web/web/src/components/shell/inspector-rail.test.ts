@@ -31,15 +31,16 @@ check('rail sits opposite the Explorer (left)', inspectorRailSide('left') === 'r
 check('rail sits opposite the Explorer (right)', inspectorRailSide('right') === 'left');
 
 const tabs = INSPECTOR_RAIL_ITEMS.map((item) => item.tab);
-check('twenty-two rail items (16 Inspector menus + the 5 Settings-modal entries + the standalone Archify modal entry)', tabs.length === 22);
+check('twenty-one rail items (15 Inspector menus + the 5 Settings-modal entries + the standalone Archify modal entry; REQ-168 removed Design)', tabs.length === 21);
 check('rail tabs unique', new Set(tabs).size === tabs.length);
 check('files first (VS Code Explorer position), todos last', tabs[0] === 'files' && tabs[tabs.length - 1] === 'todos');
 check(
   'covers every Inspector menu',
-  ['files', 'providers', 'models', 'usage', 'settings', 'terminal', 'git', 'browser', 'agents', 'orchestration', 'vault', 'skills', 'archify', 'design', 'testing', 'setup', 'plugins', 'observability', 'cron', 'extras', 'memory'].every(
+  ['files', 'providers', 'models', 'usage', 'settings', 'terminal', 'git', 'browser', 'agents', 'orchestration', 'vault', 'skills', 'archify', 'testing', 'setup', 'plugins', 'observability', 'cron', 'extras', 'memory'].every(
     (tab) => tabs.includes(tab as (typeof tabs)[number]),
   ),
 );
+check('REQ-168 Design left the rail (its own page behind the header switch)', !tabs.includes('design' as (typeof tabs)[number]));
 check(
   'every item has a label and an icon',
   INSPECTOR_RAIL_ITEMS.every((item) => item.label.length > 0 && typeof item.Icon !== 'undefined'),
@@ -105,6 +106,10 @@ check(
 check(
   'REQ-167 a stale archify drop is ignored (no pane definition, standalone modal)',
   parseInspectorDrop({ getData: (t: string) => (t === 'application/x-lokma-inspector' ? 'archify' : '') }) === null,
+);
+check(
+  'REQ-168 a stale design drop is ignored (no pane definition, Design is its own page)',
+  parseInspectorDrop({ getData: (t: string) => (t === 'application/x-lokma-inspector' ? 'design' : '') }) === null,
 );
 
 console.log(`inspector-rail.test.ts: ${passed} passed, ${failed} failed`);

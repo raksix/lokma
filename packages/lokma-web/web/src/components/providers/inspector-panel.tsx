@@ -6,9 +6,9 @@ import { InfoPanel } from '@/components/sidebar';
 import type { UseWs } from '@/hooks/use-ws';
 import { usePaneStore } from '@/stores/pane';
 import {
+  LazyAdminPane,
   LazyBrowserPane,
   LazyCronApprovalsPane,
-  LazyDesignPane,
   LazyExtrasPane,
   LazyGitPane,
   LazyModelsPane,
@@ -102,7 +102,6 @@ export type InspectorTab =
   | 'terminal'
   | 'git'
   | 'browser'
-  | 'design'
   | 'testing'
   | 'setup'
   | 'plugins'
@@ -165,8 +164,6 @@ export function InspectorPanel({
         <LazySetupPane />
       ) : tab === 'testing' ? (
         <LazyTestingPane />
-      ) : tab === 'design' ? (
-        <LazyDesignPane />
       ) : tab === 'providers' ? (
         <LazyProvidersPane />
       ) : tab === 'models' ? (

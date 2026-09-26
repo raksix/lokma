@@ -11,7 +11,6 @@ import {
   Layers,
   ListTodo,
   Package,
-  Paintbrush,
   Plug2,
   Settings,
   Shield,
@@ -36,8 +35,8 @@ export const TAB_ICONS: Record<InspectorTabId, React.ReactNode> = {
   browser: <Globe className="h-3 w-3" />,
   // REQ-163/164/165/166 — Agent Hub, Orchestration, Vault, Memory and
   // Skills left the pane registry (Settings modal sections); REQ-167 —
-  // Archify left too (standalone modal, no pane tab icon needed).
-  design: <Paintbrush className="h-3 w-3" />,
+  // Archify left too (standalone modal, no pane tab icon needed); REQ-168 —
+  // Design is its own page, so it has no pane tab icon either.
   testing: <Beaker className="h-3 w-3" />,
   auth: <Shield className="h-3 w-3" />,
   setup: <HardDrive className="h-3 w-3" />,

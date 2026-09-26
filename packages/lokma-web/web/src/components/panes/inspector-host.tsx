@@ -9,7 +9,6 @@ import {
   LazyAdminPane,
   LazyBrowserPane,
   LazyCronApprovalsPane,
-  LazyDesignPane,
   LazyExtrasPane,
   LazyGitPane,
   LazyModelsPane,
@@ -78,8 +77,8 @@ function LazyTab({
   if (tab === 'settings') return <LazySettingsPane />;
   // REQ-163/164/165/166 — Agent Hub, Orchestration, Vault, Memory and
   // Skills are not panes anymore (Settings modal sections); REQ-167 — the
-  // Archify pane path is gone too (its rail icon opens a standalone modal).
-  if (tab === 'design') return <LazyDesignPane />;
+  // Archify pane path is gone too (its rail icon opens a standalone modal);
+  // REQ-168 — Design left the pane system entirely (its own page).
   if (tab === 'testing') return <LazyTestingPane />;
   if (tab === 'auth') return <LazyAdminPane />;
   if (tab === 'setup') return <LazySetupPane />;

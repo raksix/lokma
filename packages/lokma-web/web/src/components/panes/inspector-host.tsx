@@ -101,7 +101,16 @@ function LazyTab({
   }
   if (tab === 'terminal' || tab === 'git' || tab === 'browser') {
     if (!sessionId || (tab === 'terminal' && !ws)) return <NeedsSessionPane pane={tab} onOpenSession={onOpenSession} />;
-    if (tab === 'terminal') return <LazyTerminalPane key={sessionId} sessionId={sessionId} ws={ws as UseWs} />;
+    if (tab === 'terminal') {
+      // REQ-162 — the shared tab wrapper is a scrolling block (`h-full
+      // overflow-auto`), so the emulator's viewport collapses there: give it
+      // the tab body's full height (same shell the browser uses, REQ-037).
+      return (
+        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+          <LazyTerminalPane key={sessionId} sessionId={sessionId} ws={ws as UseWs} />
+        </div>
+      );
+    }
     if (tab === 'git') return <LazyGitPane key={sessionId} sessionId={sessionId} />;
     // REQ-037 — the shared tab wrapper above is a scrolling block (`h-full
     // overflow-auto`), so BrowserPane's flex-1 is inert there and the page

@@ -1,5 +1,8 @@
 import * as React from 'react';
 import { LoaderCircle, Unplug } from 'lucide-react';
+import { Terminal, type ITheme } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import '@xterm/xterm/css/xterm.css';
 import { api, type TerminalInfo } from '@/lib/api';
 import type { UseWs } from '@/hooks/use-ws';
 import { emitToast } from '@/components/shell';
@@ -9,43 +12,90 @@ import {
   isRecentDuplicate,
   connectionNotice,
   exitSummary,
-  keyToBytes,
   resolveTerminalCwd,
-  stripAnsi,
+  shouldSendResize,
 } from './terminal';
 
 /**
- * TerminalPane — live shell tabs over real server processes (W3-10).
+ * TerminalPane — a REAL terminal emulator over the server PTYs (REQ-162).
  * Spawn via `POST /api/terminal`, keystrokes travel over the shared WS
  * socket (`terminal/input`) as raw PTY bytes, output arrives as
  * `terminal/data` frames, end as `terminal/exit`. Kill ends the real PID;
  * forget drops the record. No mocks: tabs, bytes, pids and exit codes all
  * come from the server.
- * REQ-059: no command box — the scrollback itself is the terminal. Click
- * it and type: printable keys, Enter, Backspace, Tab, arrows (shell
- * history), Ctrl+C (interrupt), Ctrl+D (EOF) all reach the server PTY.
- * REQ-079: chrome-free — no header/tab/action bars, the scrollback fills
- * the whole pane. A running shell auto-starts on mount when none exists
- * (an empty pane used to look broken — typing went nowhere); clicking an
- * empty/dead pane starts a fresh shell. `exit` ends the real process.
+ *
+ * REQ-162: the viewport is an `@xterm/xterm` instance, not a plain-text
+ * scrollback. Frames are written RAW (no ANSI stripping): the cursor
+ * blinks where the shell says it is, Backspace deletes, `\r` redraws the
+ * line, SGR colours render, and full-screen apps (vim/htop) work — it
+ * reads like an SSH session because it IS an emulator.
+ *
+ * Kept contracts: auto-start (REQ-079), session cwd (REQ-060/159), frame
+ * dedupe (REQ-158), live-terminal limit (REQ-159), socket notice (REQ-107).
+ * Resize: FitAddon + ResizeObserver feed `terminal/resize` for live shells
+ * only, and spawn passes the fitted cols/rows.
  */
+
+/** xterm palette — matches the harness shell (#0F0F11) with legible ANSI hues. */
+const TERMINAL_THEME: ITheme = {
+  background: '#0F0F11',
+  foreground: '#EDE9E2',
+  cursor: '#EDE9E2',
+  cursorAccent: '#0F0F11',
+  selectionBackground: 'rgba(237, 233, 226, 0.24)',
+  black: '#1E1E21',
+  red: '#E5484D',
+  green: '#46A758',
+  yellow: '#FFB224',
+  blue: '#4C8DFF',
+  magenta: '#B26BFF',
+  cyan: '#3DD4C8',
+  white: '#EDE9E2',
+  brightBlack: '#6E6E73',
+  brightRed: '#FF6369',
+  brightGreen: '#5BD46B',
+  brightYellow: '#FFC94D',
+  brightBlue: '#72A7FF',
+  brightMagenta: '#C98AFF',
+  brightCyan: '#56E6DA',
+  brightWhite: '#FFFFFF',
+};
+
+const TERMINAL_FONT = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace';
+
+/** Spawn size before the first fit (a zero-box pane must not spawn 0×0). */
+const FALLBACK_SIZE = { cols: 80, rows: 24 };
 
 export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }) {
   const [terminals, setTerminals] = React.useState<TerminalInfo[]>([]);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
-  const [buffers, setBuffers] = React.useState<Record<string, string>>({});
   const [cwd, setCwd] = React.useState('');
   const [starting, setStarting] = React.useState(false);
 
-  const scrollRef = React.useRef<HTMLDivElement>(null);
+  /** xterm mount point — the emulator's own DOM lives inside it. */
+  const hostRef = React.useRef<HTMLDivElement>(null);
+  const termRef = React.useRef<Terminal | null>(null);
+  /** Last fitted emulator size (drives spawn cols/rows + resize frames). */
+  const sizeRef = React.useRef<{ cols: number; rows: number } | null>(null);
+  /** Last size SENT per terminal — `terminal/resize` only on a real change. */
+  const sentSizeRef = React.useRef<Record<string, { cols: number; rows: number }>>({});
+  /** Raw PTY bytes per terminal — the emulator's replay log (never stripped). */
+  const rawRef = React.useRef<Record<string, string>>({});
   const processedRef = React.useRef(0);
-  /** REQ-158: last folded frame — identical back-to-back deliveries are one. */
+  /** REQ-158: last folded frames — identical back-to-back deliveries are one. */
   const recentFramesRef = React.useRef<{ terminalId: string; data: string; at: number }[]>([]);
   const refreshRef = React.useRef(() => {});
   const selectRef = React.useRef<(id: string) => void>(() => {});
   // REQ-079: auto-start guard — one attempt per session so a failing create
   // never loops (the error toast explains, click retries manually).
   const autoStartedRef = React.useRef<string | null>(null);
+
+  // Live values for the emulator's own (non-React) event handlers.
+  const wsRef = React.useRef(ws);
+  wsRef.current = ws;
+  const selectedIdRef = React.useRef<string | null>(null);
+  selectedIdRef.current = selectedId;
+  const runningRef = React.useRef(false);
 
   const refresh = React.useCallback(async () => {
     try {
@@ -56,6 +106,86 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
     }
   }, []);
   refreshRef.current = refresh;
+
+  // ── Emulator lifecycle (REQ-162): one xterm instance owns the viewport.
+  // Raw bytes go in as-is; nothing here interprets escape sequences.
+  React.useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const term = new Terminal({
+      cursorBlink: true,
+      fontSize: 12,
+      fontFamily: TERMINAL_FONT,
+      lineHeight: 1.2,
+      scrollback: 5000,
+      theme: TERMINAL_THEME,
+    });
+    const fit = new FitAddon();
+    term.loadAddon(fit);
+    term.open(host);
+    termRef.current = term;
+
+    // xterm encodes keys/paste/selection itself — its data event IS the
+    // stdin stream. (REQ-059's hand-rolled keyToBytes is gone.)
+    const dataSub = term.onData((data) => {
+      const id = selectedIdRef.current;
+      if (!id) return;
+      wsRef.current.sendTerminal(id, data);
+    });
+    // Fit changes are the only source of resize frames; a dead/absent
+    // shell never gets one (server answers terminal_not_found otherwise).
+    const resizeSub = term.onResize(({ cols, rows }) => {
+      sizeRef.current = { cols, rows };
+      const id = selectedIdRef.current;
+      if (!id || !runningRef.current) return;
+      if (!shouldSendResize(sentSizeRef.current[id] ?? null, { cols, rows })) return;
+      sentSizeRef.current[id] = { cols, rows };
+      wsRef.current.resizeTerminal(id, cols, rows);
+    });
+
+    // Fit is a no-op while xterm is still measuring its cell size or while
+    // the pane has no box yet (sidebar column / inactive tab): retry briefly,
+    // then let the ResizeObserver take over for real box changes.
+    const fitNow = (): boolean => {
+      const el = hostRef.current;
+      if (!el || el.clientWidth < 24 || el.clientHeight < 24) return false;
+      const dims = fit.proposeDimensions();
+      if (!dims || !dims.cols || !dims.rows) return false;
+      try {
+        fit.fit();
+      } catch {
+        return false;
+      }
+      sizeRef.current = { cols: term.cols, rows: term.rows };
+      return true;
+    };
+    let fitTimer: number | null = null;
+    const fitUntilSized = (attempt = 0) => {
+      if (fitNow() || attempt >= 8) return;
+      fitTimer = window.setTimeout(() => fitUntilSized(attempt + 1), 120 * (attempt + 1));
+    };
+    fitUntilSized();
+    const raf = window.requestAnimationFrame(() => fitUntilSized());
+    const ro = new ResizeObserver(() => {
+      fitNow();
+    });
+    ro.observe(host);
+    const onWinResize = () => {
+      fitNow();
+    };
+    window.addEventListener('resize', onWinResize);
+
+    return () => {
+      window.cancelAnimationFrame(raf);
+      if (fitTimer !== null) window.clearTimeout(fitTimer);
+      window.removeEventListener('resize', onWinResize);
+      ro.disconnect();
+      dataSub.dispose();
+      resizeSub.dispose();
+      term.dispose();
+      termRef.current = null;
+    };
+  }, []);
 
   // Session scope: new shells default to the selected session/project cwd
   // (REQ-060) — the value comes from the cached server list, never a
@@ -73,10 +203,14 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
     const sessionChanged = prevSessionRef.current !== sessionId;
     if (sessionChanged) {
       prevSessionRef.current = sessionId;
-      setBuffers({});
       setSelectedId(null);
       processedRef.current = 0;
       cwdAdoptedRef.current = false;
+      // REQ-162: emulator bookkeeping is session-scoped too — a new
+      // session starts with an empty byte log and a blank screen.
+      rawRef.current = {};
+      sentSizeRef.current = {};
+      termRef.current?.reset();
     }
     const next = resolveTerminalCwd({
       sessionChanged,
@@ -91,7 +225,8 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
     }
   }, [sessionId, refresh, known, cwd]);
 
-  // Fold WS terminal frames into per-terminal scrollback (incremental, capped).
+  // Fold WS terminal frames into the emulator + the replay log (incremental,
+  // capped). REQ-158 dedupe runs BEFORE anything is written.
   React.useEffect(() => {
     const messages = ws.messages;
     let advanced = false;
@@ -104,8 +239,8 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
           continue;
         }
         recentFramesRef.current = [...recentFramesRef.current, { terminalId: msg.terminalId, data: msg.data, at: now }].slice(-6);
-        const text = stripAnsi(msg.data);
-        setBuffers((prev) => ({ ...prev, [msg.terminalId]: appendCapped(prev[msg.terminalId] ?? '', text) }));
+        rawRef.current[msg.terminalId] = appendCapped(rawRef.current[msg.terminalId] ?? '', msg.data);
+        if (msg.terminalId === selectedIdRef.current) termRef.current?.write(msg.data);
       } else if (msg.type === 'terminal/exit' && msg.sessionId === sessionId) {
         void refreshRef.current();
       }
@@ -114,26 +249,38 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
     if (advanced) processedRef.current = messages.length;
   }, [ws.messages, sessionId]);
 
-  const select = React.useCallback(
-    (id: string) => {
-      setSelectedId(id);
-      // Late-join catch-up: seed the buffer from the server tail when empty.
-      setBuffers((prev) => {
-        if (prev[id] !== undefined) return prev;
-        void api
-          .getTerminal(id)
-          .then((detail) => {
-            const tail = stripAnsi(detail.tail ?? '');
-            if (tail) setBuffers((cur) => (cur[id] === undefined || cur[id] === '' ? { ...cur, [id]: tail } : cur));
-          })
-          .catch(() => {
-            // Live frames still arrive — the tail is a convenience, not a gate.
-          });
-        return prev;
+  // ── Selection (REQ-162): replay the raw byte log into the emulator, or
+  // seed it from the server tail on a late join. Replay keeps ANSI state
+  // (colours, alternate screen) intact across terminal switches.
+  React.useEffect(() => {
+    const term = termRef.current;
+    if (!term || !selectedId) return;
+    term.reset();
+    const buffered = rawRef.current[selectedId];
+    if (buffered !== undefined) {
+      if (buffered) term.write(buffered);
+      return;
+    }
+    let alive = true;
+    void api
+      .getTerminal(selectedId)
+      .then((detail) => {
+        const tail = detail.tail ?? '';
+        if (!alive || !tail) return;
+        rawRef.current[selectedId] = appendCapped(rawRef.current[selectedId] ?? '', tail);
+        if (selectedIdRef.current === selectedId) term.write(tail);
+      })
+      .catch(() => {
+        // Live frames still arrive — the tail is a convenience, not a gate.
       });
-    },
-    [],
-  );
+    return () => {
+      alive = false;
+    };
+  }, [selectedId]);
+
+  const select = React.useCallback((id: string) => {
+    setSelectedId(id);
+  }, []);
   selectRef.current = select;
 
   // Auto-select the first running terminal once the list lands.
@@ -148,14 +295,20 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
     if (first) selectRef.current(first.id);
   }, [mine, selectedId]);
 
-  // Auto-scroll on new output (always follow — the pane is the terminal).
   const selected = mine.find((t) => t.id === selectedId) ?? null;
   const selectedRunning = selected?.status === 'running';
-  const rawBuffer = selectedId ? (buffers[selectedId] ?? '') : '';
-  const lines = React.useMemo(() => rawBuffer.split('\n'), [rawBuffer]);
+  runningRef.current = selectedRunning;
+
+  // The server shell may hold a stale size (spawned elsewhere, or before a
+  // layout change): push the fitted size once per terminal, live ones only.
   React.useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [lines]);
+    if (!selectedId || !selectedRunning) return;
+    const size = sizeRef.current;
+    if (!size) return;
+    if (!shouldSendResize(sentSizeRef.current[selectedId] ?? null, size)) return;
+    sentSizeRef.current[selectedId] = size;
+    ws.resizeTerminal(selectedId, size.cols, size.rows);
+  }, [selectedId, selectedRunning, ws]);
 
   const create = React.useCallback(async () => {
     // REQ-159: a session with no folder still gets a shell — the server falls
@@ -168,11 +321,19 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
     }
     setStarting(true);
     try {
-      const res = await api.createTerminal(cwd ? { cwd, sessionId } : { sessionId });
+      // REQ-162: spawn at the emulator's fitted size so the first prompt
+      // wraps exactly like the pane (never the 80×24 default).
+      const size = sizeRef.current ?? FALLBACK_SIZE;
+      const res = await api.createTerminal({
+        ...(cwd ? { cwd } : {}),
+        sessionId,
+        cols: size.cols,
+        rows: size.rows,
+      });
       await refresh();
       select(res.terminal.id);
-      // REQ-059: hand focus to the scrollback so typing starts immediately.
-      window.setTimeout(() => scrollRef.current?.focus({ preventScroll: true }), 50);
+      // REQ-059: hand focus to the emulator so typing starts immediately.
+      window.setTimeout(() => termRef.current?.focus(), 50);
     } catch (e) {
       emitToast(e instanceof Error ? e.message : 'terminal create failed');
     } finally {
@@ -196,7 +357,7 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
     }
     pendingStartRef.current = true;
     emitToast('Session cwd is still loading — the shell starts as soon as it lands');
-  }, [cwd, starting, create]);
+  }, [cwd, known, starting, create]);
 
   // REQ-079: a running shell auto-starts when the pane has none (one attempt
   // per session — failures toast and wait for a click instead of looping).
@@ -211,7 +372,7 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
     }
     autoStartedRef.current = sessionId;
     void create();
-  }, [sessionId, cwd, mine, starting, create]);
+  }, [sessionId, cwd, known, mine, starting, create]);
 
   React.useEffect(() => {
     if (!pendingStartRef.current || !cwd || starting) return;
@@ -224,126 +385,75 @@ export function TerminalPane({ sessionId, ws }: { sessionId: string; ws: UseWs }
     void create();
   }, [cwd, starting, mine, sessionId, create]);
 
-  const sendRaw = React.useCallback(
-    (data: string) => {
-      if (!selectedId || !data || ws.status !== 'open') return;
-      // PTY shells echo input themselves — never paint it client-side.
-      ws.sendTerminal(selectedId, data);
-    },
-    [selectedId, ws],
-  );
-
-  // REQ-085 dedup: the same physical keypress must never reach the PTY
-  // twice (double keydown delivery shows every key doubled). Held-key
-  // auto-repeat (e.repeat) always passes; only non-repeat duplicates of
-  // the identical byte within the window are dropped — a human cannot
-  // re-press the same key in <50ms.
-  const lastKeyRef = React.useRef<{ bytes: string; at: number }>({ bytes: '', at: 0 });
-
-  // REQ-059 direct typing: the scrollback is the terminal. Every handled
-  // key becomes raw PTY bytes; unmapped keys (Cmd-combos, F-keys) fall
-  // through to the browser.
-  const onTermKeyDown = React.useCallback(
-    (e: React.KeyboardEvent<HTMLDivElement>) => {
-      if (!selectedId || selected?.status !== 'running') return;
-      const bytes = keyToBytes({ key: e.key, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey });
-      if (bytes === null) return;
-      e.preventDefault();
-      if (!e.repeat) {
-        const now = Date.now();
-        if (lastKeyRef.current.bytes === bytes && now - lastKeyRef.current.at < 50) return;
-        lastKeyRef.current = { bytes, at: now };
-      }
-      sendRaw(bytes);
-    },
-    [selectedId, selected, sendRaw],
-  );
-
-  const onTermPaste = React.useCallback(
-    (e: React.ClipboardEvent<HTMLDivElement>) => {
-      if (!selectedId || selected?.status !== 'running') return;
-      const text = e.clipboardData.getData('text');
-      if (!text) return;
-      e.preventDefault();
-      sendRaw(text.replace(/\r\n/g, '\n'));
-    },
-    [selectedId, selected, sendRaw],
-  );
-
   const exitNote = selected ? exitSummary(selected) : null;
-  // REQ-107: SSH feel — the socket state is a visible scrollback row, not
-  // just an aria-label. While disconnected the fake `$` cursor stays
-  // hidden (it would pretend liveness) and keystrokes keep dropping
-  // silently at sendRaw — same as a dead SSH socket, minus the beep.
+  // REQ-107: SSH feel — the socket state is a visible strip, not just an
+  // aria-label. While disconnected keystrokes keep dropping silently at the
+  // emulator, same as a dead SSH socket.
   const connNotice = connectionNotice(ws.status);
-  const wsLive = ws.status === 'open';
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#0F0F11] text-[#EDE9E2]">
       <div
-        ref={scrollRef}
-        tabIndex={selectedRunning ? 0 : -1}
         role="application"
         aria-label={
           selectedRunning
             ? `Terminal — click and type directly, arrows for history, Control C interrupts (ws ${ws.status})`
-            : 'Terminal scrollback'
+            : 'Terminal pane'
         }
-        onKeyDown={onTermKeyDown}
-        onPaste={onTermPaste}
         onClick={() => {
           // REQ-079: an empty/dead pane starts a fresh shell on click — no
-          // menus, no buttons, just click and type.
-          if (!selectedRunning && !starting) startShell();
-          else scrollRef.current?.focus({ preventScroll: true });
+          // menus, no buttons, just click and type. A live one just focuses.
+          if (!selectedRunning) {
+            if (!starting) startShell();
+            return;
+          }
+          termRef.current?.focus();
         }}
-        className="flex-1 cursor-text space-y-0.5 overflow-auto p-3 font-mono text-xs leading-5 focus:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500/40"
+        className="relative min-h-0 flex-1 cursor-text"
       >
+        <div ref={hostRef} data-terminal-host className="absolute inset-0 p-2" />
         {starting && terminals.length === 0 ? (
-          <div className="text-white/40">Starting shell…</div>
+          <div className="absolute inset-x-0 top-0 p-3 font-mono text-xs text-white/40">Starting shell…</div>
         ) : !selected ? (
-          <div className="text-white/40">Click to start a shell in this session&apos;s workspace.</div>
-        ) : (
-          <>
-            {lines.map((line, i) => (
-              <div key={i} className="whitespace-pre-wrap break-all text-zinc-300">
-                {line || ' '}
-              </div>
-            ))}
-            {exitNote ? <div className="pt-1 text-[11px] text-white/40">— {exitNote}</div> : null}
-            {connNotice ? (
-              connNotice.action === 'reconnect' ? (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    ws.reconnect();
-                  }}
-                  className="mt-1 flex items-center gap-1.5 rounded border border-amber-400/20 bg-amber-400/10 px-2 py-1 font-mono text-[11px] text-amber-200/90 hover:bg-amber-400/20"
-                >
-                  <Unplug className="h-3.5 w-3.5" />
-                  {connNotice.text}
-                </button>
-              ) : (
-                <div className="mt-1 flex items-center gap-1.5 py-1 font-mono text-[11px] text-white/40">
-                  <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                  {connNotice.text}
-                </div>
-              )
-            ) : null}
-            {!selectedRunning ? (
-              <button
-                className="mt-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/60 hover:bg-white/10 hover:text-white"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  startShell();
-                }}
-              >
-                Shell ended — click for a fresh one
-              </button>
-            ) : null}
-          </>
-        )}
+          <button
+            type="button"
+            className="absolute inset-0 flex items-start p-3 text-left font-mono text-xs text-white/40 hover:text-white/70"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!starting) startShell();
+            }}
+          >
+            Click to start a shell in this session&apos;s workspace.
+          </button>
+        ) : null}
       </div>
+      {exitNote ? (
+        <div className="border-t border-white/10 px-3 py-1 font-mono text-[11px] text-white/40">— {exitNote}</div>
+      ) : null}
+      {connNotice ? (
+        connNotice.action === 'reconnect' ? (
+          <button
+            onClick={() => ws.reconnect()}
+            className="flex items-center gap-1.5 border-t border-amber-400/20 bg-amber-400/10 px-3 py-1 font-mono text-[11px] text-amber-200/90 hover:bg-amber-400/20"
+          >
+            <Unplug className="h-3.5 w-3.5" />
+            {connNotice.text}
+          </button>
+        ) : (
+          <div className="flex items-center gap-1.5 border-t border-white/10 px-3 py-1 font-mono text-[11px] text-white/40">
+            <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+            {connNotice.text}
+          </div>
+        )
+      ) : null}
+      {selected && !selectedRunning ? (
+        <button
+          className="border-t border-white/10 bg-white/5 px-3 py-1.5 text-left text-[11px] text-white/60 hover:bg-white/10 hover:text-white"
+          onClick={() => startShell()}
+        >
+          Shell ended — click for a fresh one
+        </button>
+      ) : null}
     </div>
   );
 }

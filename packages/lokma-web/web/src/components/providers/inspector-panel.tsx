@@ -222,7 +222,12 @@ export function InspectorPanel({
           <BrowserPaneRedirect />
         )
       ) : sessionId && ws ? (
-        <LazyTerminalPane key={sessionId} sessionId={sessionId} ws={ws} />
+        // REQ-162 — same shell the browser got (REQ-037): the sidebar is an
+        // unbounded scrolling column, so the emulator needs a real box or its
+        // viewport collapses to zero height.
+        <div className="flex h-[60vh] min-h-[320px] flex-col overflow-hidden">
+          <LazyTerminalPane key={sessionId} sessionId={sessionId} ws={ws} />
+        </div>
       ) : (
         <div className="rounded border border-dashed p-3 text-xs text-muted-foreground">
           Open a session to use the terminal.

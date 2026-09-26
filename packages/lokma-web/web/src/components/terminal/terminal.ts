@@ -4,25 +4,15 @@ import type { WsStatus } from '@/lib/ws';
 /**
  * Pure TerminalPane helpers — no DOM, no server (unit-tested in
  * `terminal.test.ts`). The pane itself only renders what these return.
+ *
+ * REQ-162: the pane is a real xterm emulator now. The helpers that existed
+ * for the plain-text scrollback (ANSI stripping, key→byte mapping, line
+ * filtering, the clipboard shim) are gone — the emulator owns cursor
+ * motion, redraws, colours, key encodings and copy/paste itself.
  */
 
-/** Max scrollback chars kept per terminal in the browser (server keeps 64k). */
+/** Max raw PTY bytes kept per terminal in the browser (server keeps 64k). */
 export const TERMINAL_BUFFER_CAP = 200_000;
-
-/** Short tab label: agent shells show the agent, plain shells `shell · pid`. */
-export function terminalLabel(info: TerminalInfo): string {
-  if (info.agentId) return info.agentId;
-  const shell = info.shell.split('/').pop() || info.shell;
-  return info.pid ? `${shell} · ${info.pid}` : shell;
-}
-
-/** One-line status for the tab tooltip / footer. */
-export function statusLabel(info: TerminalInfo): string {
-  if (info.status === 'running') return `running · pid ${info.pid ?? '?'}`;
-  if (info.status === 'error') return 'spawn failed';
-  if (info.signal) return `killed (${info.signal})`;
-  return `exit ${info.exitCode ?? '?'}`;
-}
 
 /** Human summary of how a shell ended (footer + exit banner). */
 export function exitSummary(info: TerminalInfo): string | null {
@@ -33,13 +23,12 @@ export function exitSummary(info: TerminalInfo): string | null {
 }
 
 /**
- * REQ-107 — SSH-style connection notice for the scrollback.
- * The socket is invisible in the pane today: when it drops, typing
- * silently goes nowhere and the fake `$` cursor keeps pulsing as if
- * live. This maps every non-open socket state to one inline notice
- * row (null = connected, render nothing). `action: 'reconnect'`
- * means the row is a button that calls `ws.reconnect()`; otherwise
- * the socket is still retrying on its own (auto-backoff in use-ws).
+ * REQ-107 — SSH-style connection notice for the pane footer.
+ * The socket is invisible in the pane: when it drops, typing silently
+ * goes nowhere. This maps every non-open socket state to one thin notice
+ * strip (null = connected, render nothing). `action: 'reconnect'` means
+ * the strip is a button that calls `ws.reconnect()`; otherwise the socket
+ * is still retrying on its own (auto-backoff in use-ws).
  */
 export type ConnectionNotice = {
   text: string;
@@ -58,8 +47,10 @@ export function connectionNotice(status: WsStatus): ConnectionNotice | null {
 }
 
 /**
- * Append a chunk to the scrollback, keeping the tail under the cap.
+ * Append a chunk to the raw scrollback, keeping the tail under the cap.
  * Pure + capped so a runaway `yes` loop cannot grow the tab forever.
+ * REQ-162: this is the emulator's replay log — raw PTY bytes, never
+ * stripped, so a selection switch can be replayed losslessly.
  */
 export function appendCapped(prev: string, chunk: string, cap: number = TERMINAL_BUFFER_CAP): string {
   if (!chunk) return prev;
@@ -67,7 +58,6 @@ export function appendCapped(prev: string, chunk: string, cap: number = TERMINAL
   return next.length > cap ? next.slice(-cap) : next;
 }
 
-/** Strip ANSI escape sequences for the plain-text scrollback view. */
 /**
  * REQ-158: the same `terminal/data` chunk can reach the client twice when more
  * than one socket feeds a session, which painted typed lines 2-3 times.
@@ -94,101 +84,23 @@ export function isRecentDuplicate(
   return recent.some((r) => r.terminalId === frame.terminalId && r.data === frame.data && now - r.at < windowMs);
 }
 
-
-export function stripAnsi(text: string): string {
-  return text
-    .replace(/\[[0-9;?]*[A-Za-z]/g, '')
-    .replace(/\][^\u0007]*\u0007/g, '')
-    .replace(/[()][0-9A-B]/g, '');
-}
-
-/** Case-insensitive line filter for the pane search box (empty = all). */
-export function filterLines(text: string, query: string): string[] {
-  const lines = text.split('\n');
-  const q = query.trim().toLowerCase();
-  if (!q) return lines;
-  return lines.filter((line) => line.toLowerCase().includes(q));
-}
-
-/** Minimal key shape for direct terminal typing (DOM-free, unit-tested). */
-export type TermKey = {
-  key: string;
-  ctrlKey?: boolean;
-  metaKey?: boolean;
-  altKey?: boolean;
-};
-
 /**
- * Map a browser key event to raw PTY bytes (REQ-059 direct typing).
- * Returns the bytes to send, or null when the browser should handle the
- * key itself (Cmd-combos, Alt-combos, unmapped function keys).
- * Ctrl+letter folds to control codes (Ctrl+C = \x03 interrupts, Ctrl+D =
- * \x04 EOF, Ctrl+L clears), arrows/history keys become ANSI sequences so
- * the shell's own readline owns history and completion.
+ * REQ-162 — resize frames mirror the emulator's fitted size.
+ * `terminal/resize` must go out only when the fitted cols/rows actually
+ * changed (or nothing was recorded for that shell yet): a hidden pane fits
+ * to a degenerate box, and junk sizes would be clamped by the server. The
+ * caller separately gates on a live shell — the server raises
+ * `terminal_not_found` for shells that already exited — this helper only
+ * answers "is this size news?".
  */
-export function keyToBytes(e: TermKey): string | null {
-  if (e.metaKey || e.altKey) return null;
-  const { key } = e;
-  if (e.ctrlKey) {
-    if (key === '[') return '\u001b';
-    if (key.length === 1) {
-      const code = key.toLowerCase().charCodeAt(0);
-      if (code >= 97 && code <= 122) return String.fromCharCode(code - 96);
-    }
-    return null;
-  }
-  switch (key) {
-    case 'Enter':
-      return '\n';
-    case 'Backspace':
-      return '\u007f';
-    case 'Tab':
-      return '\t';
-    case 'Escape':
-      return '\u001b';
-    case 'ArrowUp':
-      return '\u001b[A';
-    case 'ArrowDown':
-      return '\u001b[B';
-    case 'ArrowRight':
-      return '\u001b[C';
-    case 'ArrowLeft':
-      return '\u001b[D';
-    case 'Delete':
-      return '\u001b[3~';
-    case 'Home':
-      return '\u001b[H';
-    case 'End':
-      return '\u001b[F';
-    case 'PageUp':
-      return '\u001b[5~';
-    case 'PageDown':
-      return '\u001b[6~';
-    default:
-      return key.length === 1 ? key : null;
-  }
-}
-
-/** Copy helper — clipboard API with a textarea fallback (non-secure contexts). */
-export async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    try {
-      const area = document.createElement('textarea');
-      area.value = text;
-      area.style.position = 'fixed';
-      area.style.opacity = '0';
-      document.body.appendChild(area);
-      area.select();
-      const ok = document.execCommand('copy');
-      document.body.removeChild(area);
-      return ok;
-    } catch {
-      return false;
-    }
-  }
+export function shouldSendResize(
+  last: { cols: number; rows: number } | null,
+  next: { cols: number; rows: number },
+): boolean {
+  if (!Number.isFinite(next.cols) || !Number.isFinite(next.rows)) return false;
+  if (next.cols < 2 || next.rows < 2) return false;
+  if (!last) return true;
+  return last.cols !== next.cols || last.rows !== next.rows;
 }
 
 /**

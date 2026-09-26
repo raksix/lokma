@@ -3,13 +3,12 @@
  */
 export { TerminalPane } from './terminal-pane';
 export {
+  FRAME_DEDUPE_MS,
   TERMINAL_BUFFER_CAP,
   appendCapped,
-  copyText,
+  connectionNotice,
   exitSummary,
-  filterLines,
+  isRecentDuplicate,
   resolveTerminalCwd,
-  statusLabel,
-  stripAnsi,
-  terminalLabel,
+  shouldSendResize,
 } from './terminal';

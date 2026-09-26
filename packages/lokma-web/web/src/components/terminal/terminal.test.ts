@@ -1,20 +1,20 @@
 /**
  * terminal.test.ts — probe for the pure TerminalPane helpers.
  * Run: `bun src/components/terminal/terminal.test.ts` (no DOM, no server).
+ *
+ * REQ-162 dropped the plain-text scrollback helpers (stripAnsi, keyToBytes,
+ * filterLines, copyText) — the xterm emulator owns those concerns now, so
+ * the checks for them are gone along with the code.
  */
 import {
   FRAME_DEDUPE_MS,
   isRecentDuplicate,
+  shouldSendResize,
   TERMINAL_BUFFER_CAP,
   appendCapped,
   connectionNotice,
   exitSummary,
-  filterLines,
-  keyToBytes,
   resolveTerminalCwd,
-  statusLabel,
-  stripAnsi,
-  terminalLabel,
 } from './terminal';
 import type { TerminalInfo } from '@/lib/api';
 
@@ -47,17 +47,6 @@ const info = (over: Partial<TerminalInfo> = {}): TerminalInfo => ({
   ...over,
 });
 
-// terminalLabel
-check('plain shell shows shell + pid', terminalLabel(info()) === 'bash · 4242');
-check('agent shell shows agent id', terminalLabel(info({ agentId: 'builder-1' })) === 'builder-1');
-check('missing pid shows shell only', terminalLabel(info({ pid: null })) === 'bash');
-
-// statusLabel
-check('running status', statusLabel(info()) === 'running · pid 4242');
-check('exited status', statusLabel(info({ status: 'exited', exitCode: 1 })) === 'exit 1');
-check('killed status', statusLabel(info({ status: 'exited', signal: 'SIGTERM' })) === 'killed (SIGTERM)');
-check('error status', statusLabel(info({ status: 'error' })) === 'spawn failed');
-
 // exitSummary
 check('running has no summary', exitSummary(info()) === null);
 check('clean exit', exitSummary(info({ status: 'exited', exitCode: 0 })) === 'Process exited with code 0');
@@ -71,37 +60,16 @@ check('empty chunk is noop', appendCapped('ab', '') === 'ab');
 check('over-cap keeps the tail', appendCapped('abcdef', 'gh', 5) === 'defgh');
 check('default cap is sane', TERMINAL_BUFFER_CAP >= 100_000);
 
-// stripAnsi
-check('strips SGR colors', stripAnsi('[32mok[0m') === 'ok');
-check('strips cursor codes', stripAnsi('a[2Kb') === 'ab');
-check('plain text untouched', stripAnsi('hello $ world [x]') === 'hello $ world [x]');
-check('empty untouched', stripAnsi('') === '');
-
-// filterLines
-const buf = 'echo hello\nnpm test passed\nnothing here';
-check('empty query returns all lines', filterLines(buf, '').length === 3);
-check('substring match', filterLines(buf, 'npm').length === 1);
-check('case-insensitive', filterLines(buf, 'HELLO').length === 1);
-check('no match is empty', filterLines(buf, 'zzz').length === 0);
-
-// keyToBytes (REQ-059 direct typing)
-check('printable passes through', keyToBytes({ key: 'a' }) === 'a');
-check('digit passes through', keyToBytes({ key: '7' }) === '7');
-check('enter is newline', keyToBytes({ key: 'Enter' }) === '\n');
-check('backspace is DEL', keyToBytes({ key: 'Backspace' }) === '');
-check('tab passes through', keyToBytes({ key: 'Tab' }) === '\t');
-check('escape passes through', keyToBytes({ key: 'Escape' }) === '');
-check('arrow up is history', keyToBytes({ key: 'ArrowUp' }) === '[A');
-check('arrow down', keyToBytes({ key: 'ArrowDown' }) === '[B');
-check('arrow left/right', keyToBytes({ key: 'ArrowLeft' }) === '[D' && keyToBytes({ key: 'ArrowRight' }) === '[C');
-check('ctrl+c interrupts', keyToBytes({ key: 'c', ctrlKey: true }) === '');
-check('ctrl+d EOF', keyToBytes({ key: 'd', ctrlKey: true }) === '');
-check('ctrl+l clears', keyToBytes({ key: 'l', ctrlKey: true }) === '');
-check('ctrl uppercase folds', keyToBytes({ key: 'C', ctrlKey: true }) === '');
-check('cmd combo falls through', keyToBytes({ key: 'c', metaKey: true }) === null);
-check('alt combo falls through', keyToBytes({ key: 'b', altKey: true }) === null);
-check('f-keys fall through', keyToBytes({ key: 'F5' }) === null);
-check('shift alone falls through', keyToBytes({ key: 'Shift' }) === null);
+// shouldSendResize (REQ-162: resize frames only on a real fitted change)
+check('a first size is always news', shouldSendResize(null, { cols: 100, rows: 30 }) === true);
+check('an unchanged size is not re-sent', shouldSendResize({ cols: 100, rows: 30 }, { cols: 100, rows: 30 }) === false);
+check('a width change is sent', shouldSendResize({ cols: 100, rows: 30 }, { cols: 101, rows: 30 }) === true);
+check('a height change is sent', shouldSendResize({ cols: 100, rows: 30 }, { cols: 100, rows: 31 }) === true);
+check('a zero-box fit (hidden pane) is never sent', shouldSendResize(null, { cols: 0, rows: 0 }) === false);
+check('a 1-col fit is never sent', shouldSendResize({ cols: 80, rows: 24 }, { cols: 1, rows: 24 }) === false);
+check('a 1-row fit is never sent', shouldSendResize({ cols: 80, rows: 24 }, { cols: 80, rows: 1 }) === false);
+check('a NaN fit is never sent', shouldSendResize(null, { cols: Number.NaN, rows: 24 }) === false);
+check('after a hidden fit the real size is still sent', shouldSendResize({ cols: 80, rows: 24 }, { cols: 120, rows: 40 }) === true);
 
 // resolveTerminalCwd (REQ-060: new shells default to the selected project dir)
 const rtc = (

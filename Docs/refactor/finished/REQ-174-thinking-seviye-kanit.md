@@ -1,6 +1,7 @@
 # REQ-174 — "Thinking seviyesi değişmiyor gibi": zinciri kanıtla, uygulanan seviyeyi görünür yap
 
-**Status:** pending
+**Status:** done (2026-09-29)
+**Kapanış commitleri:** `1c8d4e8` (prob: giden gövde) + `4d40d9e` (usage: seviye koşu kaydında) + `74fb082` (chat: meta satırı) + `ab380eb` (prob: cost frame + temizlik) + `1b98424` (chat: dürüstlük notu) + bu kapanış docs commit'i
 **Tarih:** 2026-09-29
 **Kaynak:** Kullanıcı mesajı + ekran görüntüleri (29 Eyl 2026):
 > "thinking seviyesi değişmio gibi siktritme aq"
@@ -54,3 +55,35 @@ Kullanıcı composer'daki **Thinking / Effort** seçicisini değiştirdiğinde *
 - Kullanıcı kuralı: SADECE `deepseek/deepseek-v4.1-flash` kullanılıyor — bu modelin effort'u "kabul edip görünür fark üretmemesi" bilinen bir ölçüm; REQ'in hedefi sistemi **kanıtlanabilir** kılmak ve hissi bilgiye çevirmek (görünmezse dürüstçe söylemek).
 - Write-only: kod yazılmadı; worker uygular.
 - İlişkili: REQ-133 (thinking picker), REQ-139 (merdiven + clamp), REQ-143 (kompakt menü).
+
+## Kanıt (kapanış)
+
+**Teşhis:** zincir zaten sağlamdı — seçim `composer → ws frame → agent-loop → adaptör gövdesi` yolunda EKSİKSİZ ilerliyor; hissin kökü görünürlüktü (meta satırı yalnız `tokens · $ · model` yazıyordu) + seçili modelin (`deepseek/deepseek-v4.1-flash`) alanı kabul edip akışta akıl yürütme YAYINLAMAMASI. Memo (process-lifetime rejection memory) probda tetiklenmedi (stub kabul ediyor; her istek seçimi taşıdı).
+
+**Canlı prob `scripts/probe-thinking-effectiveness.cjs` — 25/25 PASS** (geçici loopback provider + kayıt tutan stub; canlı sunucunun GERÇEK giden gövdeleri okunur, sonra temizlik 5/5 CHECK + 0 artık):
+
+```
+PASS: high run: outgoing body carries reasoning_effort "high" (got "high")
+PASS: off run: outgoing body has NO reasoning field (got undefined)
+PASS: every high-run request carried the pick (no memo drop)
+PASS: cost frame stamps thinking level "high" / "off"
+PASS: the UI picker writes high to localStorage
+PASS: meta line shows thinking: high after a UI run
+PASS: a silent reasoning run is called out in the meta line
+PASS: the UI-typed run reached the stub with reasoning_effort high
+PASS: the pick survives a reload (localStorage)
+PASS: the composer chip still shows High after reload (got "Thinking High")
+PASS: meta line shows thinking: off after an off run
+PASS: an off run gets no callout
+RAW UI meta (high): 1.4k · $0.00 · thinkprobe/stub-thinking · thinking: high · akıl yürütme yayınlanmadı
+RAW UI meta (off):  1.4k · $0.00 · thinkprobe/stub-thinking · thinking: off
+CHECK: probe session deleted (200) · temp provider deleted (200) · provider registry restored (10) · probe project dir removed · probe temp cwd removed
+```
+
+**Kalıcı kayıt:** usage ledger satırları artık koşu başına seviyeyi taşıyor (`usage.jsonl`): `{"model":"thinkprobe/stub-thinking", ..., "reasoningEffort":"high"}` / `"off"`.
+
+**Birim testler:** `ws.test.ts` (promptMessage seviyeyi taşır / boş seviye telde yok / bilinmeyen seviye reddedilir + cost frame damgası + validator alanı KORUR (zod strip tuzağı) + dürüstlük verdict'i: yayınladı / sessiz / off / iptal sızıntısı yok); `run-meta.test.ts` 11/11 (satır kompozisyonu + callout kuralları); `composer.test.ts` (kalıcılık, 7 seviye, bozuk storage).
+
+**Kapılar:** kök `bun x tsc --noEmit` 0; steril web build yeşil; `pm2 restart lokma-web` sonrası servis edilen bundle == disk `index-DoHgU9HP.js`; tokenless `/api/auth/me` 401 (gate ON).
+
+**Ekler:** `assets/REQ-174-ss3-meta-high.png` (high koşusu sonrası meta satırı + dürüstlük notu), `assets/REQ-174-ss4-meta-off.png` (off koşusu: seviye görünür, not yok).

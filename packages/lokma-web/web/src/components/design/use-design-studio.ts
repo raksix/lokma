@@ -2,11 +2,13 @@ import * as React from 'react';
 import { api, type CritiqueResult, type DesignGuard, type DesignManifest, type DesignSystemMeta } from '@/lib/api';
 import {
   DESIGN_TYPES,
+  appendDesignEvent,
   emptyGenerateForm,
   filterArtifacts,
   parseHtmlEdit,
   toRow,
   validateGenerateForm,
+  type DesignEvent,
   type DesignExportFormat,
   type GenerateForm,
   type NormalizedArtifact,
@@ -25,6 +27,10 @@ import { readDesignPageSnapshot, writeDesignPageSnapshot, type DesignPageSnapsho
  * The page's own state (selected artifact + brief form) is snapshotted to
  * `localStorage` on every change, so leaving the Design page and coming back
  * (or a reload) restores exactly where the user left off.
+ *
+ * REQ-172 — the page is now chat + canvas: the hook additionally narrates
+ * what this visit did (`events`, capped chips for the thread) and owns the
+ * canvas drawer (`code` / `critique`), which replaced the old tab stack.
  */
 
 /** Toast channel shared with the shell (`ToastHost` listens for the event). */
@@ -38,13 +44,13 @@ function saveBlob(filename: string, blob: Blob): void {
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
-  document.body.appendChild(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
-export type DesignStudioTab = 'code' | 'critique' | 'export';
+/** Canvas drawer id — one overlay at a time over the viewer. */
+export type DesignDrawer = 'code' | 'critique';
 
 export type DesignStudio = {
   items: NormalizedArtifact[];
@@ -71,8 +77,11 @@ export type DesignStudio = {
   systems: DesignSystemMeta[];
   guard: DesignGuard | null;
   systemMeta: DesignSystemMeta | undefined;
-  tab: DesignStudioTab;
-  setTab: (tab: DesignStudioTab) => void;
+  /** REQ-172 — session activity chips for the chat thread (newest last). */
+  events: DesignEvent[];
+  /** Which canvas drawer is open, if any. */
+  drawer: DesignDrawer | null;
+  toggleDrawer: (drawer: DesignDrawer) => void;
   htmlEdit: string;
   setHtmlEdit: (value: string) => void;
   htmlError: string | null;
@@ -81,9 +90,7 @@ export type DesignStudio = {
   critiquing: boolean;
   runCritique: () => Promise<void>;
   exporting: string | null;
-  runExport: (format: DesignExportFormat) => Promise<void>;
-  pngScale: 1 | 2;
-  setPngScale: (scale: 1 | 2) => void;
+  runExport: (format: DesignExportFormat, scaleOverride?: 1 | 2) => Promise<void>;
   confirmDelete: string | null;
   deleting: boolean;
   runDelete: () => Promise<void>;
@@ -110,17 +117,29 @@ export function useDesignStudio(): DesignStudio {
   const [generating, setGenerating] = React.useState(false);
   const [systems, setSystems] = React.useState<DesignSystemMeta[]>([]);
   const [guard, setGuard] = React.useState<DesignGuard | null>(null);
-  const [tab, setTab] = React.useState<DesignStudioTab>('code');
+  const [events, setEvents] = React.useState<DesignEvent[]>([]);
+  const [drawer, setDrawer] = React.useState<DesignDrawer | null>(null);
   const [htmlEdit, setHtmlEdit] = React.useState('');
   const [htmlError, setHtmlError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [critiquing, setCritiquing] = React.useState(false);
   const [exporting, setExporting] = React.useState<string | null>(null);
-  // PNG raster scale (1x/2x) — passed as `?scale=` to the export endpoint.
-  const [pngScale, setPngScale] = React.useState<1 | 2>(2);
   // Two-click delete arm (archify-pane pattern) + in-flight flag.
   const [confirmDelete, setConfirmDelete] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
+
+  // Narration sequence: ids only need to be unique within one visit.
+  const eventSeq = React.useRef(0);
+  const pushEvent = React.useCallback((kind: DesignEvent['kind'], text: string) => {
+    setEvents((list) =>
+      appendDesignEvent(list, { id: (eventSeq.current += 1), kind, text, at: Date.now() }),
+    );
+  }, []);
+
+  // Generate is an async POST behind a disabled button; a same-frame double
+  // click could still fire twice, so the re-entry guard is a ref, not state.
+  const generatingRef = React.useRef(false);
+
   // Independent request-sequence guards: the list and the detail load run in
   // PARALLEL on a boot with a restored selection — a single shared counter
   // made the detail call cancel the list call (and the list's `loading` flag
@@ -195,11 +214,13 @@ export function useDesignStudio(): DesignStudio {
   }, [selected, loadDetail]);
 
   const runGenerate = React.useCallback(async () => {
+    if (generatingRef.current) return;
     const local = validateGenerateForm(form);
     if (local) {
       setFormError(local);
       return;
     }
+    generatingRef.current = true;
     setGenerating(true);
     setFormError(null);
     try {
@@ -208,15 +229,19 @@ export function useDesignStudio(): DesignStudio {
         brief: form.brief.trim(),
         system: form.system,
       });
+      pushEvent('ok', `Generated ${res.id} — overall ${res.critique.overall}/10`);
       toast(`Generated ${res.id} — overall ${res.critique.overall}/10`);
       setForm((f) => ({ ...emptyGenerateForm, type: f.type, system: f.system }));
       await loadList(res.id);
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : 'generate failed');
+      const message = e instanceof Error ? e.message : 'generate failed';
+      setFormError(message);
+      pushEvent('error', `Generate failed — ${message}`);
     } finally {
+      generatingRef.current = false;
       setGenerating(false);
     }
-  }, [form, loadList]);
+  }, [form, loadList, pushEvent]);
 
   const runSave = React.useCallback(async () => {
     if (!selected) return;
@@ -230,14 +255,17 @@ export function useDesignStudio(): DesignStudio {
     try {
       const saved = await api.saveDesignHtml(selected, parsed.html);
       setDetail({ manifest: saved.manifest, critique: saved.critique });
+      pushEvent('ok', `HTML saved — viewer rebuilt, overall ${saved.critique.overall}/10`);
       toast(`Saved ${selected} — viewer rebuilt, overall ${saved.critique.overall}/10`);
       void loadList(selected);
     } catch (e) {
-      setHtmlError(e instanceof Error ? e.message : 'save failed');
+      const message = e instanceof Error ? e.message : 'save failed';
+      setHtmlError(message);
+      pushEvent('error', `Save failed — ${message}`);
     } finally {
       setSaving(false);
     }
-  }, [selected, htmlEdit, loadList]);
+  }, [selected, htmlEdit, loadList, pushEvent]);
 
   const runCritique = React.useCallback(async () => {
     if (!selected || critiquing) return;
@@ -245,34 +273,40 @@ export function useDesignStudio(): DesignStudio {
     try {
       const res = await api.critiqueDesign(selected);
       setDetail((d) => (d ? { ...d, critique: res.critique } : d));
+      pushEvent('ok', `Critique done — ${res.critique.overall}/10`);
       toast(`Critique ${res.critique.overall}/10`);
       void loadList(selected);
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'critique failed');
+      const message = e instanceof Error ? e.message : 'critique failed';
+      pushEvent('error', `Critique failed — ${message}`);
+      toast(message);
     } finally {
       setCritiquing(false);
     }
-  }, [selected, critiquing, loadList]);
+  }, [selected, critiquing, loadList, pushEvent]);
 
   const runExport = React.useCallback(
-    async (format: DesignExportFormat) => {
+    async (format: DesignExportFormat, scaleOverride?: 1 | 2) => {
       if (!selected || exporting) return;
       setExporting(format);
       try {
         const { filename, blob } = await api.downloadDesignExport(
           selected,
           format,
-          format === 'png' ? pngScale : undefined,
+          format === 'png' ? (scaleOverride ?? 2) : undefined,
         );
         saveBlob(filename, blob);
+        pushEvent('ok', `Exported ${filename}`);
         toast(`Exported ${filename}`);
       } catch (e) {
-        toast(e instanceof Error ? e.message : 'export failed');
+        const message = e instanceof Error ? e.message : 'export failed';
+        pushEvent('error', `Export failed — ${message}`);
+        toast(message);
       } finally {
         setExporting(null);
       }
     },
-    [selected, exporting, pngScale],
+    [selected, exporting, pushEvent],
   );
 
   // Selecting a row always cancels a pending delete-arm (pane parity).
@@ -287,22 +321,31 @@ export function useDesignStudio(): DesignStudio {
       setConfirmDelete(selected);
       return;
     }
+    const target = selected;
     setConfirmDelete(null);
     setDeleting(true);
     try {
-      await api.deleteDesign(selected);
-      toast(`Deleted ${selected}`);
+      await api.deleteDesign(target);
+      pushEvent('ok', `Deleted ${target}`);
+      toast(`Deleted ${target}`);
       setSelected(null);
       setDetail(null);
       setDetailError(null);
       setHtmlEdit('');
+      setDrawer(null);
       await loadList();
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'delete failed');
+      const message = e instanceof Error ? e.message : 'delete failed';
+      pushEvent('error', `Delete failed — ${message}`);
+      toast(message);
     } finally {
       setDeleting(false);
     }
-  }, [selected, deleting, confirmDelete, loadList]);
+  }, [selected, deleting, confirmDelete, loadList, pushEvent]);
+
+  const toggleDrawer = React.useCallback((next: DesignDrawer) => {
+    setDrawer((current) => (current === next ? null : next));
+  }, []);
 
   const reload = React.useCallback(() => {
     void loadList();
@@ -341,8 +384,9 @@ export function useDesignStudio(): DesignStudio {
     systems,
     guard,
     systemMeta,
-    tab,
-    setTab,
+    events,
+    drawer,
+    toggleDrawer,
     htmlEdit,
     setHtmlEdit,
     htmlError,
@@ -352,8 +396,6 @@ export function useDesignStudio(): DesignStudio {
     runCritique,
     exporting,
     runExport,
-    pngScale,
-    setPngScale,
     confirmDelete,
     deleting,
     runDelete,

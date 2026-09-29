@@ -118,3 +118,27 @@ export function toRow(manifest: DesignManifest, bytes: number, overall: number |
 export function overallLabel(overall: number | null): string {
   return overall === null ? '—' : `${overall}/10`;
 }
+
+/**
+ * REQ-172 — one session activity chip in the Design chat thread
+ * ("Generated …", "HTML saved", "Critique 8/10", errors). Ephemeral by
+ * design: the artifact list is the durable history, events only narrate
+ * what this visit actually did.
+ */
+export type DesignEvent = {
+  id: number;
+  kind: 'ok' | 'info' | 'error';
+  text: string;
+  at: number;
+};
+
+/**
+ * Newest-last push with a hard cap: the thread only renders the tail, so a
+ * long session must not grow the list without bound. Returns a NEW array
+ * (never mutates the input — React state update).
+ */
+export function appendDesignEvent(list: DesignEvent[], event: DesignEvent, cap = 40): DesignEvent[] {
+  const keep = list.length >= cap ? list.slice(list.length - cap + 1) : list.slice();
+  keep.push(event);
+  return keep;
+}

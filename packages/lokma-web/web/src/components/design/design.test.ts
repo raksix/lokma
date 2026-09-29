@@ -2,6 +2,7 @@ import {
   DESIGN_EXPORTS,
   DESIGN_SYSTEMS,
   DESIGN_TYPES,
+  appendDesignEvent,
   artifactBadge,
   emptyGenerateForm,
   filterArtifacts,
@@ -11,6 +12,7 @@ import {
   scoreTone,
   toRow,
   validateGenerateForm,
+  type DesignEvent,
   type GenerateForm,
   type NormalizedArtifact,
 } from './design';
@@ -117,6 +119,22 @@ const rows: NormalizedArtifact[] = [
   check('snapshot: foreign type/system fall back to defaults', foreign.form.type === 'prototype' && foreign.form.system === 'stripe-linear');
   check('snapshot: overlong brief dropped', parseDesignPageSnapshot(JSON.stringify({ form: { brief: 'x'.repeat(2001) } })).form.brief === '');
   check('snapshot: non-string selection dropped', parseDesignPageSnapshot(JSON.stringify({ selected: 42 })).selected === null);
+}
+
+// REQ-172 — the Design chat's activity chips: append keeps order, caps the
+// tail and never mutates the previous list.
+{
+  const base: DesignEvent[] = [];
+  const one = appendDesignEvent(base, { id: 1, kind: 'ok', text: 'Generated p-1 — overall 8/10', at: 1 });
+  const two = appendDesignEvent(one, { id: 2, kind: 'info', text: 'HTML saved', at: 2 });
+  check('event append keeps newest last', two.length === 2 && two[1].id === 2 && two[1].kind === 'info');
+  check('event append never mutates the input', one.length === 1 && base.length === 0);
+  let capped: DesignEvent[] = [];
+  for (let i = 1; i <= 45; i += 1) {
+    capped = appendDesignEvent(capped, { id: i, kind: 'info', text: `event ${i}`, at: i }, 40);
+  }
+  check('event cap keeps exactly 40', capped.length === 40);
+  check('event cap drops the oldest first', capped[0].id === 6 && capped[39].id === 45);
 }
 
 console.log(`\nDESIGN PROBE: ${passed} passed, ${failed} failed`);

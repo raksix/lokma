@@ -189,3 +189,4 @@
 - [REQ-168](finished/REQ-168-design-studio-ayri-sayfa.md) — Design Studio apayrı bir SAYFA olsun (Claude Design gibi: sol brief + sağ canvas); üst geçişe lokma · Bots · Design eklenir — done (full page + snapshot restore; live probe 45/45)
 - [REQ-169](finished/REQ-169-setup-rail-gorunurluk.md) — Setup girişi kurulum bitince (bootstrapped) sidebar'da görünmesin; pane gizli kalır, silinmez — done (live probe 16/16)
 - [REQ-170](finished/REQ-170-tool-cagri-cift-render.md) — Araç çağrıları iki kez görünüyor (zaman çizelgesi + canlı blok): koşu içi dedupe, canlı katman transcript'e düşeni tekrar çizmesin — done (live probe 9/9; eski build'de max-seen 2x → fix sonrası 1x)
+- [REQ-171](REQ-171-create-modal-model-kaldir.md) — Create bot/agent modalından Model alanı kaldırılsın; composer'daki model seçicisi yeter (Visibility + diğer alanlar kalır) — pending

@@ -22,8 +22,9 @@
 const http = require('node:http');
 const WebSocket = require('ws');
 const { execFileSync } = require('node:child_process');
-const { mkdtempSync, writeFileSync } = require('node:fs');
-const { tmpdir } = require('node:os');
+const { createHash } = require('node:crypto');
+const { existsSync, mkdtempSync, rmSync, writeFileSync } = require('node:fs');
+const { homedir, tmpdir } = require('node:os');
 const { join } = require('node:path');
 
 const BASE = 'http://127.0.0.1:3456';
@@ -94,7 +95,7 @@ async function req(token, method, path, body) {
   return fetch(BASE + path, init);
 }
 
-/** Send one prompt over a real WS and settle on done/error (single frames). */
+/** Send one prompt over a real WS and settle after the run's cost frame. */
 function runTurn(sessionId, token, prompt, reasoningEffort, model) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket('ws://127.0.0.1:3456/ws/' + sessionId + '?token=' + encodeURIComponent(token));
@@ -103,6 +104,13 @@ function runTurn(sessionId, token, prompt, reasoningEffort, model) {
       ws.close();
       reject(new Error('timeout waiting for done (level=' + reasoningEffort + ')'));
     }, 120000);
+    let sawDone = false;
+    const settle = () => {
+      if (!sawDone) return;
+      clearTimeout(timer);
+      ws.close();
+      resolve(frames);
+    };
     ws.on('open', () => {
       const msg = { type: 'prompt', sessionId, prompt, model };
       if (reasoningEffort) msg.reasoningEffort = reasoningEffort;
@@ -121,9 +129,12 @@ function runTurn(sessionId, token, prompt, reasoningEffort, model) {
         ws.close();
         reject(new Error('server error: ' + JSON.stringify(msg).slice(0, 300)));
       } else if (msg.type === 'done' || msg.type === 'run_end') {
-        clearTimeout(timer);
-        ws.close();
-        resolve(frames);
+        sawDone = true;
+        // Accounting (the cost frame) is emitted AFTER `done`; give the
+        // server a short window to flush it before settling.
+        setTimeout(settle, 1500);
+      } else if (msg.type === 'cost') {
+        settle();
       }
     });
     ws.on('error', (e) => {
@@ -140,6 +151,16 @@ function answerOf(frames) {
     .join('');
 }
 
+/**
+ * Mirror of lokma-core `SessionStore` project dir naming (sha1(cwd)[0:8] +
+ * sanitized cwd) so the probe can remove the project dir its run created.
+ */
+function projectDirFor(cwd) {
+  const h = createHash('sha1').update(cwd).digest('hex').slice(0, 8);
+  const safe = cwd.replace(/[^a-zA-Z0-9]/g, '-').slice(0, 40);
+  return join(homedir(), '.lokma', 'projects', safe + '-' + h);
+}
+
 (async () => {
   const token = execFileSync('bash', ['-lc', 'HOME=/root bun scripts/mint-e2e-token.mjs'], {
     cwd: join(__dirname, '..'),
@@ -153,6 +174,7 @@ function answerOf(frames) {
   const stub = await listenStub();
   let sessionId = '';
   let providerCreated = false;
+  let cwd = '';
   const baseline = await (await req(token, 'GET', '/api/providers')).json();
   // A leftover from a crashed run is cleaned below, so it is not part of the
   // expected end state (the restored registry == baseline minus the temp id).
@@ -178,7 +200,7 @@ function answerOf(frames) {
     );
     providerCreated = true;
 
-    const cwd = mkdtempSync(join(tmpdir(), 'lokma-thinkprobe-'));
+    cwd = mkdtempSync(join(tmpdir(), 'lokma-thinkprobe-'));
     writeFileSync(join(cwd, 'note.txt'), 'probe workspace\n');
     const createdSession = await req(token, 'POST', '/api/sessions', { cwd });
     const session = await createdSession.json();
@@ -218,6 +240,21 @@ function answerOf(frames) {
     // A3 — every request of both runs kept the picked value (no silent drop mid-run).
     const highAll = highReqs.every((r) => (r.body || {}).reasoning_effort === 'high');
     check(highAll, 'every high-run request carried the pick (no memo drop)');
+
+    // B1 — the cost frame carries the applied level: the data path the run
+    // meta line renders (`thinking: <level>`).
+    const highCost = highFrames.filter((f) => f.type === 'cost');
+    check(highCost.length >= 1, 'high run emitted a cost frame');
+    check(
+      highCost[0].reasoningEffort === 'high',
+      'cost frame stamps thinking level "high" (got ' + JSON.stringify(highCost[0].reasoningEffort) + ')',
+    );
+    const offCost = offFrames.filter((f) => f.type === 'cost');
+    check(offCost.length >= 1, 'off run emitted a cost frame');
+    check(
+      offCost[0].reasoningEffort === 'off',
+      'cost frame stamps thinking level "off" (got ' + JSON.stringify(offCost[0].reasoningEffort) + ')',
+    );
   } finally {
     try {
       if (sessionId) {
@@ -234,6 +271,18 @@ function answerOf(frames) {
         JSON.stringify(afterIds) === JSON.stringify(beforeIds),
         'provider registry restored (' + afterIds.length + ' providers)',
       );
+      // The run created a project dir (sessions + usage ledger) and a temp
+      // cwd — leave neither behind. The project dir goes only after the
+      // session delete above (a live store would rewrite it mid-race).
+      if (cwd) {
+        if (sessionId) {
+          const dir = projectDirFor(cwd);
+          rmSync(dir, { recursive: true, force: true });
+          soft(!existsSync(dir), 'probe project dir removed');
+        }
+        rmSync(cwd, { recursive: true, force: true });
+        soft(!existsSync(cwd), 'probe temp cwd removed');
+      }
     } catch (cleanupErr) {
       cleanupIssues.push('cleanup threw: ' + cleanupErr.message);
       console.log('CLEANUP-WARN: ' + cleanupErr.message);

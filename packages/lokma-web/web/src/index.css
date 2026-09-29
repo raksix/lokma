@@ -226,6 +226,25 @@ a[href]:not(.cursor-default),
 .dark [class*="bg-[#FAF9F5]"] input,
 .dark [class*="bg-white"] input { color: #EDE9E2 !important; }
 
+/* REQ-173 — the surface mode chips (`lokma` / `Bots` / `Design`): every
+   state carries an explicit text colour, so a chip can never inherit the
+   theme ink onto the wrong fill. Before this, the selected `lokma` pill
+   painted the light cream fill while its label inherited the dark theme's
+   light ink — invisible. A bare `[class*="bg-[#F2F0EB]"]` dark override
+   would flip every muted surface in the app, so the pairs live here,
+   scoped to `.mode-chip`. Light: zinc idle, ink on cream hover, white on
+   ink selected. Dark: the same pairs mapped onto the dark ramp. */
+.mode-chip { color: #52525B; }
+.mode-chip:hover { background-color: #F2F0EB; color: #262624; }
+.mode-chip[aria-selected="true"] { background-color: #262624; color: #FFFFFF; }
+.mode-chip-badge { background-color: #262624; color: #FFFFFF; }
+.mode-chip[aria-selected="true"] .mode-chip-badge { background-color: #FFFFFF; color: #262624; }
+.dark .mode-chip { color: #A8A8AD; }
+.dark .mode-chip:hover { background-color: #1E1E21; color: #EDE9E2; }
+.dark .mode-chip[aria-selected="true"] { background-color: #EDE9E2; color: #0F0F11; }
+.dark .mode-chip-badge { background-color: #EDE9E2; color: #0F0F11; }
+.dark .mode-chip[aria-selected="true"] .mode-chip-badge { background-color: #0F0F11; color: #EDE9E2; }
+
 /* Phase 3 a11y — honor the OS "reduce motion" setting: kill smooth
    scrolling, CSS transitions/animations (the 3D graph auto-rotate is
    additionally gated in JS via prefersReducedMotion()). */

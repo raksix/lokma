@@ -125,9 +125,12 @@ export function Header({
         )}
         {/* REQ-161 — surface switch: `lokma` is the normal chat/workspace
             mode, `Bots` opens the separate Bots section. REQ-168 adds
-            `Design` — the Design Studio's own full page. The active chip
-            carries the ink fill so the current mode is obvious at a glance;
-            clicking `lokma` always returns to the (untouched) normal mode. */}
+            `Design` — the Design Studio's own full page. REQ-173 — every
+            chip state (idle/hover/selected) takes its text+fill pair from
+            `.mode-chip` (index.css), so the label can never inherit theme
+            ink onto the wrong fill; the selected chip carries the ink fill
+            in light and the light fill in dark. Clicking `lokma` always
+            returns to the (untouched) normal mode. */}
         <div className="ml-1 flex items-center gap-1" role="tablist" aria-label="Surface">
           <button
             type="button"
@@ -136,11 +139,9 @@ export function Header({
             aria-selected={(mode ?? 'chat') === 'chat'}
             title="lokma — chat & workspace"
             onClick={() => onModeChange?.('chat')}
-            className={`flex items-center gap-1.5 rounded-md px-1.5 py-0.5 ${
-              (mode ?? 'chat') === 'chat' ? 'bg-[#F2F0EB]' : 'hover:bg-[#F2F0EB]'
-            }`}
+            className="mode-chip flex items-center gap-1.5 rounded-md px-1.5 py-0.5"
           >
-            <span className="grid h-5 w-5 place-items-center rounded-md bg-[#262624] text-[10px] font-semibold text-white">
+            <span className="mode-chip-badge grid h-5 w-5 place-items-center rounded-md text-[10px] font-semibold">
               L
             </span>
             <span className="hidden font-serif text-[15px] sm:block">lokma</span>
@@ -153,11 +154,7 @@ export function Header({
               aria-selected={mode === 'bots'}
               title="Bots — separate bot section"
               onClick={() => onModeChange('bots')}
-              className={`rounded-md px-1.5 py-0.5 text-[13px] font-medium ${
-                mode === 'bots'
-                  ? 'bg-[#262624] text-white'
-                  : 'text-zinc-600 hover:bg-[#F2F0EB]'
-              }`}
+              className="mode-chip rounded-md px-1.5 py-0.5 text-[13px] font-medium"
             >
               Bots
             </button>
@@ -170,11 +167,7 @@ export function Header({
               aria-selected={mode === 'design'}
               title="Design — standalone Design Studio page"
               onClick={() => onModeChange('design')}
-              className={`rounded-md px-1.5 py-0.5 text-[13px] font-medium ${
-                mode === 'design'
-                  ? 'bg-[#262624] text-white'
-                  : 'text-zinc-600 hover:bg-[#F2F0EB]'
-              }`}
+              className="mode-chip rounded-md px-1.5 py-0.5 text-[13px] font-medium"
             >
               Design
             </button>

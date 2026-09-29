@@ -87,6 +87,104 @@ export function interleaveLiveBlocks(
   return blocks;
 }
 
+/**
+ * REQ-170: what the transcript has NOT absorbed yet — the rows of the CURRENT
+ * run (everything after the last user prompt). Anything above that belongs to
+ * earlier runs and must never consume the buffers of the turn being watched.
+ */
+function currentRunRows(transcript: TranscriptMessage[]): TranscriptMessage[] {
+  for (let i = transcript.length - 1; i >= 0; i -= 1) {
+    const row = transcript[i];
+    if (row && row.role === 'user') return transcript.slice(i + 1);
+  }
+  return transcript.slice();
+}
+
+/** Whitespace a persisted row lost to trimming, still present in the live buffer. */
+function isSpace(ch: string | undefined): boolean {
+  return ch === ' ' || ch === '\n' || ch === '\t' || ch === '\r';
+}
+
+/**
+ * Consume one persisted segment from `live` starting at `from`; returns the
+ * new position, or null when the buffers disagree (a retried turn, a
+ * truncated thinking row) — callers then fail open.
+ */
+function consumeSegment(live: string, from: number, segment: string): number | null {
+  let i = from;
+  for (let j = 0; j < segment.length; j += 1) {
+    // Persisted rows are trimmed at their edges while the live buffer still
+    // carries that whitespace — skip it instead of failing the match.
+    while (i < live.length && live[i] !== segment[j] && isSpace(live[i])) i += 1;
+    if (i >= live.length || live[i] !== segment[j]) return null;
+    i += 1;
+  }
+  return i;
+}
+
+/** Leading chars of `live` the persisted segments account for (0 when none). */
+function absorbedPrefix(live: string, segments: string[]): number {
+  let i = 0;
+  for (const segment of segments) {
+    const at = consumeSegment(live, i, segment);
+    if (at === null) return i;
+    i = at;
+  }
+  return i;
+}
+
+/**
+ * REQ-170: the transcript is canonical — the live layer paints only what has
+ * NOT landed in it yet. A completed tool call is written as a `tool` row
+ * (same `toolCallId`) while the run is still going, and every finished turn
+ * persists its thinking/text, so the live buffers (which keep accumulating
+ * for the whole run) painted all of it a second time — the user saw every
+ * tool call twice: once with its result in the timeline, once as a bare row
+ * under the `Lokma` block.
+ *
+ * Returns the interleaved blocks for the un-persisted remainder plus the live
+ * thinking cut to the same remainder. Tool calls match by id; text/thinking
+ * consume their persisted prefix. Buffers that disagree (retried turn,
+ * truncated row) fail open per buffer — the live buffer is shown untouched
+ * rather than swallowing text that never landed.
+ */
+export function liveAfterPersisted(
+  stream: string,
+  toolMarks: ToolMark[],
+  toolCalls: Record<string, ToolCallEntry>,
+  thinking: string,
+  transcript: TranscriptMessage[],
+): { blocks: LiveBlock[]; thinking: string } {
+  const persistedIds = new Set<string>();
+  const textSegments: string[] = [];
+  const thinkSegments: string[] = [];
+  for (const row of currentRunRows(transcript)) {
+    if (row.role === 'tool') {
+      // Only rows the timeline will actually paint count — an unparseable row
+      // renders nothing there, so excluding its call here would lose it.
+      if (row.toolCallId && transcriptToolEntry(row)) persistedIds.add(row.toolCallId);
+    } else if (row.role === 'assistant' && row.content) {
+      textSegments.push(row.content);
+    } else if (row.role === 'thinking' && row.content) {
+      thinkSegments.push(row.content);
+    }
+  }
+  const consumed = absorbedPrefix(stream, textSegments);
+  // Marks are stream offsets — rebase them onto the trimmed buffer so text
+  // still interleaves with the calls that are still live.
+  const restMarks = toolMarks
+    .filter((mark) => !persistedIds.has(mark.callId))
+    .map((mark) => ({ callId: mark.callId, at: Math.max(0, mark.at - consumed) }));
+  const restCalls: Record<string, ToolCallEntry> = {};
+  for (const [callId, entry] of Object.entries(toolCalls)) {
+    if (!persistedIds.has(callId)) restCalls[callId] = entry;
+  }
+  return {
+    blocks: interleaveLiveBlocks(stream.slice(consumed), restMarks, restCalls),
+    thinking: thinking.slice(absorbedPrefix(thinking, thinkSegments)),
+  };
+}
+
 /** REQ-140: one entry in the dot rail — a prompt the user actually sent. */
 export type PromptAnchor = { index: number; label: string };
 
@@ -423,7 +521,15 @@ export function SingleChatView({
 
   // REQ-111: live tool rows interleave with the stream in arrival order
   // (text → tool → text → tool) — never one block pinned under the message.
-  const liveBlocks = React.useMemo(() => interleaveLiveBlocks(stream, toolMarks, toolCalls), [stream, toolMarks, toolCalls]);
+  // REQ-170: and only the un-persisted remainder paints — a completed call's
+  // transcript row (pushed live by REQ-149) is canonical, so re-painting it
+  // in the live block showed every tool call twice while the run was going.
+  const live = React.useMemo(
+    () => liveAfterPersisted(stream, toolMarks, toolCalls, thinking, transcript),
+    [stream, toolMarks, toolCalls, thinking, transcript],
+  );
+  const liveBlocks = live.blocks;
+  const liveThinking = live.thinking;
 
   return (
     <div className="relative flex gap-3">
@@ -498,13 +604,13 @@ export function SingleChatView({
                 </div>
               </div>
             ))}
-            {thinking && (
+            {liveThinking && (
               <div className="flex gap-3">
                 <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full border border-line bg-muted font-serif text-xs">
                   ?
                 </span>
                 <div className="min-w-0 flex-1">
-                  <ThinkingTrace thinking={thinking} streaming={streaming} />
+                  <ThinkingTrace thinking={liveThinking} streaming={streaming} />
                 </div>
               </div>
             )}

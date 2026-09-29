@@ -5,7 +5,7 @@
  * Not imported by app code, so the Vite bundle ignores it.
  */
 import type { ToolCallEntry } from '@/lib/ws';
-import { interleaveLiveBlocks, promptAnchors, promptLabel } from './single-chat-view';
+import { interleaveLiveBlocks, liveAfterPersisted, promptAnchors, promptLabel } from './single-chat-view';
 import type { TranscriptMessage } from './single-chat-view';
 
 function assert(cond: boolean, label: string): void {
@@ -107,3 +107,72 @@ assert(promptLabel('x'.repeat(80)).endsWith('…'), 'capped label ends with an e
 assert(promptLabel('   ') === 'Empty prompt', 'blank prompt still gets a label');
 
 console.log('single-chat-view.test.ts: all REQ-140 prompt-rail checks passed');
+
+// ---------------------------------------------------------------- REQ-170
+// The transcript is canonical: a call (or text) that already landed as a
+// transcript row must not paint a second time in the live layer while the
+// run is still going (the user saw every tool call twice: timeline + live).
+
+function toolRow(callId: string, tool = 'read_file'): TranscriptMessage {
+  return { role: 'tool', content: JSON.stringify({ tool, ok: true, result: 'ok' }), toolName: tool, toolCallId: callId };
+}
+
+// 12. A completed call leaves the live layer (its transcript row is canonical);
+//     the call that is still running stays.
+let live = liveAfterPersisted(
+  'looking',
+  [{ callId: 'c1', at: 7 }, { callId: 'c2', at: 7 }],
+  { c1: call('read_file'), c2: call('write_file') },
+  '',
+  [msg('user', 'do it'), toolRow('c1')],
+);
+assert(live.blocks.filter((b) => b.kind === 'tool').length === 1, 'completed call no longer painted live');
+assert(live.blocks.some((b) => b.kind === 'tool' && b.callId === 'c2'), 'the still-running call keeps its live row');
+assert(!live.blocks.some((b) => b.kind === 'tool' && b.callId === 'c1'), 'persisted call id is gone from live');
+
+// 13. Persisted assistant text is consumed — only the new tail paints.
+live = liveAfterPersisted('done part and more', [], {}, '', [msg('user', 'q'), msg('assistant', 'done part')]);
+assert(live.blocks.length === 1 && live.blocks[0].kind === 'text' && live.blocks[0].text === ' and more', 'persisted text prefix is not painted twice');
+
+// 14. Rows above the last user row never absorb the fresh run's buffer.
+live = liveAfterPersisted('hello', [], {}, '', [msg('user', 'old'), msg('assistant', 'hello'), msg('user', 'new')]);
+assert(live.blocks.length === 1 && live.blocks[0].kind === 'text' && live.blocks[0].text === 'hello', 'earlier runs never consume the fresh stream');
+
+// 15. Whitespace at a row edge (the server trims) still matches.
+live = liveAfterPersisted('hello world', [], {}, '', [msg('user', 'q'), msg('assistant', 'hello')]);
+assert(live.blocks.length === 1 && live.blocks[0].kind === 'text' && live.blocks[0].text === ' world', 'trimmed row edges still consume');
+
+// 16. Buffers that disagree fail open — nothing is swallowed.
+live = liveAfterPersisted('totally different', [], {}, '', [msg('user', 'q'), msg('assistant', 'hello')]);
+assert(live.blocks.length === 1 && live.blocks[0].kind === 'text' && live.blocks[0].text === 'totally different', 'a mismatch shows the live buffer untouched');
+
+// 17. Marks rebase onto the trimmed buffer so text still interleaves.
+live = liveAfterPersisted(
+  'AB',
+  [{ callId: 'cX', at: 1 }, { callId: 'c2', at: 2 }],
+  { cX: call('a'), c2: call('b') },
+  '',
+  [msg('user', 'q'), msg('assistant', 'A'), toolRow('cX')],
+);
+assert(
+  live.blocks.length === 2 && live.blocks[0].kind === 'text' && live.blocks[0].text === 'B' && live.blocks[1].kind === 'tool' && live.blocks[1].callId === 'c2',
+  'rebased marks keep text-before-live-tool order',
+);
+
+// 18. Thinking consumes its persisted prefix (only when such rows are shown —
+//     the chat filter drops persisted thinking, so the live copy stays).
+live = liveAfterPersisted('', [], {}, 'step onestep two more', [msg('user', 'q'), msg('thinking', 'step one'), msg('thinking', 'step two')]);
+assert(live.thinking === ' more', 'persisted thinking is cut from the live block');
+live = liveAfterPersisted('', [], {}, 'reasoning here', [msg('user', 'q')]);
+assert(live.thinking === 'reasoning here', 'thinking survives when the transcript carries none');
+
+// 19. An unparseable tool row must NOT hide the call — the timeline renders
+//     nothing for it, so the live row is the only copy.
+live = liveAfterPersisted('', [], { c1: call('read_file') }, '', [msg('user', 'q'), { role: 'tool', content: 'not json', toolCallId: 'c1' }]);
+assert(live.blocks.some((b) => b.kind === 'tool' && b.callId === 'c1'), 'unparseable rows never swallow a live call');
+
+// 20. No transcript at all = yesterday's behavior (regression guard).
+live = liveAfterPersisted('hello', [{ callId: 'c1', at: 5 }], { c1: call('read') }, 'think', []);
+assert(live.blocks.length === 2 && live.blocks[1].kind === 'tool' && live.thinking === 'think', 'empty transcript leaves the live layer untouched');
+
+console.log('single-chat-view.test.ts: all REQ-170 live-dedupe checks passed');

@@ -1,6 +1,6 @@
 # REQ-172 — Design sayfası Google Stitch / Claude Design tarzına sadeleşsin (mevcut hal çok karışık)
 
-**Status:** pending
+**Status:** done (2026-09-29) — kod `f70ab50` (web) + prob `8b83e89` (probe); canlıda doğrulandı
 **Tarih:** 2026-09-29
 **Kaynak:** Kullanıcı mesajı + 3 ekran görüntüsü (29 Eyl 2026):
 > "design kısmının tasarımı google stitch ya da claude design gibi olmalı bu çok karışık amk."
@@ -54,3 +54,20 @@ REQ-168 Design Studio'yu kendi sayfası yaptı, ama yerleşim **kart yığını*
 - İskelet **Claude Design** (sol sohbet + sağ canvas); Stitch'ten **artboard/varyant** fikri ve **altta prompt** deneyimi uyarlanır; ikisi de "az krom, çok canvas" diyor.
 - Emoji yasak (kullanıcı kuralı); mevcut işlevler kayıpsız sadeleşir.
 - Write-only: kod yazılmadı; worker uygular.
+
+## Kapanış kanıtı (2026-09-29)
+
+**Uygulama:** Design sayfası kart yığınından iki kolonlu stüdyoya çevrildi — `design-page.tsx` yeniden yazıldı; `design-chat.tsx` (sol) brief/iterasyon mesaj akışı + durum chip'leri + composer (Type/System selectleri + brief + Generate), sağda büyük canlı viewer + ince araç çubuğu (Code / Critique / Export / ⋯, DESIGN.md guard header çipi) ve altında `design-artboards.tsx` Stitch tarzı varyant şeridi (gerçek `/api/design/:id/view` önizlemeleri, ilk 24 thumbnail iframe). Kaldırılanlar: ayrı Brief kartı, ayrı Artifacts kartı (arama + tip filtresi şeride indi), Code/Critique/Export sekme yığını (drawer + menüye döndü), iki alt bilgi kartı (guard çipi + sayımlar), uzun araç çubuğu açıklaması. `use-design-studio.ts`: oturum aktivite chip'leri (`appendDesignEvent`, sınırlı + birim testli), canvas drawer durumu, ref-guard'lı generate, açık PNG 1x/2x export.
+
+**Birim:** `design.test.ts` **39/39 PASS** (yeni activity-chip + guard kontrolleri dahil); komşu süitler panes 106+120+126+159, skills 35, inspector-rail 24 — hepsi PASS.
+
+**Canlı prob:** `scripts/probe-design-studio-layout.cjs` (minted Bearer; login gate AÇIK) — **31/31 PASS**:
+- Yerleşim: sol kolon sohbet 380px (composer: Type/System/brief/Generate hazır) + sağ kolon büyük canvas 1115×851, yan yana, overflowX=0 — üçüncü kolon yok.
+- Eski kart yığını yok: `[data-design-tab]` 0, `[data-design-row]` 0, `[data-design-delete]` 0; 'Artifacts' başlık metni 0; 'Brief' yalnız composer field label'ı (1); 'DESIGN.md — guard' kart metni yok — guard header çipi ("No .lokma/DESIGN.md — bundled tokens").
+- Generate gerçekten koşuyor: yeni brief → sohbet mesajı + `Generated … — overall 7/10` chip'i + viewer iframe gerçek `/api/design/:id/view` build'ini render ediyor (`page.frames` ile okundu, bodyLen 775) + varyant şeridinde thumbnail.
+- Ölü buton yok: Code drawer gerçek HTML'i gösterdi (1691 karakter), Critique drawer Re-run ile açıldı, Export menüsü 6 formatı listeledi (HTML / ZIP / JSON / PNG 1x / PNG 2x / WebM), ⋯ menüsü iki-tık Delete'i arm etti (`Confirm delete`).
+- Cleanup: prob artığı sayfa-içi iki-tık ⋯ Delete ile silindi + canlı liste üzerinden 'stays gone' re-check; 0 sayfa JS hatası.
+
+**Kapılar:** root `bun x tsc --noEmit` 0; steril web build yeşil (entry `index-DxUl1rCS.js`, disk == servis edilen); `pm2 restart lokma-web` sonrası servis edilen entry == disk; concept build yeşil; tokenless `/api/auth/me` 401 (gate ON). Ekran görüntüleri: `assets/REQ-172-ss1-mevcut-design.png` (önce — kullanıcı) ve `assets/REQ-172-ss4-sonra.png` (sonra — prob koşusu).
+
+**Kapsam notu:** Export formatlarının gerçek indirmesi bu probda sürülmedi (menü + 6 format + enabled doğrulandı; gerçek dosya indirmesi REQ-168 probunda kanıtlanmıştı); code kaydetme butonu (`data-design-save`) yerinde ve gerçek `api.saveDesignHtml` yoluna bağlı.

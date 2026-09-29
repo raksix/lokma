@@ -1,6 +1,6 @@
 # REQ-173 — Seçili "lokma" mod çipinin yazısı görünmüyor (açık zemin + açık/miras yazı rengi)
 
-**Status:** pending
+**Status:** done (2026-09-29 — kod `85431ff`, prob `bd94e2b`)
 **Tarih:** 2026-09-29
 **Kaynak:** Kullanıcı mesajı + ekran görüntüsü (29 Eyl 2026):
 > "lokma seçiliyken lokma yazısı gözükmüyor"
@@ -47,3 +47,13 @@
 
 - Write-only: kod yazılmadı; worker uygular.
 - `concept/` prototipi kapsam dışı.
+
+## Kanıt (2026-09-29, canlı — prob + piksel)
+
+- Prob `scripts/probe-mode-switch-contrast.cjs` (üç çip × idle/hover/seçili/seçili-hover × koyu+açık):
+  **önce 20 PASS / 5 FAIL** → koyu chat seçili **1.06:1**, koyu hover'lar **2.08:1**, koyu chat hover **1.06:1**;
+  **sonra 21/21 PASS** → koyu seçili **15.82** · koyu hover **13.74** · açık pasif **7.34** · açık hover **13.31** · açık seçili **15.16**.
+- Piksel kanıtı (başlık kırpması, aynı kutu x64–143): önce etiket **#EDE9E2** / zemin **#F2F0EB** (≈1.05:1 — görünmez) → sonra **#0F0F11** / **#EDE9E2** (≈15.8:1).
+- Ekran görüntüleri: `assets/REQ-173-ss2-before-dark.png` (önce) · `assets/REQ-173-ss3-after-dark.png` · `assets/REQ-173-ss4-after-light.png`.
+- Kapılar: kök `bun x tsc --noEmit` 0 · steril web build yeşil · `pm2 restart lokma-web` sonrası servis edilen bundle == disk (`index-CYKSJnlL.js` / `index-BNbmKiO2.css`; CSS'te `.mode-chip` kuralları servis ediliyor) · tokenless `/api/auth/me` 401 (gate ON).
+- Not: `src/components/shell/a11y.test.ts` içindeki 3 hata (dialog/focus-trap) bu değişiklikten ÖNCE de vardı (stash'li karşılaştırma: iki durumda da 48/3) — kapsam dışı, ayrı iş.

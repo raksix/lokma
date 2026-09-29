@@ -188,3 +188,4 @@
 - [REQ-167](finished/REQ-167-archify-ayri-modal.md) — Archify apayrı bir modal olsun (Settings'e bölüm değil, kendi başına modal); rail ikonu modalı açar — done (live probe 41/41)
 - [REQ-168](finished/REQ-168-design-studio-ayri-sayfa.md) — Design Studio apayrı bir SAYFA olsun (Claude Design gibi: sol brief + sağ canvas); üst geçişe lokma · Bots · Design eklenir — done (full page + snapshot restore; live probe 45/45)
 - [REQ-169](finished/REQ-169-setup-rail-gorunurluk.md) — Setup girişi kurulum bitince (bootstrapped) sidebar'da görünmesin; pane gizli kalır, silinmez — done (live probe 16/16)
+- [REQ-170](REQ-170-tool-cagri-cift-render.md) — Araç çağrıları iki kez görünüyor (zaman çizelgesi + canlı blok): koşu içi dedupe, canlı katman transcript'e düşeni tekrar çizmesin — pending

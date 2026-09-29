@@ -41,7 +41,18 @@ export type ToolCallEntry = {
   result?: unknown;
   isError?: boolean;
 };
-export type CostTotal = { inputTokens: number; outputTokens: number; costUsd: number; model: string };
+export type CostTotal = {
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  model: string;
+  /**
+   * REQ-174: thinking level of the LATEST cost frame — what the run meta
+   * line displays as `thinking: <level>`. Absent for engine frames that
+   * carry no level.
+   */
+  reasoningEffort?: ReasoningEffort;
+};
 
 /** Reducer state derived from the append-only server frame log. */
 export type WsUiState = {
@@ -238,6 +249,8 @@ function addCost(total: CostTotal, msg: Extract<ServerMessage, { type: 'cost' }>
     outputTokens: total.outputTokens + msg.outputTokens,
     costUsd: total.costUsd + msg.costUsd,
     model: msg.model || total.model,
+    // REQ-174: last frame wins — the meta line reads the latest run's level.
+    reasoningEffort: msg.reasoningEffort ?? total.reasoningEffort,
   };
 }
 

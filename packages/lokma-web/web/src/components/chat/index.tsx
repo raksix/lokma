@@ -18,7 +18,7 @@ import { useKnownSession, useProviderStore, useSessionStore } from '@/stores';
 import { markSessionSeen } from '@/stores/session';
 import { emitToast } from '@/components/shell';
 import { FILE_DRAG_MIME, INSERT_MENTION_EVENT } from '@/components/files';
-import { formatCostBadge } from '@/components/header';
+import { runMetaLabel } from './run-meta';
 
 /**
  * Chat — one session: REST transcript + live WS stream + real Composer.
@@ -591,10 +591,8 @@ export function Chat({
     [insertMention],
   );
 
-  const costLabel =
-    cost.inputTokens + cost.outputTokens > 0
-      ? `${formatCostBadge(cost)}${cost.model ? ` · ${cost.model}` : ''}`
-      : null;
+  // REQ-174: cost badge + model + the thinking level the run applied.
+  const costLabel = runMetaLabel(cost);
 
   return (
     <Card

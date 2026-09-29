@@ -124,6 +124,41 @@ state = applyServerFrame(state, {
   model: 'm',
 });
 assert(state.cost.inputTokens === 20 && Math.abs(state.cost.costUsd - 0.002) < 1e-9, 'cost accumulates');
+// 8b. REQ-174: the cost frame stamps the run's thinking level; the latest wins.
+state = applyServerFrame(state, {
+  type: 'cost',
+  sessionId: 's',
+  inputTokens: 0,
+  outputTokens: 0,
+  costUsd: 0,
+  model: 'm',
+  reasoningEffort: 'high',
+});
+assert(state.cost.reasoningEffort === 'high', 'cost frame stamps the applied thinking level');
+state = applyServerFrame(state, {
+  type: 'cost',
+  sessionId: 's',
+  inputTokens: 0,
+  outputTokens: 0,
+  costUsd: 0,
+  model: 'm',
+  reasoningEffort: 'off',
+});
+assert(state.cost.reasoningEffort === 'off', 'the latest level replaces the earlier one');
+// The WS validator strips unknown keys — the schema field is what keeps it.
+const decodedCost = decodeServerFrame(
+  JSON.stringify({ type: 'cost', sessionId: 's', inputTokens: 1, outputTokens: 1, costUsd: 0, model: 'm', reasoningEffort: 'xhigh' }),
+);
+assert(
+  decodedCost !== null && decodedCost.type === 'cost' && decodedCost.reasoningEffort === 'xhigh',
+  'the frame validator keeps reasoningEffort on cost frames',
+);
+assert(
+  decodeServerFrame(
+    JSON.stringify({ type: 'cost', sessionId: 's', inputTokens: 1, outputTokens: 1, costUsd: 0, model: 'm', reasoningEffort: 'ultra' }),
+  ) === null,
+  'an unknown level fails validation instead of leaking through',
+);
 state = applyServerFrame(state, {
   type: 'permission_request',
   requestId: 'p1',

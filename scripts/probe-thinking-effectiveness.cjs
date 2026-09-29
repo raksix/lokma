@@ -13,14 +13,19 @@
  *   A1  a `high` run egreses `reasoning_effort: "high"` on the chat body
  *   A2  an `off` run egreses NO reasoning field at all (regression shape)
  *   A3  the requests land on the stub's /v1/chat/completions (model routing)
+ *   B1  the cost frame stamps the applied level (the meta line's data path)
+ *   C   the deployed UI: picking a level, sending, the meta line showing
+ *       `thinking: <level>` (+ the silent-run callout), and the pick
+ *       surviving a reload — driven like a user (composer + picker)
  *
- * Run: NODE_PATH=/root/test-hermes/node_modules node scripts/probe-thinking-effectiveness.cjs
+ * Run: NODE_PATH=/root/test-hermes/node_modules xvfb-run -a node scripts/probe-thinking-effectiveness.cjs
  * No billed API key is read: the token is minted locally and the stub is
  * loopback-only. Everything the probe creates (temp provider, session,
- * temp dir) is deleted and re-verified before exit.
+ * project dir, temp cwd) is deleted and re-verified before exit.
  */
 const http = require('node:http');
 const WebSocket = require('ws');
+const { chromium } = require('playwright-core');
 const { execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
 const { existsSync, mkdtempSync, rmSync, writeFileSync } = require('node:fs');
@@ -28,6 +33,8 @@ const { homedir, tmpdir } = require('node:os');
 const { join } = require('node:path');
 
 const BASE = 'http://127.0.0.1:3456';
+const UI_BASE = 'http://127.0.0.1:3457';
+const CHROME_PATH = '/root/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome';
 const PROVIDER_ID = 'thinkprobe';
 const STUB_MODEL = 'stub-thinking';
 const MODEL_REF = PROVIDER_ID + '/' + STUB_MODEL;
@@ -161,6 +168,107 @@ function projectDirFor(cwd) {
   return join(homedir(), '.lokma', 'projects', safe + '-' + h);
 }
 
+/** The run meta line: a leaf div carrying the thinking token. */
+async function readMetaLine(page, level) {
+  return page.evaluate((lvl) => {
+    const el = [...document.querySelectorAll('div')].find(
+      (d) => d.children.length === 0 && (d.textContent || '').includes('thinking: ' + lvl),
+    );
+    return el ? el.textContent || '' : '';
+  }, level);
+}
+
+/**
+ * C — the deployed UI, driven like a user: seed the token + session into
+ * localStorage, pick a level through the composer menu, type the prompt,
+ * and read the meta line the run leaves behind.
+ */
+async function runUiChecks(token, sessionId, stub) {
+  const browser = await chromium.launch({
+    headless: true,
+    executablePath: CHROME_PATH,
+    args: ['--no-sandbox', '--disable-dev-shm-usage'],
+  });
+  try {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    await context.addInitScript(
+      ([t, sid]) => {
+        localStorage.setItem('lokma-token', t);
+        localStorage.setItem('lokma:sessionId', sid);
+      },
+      [token, sessionId],
+    );
+    const page = await context.newPage();
+    const composer = 'textarea[aria-label="Message Lokma"]';
+    await page.goto(UI_BASE + '/', { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector(composer, { timeout: 30000 });
+
+    // Pick `high` through the composer menu (data-effort-* hooks, REQ-143).
+    await page.click('button[title^="Thinking budget"]');
+    await page.click('[data-effort-option="high"]');
+    check(
+      (await page.evaluate(() => localStorage.getItem('lokma-composer-thinking'))) === 'high',
+      'the UI picker writes high to localStorage',
+    );
+
+    const markUi = stub.captured.length;
+    await page.fill(composer, 'Reply with ONLY the word UI-HIGH. No tools.');
+    await page.press(composer, 'Enter');
+    await page.waitForFunction(() => document.body.innerText.includes('thinking: high'), null, { timeout: 90000 });
+    const metaHigh = await readMetaLine(page, 'high');
+    check(metaHigh.includes('thinking: high'), 'meta line shows thinking: high after a UI run');
+    check(metaHigh.includes('akıl yürütme yayınlanmadı'), 'a silent reasoning run is called out in the meta line');
+    const uiReqs = stub.captured.slice(markUi);
+    check(
+      uiReqs.length >= 1 && (uiReqs[0].body || {}).reasoning_effort === 'high',
+      'the UI-typed run reached the stub with reasoning_effort high',
+    );
+    console.log('RAW UI meta (high): ' + metaHigh);
+    // Evidence shot — best-effort only (this box's chromium occasionally
+    // refuses CDP screenshots; the probe must never fail on it).
+    try {
+      await page.screenshot({ path: join(__dirname, '..', 'Docs', 'refactor', 'assets', 'REQ-174-ss3-meta-high.png') });
+      console.log('shot: REQ-174-ss3-meta-high.png');
+    } catch (shotErr) {
+      console.log('shot skipped (high): ' + shotErr.message);
+    }
+
+    // (c) the pick survives a reload — storage line + chip label.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector(composer, { timeout: 30000 });
+    check(
+      (await page.evaluate(() => localStorage.getItem('lokma-composer-thinking'))) === 'high',
+      'the pick survives a reload (localStorage)',
+    );
+    const chip = await page.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find((x) =>
+        (x.getAttribute('title') || '').startsWith('Thinking budget'),
+      );
+      return b ? b.innerText.replace(/\s+/g, ' ') : '';
+    });
+    check(chip.indexOf('High') >= 0, 'the composer chip still shows High after reload (got "' + chip + '")');
+
+    // Off run: the level is shown, and nothing gets called out.
+    await page.click('button[title^="Thinking budget"]');
+    await page.click('[data-effort-option="off"]');
+    await page.fill(composer, 'Reply with ONLY the word UI-OFF. No tools.');
+    await page.press(composer, 'Enter');
+    await page.waitForFunction(() => document.body.innerText.includes('thinking: off'), null, { timeout: 90000 });
+    const metaOff = await readMetaLine(page, 'off');
+    check(metaOff.includes('thinking: off'), 'meta line shows thinking: off after an off run');
+    check(!metaOff.includes('akıl yürütme yayınlanmadı'), 'an off run gets no callout');
+    console.log('RAW UI meta (off): ' + metaOff);
+    try {
+      await page.screenshot({ path: join(__dirname, '..', 'Docs', 'refactor', 'assets', 'REQ-174-ss4-meta-off.png') });
+      console.log('shot: REQ-174-ss4-meta-off.png');
+    } catch (shotErr) {
+      console.log('shot skipped (off): ' + shotErr.message);
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
 (async () => {
   const token = execFileSync('bash', ['-lc', 'HOME=/root bun scripts/mint-e2e-token.mjs'], {
     cwd: join(__dirname, '..'),
@@ -255,6 +363,12 @@ function projectDirFor(cwd) {
       offCost[0].reasoningEffort === 'off',
       'cost frame stamps thinking level "off" (got ' + JSON.stringify(offCost[0].reasoningEffort) + ')',
     );
+
+    // C — the deployed UI, driven like a user. The session model is pointed
+    // at the stub first so the typed runs cannot reach a billed upstream.
+    const patched = await req(token, 'PATCH', '/api/sessions/' + sessionId, { model: MODEL_REF });
+    check(patched.status === 200, 'session model pointed at the stub (HTTP ' + patched.status + ')');
+    await runUiChecks(token, sessionId, stub);
   } finally {
     try {
       if (sessionId) {

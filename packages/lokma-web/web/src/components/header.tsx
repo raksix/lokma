@@ -10,8 +10,10 @@ import type { AppMode } from '@/components/bots/mode';
  * Header — harness top bar ported from the concept shell (same cream/
  * terracotta tokens, serif wordmark, lucide icons only).
  * REQ-012: no model picker here — model selection lives in the Composer
- * popup and the Models tab. Compact single-row bar: brand, session pill,
- * WS/cost readout, search, settings, theme and sidebar toggles.
+ * popup and the Models tab. Compact single-row bar: brand, WS/cost readout,
+ * search, settings, theme and sidebar toggles.
+ * REQ-175: the session-id readout and the Checking/Active/Down pill are
+ * gone — the footer bar owns gateway state, the session list owns ids.
  */
 
 /** Compact `12.3k · $0.04` label from accumulated WS cost frames. */
@@ -22,8 +24,6 @@ export function formatCostBadge(cost: CostTotal): string {
 }
 
 export function Header({
-  sessionId,
-  serverUp,
   cost,
   wsStatus,
   onSearch,
@@ -36,8 +36,6 @@ export function Header({
   mode,
   onModeChange,
 }: {
-  sessionId: string;
-  serverUp: boolean | null;
   cost: CostTotal;
   wsStatus: WsStatus;
   onSearch: () => void;
@@ -172,23 +170,6 @@ export function Header({
               Design
             </button>
           ) : null}
-        </div>
-        <div className="ml-2 hidden items-center gap-1 text-xs text-zinc-500 md:flex">
-          <span className="mx-1 h-4 w-px bg-[#E8E4DE]" />
-          <span className="font-mono" title={sessionId}>
-            {sessionId.slice(0, 12)}
-          </span>
-          <span
-            className={`rounded-full border px-1.5 py-0.5 text-[10px] ${
-              serverUp === null
-                ? 'border-[#E8E4DE] text-zinc-500'
-                : serverUp
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                  : 'border-red-200 bg-red-50 text-red-700'
-            }`}
-          >
-            {serverUp === null ? 'Checking' : serverUp ? 'Active' : 'Down'}
-          </span>
         </div>
         <div className="flex flex-1 justify-center">
           <span className="hidden items-center gap-1.5 text-xs text-zinc-500 lg:flex" title={`WS ${wsStatus}`}>

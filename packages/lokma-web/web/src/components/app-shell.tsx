@@ -591,8 +591,6 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           Skip to chat
         </a>
         <Header
-          sessionId={activeId}
-          serverUp={serverUp}
           cost={ws.cost}
           wsStatus={ws.status}
           onSearch={() => setSearchOpen(true)}
@@ -670,8 +668,6 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           Skip to design studio
         </a>
         <Header
-          sessionId={activeId}
-          serverUp={serverUp}
           cost={ws.cost}
           wsStatus={ws.status}
           onSearch={() => setSearchOpen(true)}
@@ -748,8 +744,6 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           Skip to chat
         </a>
         <Header
-          sessionId={activeId}
-          serverUp={serverUp}
           cost={ws.cost}
           wsStatus={ws.status}
           onSearch={() => setSearchOpen(true)}
@@ -840,8 +834,6 @@ export function AppShell({ sessionId }: { sessionId: string }) {
         Skip to chat
       </a>
       <Header
-        sessionId={activeId}
-        serverUp={serverUp}
         cost={ws.cost}
         wsStatus={ws.status}
         onSearch={() => setSearchOpen(true)}

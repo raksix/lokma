@@ -1,6 +1,6 @@
 # REQ-170 — Aynı araç çağrısı iki kez görünüyor: canlı katman, transcript'e düşen satırı tekrar çizmesin
 
-**Status:** pending
+**Status:** done (2026-09-29) — commits `20d484a` (fix) + `7e4c944` (live probe)
 **Tarih:** 2026-09-29
 **Kaynak:** Kullanıcı mesajı (29 Eyl 2026, ekran görüntülü):
 > "abi tool çağrıları bi altta gözüküo toplam bir de üstte gözüküyor altta tekrar gözükmesine gerek yok 2 kere gözüküyor"
@@ -48,3 +48,15 @@ Tek kaydırma alanında AYNI 4 araç çağrısı iki kez çiziliyor:
 - Kullanıcı: "altta tekrar gözükmesine gerek yok" → **alttaki canlı blok tekrarı kaldırılır**; üstteki (kalıcı, sonuçlu) satırlar kanonik kalır. Tersi (canlı bloğu tutup zaman çizelgesi satırlarını gizlemek) yenileme sonrası görünümle tutarsız olurdu — kanonik kaynak transcript'tir.
 - Bu bir HATA düzeltmesidir; kullanıcı talebiyle yalnız REQ olarak eklendi (write-only).
 - `concept/` prototipi kapsam dışı — yalnız `packages/lokma-web`.
+
+## Kapanış kanıtı (2026-09-29)
+
+**Uygulama:** `liveAfterPersisted()` (single-chat-view.tsx) — transcript kanonik; canlı katman yalnız kalıcılaşmamış artığı çizer (callId ile dışlama + metin/thinking önek tüketimi, uyuşmazlıkta fail-open; mark'lar kırpılan buffer'a yeniden tabanlanır). Chat'te kalıcı `thinking` satırları zaten filtrelendiği için canlı thinking görünür kalır (tüketim yalnız gerçekten çizilen satırlardan).
+
+**Birim:** `single-chat-view.test.ts` +12 REQ-170 kontrolü (persisted call düşer / süren kalır, metin öneki tüketilir, önceki koşu tüketmez, trim toleransı, fail-open, mark rebase, thinking kuralı, parse edilemeyen satır çağrıyı yutmaz, boş transcript regresyonu) — hepsi PASS; komşu testler (chat, lokma-message, ws, submit-guard) PASS; root `bun x tsc --noEmit` 0.
+
+**Canlı prob:** `scripts/probe-tool-row-dedupe.cjs` (MutationObserver ile HER DOM durumu; 3 `read_file` çağrılı gerçek koşu, 3 tool_start frame):
+- Düzeltilmiş build: `max-seen 1x` + `live-seen yes` (üçü), bitişte her satır tam 1, canlı blok 0 — **9/9 PASS**.
+- Eski build (`2be8e34`, aynı ölçüm aracı): `max-seen 2x` → FAIL — kullanıcının gördüğü çift birebir yakalandı.
+
+**Kapılar:** steril web build yeşil; `pm2 restart lokma-web` sonrası servis edilen bundle == disk `index-CEadL_8F.js`; prob oturumu silindi + GET→404 re-check.

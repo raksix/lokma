@@ -1,6 +1,6 @@
 # REQ-175 — Header'dan `sess_...` oturum kimliği ve "Active" durum rozeti kaldırılsın
 
-**Status:** pending
+**Status:** done (2026-09-29 — kod `f3bcd1a`, test `184e91e`, prob `7339ff7`)
 **Tarih:** 2026-09-29
 **Kaynak:** Kullanıcı mesajı (29 Eyl 2026):
 > "sess_mtt0y10 falan yazmasıana gerek yok yanında active diye de bunu kaldır ya."
@@ -43,3 +43,16 @@
 
 - Write-only: kod yazılmadı; worker uygular.
 - Aynı dosyaya REQ-173 de dokunuyor (çip kontrastı) → sıralı işlenir (173 önce), çakışma beklenmez.
+
+## Kanıt (2026-09-29, canlı — prob + OCR + bundle)
+
+- Uygulama: sağ blok (ayraç + `font-mono` `sess_...` + `Checking/Active/Down` rozeti) tamamen kaldırıldı; `sessionId`/`serverUp` Header prop'ları imzadan ve DÖRT çağrı yerinden (Bots modu, Design sayfası, mobil, masaüstü) temizlendi. `serverUp` state'i AppShell'de KALDI — FooterBar gateway durumunu zaten gösteriyor; oturum kimliği oturum listesinde.
+- Prob `scripts/probe-header-clean.cjs` (canlı :3457, token mint edilerek — gate AÇIK kalır):
+  **önce 4/7** — `sess_=true mono=["sess_mun3dqe"]`, `words=["Active"]` (header metni: `L lokma Bots Design sess_mun3dqe Active 0 · $0.00`) →
+  **sonra 7/7 PASS** — `sess_=false mono=[]`, `words=[]` (header metni: `L lokma Bots Design 0 · $0.00`); 3 mod çipi görünür, maliyet rozeti (`0 · $0.00`, `title="WS open"`), tema/arama/ayarlar butonları yerinde, 0 yakalanmamış sayfa hatası.
+- OCR kanıtı (başlık kırpması): önce `Bots / Design / s_munsdi / Active / $0.00` → sonra `Bots / Design / 0 · $0.00` — kimlik ve rozet metni kırpmada YOK.
+- Ekran görüntüleri: `assets/REQ-175-ss1-before-header.png` · `ss2-after-header.png` · `ss3-before-full.png` · `ss4-after-full.png`.
+- Birim kapıları: `shell.test.ts` 12/12 (REQ-175 iki yeni kaynak guard'ı: header kaynağı `sessionId`/`serverUp` adlarını taşıyamaz + hiçbir `<Header` çağrısı bu prop'ları geçemez) · `mobile-single-view.test.ts` 31/31.
+- Kapılar: kök `bun x tsc --noEmit` 0 · steril web build yeşil · `pm2 restart lokma-web` sonrası servis edilen bundle == disk (`index-03fSVNKl.js` / `index-DPHugSuK.css`) · tokenless `/api/auth/me` 401 (gate ON).
+- Not: prob INFO satırındaki 2× `/api/sessions/<id>` 404 konsol gürültüsü değişiklikten ÖNCE de vardı (bootstrap isteği) — kapsam dışı, bilgi amaçlı.
+- Commitler: `f3bcd1a` (web) + `184e91e` (test) + `7339ff7` (prob) + bu kapanış docs commit'i.

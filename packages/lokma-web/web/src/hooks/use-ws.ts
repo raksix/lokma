@@ -58,6 +58,12 @@ export type UseWs = {
   /** REQ-111: live stream cuts in arrival order (view interleaves tool rows). */
   toolMarks: Array<{ callId: string; at: number }>;
   cost: CostTotal;
+  /**
+   * REQ-174: did the last reasoning run actually publish thinking? `false`
+   * when it asked (level != off) and streamed none — the meta line then says
+   * so; `null` when the last run did not ask.
+   */
+  reasoningPublished: boolean | null;
   permissions: PermissionRequest[];
   questions: QuestionRequest[];
   /** Agent UI-control queue (REQ-057) — the shell opens panes per entry. */
@@ -352,6 +358,8 @@ export function useWs(sessionId: string): UseWs {
     toolCalls: ui.toolCalls,
     toolMarks: ui.toolMarks,
     cost: ui.cost,
+    /** REQ-174: honesty verdict of the last reasoning run (`false` = asked but silent). */
+    reasoningPublished: ui.reasoningPublished,
     permissions: ui.permissions,
     questions: ui.questions,
     uiActions: ui.uiActions,

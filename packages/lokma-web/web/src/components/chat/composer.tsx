@@ -718,7 +718,7 @@ export function Composer({
               variant="outline"
               size="sm"
               onClick={() => setThinkOpen((v) => !v)}
-              title="Thinking budget for the next prompt"
+              title="Thinking budget for the next prompt — the level rides every request; a model that does not publish reasoning shows no thinking block."
               aria-label="Thinking budget"
               aria-expanded={thinkOpen}
               className={cn(

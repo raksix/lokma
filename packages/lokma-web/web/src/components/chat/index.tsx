@@ -87,7 +87,7 @@ export function Chat({
   /** REQ-104: one smart-chain resolution per session (guard, not state — never re-fires). */
   const chainResolved = React.useRef<string | null>(null);
 
-  const { status, stream, thinking, cost, done, lastError, lastErrorCode, retry, toolCalls, toolMarks, permissions, questions, sendText, interrupt, answerPermission, answerQuestion, clearLiveTrace, requestTranscript } = ws;
+  const { status, stream, thinking, cost, reasoningPublished, done, lastError, lastErrorCode, retry, toolCalls, toolMarks, permissions, questions, sendText, interrupt, answerPermission, answerQuestion, clearLiveTrace, requestTranscript } = ws;
   const socketOpen = status === 'open';
   /**
    * REQ-149: the async paths below must know whether the socket is feeding
@@ -591,8 +591,9 @@ export function Chat({
     [insertMention],
   );
 
-  // REQ-174: cost badge + model + the thinking level the run applied.
-  const costLabel = runMetaLabel(cost);
+  // REQ-174: cost badge + model + the thinking level the run applied (and an
+  // honest callout when the run asked for reasoning but published none).
+  const costLabel = runMetaLabel(cost, reasoningPublished);
 
   return (
     <Card

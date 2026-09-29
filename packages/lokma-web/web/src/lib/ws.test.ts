@@ -159,6 +159,52 @@ assert(
   ) === null,
   'an unknown level fails validation instead of leaking through',
 );
+// 8c. REQ-174: the honesty verdict — asked but silent vs spoke up.
+let verdict = initialWsUiState();
+verdict = applyServerFrame(verdict, { type: 'thinking_delta', delta: 'hmm', sessionId: 's' });
+verdict = applyServerFrame(verdict, {
+  type: 'cost',
+  sessionId: 's',
+  inputTokens: 5,
+  outputTokens: 5,
+  costUsd: 0,
+  model: 'm',
+  reasoningEffort: 'high',
+});
+assert(verdict.reasoningPublished === true, 'a run that streamed thinking counts as published');
+verdict = applyServerFrame(verdict, {
+  type: 'cost',
+  sessionId: 's',
+  inputTokens: 5,
+  outputTokens: 5,
+  costUsd: 0,
+  model: 'm',
+  reasoningEffort: 'high',
+});
+assert(verdict.reasoningPublished === false, 'a silent reasoning run flips the verdict');
+verdict = applyServerFrame(verdict, {
+  type: 'cost',
+  sessionId: 's',
+  inputTokens: 5,
+  outputTokens: 5,
+  costUsd: 0,
+  model: 'm',
+  reasoningEffort: 'off',
+});
+assert(verdict.reasoningPublished === null, 'an off run carries no verdict');
+// An aborted run's partial thinking must not leak into the next verdict.
+verdict = applyServerFrame(verdict, { type: 'thinking_delta', delta: 'partial', sessionId: 's' });
+verdict = applyServerFrame(verdict, { type: 'done', sessionId: 's', reason: 'aborted' });
+verdict = applyServerFrame(verdict, {
+  type: 'cost',
+  sessionId: 's',
+  inputTokens: 5,
+  outputTokens: 5,
+  costUsd: 0,
+  model: 'm',
+  reasoningEffort: 'high',
+});
+assert(verdict.reasoningPublished === false, 'an aborted run never counts as published');
 state = applyServerFrame(state, {
   type: 'permission_request',
   requestId: 'p1',

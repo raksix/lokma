@@ -59,6 +59,17 @@ export type WsUiState = {
   stream: string;
   /** Live reasoning text (REQ-050) — shown while streaming, never persisted. */
   thinking: string;
+  /**
+   * REQ-174: thinking deltas seen since the last cost frame — the raw signal
+   * behind the honesty verdict below.
+   */
+  thinkingSinceCost: boolean;
+  /**
+   * REQ-174: did the last run that ASKED for reasoning actually publish any?
+   * `null` when the last run did not ask (off/engine), so the meta line never
+   * claims something the run did not promise.
+   */
+  reasoningPublished: boolean | null;
   toolCalls: Record<string, ToolCallEntry>;
   /**
    * REQ-111: stream cut recorded at each `tool_start` (`at` = stream length
@@ -229,6 +240,8 @@ export function initialWsUiState(): WsUiState {
   return {
     stream: '',
     thinking: '',
+    thinkingSinceCost: false,
+    reasoningPublished: null,
     toolCalls: {},
     toolMarks: [],
     cost: { inputTokens: 0, outputTokens: 0, costUsd: 0, model: '' },
@@ -263,7 +276,7 @@ export function applyServerFrame(state: WsUiState, msg: ServerMessage): WsUiStat
     case 'text_delta':
       return { ...state, stream: state.stream + msg.delta, done: false };
     case 'thinking_delta':
-      return { ...state, thinking: state.thinking + msg.delta, done: false };
+      return { ...state, thinking: state.thinking + msg.delta, thinkingSinceCost: true, done: false };
     case 'tool_start': {
       // REQ-111: cut the live stream here so the row interleaves in arrival
       // order. Idempotent — a resent start never double-marks the same call.
@@ -298,8 +311,19 @@ export function applyServerFrame(state: WsUiState, msg: ServerMessage): WsUiStat
         ...state,
         retry: { attempt: msg.attempt, maxAttempts: msg.maxAttempts, waitMs: msg.waitMs, message: msg.message },
       };
-    case 'cost':
-      return { ...state, cost: addCost(state.cost, msg) };
+    case 'cost': {
+      const cost = addCost(state.cost, msg);
+      // REQ-174 honesty verdict: a run that ASKED for reasoning but streamed
+      // none gets called out in the meta line instead of letting the user
+      // assume the picker is broken. Runs that did not ask carry no verdict.
+      const asked = cost.reasoningEffort !== undefined && cost.reasoningEffort !== 'off';
+      return {
+        ...state,
+        cost,
+        reasoningPublished: asked ? state.thinkingSinceCost : null,
+        thinkingSinceCost: false,
+      };
+    }
     case 'agent_state':
       return state;
     case 'terminal/data':
@@ -315,13 +339,27 @@ export function applyServerFrame(state: WsUiState, msg: ServerMessage): WsUiStat
       // state never changes on it.
       return state;
     case 'done':
-      return { ...state, done: true, doneReason: msg.reason };
+      return {
+        ...state,
+        done: true,
+        doneReason: msg.reason,
+        // REQ-174: an aborted run gets no cost frame — its partial thinking
+        // must not leak a "published" verdict into the next run.
+        thinkingSinceCost: msg.reason === 'complete' ? state.thinkingSinceCost : false,
+      };
     case 'error':
       // REQ-038: an upstream failure used to leave the chat stuck on
       // "sending…" forever — the server sends `error` with NO following
       // `done`, and pending rows only clear on `done`. Ending the run here
       // drops the optimistic row; the message stays visible via lastError.
-      return { ...state, lastError: msg.message, lastErrorCode: msg.code ?? null, done: true, doneReason: 'error' };
+      return {
+        ...state,
+        lastError: msg.message,
+        lastErrorCode: msg.code ?? null,
+        done: true,
+        doneReason: 'error',
+        thinkingSinceCost: false,
+      };
   }
 }
 

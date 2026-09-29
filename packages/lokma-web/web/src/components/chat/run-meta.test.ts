@@ -34,4 +34,16 @@ assert(engine !== null && !engine.includes('thinking'), 'a level-less frame adds
 // 5. The model still rides the line between the cost badge and the level.
 assert(high !== null && high.includes('deepseek/deepseek-v4.1-flash · thinking: high'), 'model sits before the level');
 
+// 6. Honesty verdict: asked for reasoning but the run published none.
+const silent = runMetaLabel({ ...base, reasoningEffort: 'high' }, false);
+assert(silent !== null && silent.includes('akıl yürütme yayınlanmadı'), 'a silent reasoning run is called out');
+// 7. Published runs and not-asked runs carry no callout.
+const published = runMetaLabel({ ...base, reasoningEffort: 'high' }, true);
+assert(published !== null && !published.includes('yayınlanmadı'), 'a publishing run stays quiet');
+const offVerdict = runMetaLabel({ ...base, reasoningEffort: 'off' }, true);
+assert(offVerdict !== null && !offVerdict.includes('yayınlanmadı'), 'off never gets the callout (nothing was asked)');
+// 8. No verdict yet (null) → no callout, level still shown.
+const unknown = runMetaLabel({ ...base, reasoningEffort: 'medium' }, null);
+assert(unknown !== null && unknown.includes('thinking: medium') && !unknown.includes('yayınlanmadı'), 'a null verdict shows the level only');
+
 console.log('run-meta.test.ts: run meta line checks passed');

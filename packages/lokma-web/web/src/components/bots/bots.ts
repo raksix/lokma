@@ -76,7 +76,6 @@ export function agentCountFor(botId: string, agents: AgentInfo[]): number {
 export type CreateBotForm = {
   name: string;
   description: string;
-  model: string;
   systemPrompt: string;
   visibility: Bot['visibility'];
 };
@@ -84,18 +83,20 @@ export type CreateBotForm = {
 export const emptyCreateForm: CreateBotForm = {
   name: '',
   description: '',
-  model: 'anthropic/claude-4-sonnet',
   systemPrompt: '',
   visibility: 'private',
 };
 
-/** Mirrors the server create rules (name 1-60, description 1-500, model set). */
+/**
+ * Mirrors the server create rules (name 1-60, description 1-500). REQ-171:
+ * the create dialog no longer asks for a model — the composer picks it at
+ * chat time, so the POST omits `model` and the server keeps its default.
+ */
 export function validateCreateForm(form: CreateBotForm): string | null {
   if (!form.name.trim() || form.name.trim().length > 60) return 'Name must be 1-60 chars.';
   if (!form.description.trim() || form.description.trim().length > 500) {
     return 'Description must be 1-500 chars.';
   }
-  if (!form.model.trim() || form.model.trim().length > 200) return 'Model must be set.';
   if (form.systemPrompt && form.systemPrompt.length > 20_000) return 'System prompt must be under 20000 chars.';
   return null;
 }

@@ -23,7 +23,6 @@ export function AgentDialog({
   onCreate: (body: {
     name: string;
     persona: string;
-    model: string;
     cwd?: string;
     budgets?: { tokens?: number; usd?: number };
   }) => void;
@@ -59,7 +58,6 @@ export function AgentDialog({
     onCreate({
       name: form.name.trim(),
       persona: form.persona,
-      model: form.model.trim(),
       ...(form.cwd.trim() ? { cwd: form.cwd.trim() } : {}),
       ...(Object.keys(budgets).length > 0 ? { budgets } : {}),
     });
@@ -100,34 +98,20 @@ export function AgentDialog({
               maxLength={40}
             />
           </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <div>
-              <label
-                htmlFor="agent-persona"
-                className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300"
-              >
-                Persona
-              </label>
-              <select id="agent-persona" className={inputClass} value={form.persona} onChange={set('persona')}>
-                {PERSONA_OPTIONS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="agent-model" className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
-                Model
-              </label>
-              <input
-                id="agent-model"
-                className={inputClass}
-                placeholder="anthropic/claude-4-sonnet"
-                value={form.model}
-                onChange={set('model')}
-              />
-            </div>
+          <div>
+            <label
+              htmlFor="agent-persona"
+              className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300"
+            >
+              Persona
+            </label>
+            <select id="agent-persona" className={inputClass} value={form.persona} onChange={set('persona')}>
+              {PERSONA_OPTIONS.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label htmlFor="agent-cwd" className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">

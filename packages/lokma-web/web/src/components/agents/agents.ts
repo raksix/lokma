@@ -146,7 +146,6 @@ export function queuePosition(agents: HubAgent[], id: string): number | null {
 export type AgentForm = {
   name: string;
   persona: string;
-  model: string;
   cwd: string;
   tokens: string;
   usd: string;
@@ -163,8 +162,6 @@ export function validateAgentForm(form: AgentForm): string | null {
   if (!(PERSONA_OPTIONS as readonly string[]).includes(form.persona)) {
     return 'Pick a persona from the list.';
   }
-  const model = form.model.trim();
-  if (!model || model.length > 200) return 'Set a model (e.g. anthropic/claude-4-sonnet).';
   if (form.cwd.trim().length > 500) return 'That working directory looks too long.';
   if (form.tokens.trim()) {
     const tokens = Number(form.tokens);
@@ -221,7 +218,11 @@ export function bulkTargets(agents: HubAgent[], action: BulkAction): HubAgent[] 
   return agents.filter((a) => !TERMINAL_STATES.includes(a.state));
 }
 
-/** Empty create-form defaults (model matches the server default). */
+/**
+ * Empty create-form defaults. REQ-171: the create dialog no longer asks for
+ * a model — the composer picks it at chat time; the server keeps its default
+ * for the registry record.
+ */
 export function emptyAgentForm(): AgentForm {
-  return { name: '', persona: 'builder', model: 'anthropic/claude-4-sonnet', cwd: '', tokens: '', usd: '' };
+  return { name: '', persona: 'builder', cwd: '', tokens: '', usd: '' };
 }

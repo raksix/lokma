@@ -196,7 +196,6 @@ export function BotsMode({ onOpenSession }: { onOpenSession?: (id: string) => vo
         const res = await api.createBot({
           name: form.name.trim(),
           description: form.description.trim(),
-          model: form.model.trim(),
           visibility: form.visibility,
           ...(form.systemPrompt.trim() ? { systemPrompt: form.systemPrompt.trim() } : {}),
         });

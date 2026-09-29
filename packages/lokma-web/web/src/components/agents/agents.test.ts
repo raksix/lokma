@@ -92,7 +92,6 @@ check('valid form passes', validateAgentForm(valid) === null);
 check('empty name rejected', validateAgentForm({ ...valid, name: '   ' }) !== null);
 check('long name rejected', validateAgentForm({ ...valid, name: 'x'.repeat(41) }) !== null);
 check('bad persona rejected', validateAgentForm({ ...valid, persona: 'wizard' }) !== null);
-check('empty model rejected', validateAgentForm({ ...valid, model: '' }) !== null);
 check('bad tokens rejected', validateAgentForm({ ...valid, tokens: '-5' }) !== null);
 check('fractional tokens rejected', validateAgentForm({ ...valid, tokens: '1.5' }) !== null);
 check('bad usd rejected', validateAgentForm({ ...valid, usd: 'abc' }) !== null);
@@ -104,7 +103,7 @@ check('budget line', formatBudget(500_000, 10) === '500k tokens · $10');
 check('million budget line', formatBudget(2_000_000, 25) === '2M tokens · $25');
 check('seven personas', PERSONA_OPTIONS.length === 7);
 check('seven states', AGENT_STATES.length === 7);
-check('empty form model is server default', emptyAgentForm().model === 'anthropic/claude-4-sonnet');
+check('create form carries no model field', !('model' in emptyAgentForm()));
 
 // formatRelativeTime (REQ-052 registry timestamps)
 const NOW = Date.parse('2026-09-08T12:00:00.000Z');

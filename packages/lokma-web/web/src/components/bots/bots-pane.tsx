@@ -131,7 +131,6 @@ export function BotsPane({ onOpenSession }: { onOpenSession?: (id: string) => vo
       const res = await api.createBot({
         name: form.name.trim(),
         description: form.description.trim(),
-        model: form.model.trim(),
         ...(form.systemPrompt.trim() ? { systemPrompt: form.systemPrompt } : {}),
         visibility: form.visibility,
       });

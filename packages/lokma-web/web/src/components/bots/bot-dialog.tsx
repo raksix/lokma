@@ -99,37 +99,23 @@ export function BotDialog({
               maxLength={500}
             />
           </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <div>
-              <label htmlFor="bot-model" className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
-                Model
-              </label>
-              <input
-                id="bot-model"
-                className={inputClass}
-                placeholder="anthropic/claude-4-sonnet"
-                value={form.model}
-                onChange={set('model')}
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="bot-visibility"
-                className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300"
-              >
-                Visibility
-              </label>
-              <select
-                id="bot-visibility"
-                className={inputClass}
-                value={form.visibility}
-                onChange={(e) => setForm((prev) => ({ ...prev, visibility: e.target.value as BotVisibility }))}
-              >
-                <option value="private">private</option>
-                <option value="shared">shared</option>
-                <option value="public">public</option>
-              </select>
-            </div>
+          <div>
+            <label
+              htmlFor="bot-visibility"
+              className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300"
+            >
+              Visibility
+            </label>
+            <select
+              id="bot-visibility"
+              className={inputClass}
+              value={form.visibility}
+              onChange={(e) => setForm((prev) => ({ ...prev, visibility: e.target.value as BotVisibility }))}
+            >
+              <option value="private">private</option>
+              <option value="shared">shared</option>
+              <option value="public">public</option>
+            </select>
           </div>
           <div>
             <label

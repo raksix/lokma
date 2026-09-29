@@ -124,16 +124,16 @@ const gallery: Bot[] = [
   check('zero live agents', agentCountFor('pub-1', agents) === 0);
 }
 
-// validateCreateForm — mirrors the server create rules.
+// validateCreateForm — mirrors the server create rules (REQ-171: no model field).
 {
-  const good = { ...emptyCreateForm, name: 'Scout', description: 'Scans vault', model: 'anthropic/claude-4-sonnet' };
+  const good = { ...emptyCreateForm, name: 'Scout', description: 'Scans vault' };
   check('valid form passes', validateCreateForm(good) === null);
   check('blank name rejected', validateCreateForm({ ...good, name: '   ' }) !== null);
   check('long name rejected', validateCreateForm({ ...good, name: 'x'.repeat(61) }) !== null);
   check('blank description rejected', validateCreateForm({ ...good, description: '' }) !== null);
   check('long description rejected', validateCreateForm({ ...good, description: 'x'.repeat(501) }) !== null);
-  check('blank model rejected', validateCreateForm({ ...good, model: '' }) !== null);
   check('long prompt rejected', validateCreateForm({ ...good, systemPrompt: 'x'.repeat(20001) }) !== null);
+  check('create form carries no model field', !('model' in emptyCreateForm));
 }
 
 // validateForkForm — empty means server-derived `<id>-fork`.

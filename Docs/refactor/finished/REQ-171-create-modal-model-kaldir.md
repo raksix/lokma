@@ -1,6 +1,6 @@
 # REQ-171 — Create bot/agent modalından "Model" alanı kaldırılsın (composer'dan seçiliyor)
 
-**Status:** pending
+**Status:** done (2026-09-29) — kod `e468ff4` (web) + prob `03e760b` (probe); canlıda doğrulandı
 **Tarih:** 2026-09-29
 **Kaynak:** Kullanıcı mesajı + ekran görüntüsü (29 Eyl 2026, "Create bot" modalı):
 > "create new modda model seçimi vs ypamammzıda gerek yok textareadan zaten seçebiliyoz ya"
@@ -44,3 +44,19 @@
 - Kullanıcı gerekçesi: *"textareadan zaten seçebiliyoruz"* — composer model seçicisi varken create anında model sormak gereksiz yük.
 - Model alanı **silinen veridir değil**: yalnız formdan kalkar; mevcut kayıtlar ve (varsa) başka yüzeylerdeki gösterim korunur.
 - Bu istek kullanıcı talebiyle yalnız REQ olarak eklendi (write-only); worker uygular.
+
+## Kapanış kanıtı (2026-09-29)
+
+**Uygulama:** Model alanı iki create diyaloğundan da kaldırıldı — `bot-dialog.tsx` / `agent-dialog.tsx` artık Model label/input çizmiyor (Visibility ve Persona tam genişlik kaldı, görünür label kuralı korundu); `CreateBotForm` / `AgentForm`, `emptyCreateForm` / `emptyAgentForm` ve `validateCreateForm` / `validateAgentForm`'dan model düştü; `bots-mode.tsx` ve `bots-pane.tsx` create gövdeleri `model` göndermiyor. Mevcut kayıtlar korunur: sunucu `body.model === undefined` durumunda alanı yazmaz (create'te varsayılan `anthropic/claude-4-sonnet` uygulanır), patch yolları yalnız değer verilince modele dokunur — güncelleme akışları model'i boşaltmaz.
+
+**Birim:** `bots.test.ts` 49/49 + `agents.test.ts` 53/53 PASS (yeni "create form carries no model field" kontrolleri dahil).
+
+**Canlı prob:** `scripts/probe-create-modal-no-model.cjs` (minted Bearer; login gate AÇIK) — **39/39 PASS**:
+- Agent: rail Agents → Settings modal → Agent Hub → Create — `#agent-model` YOK, 'Model' kelimesi diyalog gövdesinde hiç geçmiyor; Persona/Name/cwd/bütçe alanları duruyor; oluşturma gerçek kayıt açtı (model = sunucu varsayılanı); mevcut ajanların model'i değişmedi.
+- Bot: Bots modu → New Bot — `#bot-model` YOK, Visibility duruyor; oluşturma gerçek kayıt açtı; bot sohbeti açıldı ve composer model seçicisi (`#lokma-composer-model`) render oldu; bot'a bağlı oturum mint edildi; mevcut botların model'i değişmedi.
+- Cleanup: session → bot → agent silindi (HTTP 200 ×3) + "stays gone" API re-check; 0 sayfa JS hatası.
+- Ekran görüntüleri: `assets/REQ-171-ss1-agent-dialog.png`, `assets/REQ-171-ss2-bot-dialog.png`.
+
+**Kapılar:** root + web `bun x tsc --noEmit` 0; steril web build yeşil; `pm2 restart lokma-web` sonrası servis edilen entry == disk `index-Czl2eOZG.js`; canlı entry'de `bot-model` 0 / `bot-visibility` 1, taze `agents-pane-NydMaCrm.js`'te `agent-model` 0 / `agent-persona` 1; tokenless `/api/auth/me` 401 (gate ON); prob artığı sıfır (agents/bots/session dosyaları temiz).
+
+**Kapsam notu:** Botu gerçek bir model koşusuyla çalıştırma bu probda yapılmadı (metreli upstream) — composer'dan model seçme zinciri mevcut REQ-130 kanıtlarına dayanıyor; burada sohbet açılışı + seçicinin render'ı doğrulandı.

@@ -23,6 +23,11 @@ export type UsageEntry = {
   costUsd: number;
   /** False when the model has no list price (costUsd 0, shown as "unpriced"). */
   priced: boolean;
+  /**
+   * REQ-174: thinking level this run applied (`off` when none). Stored per
+   * run so a level change stays verifiable after the chat window is gone.
+   */
+  reasoningEffort?: string;
 };
 
 export type UsageModelRow = {
@@ -81,6 +86,7 @@ export class UsageLedger {
       outputTokens: Math.max(0, Math.floor(entry.outputTokens)),
       costUsd: Math.max(0, entry.costUsd),
       priced: entry.priced,
+      reasoningEffort: entry.reasoningEffort,
     };
     const dir = dirname(usagePath(this.cwd));
     await mkdir(dir, { recursive: true });

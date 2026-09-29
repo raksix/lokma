@@ -147,7 +147,20 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('tool_result'), callId: z.string(), result: z.unknown(), isError: z.boolean().default(false), sessionId: z.string() }),
   z.object({ type: z.literal('permission_request'), requestId: z.string(), tool: z.string(), description: z.string(), sessionId: z.string() }),
   z.object({ type: z.literal('ask_user_question'), requestId: z.string(), question: z.string(), choices: z.array(z.string()).optional(), sessionId: z.string() }),
-  z.object({ type: z.literal('cost'), sessionId: z.string(), inputTokens: z.number(), outputTokens: z.number(), costUsd: z.number(), model: z.string() }),
+  z.object({
+    type: z.literal('cost'),
+    sessionId: z.string(),
+    inputTokens: z.number(),
+    outputTokens: z.number(),
+    costUsd: z.number(),
+    model: z.string(),
+    /**
+     * REQ-174: the thinking level this run forwarded to the adapter (`off`
+     * when none). Rides the cost frame so the run meta line can show it —
+     * optional, because engine-driven runs (claude-code) emit no level.
+     */
+    reasoningEffort: z.enum(REASONING_EFFORTS).optional(),
+  }),
   z.object({ type: z.literal('agent_state'), agentId: z.string(), state: z.string(), sessionId: z.string().optional() }),
   // Terminal pane (W3-10): live process output + exit, scoped to the
   // spawning session so tabs in other sessions never see each other's bytes.

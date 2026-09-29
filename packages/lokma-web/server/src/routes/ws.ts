@@ -605,6 +605,8 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
             outputTokens,
             costUsd,
             priced,
+            // REQ-174: the applied thinking level, stored per run.
+            reasoningEffort: item.reasoningEffort ?? 'off',
           });
         } catch (e) {
           // Accounting must never break chat — log and keep streaming.
@@ -617,6 +619,9 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
           outputTokens,
           costUsd,
           model,
+          // REQ-174: the meta line shows which level this run applied, so a
+          // pick change is visible at a glance instead of a guess.
+          reasoningEffort: item.reasoningEffort ?? 'off',
         });
       } catch (e) {
         if (state.abort === ctrl) state.abort = null;

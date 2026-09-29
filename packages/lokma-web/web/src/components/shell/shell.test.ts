@@ -2,6 +2,9 @@
  * shell.test.ts — probe for the pure shell-chrome helpers.
  * Run: `bun src/components/shell/shell.test.ts` (no DOM, no server).
  */
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { filterNoteHits, filterSessionHits } from './search-modal';
 
 let passed = 0;
@@ -43,6 +46,27 @@ check('path-only node uses path as id+title', allNotes[2]?.id === 'vault/obsidia
 check('query filters title+id', filterNoteHits(nodes, 'roadmap').length === 1);
 check('query with no match is empty', filterNoteHits(nodes, 'zzz').length === 0);
 check('empty nodes stay empty', filterNoteHits([], 'x').length === 0);
+
+// REQ-175 source guard — the header must not carry the session id or the
+// Checking/Active/Down pill any more (the footer bar owns gateway state and
+// the session list owns ids). A stale re-add of either prop fails this gate.
+const HERE = dirname(fileURLToPath(import.meta.url));
+const headerSrc = readFileSync(join(HERE, '..', 'header.tsx'), 'utf8');
+check(
+  'header carries no sessionId/serverUp props (REQ-175)',
+  !headerSrc.includes('sessionId') && !headerSrc.includes('serverUp'),
+);
+
+const shellSrc = readFileSync(join(HERE, '..', 'app-shell.tsx'), 'utf8');
+const headerBlocks = shellSrc
+  .split('<Header')
+  .slice(1)
+  .map((b) => b.slice(0, b.indexOf('/>')));
+check(
+  'no Header call site passes sessionId/serverUp (REQ-175)',
+  headerBlocks.length >= 4 &&
+    headerBlocks.every((b) => !b.includes('serverUp') && !b.includes('sessionId')),
+);
 
 console.log(`shell.test.ts: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

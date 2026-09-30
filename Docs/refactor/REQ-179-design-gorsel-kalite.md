@@ -1,6 +1,6 @@
 # REQ-179 — Design arayüzü görsel kalite geçişi (native select'ler gitsin, hiyerarşi/boş durum düzelsin)
 
-**Status:** pending
+**Status:** in-progress (worker tur 1/5 — SelectMenu adımı landed; boş durum/denetim sırada)
 **Tarih:** 2026-09-30
 **Kaynak:** Kullanıcı mesajı (30 Eyl 2026):
 > "bunların tasarımı desgin de çok kötü."
@@ -35,6 +35,10 @@
 1. Kontroller canlıda PASS + kanıt (probe + before/after görseller + bundle hash).
 2. Atomik İngilizce commit(ler) + push.
 3. Dosya: `Status: done` + hash'ler; `git mv` → `finished/`; README index; 00-KONTEKST kronoloji.
+
+## İlerleme (worker turları)
+
+- **Tur 1 (30 Eyl):** yeni `components/ui/select-menu.tsx` primitifi (buton trigger + listbox popup; Enter/Space/Ok tuşları, Home/End, Escape; `aria-haspopup/expanded/controls`, role=option/aria-selected; terracotta vurgu + krem/koyu tokenlar) ve Design yüzeyindeki TÜM native `<select>`'lerin değişimi: composer Project/Type/System/Model + artboard tip filtresi. Etiket/meta metinleri geçen kontrast tokenlarına çekildi (kremde zinc-500 ≈4.7:1, koyu panelde zinc-400 ≈6.5:1; ölçüm script'i ile doğrulandı). İki eski prob SelectMenu akışına uyarlandı (layout: popup'tan seçim + sayfada `<select>` kalmadığı assert'i; model: seçenekler DOM sırasıyla gruplu okunur, trigger BUTTON). Canlı kanıt: smoke 11/11 (fare + klavye + Escape + taşma −5px + 0 hata), adapte model probu **20/20** (giden gövdede seçilen model; 613 seçenek/4 grup), servis edilen bundle == disk. Commit'ler: `94abfbc` + `2848629` + `b2f5c92` (push'lu). **Kalan:** hiyerarşi/boş durum adımı (canvas tek CTA + örnek brief çipleri), `scripts/probe-design-visual.cjs` + before/after görseller, kapanış.
 
 ## Notlar
 

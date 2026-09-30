@@ -123,6 +123,8 @@ export type DesignManifest = {
   type: DesignType;
   brief: string;
   system: DesignSystem;
+  /** Model that generated the artifact (absent on pre-REQ-177 artifacts). */
+  model?: string;
   createdAt: string;
   updatedAt: string;
 };

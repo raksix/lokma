@@ -9,6 +9,7 @@
  * Not imported by library code; `tsconfig.json` excludes `*.test.ts`.
  */
 import { findChromeBinary } from '../archify/raster.js';
+import { OFFLINE_TEMPLATE_MODEL } from './generate.js';
 import { DESIGN_PNG_HEIGHT, DESIGN_PNG_WIDTH, exportArtifactPng } from './raster.js';
 import { generateArtifact } from './store.js';
 import { DesignError } from './types.js';
@@ -71,7 +72,8 @@ if (probeBinary === null) {
   skipped += 1;
   console.log('SKIP: end-to-end raster (no headless Chrome on this box)');
 } else {
-  const { id } = await generateArtifact('prototype', 'png probe pricing page with three tiers', 'stripe-linear');
+  // REQ-177: probe stays hermetic — the offline template, never a model call.
+  const { id } = await generateArtifact('prototype', 'png probe pricing page with three tiers', 'stripe-linear', OFFLINE_TEMPLATE_MODEL);
   check('seed artifact generated', /^[a-z0-9][a-z0-9-]{1,63}$/.test(id));
   const one = await exportArtifactPng(id, { scale: 1 });
   check('1x content type is image/png', one.contentType === 'image/png');

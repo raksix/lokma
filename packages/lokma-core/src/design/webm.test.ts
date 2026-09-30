@@ -10,6 +10,7 @@
  */
 import { findChromeBinary } from '../archify/raster.js';
 import { findFfmpegBinary, WEBM_FPS, WEBM_FRAMES } from '../archify/webm.js';
+import { OFFLINE_TEMPLATE_MODEL } from './generate.js';
 import { generateArtifact } from './store.js';
 import { DesignError } from './types.js';
 import { buildDesignWebmFrameHtml, exportArtifactWebm, DESIGN_WEBM_TIMEOUT_MS } from './webm.js';
@@ -90,7 +91,8 @@ if (probeChrome === null || probeFfmpeg === null) {
   skipped += 1;
   console.log('SKIP: end-to-end webm encode (Chrome and ffmpeg both required)');
 } else {
-  const { id } = await generateArtifact('prototype', 'webm probe landing page', 'stripe-linear');
+  // REQ-177: probe stays hermetic — the offline template, never a model call.
+  const { id } = await generateArtifact('prototype', 'webm probe landing page', 'stripe-linear', OFFLINE_TEMPLATE_MODEL);
   check('seed artifact generated', /^[a-z0-9][a-z0-9-]{1,63}$/.test(id));
   const webm = await exportArtifactWebm(id);
   check('content type is video/webm', webm.contentType === 'video/webm');

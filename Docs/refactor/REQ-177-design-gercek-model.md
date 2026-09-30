@@ -1,6 +1,6 @@
 # REQ-177 — Design üretimi GERÇEK modele bağlansın + model seçimi gelsin ("tasarımlar çok kötü"nün kökü)
 
-**Status:** pending
+**Status:** in-progress (worker — core model path landed; server + UI model wiring in progress)
 **Tarih:** 2026-09-30
 **Kaynak:** Kullanıcı mesajı + ekran görüntüsü (30 Eyl 2026):
 > "bunların tasarımı desgin de çok kötü." / "ayrıcadesgin de model seçimi vs de yok."

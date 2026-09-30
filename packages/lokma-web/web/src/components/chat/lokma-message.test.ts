@@ -5,7 +5,7 @@
  * Not imported by app code, so the Vite bundle ignores it.
  */
 import { applyServerFrame, dropRequest, initialWsUiState, permissionAnswer, questionAnswer } from '@/lib/ws';
-import { describeToolCall, formatBytes, parseMarkdownBlocks, reasoningPreview, sanitizeMdUrl, splitCodeFences, stripThinkingMarkup, summarizeInput, summarizeResult, transcriptToolEntry } from './lokma-message';
+import { describeToolCall, formatBytes, parseMarkdownBlocks, parseTableAlign, reasoningPreview, sanitizeMdUrl, splitCodeFences, splitTableRow, stripThinkingMarkup, summarizeInput, summarizeResult, transcriptToolEntry } from './lokma-message';
 
 function assert(cond: boolean, label: string): void {
   if (!cond) throw new Error(`FAIL: ${label}`);
@@ -157,3 +157,57 @@ console.log('lokma-message.test.ts: REQ-124 thinking-strip checks passed');
   assert(reasoningPreview('   \n\n  \n\n').lines.length === 0, 'blank-only reasoning yields no lines');
 }
 console.log('lokma-message.test.ts: REQ-139 reasoning-preview checks passed');
+
+// REQ-176 — GFM tables: header + delimiter decide, body rows pad/drop to the
+// header width, `\|` stays inside a cell, and half-streamed tables stay prose.
+{
+  const t = parseMarkdownBlocks('| Katman | Ne çıktı |\n|--------|----------|\n| UI | tablo |\n| API | json |');
+  assert(t.length === 1 && t[0].kind === 'table', `table parses as one block, got ${t.length} blocks`);
+  const tb = t[0] as { header: string[]; aligns: string[]; rows: string[][] };
+  assert(tb.header.join(',') === 'Katman,Ne çıktı', `header cells parsed, got ${tb.header.join(',')}`);
+  assert(tb.aligns.join(',') === 'left,left', 'default alignment is left');
+  assert(tb.rows.length === 2 && tb.rows[1].join(',') === 'API,json', 'body rows parsed');
+
+  const al = parseMarkdownBlocks('| a | b | c |\n|---|:---:|---:|\n| 1 | 2 | 3 |')[0] as { aligns: string[] };
+  assert(al.aligns.join(',') === 'left,center,right', `alignment variants parsed, got ${al.aligns.join(',')}`);
+
+  const pad = parseMarkdownBlocks('| a | b |\n|---|---|\n| 1 |\n| 1 | 2 | 3 |')[0] as { rows: string[][] };
+  assert(pad.rows.length === 2 && pad.rows[0].join('|') === '1|', 'missing cells pad empty');
+  assert(pad.rows[1].join('|') === '1|2', 'extra cells are dropped');
+
+  const inline = parseMarkdownBlocks('| **b** | `c` |\n|---|---|\n| x | [l](/u) |')[0] as { header: string[] };
+  assert(inline.header[0] === '**b**' && inline.header[1] === '`c`', 'cell markup reaches the inline renderer');
+
+  const BS = String.fromCharCode(92);
+  const esc = parseMarkdownBlocks('| a ' + BS + '| b | c |\n|---|---|\n| 1 | 2 |')[0] as { header: string[] };
+  assert(esc.header.join(',') === 'a | b,c', `escaped pipe stays inside the cell, got ${esc.header.join(',')}`);
+
+  const two = parseMarkdownBlocks('| a |\n|---|\n| 1 |\n\n| b |\n|---|\n| 2 |');
+  assert(two.length === 2 && two[0].kind === 'table' && two[1].kind === 'table', 'consecutive tables stay separate');
+
+  const after = parseMarkdownBlocks('| a |\n|---|\n| 1 |\nplain tail');
+  assert(after.length === 2 && after[0].kind === 'table' && after[1].kind === 'p', 'table ends at a pipeless line');
+
+  const solo = parseMarkdownBlocks('| a | b |');
+  assert(solo.length === 1 && solo[0].kind === 'p', 'a lone pipe line stays prose (no crash)');
+
+  const stream = parseMarkdownBlocks('| a | b |\n|---|');
+  assert(stream.length === 1 && stream[0].kind === 'p', 'half-streamed delimiter stays prose until complete');
+
+  const grow = parseMarkdownBlocks('| a | b |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |')[0] as { kind: string; rows: string[][] };
+  assert(grow.kind === 'table' && grow.rows.length === 2, 'body rows keep appending while streaming');
+
+  const single = parseMarkdownBlocks('| Name |\n|---|\n| Lokma |')[0] as { kind: string; header: string[] };
+  assert(single.kind === 'table' && single.header[0] === 'Name', 'single-column table works');
+
+  const mismatch = parseMarkdownBlocks('| a | b |\n|---|')[0];
+  assert(mismatch.kind === 'p', 'delimiter cell-count mismatch is not a table');
+
+  const badAlign = parseMarkdownBlocks('| a |\n|:|')[0];
+  assert(badAlign.kind === 'p', 'colon-only delimiter rejected');
+
+  assert(splitTableRow('| x | y |').cells.join(',') === 'x,y', 'splitTableRow strips outer pipes');
+  assert(splitTableRow('x | y').cells.join(',') === 'x,y', 'splitTableRow handles pipeless edges');
+  assert(parseTableAlign('|---|---|') !== null && parseTableAlign('nope') === null, 'parseTableAlign validates');
+}
+console.log('lokma-message.test.ts: REQ-176 table checks passed');

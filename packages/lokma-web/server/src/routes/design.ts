@@ -52,10 +52,15 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
-  app.get('/api/design/list', async (req) => {
+  app.get('/api/design/list', async (req, reply) => {
     const query = req.query as { cwd?: unknown };
-    const { items, count, project, root } = await listArtifacts(query.cwd);
-    return { items, count, project, root };
+    try {
+      const { items, count, project, root } = await listArtifacts(query.cwd);
+      return { items, count, project, root };
+    } catch (e) {
+      if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      throw e;
+    }
   });
 
   app.get('/api/design/systems', async () => {

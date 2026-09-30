@@ -1,6 +1,6 @@
 # REQ-177 — Design üretimi GERÇEK modele bağlansın + model seçimi gelsin ("tasarımlar çok kötü"nün kökü)
 
-**Status:** in-progress (worker — core + server + UI landed; live API path 21/21 PASS including the budget fix; remaining: UI picker probe, before/after screenshots, close-out)
+**Status:** done (2026-09-30 — kod `a8e68b2`+`f3c9bb3`, prob `074e9cb`+`3dad15d`; canlı API 21/21 + canlı UI 19/19)
 **Tarih:** 2026-09-30
 **Kaynak:** Kullanıcı mesajı + ekran görüntüsü (30 Eyl 2026):
 > "bunların tasarımı desgin de çok kötü." / "ayrıcadesgin de model seçimi vs de yok."
@@ -47,7 +47,13 @@
   - E: kötü model id → **502** `{code: design_upstream_error, message}` + artifact YOK (sessiz şablon fallback yok)
 - **Bütçe düzeltmesi (ölçüme dayalı):** tam HTML üretimi ~2 dakika sürüyor (103-114s; bir deneme eski 120s tavanını aştı ve jenerik 502'ye düştü) → `DESIGN_GENERATION_TIMEOUT_MS` **120s → 240s** + abort artık sinyal üzerinden izlenir, `design_timeout/504`'e eşlenir. Prod nginx `/api/` `proxy_read_timeout` **60s → 300s** (sunucu config'i, repo dışı; yedek `/root/nginx-backups/`).
 - **Birim + gates:** core design suite (generate 24 · raster 15 · webm 23) PASS; core+server `tsc --noEmit` 0; kök `tsc --noEmit` temiz; lokma-server tek-proc restart (13:57) sonrası canlı bundle/binary bayat değil.
-- **Kalan:** UI probu (picker görünür + seçim istek gövdesinde + reload kalıcılığı + hata görünürlüğü), before/after ekran görüntüleri, kapanış.
+- **Canlı UI yolu (tur 4):** `scripts/probe-design-ui-model.cjs` → **19/19 PASS** (gerçek tarayıcı, minted Bearer — gate ON):
+  - Picker katalogdan besleniyor: `[data-design-composer-model]` 613 seçenek / 4 provider optgroup; test sentinel'i (`offline-template`) sızmıyor; seçilen model `commandcode/deepseek/deepseek-v4.1-flash`.
+  - Seçim kalıcı: sayfa snapshot'ı (`lokma-design-page:v1`) hatırlıyor; reload sonrası mod + seçim geri geliyor.
+  - Wire kanıtı (intercept): giden gövde `{"type":"prototype","brief":"model picker probe …","system":"stripe-linear","model":"commandcode/deepseek/deepseek-v4.1-flash"}` — seçilen model İSTEK GÖVDESİNDE.
+  - Dürüst hata: simüle upstream hatası (intercept edilen POST — faturalı çağrı yok) → inline form hatası + `Generate failed — …` chip'i; yeni artifact YOK (liste 4=4); picker seçimi koruyor.
+- **Before/after (kalite):** `assets/REQ-177-ss2-before-template.png` (eski deterministik şablon, 1.873 bayt) ↔ `assets/REQ-177-ss3-after-real.png` (gerçek model çıktısı, 21.608 bayt tam sayfa landing — vision doğrulamalı) · `assets/REQ-177-ss4-ui-model-picker.png` · `assets/REQ-177-ss5-ui-model-error.png`.
+- **Temizlik:** 4 prob artifact'ı kapanışta API'den silindi (DELETE ×4 → 200, sonra liste boş + tekil GET ×4 → 404 stays-gone). Tokenless `/api/auth/me` 401 (gate ON).
 
 ## Bitirme (done)
 

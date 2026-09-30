@@ -95,8 +95,9 @@ const layoutState = () => {
     hasBrief: Boolean(root.querySelector('[data-design-brief]')),
     hasGenerate: Boolean(root.querySelector('[data-design-generate]')),
     stripSearch: Boolean(strip && strip.querySelector('input[aria-label="Search artifacts"]')),
-    stripFilter: Boolean(strip && strip.querySelector('select[aria-label="Filter by type"]')),
+    stripFilter: Boolean(strip && strip.querySelector('[data-design-strip-filter]')),
     oldTabs: root.querySelectorAll('[data-design-tab]').length,
+    selectCount: root.querySelectorAll('select').length,
     oldRows: root.querySelectorAll('[data-design-row]').length,
     oldDelete: root.querySelectorAll('[data-design-delete]').length,
     exactBrief: exactCount('Brief'),
@@ -296,13 +297,24 @@ const closePanel = (sel) => {
     Boolean(L && L.stripSearch && L.stripFilter),
     L ? 'search=' + L.stripSearch + ' filter=' + L.stripFilter : 'n/a',
   );
+  ok(
+    'REQ-179: no native <select> control remains on the design page',
+    Boolean(L && L.selectCount === 0),
+    'selects=' + (L ? L.selectCount : 'n/a'),
+  );
   ok('no horizontal overflow on the page', Boolean(L && L.overflowX <= 1), 'overflowX=' + (L ? L.overflowX : 'n/a'));
 
   // ── 3 ── generate through the REAL composer; the artifact is selected. ──
   const before = (L && L.msgIds) || [];
   await page.fill('[data-design-brief]', 'probe pricing section ' + MARKER);
-  await page.selectOption('[data-design-composer-type]', 'prototype');
-  await page.selectOption('[data-design-composer-system]', 'stripe-linear');
+  // REQ-179 — the composer controls are SelectMenu popups now: open, pick,
+  // and the popup closes itself (there is no native select left to drive).
+  await page.click('[data-design-composer-type]');
+  await page.waitForSelector('[data-select-option="prototype"]', { timeout: 5000 });
+  await page.click('[data-select-option="prototype"]');
+  await page.click('[data-design-composer-system]');
+  await page.waitForSelector('[data-select-option="stripe-linear"]', { timeout: 5000 });
+  await page.click('[data-select-option="stripe-linear"]');
   await page.click('[data-design-generate]');
   let createdId = null;
   for (let i = 0; i < 60 && !createdId; i += 1) {

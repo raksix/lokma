@@ -7,9 +7,9 @@
  * proven by scripts/probe-design-real-model.cjs (21/21). This probe drives
  * the LIVE Design page in a real browser and asserts the UI half:
  *
- *   1  the composer carries a Model select fed by the shared provider
- *      catalog (provider optgroups, concrete model options, no test
- *      sentinel leaks into the picker)
+ *   1  the composer carries a Model SelectMenu (REQ-179: no native select)
+ *      fed by the shared provider catalog (provider groups, concrete model
+ *      options, no test sentinel leaks into the picker)
  *   2  picking a model is remembered: the page snapshot holds it and it
  *      survives a full reload
  *   3  the picked model leaves the browser in the generate request body
@@ -48,7 +48,7 @@ const PREFERRED = 'commandcode/deepseek/deepseek-v4.1-flash';
 const SENTINEL = 'offline-template';
 
 let passed = 0;
-const EXPECTED = 19;
+const EXPECTED = 20;
 function check(cond, label) {
   if (!cond) throw new Error('FAIL: ' + label);
   passed += 1;
@@ -62,21 +62,38 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // -- page-side readers (browser globals only, one arg max) -----------------
 
 const pickerState = () => {
-  const sel = document.querySelector('[data-design-composer-model]');
-  if (!sel) return null;
-  const opts = [].slice.call(sel.querySelectorAll('option')).map((o) => ({
-    value: o.value,
-    label: (o.textContent || '').trim(),
-    group:
-      o.parentElement && o.parentElement.tagName === 'OPTGROUP'
-        ? o.parentElement.getAttribute('label')
-        : null,
-  }));
-  const groups = [].slice.call(sel.querySelectorAll('optgroup')).map((g) => ({
-    label: g.getAttribute('label'),
-    count: g.querySelectorAll('option').length,
-  }));
-  return { value: sel.value, options: opts, groups: groups };
+  const el = document.querySelector('[data-design-composer-model]');
+  if (!el) return null;
+  return {
+    value: el.getAttribute('data-select-value'),
+    label: (el.textContent || '').trim(),
+    tag: el.tagName,
+  };
+};
+
+// REQ-179 — the picker is a SelectMenu popup: open it, then walk the menu in
+// DOM order so each option knows which provider group heading it sits under.
+const menuState = () => {
+  const menu = document.querySelector('[data-select-menu]');
+  if (!menu) return null;
+  let group = null;
+  const options = [];
+  const groups = [];
+  const nodes = menu.children;
+  for (let i = 0; i < nodes.length; i += 1) {
+    const el = nodes[i];
+    if (el.hasAttribute('data-select-group')) {
+      group = el.getAttribute('data-select-group');
+      groups.push(group);
+    } else if (el.hasAttribute('data-select-option')) {
+      options.push({
+        value: el.getAttribute('data-select-option'),
+        label: (el.textContent || '').trim(),
+        group: group,
+      });
+    }
+  }
+  return { options: options, groups: groups };
 };
 
 const composerState = () => {
@@ -86,7 +103,7 @@ const composerState = () => {
   const btn = box.querySelector('[data-design-generate]');
   return {
     text: (box.textContent || '').trim(),
-    modelValue: sel ? sel.value : null,
+    modelValue: sel ? sel.getAttribute('data-select-value') : null,
     generateDisabled: btn ? Boolean(btn.disabled) : null,
   };
 };
@@ -162,36 +179,57 @@ const clickDesignMode = () => {
   await sleep(1500);
 
   // ── 1 ── the picker renders and is fed by the provider catalog ─────────
+  // REQ-179 — the picker is a SelectMenu popup (no native <select>): open
+  // it, read the options/groups in DOM order, then pick by clicking the row.
   let P = null;
+  let M = null;
   for (let i = 0; i < 30; i += 1) {
     P = await page.evaluate(pickerState);
-    if (P && P.options.length > 1 && P.groups.length > 0) break;
+    if (!P) {
+      await sleep(500);
+      continue;
+    }
+    const menuOpen = await page.evaluate(() => Boolean(document.querySelector('[data-select-menu]')));
+    if (!menuOpen) await page.click('[data-design-composer-model]');
+    M = await page.evaluate(menuState);
+    if (M && M.options.length > 1 && M.groups.length > 0) break;
+    if (menuOpen) await page.keyboard.press('Escape');
     await sleep(500);
   }
   check(Boolean(P), '1 the composer model picker renders');
   check(
-    Boolean(P && P.options.length > 1),
-    '2 the picker is fed from the catalog (options > 1; got ' + (P ? P.options.length : 'n/a') + ')',
+    Boolean(P && P.tag !== 'SELECT'),
+    '1b the picker is a SelectMenu trigger, not a native <select> (tag=' + (P ? P.tag : 'n/a') + ')',
   );
   check(
-    Boolean(P && P.groups.length > 0),
-    '3 provider optgroups present (' + (P ? P.groups.length : 'n/a') + ' groups)',
+    Boolean(M && M.options.length > 1),
+    '2 the picker is fed from the catalog (options > 1; got ' + (M ? M.options.length : 'n/a') + ')',
   );
   check(
-    Boolean(P && P.options.every((o) => o.value !== SENTINEL)),
+    Boolean(M && M.groups.length > 0),
+    '3 provider groups present (' + (M ? M.groups.length : 'n/a') + ' groups)',
+  );
+  check(
+    Boolean(M && M.options.every((o) => o.value !== SENTINEL)),
     '4 no test sentinel leaks into the picker (' + SENTINEL + ' absent)',
   );
 
-  const preferred = P.options.find((o) => o.value === PREFERRED);
-  const fallback = P.options.find((o) => o.group === 'commandcode' && o.value);
-  const chosen = preferred || fallback || P.options.find((o) => o.value);
+  const preferred = M.options.find((o) => o.value === PREFERRED);
+  const fallback = M.options.find((o) => o.group === 'commandcode' && o.value);
+  const chosen = preferred || fallback || M.options.find((o) => o.value);
   check(
     Boolean(chosen && chosen.value),
     '5 a concrete model option is selectable (' + (chosen ? chosen.value : 'none') + ')',
   );
   info('picked model', chosen.value);
 
-  await page.selectOption('[data-design-composer-model]', chosen.value);
+  // The menu is open from the catalog scan; pick the row, then confirm the
+  // popup closed itself and the trigger mirrors the value.
+  if (!(await page.evaluate(() => Boolean(document.querySelector('[data-select-menu]'))))) {
+    await page.click('[data-design-composer-model]');
+    await page.waitForSelector('[data-select-menu]', { timeout: 5000 });
+  }
+  await page.click('[data-select-option="' + chosen.value + '"]');
   await sleep(800);
   let C = await page.evaluate(composerState);
   check(Boolean(C && C.modelValue === chosen.value), '6 selecting a model updates the picker value');

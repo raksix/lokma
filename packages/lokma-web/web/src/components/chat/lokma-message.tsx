@@ -200,13 +200,102 @@ const TOOL_ICONS: Record<string, typeof Wrench> = {
 // dangerouslySetInnerHTML — the renderer below emits React elements from
 // these token lists, so model output can never inject markup/scripts.
 
+export type MdAlign = 'left' | 'center' | 'right';
+
 export type MdBlock =
   | { kind: 'p'; body: string }
   | { kind: 'h'; level: 1 | 2 | 3 | 4; body: string }
   | { kind: 'quote'; body: string }
   | { kind: 'hr' }
   | { kind: 'ul'; items: string[] }
-  | { kind: 'ol'; items: string[] };
+  | { kind: 'ol'; items: string[] }
+  | { kind: 'table'; header: string[]; aligns: MdAlign[]; rows: string[][] };
+
+/** The escape char as a byte — dodges backslash literals through edit layers. */
+const BACKSLASH = String.fromCharCode(92);
+
+/**
+ * Split one GFM table row into trimmed cells (REQ-176). A `\|` is a literal
+ * pipe inside a cell; the optional outer pipes are dropped. Char-scanned on
+ * purpose: a regex would have to thread the escape rule twice.
+ */
+export function splitTableRow(line: string): { cells: string[]; hasPipe: boolean } {
+  const cells: string[] = [];
+  let cur = '';
+  let hasPipe = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === BACKSLASH && line[i + 1] === '|') {
+      cur += '|';
+      i++;
+      continue;
+    }
+    if (ch === '|') {
+      hasPipe = true;
+      cells.push(cur);
+      cur = '';
+      continue;
+    }
+    cur += ch;
+  }
+  cells.push(cur);
+  // `| a | b |` splits into ['', ' a ', ' b ', ''] — drop the padding ends.
+  if (cells.length > 1 && !cells[0].trim()) cells.shift();
+  if (cells.length > 1 && !cells[cells.length - 1].trim()) cells.pop();
+  return { cells: cells.map((c) => c.trim()), hasPipe };
+}
+
+/**
+ * `|---|:---:|---:|` → one alignment per column (`-` → left, `:--` → left,
+ * `--:` → right, `:-:` → center); null when the line is not a delimiter row.
+ */
+export function parseTableAlign(line: string): MdAlign[] | null {
+  const { cells, hasPipe } = splitTableRow(line);
+  if (!hasPipe || cells.length === 0) return null;
+  const aligns: MdAlign[] = [];
+  for (const cell of cells) {
+    let core = cell;
+    let left = false;
+    let right = false;
+    if (core.startsWith(':')) {
+      left = true;
+      core = core.slice(1);
+    }
+    if (core.endsWith(':')) {
+      right = true;
+      core = core.slice(0, -1);
+    }
+    if (!core || core.split('').some((c) => c !== '-')) return null;
+    aligns.push(left && right ? 'center' : right ? 'right' : 'left');
+  }
+  return aligns;
+}
+
+/**
+ * A table starts at `i` when the line has pipes and the NEXT line is a
+ * matching delimiter row — the delimiter decides, so a lone `|` prose line
+ * (or a half-streamed table) stays text until the row is complete.
+ * Body rows run until a blank line or a line without a pipe; missing cells
+ * pad to the header width, extras are dropped.
+ */
+function tryTable(lines: string[], i: number): { block: Extract<MdBlock, { kind: 'table' }>; end: number } | null {
+  const head = splitTableRow(lines[i] ?? '');
+  if (!head.hasPipe || head.cells.length === 0) return null;
+  const aligns = parseTableAlign(lines[i + 1] ?? '');
+  if (!aligns || aligns.length !== head.cells.length) return null;
+  const rows: string[][] = [];
+  let j = i + 2;
+  while (j < lines.length) {
+    const line = lines[j] ?? '';
+    const row = splitTableRow(line);
+    if (!line.trim() || !row.hasPipe) break;
+    const cells = row.cells.slice(0, head.cells.length);
+    while (cells.length < head.cells.length) cells.push('');
+    rows.push(cells);
+    j++;
+  }
+  return { block: { kind: 'table', header: head.cells, aligns, rows }, end: j };
+}
 
 /** Split a text segment into block tokens (headers, quotes, lists, rules, paragraphs). */
 export function parseMarkdownBlocks(text: string): MdBlock[] {
@@ -223,12 +312,22 @@ export function parseMarkdownBlocks(text: string): MdBlock[] {
     if (list && list.items.length > 0) blocks.push(list.ordered ? { kind: 'ol', items: list.items } : { kind: 'ul', items: list.items });
     list = null;
   };
-  for (const line of lines) {
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
     const h = line.match(/^(#{1,4})\s+(.*)$/);
     if (h) {
       flushPara();
       flushList();
       blocks.push({ kind: 'h', level: h[1].length as 1 | 2 | 3 | 4, body: (h[2] ?? '').trim() });
+      continue;
+    }
+    // REQ-176: GFM table — header row + `---|---` delimiter row.
+    const table = tryTable(lines, li);
+    if (table) {
+      flushPara();
+      flushList();
+      blocks.push(table.block);
+      li = table.end - 1;
       continue;
     }
     if (/^\s*---\s*$/.test(line)) {
@@ -408,6 +507,42 @@ export function renderMdBlock(block: MdBlock, keyPrefix: string): React.ReactNod
           ))}
         </ol>
       );
+    case 'table': {
+      // REQ-176: real <table> — header/body cells run through renderInline
+      // (bold/code/links), alignment comes from the delimiter row, and the
+      // wrapper scrolls sideways instead of letting a wide table push the
+      // chat layout out.
+      const alignCls = (a: MdAlign): string => (a === 'center' ? 'text-center' : a === 'right' ? 'text-right' : 'text-left');
+      return (
+        <div key={keyPrefix} className="mt-2 max-w-full overflow-x-auto rounded-lg border border-line">
+          <table className="w-full border-collapse text-[12.5px] leading-[1.5]">
+            <thead>
+              <tr className="bg-muted/40 dark:bg-[#1E1E21]/70">
+                {block.header.map((cell, c) => (
+                  <th
+                    key={c}
+                    className={`border-b border-line px-2.5 py-1.5 font-semibold ${alignCls(block.aligns[c] ?? 'left')}`}
+                  >
+                    {renderInline(cell, `${keyPrefix}th${c}`)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {block.rows.map((row, r) => (
+                <tr key={r} className="border-b border-line last:border-b-0">
+                  {row.map((cell, c) => (
+                    <td key={c} className={`px-2.5 py-1.5 align-top break-words ${alignCls(block.aligns[c] ?? 'left')}`}>
+                      {renderInline(cell, `${keyPrefix}td${r}c${c}`)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
     case 'p':
     default:
       return (

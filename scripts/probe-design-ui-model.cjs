@@ -260,7 +260,7 @@ const clickDesignMode = () => {
   let P2 = null;
   for (let i = 0; i < 30; i += 1) {
     P2 = await page.evaluate(pickerState);
-    if (P2 && P2.options.length > 1) break;
+    if (P2 && P2.value === chosen.value) break;
     await sleep(500);
   }
   check(

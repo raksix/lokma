@@ -16,6 +16,9 @@ export const DESIGN_SYSTEMS = ['stripe-linear', 'omp-dark', 'paper-ink', 'minima
 export const DESIGN_EXPORTS = ['html', 'zip', 'json', 'png', 'webm'] as const;
 export type DesignExportFormat = (typeof DESIGN_EXPORTS)[number];
 
+/** Mirror of the server `cwd` bound (REQ-178 store `DESIGN_CWD_MAX_LEN`). */
+export const DESIGN_CWD_MAX_LEN = 500;
+
 export type NormalizedArtifact = {
   id: string;
   type: string;
@@ -25,6 +28,8 @@ export type NormalizedArtifact = {
   updatedAt: string;
   bytes: number;
   overall: number | null;
+  /** REQ-178 — absolute project cwd the artifact was written under (absent = global). */
+  project?: string;
 };
 
 export type GenerateForm = {
@@ -115,7 +120,20 @@ export function toRow(manifest: DesignManifest, bytes: number, overall: number |
     updatedAt: manifest.updatedAt,
     bytes,
     overall,
+    // REQ-178 — carry the project cwd when the manifest recorded one (the
+    // row chip names it; absent stays undefined = global root).
+    project: typeof manifest.project === 'string' && manifest.project.length > 0 ? manifest.project : undefined,
   };
+}
+
+/**
+ * REQ-178 — short label for a project cwd. `''` is the global root; any
+ * absolute path renders as its last segment (a chip, never the full path).
+ */
+export function projectLabel(cwd: string): string {
+  if (!cwd) return 'Global (~)';
+  const parts = cwd.split('/').filter(Boolean);
+  return parts.length > 0 ? parts[parts.length - 1] : cwd;
 }
 
 /** Overall score label for the row badge (`8/10` or `—` when uncritiqued). */

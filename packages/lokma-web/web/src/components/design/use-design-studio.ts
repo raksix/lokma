@@ -1,12 +1,13 @@
 import * as React from 'react';
 import { api, type CritiqueResult, type DesignGuard, type DesignManifest, type DesignSystemMeta } from '@/lib/api';
-import { useProviderStore } from '@/stores';
+import { useProviderStore, useSessionStore } from '@/stores';
 import {
   DESIGN_TYPES,
   appendDesignEvent,
   emptyGenerateForm,
   filterArtifacts,
   parseHtmlEdit,
+  projectLabel,
   toRow,
   validateGenerateForm,
   type DesignEvent,
@@ -58,6 +59,13 @@ export type DesignStudio = {
   loading: boolean;
   error: string | null;
   reload: () => void;
+  /**
+   * REQ-178 — the selected project cwd (`''` = the global
+   * `~/.lokma/design/artifacts` root). Switching projects re-scopes the
+   * list + guard and clears the canvas (artifacts belong to a project).
+   */
+  projectCwd: string;
+  changeProject: (cwd: string) => void;
   typeFilter: string;
   setTypeFilter: (value: string) => void;
   q: string;
@@ -107,6 +115,8 @@ export function useDesignStudio(): DesignStudio {
   const [items, setItems] = React.useState<NormalizedArtifact[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  // REQ-178 — the project the studio is scoped to ('' = global root).
+  const [projectCwd, setProjectCwd] = React.useState<string>(snapshot.project);
   const [typeFilter, setTypeFilter] = React.useState<string>('all');
   const [q, setQ] = React.useState('');
   const [selected, setSelected] = React.useState<string | null>(snapshot.selected);
@@ -150,14 +160,14 @@ export function useDesignStudio(): DesignStudio {
 
   // Persist the remembered pieces on every change (cheap, serialized JSON).
   React.useEffect(() => {
-    writeDesignPageSnapshot({ selected, form });
-  }, [selected, form]);
+    writeDesignPageSnapshot({ selected, form, project: projectCwd });
+  }, [selected, form, projectCwd]);
 
-  const loadList = React.useCallback(async (selectId?: string) => {
+  const loadList = React.useCallback(async (cwd: string, selectId?: string) => {
     const run = (listRunRef.current += 1);
     setLoading(true);
     try {
-      const res = await api.listDesigns();
+      const res = await api.listDesigns(cwd || undefined);
       if (listRunRef.current !== run) return;
       setItems(res.items.map((m) => toRow(m, m.bytes, m.overall)));
       setError(null);
@@ -171,7 +181,7 @@ export function useDesignStudio(): DesignStudio {
     }
   }, []);
 
-  const loadMeta = React.useCallback(async () => {
+  const loadMeta = React.useCallback(async (cwd: string) => {
     try {
       const res = await api.getDesignSystems();
       setSystems(res.systems);
@@ -179,7 +189,7 @@ export function useDesignStudio(): DesignStudio {
       setSystems([]);
     }
     try {
-      const res = await api.getDesignGuard();
+      const res = await api.getDesignGuard(cwd || undefined);
       setGuard(res.guard);
     } catch {
       setGuard(null);
@@ -187,20 +197,28 @@ export function useDesignStudio(): DesignStudio {
   }, []);
 
   React.useEffect(() => {
-    void loadList();
-    void loadMeta();
     // REQ-177 — the composer's model picker reads the shared provider
     // catalog; load it even when Design is the first page opened.
     void useProviderStore.getState().refresh();
-  }, [loadList, loadMeta]);
+    // REQ-178 — the project picker lists the saved projects; refresh them
+    // even when Design is the first page opened (the sidebar usually did it).
+    void useSessionStore.getState().refreshProjects();
+  }, []);
 
-  const loadDetail = React.useCallback(async (id: string) => {
+  // REQ-178 — a project switch re-scopes both the artifact list and the
+  // DESIGN.md guard to the new root.
+  React.useEffect(() => {
+    void loadList(projectCwd);
+    void loadMeta(projectCwd);
+  }, [loadList, loadMeta, projectCwd]);
+
+  const loadDetail = React.useCallback(async (id: string, cwd: string) => {
     const run = (detailRunRef.current += 1);
     setDetailLoading(true);
     setDetailError(null);
     setDetail(null);
     try {
-      const res = await api.getDesign(id);
+      const res = await api.getDesign(id, cwd || undefined);
       if (detailRunRef.current !== run) return;
       setDetail({ manifest: res.manifest, critique: res.critique });
       setHtmlEdit(res.html);
@@ -214,8 +232,8 @@ export function useDesignStudio(): DesignStudio {
   }, []);
 
   React.useEffect(() => {
-    if (selected) void loadDetail(selected);
-  }, [selected, loadDetail]);
+    if (selected) void loadDetail(selected, projectCwd);
+  }, [selected, projectCwd, loadDetail]);
 
   const runGenerate = React.useCallback(async () => {
     if (generatingRef.current) return;
@@ -233,11 +251,17 @@ export function useDesignStudio(): DesignStudio {
         brief: form.brief.trim(),
         system: form.system,
         model: form.model || undefined,
+        cwd: projectCwd || undefined,
       });
-      pushEvent('ok', `Generated ${res.id} — overall ${res.critique.overall}/10`);
+      // REQ-178 scope 6 — the narration names the project the artifact
+      // actually landed in.
+      pushEvent(
+        'ok',
+        `Generated ${res.id} — overall ${res.critique.overall}/10 · → proje: ${projectLabel(projectCwd)}`,
+      );
       toast(`Generated ${res.id} — overall ${res.critique.overall}/10`);
       setForm((f) => ({ ...emptyGenerateForm, type: f.type, system: f.system, model: f.model }));
-      await loadList(res.id);
+      await loadList(projectCwd, res.id);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'generate failed';
       setFormError(message);
@@ -246,7 +270,7 @@ export function useDesignStudio(): DesignStudio {
       generatingRef.current = false;
       setGenerating(false);
     }
-  }, [form, loadList, pushEvent]);
+  }, [form, loadList, pushEvent, projectCwd]);
 
   const runSave = React.useCallback(async () => {
     if (!selected) return;
@@ -258,11 +282,11 @@ export function useDesignStudio(): DesignStudio {
     setSaving(true);
     setHtmlError(null);
     try {
-      const saved = await api.saveDesignHtml(selected, parsed.html);
+      const saved = await api.saveDesignHtml(selected, parsed.html, projectCwd || undefined);
       setDetail({ manifest: saved.manifest, critique: saved.critique });
       pushEvent('ok', `HTML saved — viewer rebuilt, overall ${saved.critique.overall}/10`);
       toast(`Saved ${selected} — viewer rebuilt, overall ${saved.critique.overall}/10`);
-      void loadList(selected);
+      void loadList(projectCwd, selected);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'save failed';
       setHtmlError(message);
@@ -270,17 +294,17 @@ export function useDesignStudio(): DesignStudio {
     } finally {
       setSaving(false);
     }
-  }, [selected, htmlEdit, loadList, pushEvent]);
+  }, [selected, htmlEdit, loadList, pushEvent, projectCwd]);
 
   const runCritique = React.useCallback(async () => {
     if (!selected || critiquing) return;
     setCritiquing(true);
     try {
-      const res = await api.critiqueDesign(selected);
+      const res = await api.critiqueDesign(selected, projectCwd || undefined);
       setDetail((d) => (d ? { ...d, critique: res.critique } : d));
       pushEvent('ok', `Critique done — ${res.critique.overall}/10`);
       toast(`Critique ${res.critique.overall}/10`);
-      void loadList(selected);
+      void loadList(projectCwd, selected);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'critique failed';
       pushEvent('error', `Critique failed — ${message}`);
@@ -288,7 +312,7 @@ export function useDesignStudio(): DesignStudio {
     } finally {
       setCritiquing(false);
     }
-  }, [selected, critiquing, loadList, pushEvent]);
+  }, [selected, critiquing, loadList, pushEvent, projectCwd]);
 
   const runExport = React.useCallback(
     async (format: DesignExportFormat, scaleOverride?: 1 | 2) => {
@@ -299,6 +323,7 @@ export function useDesignStudio(): DesignStudio {
           selected,
           format,
           format === 'png' ? (scaleOverride ?? 2) : undefined,
+          projectCwd || undefined,
         );
         saveBlob(filename, blob);
         pushEvent('ok', `Exported ${filename}`);
@@ -311,7 +336,7 @@ export function useDesignStudio(): DesignStudio {
         setExporting(null);
       }
     },
-    [selected, exporting, pushEvent],
+    [selected, exporting, pushEvent, projectCwd],
   );
 
   // Selecting a row always cancels a pending delete-arm (pane parity).
@@ -330,7 +355,7 @@ export function useDesignStudio(): DesignStudio {
     setConfirmDelete(null);
     setDeleting(true);
     try {
-      await api.deleteDesign(target);
+      await api.deleteDesign(target, projectCwd || undefined);
       pushEvent('ok', `Deleted ${target}`);
       toast(`Deleted ${target}`);
       setSelected(null);
@@ -338,7 +363,7 @@ export function useDesignStudio(): DesignStudio {
       setDetailError(null);
       setHtmlEdit('');
       setDrawer(null);
-      await loadList();
+      await loadList(projectCwd);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'delete failed';
       pushEvent('error', `Delete failed — ${message}`);
@@ -346,22 +371,36 @@ export function useDesignStudio(): DesignStudio {
     } finally {
       setDeleting(false);
     }
-  }, [selected, deleting, confirmDelete, loadList, pushEvent]);
+  }, [selected, deleting, confirmDelete, loadList, pushEvent, projectCwd]);
 
   const toggleDrawer = React.useCallback((next: DesignDrawer) => {
     setDrawer((current) => (current === next ? null : next));
   }, []);
 
+  // REQ-178 — switching projects re-scopes the studio: the previous list
+  // belongs to the old root (its artifacts are unreadable from the new
+  // one), so the canvas clears and the reload effect fetches the new root.
+  const changeProject = React.useCallback((next: string) => {
+    const value = next.trim();
+    setProjectCwd((current) => (current === value ? current : value));
+    setSelected(null);
+    setDetail(null);
+    setDetailError(null);
+    setHtmlEdit('');
+    setDrawer(null);
+    setConfirmDelete(null);
+  }, []);
+
   const reload = React.useCallback(() => {
-    void loadList();
-  }, [loadList]);
+    void loadList(projectCwd);
+  }, [loadList, projectCwd]);
 
   const filtered = React.useMemo(
     () => filterArtifacts(items, typeFilter as 'all' | (typeof DESIGN_TYPES)[number], q),
     [items, typeFilter, q],
   );
   const sel = selected ? (items.find((d) => d.id === selected) ?? null) : null;
-  const viewerSrc = selected ? api.designViewUrl(selected) : null;
+  const viewerSrc = selected ? api.designViewUrl(selected, projectCwd || undefined) : null;
   const systemMeta = systems.find((s) => s.id === (detail?.manifest.system ?? form.system));
 
   return {
@@ -369,6 +408,8 @@ export function useDesignStudio(): DesignStudio {
     loading,
     error,
     reload,
+    projectCwd,
+    changeProject,
     typeFilter,
     setTypeFilter,
     q,

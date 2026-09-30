@@ -3,6 +3,7 @@ import {
   Code2,
   Copy,
   Download,
+  FolderKanban,
   Gauge,
   LayoutTemplate,
   MoreHorizontal,
@@ -15,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
-import { formatUpdated, scoreTone, type DesignExportFormat } from './design';
+import { formatUpdated, projectLabel, scoreTone, type DesignExportFormat } from './design';
 import { DesignArtboards } from './design-artboards';
 import { DesignChat } from './design-chat';
 import { useDesignStudio, type DesignStudio } from './use-design-studio';
@@ -229,6 +230,13 @@ export function DesignPage() {
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-[#FDFCFB] px-3 py-2 dark:bg-[#1E1E21]">
         <Paintbrush className="h-4 w-4 text-terracotta" />
         <span className="font-serif text-[15px]">Design Studio</span>
+        <span
+          data-design-project-chip
+          title={s.projectCwd || 'Global — ~/.lokma/design/artifacts'}
+          className="inline-flex items-center gap-1 rounded-full border border-line bg-muted/40 px-1.5 py-0.5 text-[10px] text-zinc-500"
+        >
+          <FolderKanban className="h-2.5 w-2.5" /> {projectLabel(s.projectCwd)}
+        </span>
         {guardChip ? (
           <span
             data-design-guard

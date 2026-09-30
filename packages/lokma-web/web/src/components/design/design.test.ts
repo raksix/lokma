@@ -9,6 +9,7 @@ import {
   formatUpdated,
   overallLabel,
   parseHtmlEdit,
+  projectLabel,
   scoreTone,
   toRow,
   validateGenerateForm,
@@ -130,6 +131,36 @@ const rows: NormalizedArtifact[] = [
   check('snapshot: restores the picked model (REQ-177)', restoredModel.form.model === 'commandcode/deepseek/deepseek-v4.1-flash');
   check('snapshot: overlong model dropped', parseDesignPageSnapshot(JSON.stringify({ form: { model: 'x'.repeat(201) } })).form.model === '');
   check('snapshot: non-string model dropped', parseDesignPageSnapshot(JSON.stringify({ form: { model: 7 } })).form.model === '');
+}
+
+// REQ-178 — the snapshot also remembers the project cwd, and the label
+// helper names it ('' = the global root).
+{
+  check('snapshot: project defaults to the global root', parseDesignPageSnapshot(null).project === '');
+  const restored = parseDesignPageSnapshot(JSON.stringify({ project: '/mnt/apopic/lokma' }));
+  check('snapshot: restores the project cwd', restored.project === '/mnt/apopic/lokma');
+  check(
+    'snapshot: overlong project dropped (500 max)',
+    parseDesignPageSnapshot(JSON.stringify({ project: `/${'x'.repeat(500)}` })).project === '',
+  );
+  check('snapshot: blank project stays global', parseDesignPageSnapshot(JSON.stringify({ project: '   ' })).project === '');
+  check('snapshot: non-string project dropped', parseDesignPageSnapshot(JSON.stringify({ project: 42 })).project === '');
+  check('snapshot: project is trimmed', parseDesignPageSnapshot(JSON.stringify({ project: '  /repo/x  ' })).project === '/repo/x');
+  check('label: global root', projectLabel('') === 'Global (~)');
+  check('label: last path segment', projectLabel('/mnt/apopic/lokma') === 'lokma');
+  check('label: trailing slash tolerated', projectLabel('/mnt/apopic/lokma/') === 'lokma');
+  const rowProject = toRow(
+    { id: 'x-2', type: 'deck', brief: 'B', system: 'stripe-linear', createdAt: 'c', updatedAt: 'u', project: '/mnt/apopic/lokma' },
+    10,
+    null,
+  );
+  check('toRow carries the project (REQ-178)', rowProject.project === '/mnt/apopic/lokma');
+  const rowGlobal = toRow(
+    { id: 'x-3', type: 'deck', brief: 'B', system: 'stripe-linear', createdAt: 'c', updatedAt: 'u' },
+    10,
+    null,
+  );
+  check('toRow omits a missing project', rowGlobal.project === undefined);
 }
 
 // REQ-172 — the Design chat's activity chips: append keeps order, caps the

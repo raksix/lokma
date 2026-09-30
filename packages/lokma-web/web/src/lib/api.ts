@@ -610,13 +610,15 @@ export type DesignManifest = {
   system: string;
   createdAt: string;
   updatedAt: string;
+  /** REQ-178 — resolved project cwd the artifact lives under (absent = global root). */
+  project?: string;
 };
 export type DesignSummary = DesignManifest & { bytes: number; overall: number | null };
-export type DesignsRes = { items: DesignSummary[]; count: number };
+export type DesignsRes = { items: DesignSummary[]; count: number; project?: string | null; root?: string };
 export type CritiqueScore = { dim: string; score: number; fixes: string[] };
 export type CritiqueResult = { overall: number; scores: CritiqueScore[] };
 export type DesignDetailRes = { ok: boolean; id: string; manifest: DesignManifest; html: string; critique: CritiqueResult | null };
-export type GenerateDesignBody = { type: string; brief: string; system?: string; model?: string };
+export type GenerateDesignBody = { type: string; brief: string; system?: string; model?: string; cwd?: string };
 export type GenerateDesignRes = { ok: boolean; id: string; manifest: DesignManifest; critique: CritiqueResult };
 export type SaveDesignRes = { ok: boolean; id: string; manifest: DesignManifest; critique: CritiqueResult };
 export type CritiqueDesignRes = { ok: boolean; id: string; critique: CritiqueResult };
@@ -1051,6 +1053,17 @@ export type ApprovalsRes = { decisions: ApprovalDecisionView[]; count: number };
 
 // ─── One function per endpoint group ────────────────────────────────────────
 
+/**
+ * REQ-178 — design endpoints take an optional project `cwd`. Shared query
+ * builder: joins with `&` when the path already carries a query string, and
+ * never appends anything for the global root (`''` / undefined).
+ */
+function designCwdQuery(path: string, cwd?: string): string {
+  if (!cwd) return path;
+  const sep = path.includes('?') ? '&' : '?';
+  return `${path}${sep}cwd=${encodeURIComponent(cwd)}`;
+}
+
 export const api = {
   // Health + config
   health: () => get<HealthRes>('/api/health'),
@@ -1385,35 +1398,46 @@ export const api = {
   // Design Studio — 6 artifact types over bundled systems (W5-18). The
   // server owns generation + guard + critique + rendering; the pane lists,
   // previews, edits HTML and downloads artifacts.
-  listDesigns: () => get<DesignsRes>('/api/design/list'),
+  //
+  // REQ-178 — every entry point takes an optional project `cwd`
+  // ('' / undefined = the global `~/.lokma/design/artifacts` root). The
+  // server resolves it strictly (404 `cwd_not_found` / 400
+  // `not_a_directory`), so only a picked value is ever sent.
+  listDesigns: (cwd?: string) => get<DesignsRes>(designCwdQuery('/api/design/list', cwd)),
   generateDesign: (body: GenerateDesignBody) => post<GenerateDesignRes>('/api/design/generate', body),
-  getDesign: (id: string) => get<DesignDetailRes>(`/api/design/${encodeURIComponent(id)}`),
+  getDesign: (id: string, cwd?: string) =>
+    get<DesignDetailRes>(designCwdQuery(`/api/design/${encodeURIComponent(id)}`, cwd)),
   /** Persist an edited HTML document — server validates + re-critiques. */
-  saveDesignHtml: (id: string, html: string) =>
+  saveDesignHtml: (id: string, html: string, cwd?: string) =>
     request<SaveDesignRes>(`/api/design/${encodeURIComponent(id)}`, {
       method: 'PUT',
-      body: JSON.stringify({ html }),
+      body: JSON.stringify(cwd ? { html, cwd } : { html }),
     }),
   /** Remove the whole on-disk dir (artifact.json + html + design.md + critique). */
-  deleteDesign: (id: string) =>
-    del<{ ok: boolean; id: string }>(`/api/design/${encodeURIComponent(id)}`),
+  deleteDesign: (id: string, cwd?: string) =>
+    del<{ ok: boolean; id: string }>(designCwdQuery(`/api/design/${encodeURIComponent(id)}`, cwd)),
   /** Re-run the 5D heuristic critique over the stored HTML. */
-  critiqueDesign: (id: string) => post<CritiqueDesignRes>(`/api/design/${encodeURIComponent(id)}/critique`, {}),
+  critiqueDesign: (id: string, cwd?: string) =>
+    post<CritiqueDesignRes>(designCwdQuery(`/api/design/${encodeURIComponent(id)}/critique`, cwd), {}),
   /** 4 bundled system cards (name/preset/tokens for the picker). */
   getDesignSystems: () => get<DesignSystemsRes>('/api/design/systems'),
-  /** Real `.lokma/DESIGN.md` guard for the server working dir. */
-  getDesignGuard: () => get<DesignGuardRes>('/api/design/guard'),
+  /** Real `.lokma/DESIGN.md` guard for the picked project (else the server cwd). */
+  getDesignGuard: (cwd?: string) => get<DesignGuardRes>(designCwdQuery('/api/design/guard', cwd)),
   /** Stable viewer URL (sandboxed iframe, self-contained HTML, no CDN). */
-  designViewUrl: (id: string) => `/api/design/${encodeURIComponent(id)}/view`,
+  designViewUrl: (id: string, cwd?: string) =>
+    designCwdQuery(`/api/design/${encodeURIComponent(id)}/view`, cwd),
   /** Real file download — blob + server filename, auth via `authedFetch`. */
   downloadDesignExport: async (
     id: string,
     format: DesignExportFormat,
     scale?: 1 | 2,
+    cwd?: string,
   ): Promise<{ filename: string; blob: Blob }> => {
     const fallback = `${id}.${format}`;
     const suffix = format === 'png' && scale !== undefined ? `&scale=${scale}` : '';
-    const res = await authedFetch(`/api/design/${encodeURIComponent(id)}/export?format=${format}${suffix}`);
+    const res = await authedFetch(
+      designCwdQuery(`/api/design/${encodeURIComponent(id)}/export?format=${format}${suffix}`, cwd),
+    );
     const blob = await res.blob();
     const disposition = res.headers.get('Content-Disposition') ?? '';
     const match = disposition.match(/filename="([^"]+)"/);

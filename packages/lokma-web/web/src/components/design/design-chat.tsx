@@ -1,13 +1,14 @@
 import * as React from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useProviderStore } from '@/stores';
+import { useProviderStore, useSessionStore } from '@/stores';
 import { enabledModels, groupByProvider } from '@/components/providers/models';
 import {
   DESIGN_SYSTEMS,
   DESIGN_TYPES,
   formatUpdated,
   overallLabel,
+  projectLabel,
   type DesignEvent,
   type NormalizedArtifact,
 } from './design';
@@ -61,6 +62,15 @@ function ArtifactMessage({
         <span className="rounded-full border border-line bg-white px-1.5 py-0.5 text-[10px] text-zinc-500 dark:bg-[#1E1E21]">
           {row.system}
         </span>
+        {row.project ? (
+          <span
+            data-design-msg-project
+            title={row.project}
+            className="rounded-full border border-line bg-white px-1.5 py-0.5 text-[10px] text-zinc-500 dark:bg-[#1E1E21]"
+          >
+            {projectLabel(row.project)}
+          </span>
+        ) : null}
         <span className="rounded-full border border-line bg-white px-1.5 py-0.5 text-[10px] text-zinc-500 dark:bg-[#1E1E21]">
           {overallLabel(row.overall)}
         </span>
@@ -75,6 +85,14 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
   // REQ-177 — the composer's model picker speaks from the same catalog as
   // the chat composer (only enabled models; Models tab owns the flags).
   const storeModels = useProviderStore((state) => state.models);
+  // REQ-178 — the project picker lists the saved project records (same
+  // source as session creation); only entries with a real cwd can scope
+  // the design root.
+  const storeProjects = useSessionStore((state) => state.projects);
+  const projects = React.useMemo(
+    () => storeProjects.filter((p) => p.cwd.trim() !== ''),
+    [storeProjects],
+  );
   const modelGroups = React.useMemo(
     () => groupByProvider(enabledModels(storeModels)),
     [storeModels],
@@ -133,7 +151,32 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
         ) : null}
       </div>
       <div data-design-composer className="shrink-0 border-t border-line bg-[#FDFCFB] p-3 dark:bg-[#1E1E21]">
-        <div className="grid grid-cols-2 gap-2">
+        <label htmlFor="design-project" className="block text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+          Project
+        </label>
+        <select
+          id="design-project"
+          data-design-composer-project
+          value={s.projectCwd}
+          onChange={(e) => s.changeProject(e.target.value)}
+          className={`${selectClass} mt-1`}
+        >
+          <option value="">Global (~)</option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.cwd}>
+              {p.name} — {p.cwd}
+            </option>
+          ))}
+          {s.projectCwd && !projects.some((p) => p.cwd === s.projectCwd) ? (
+            <option value={s.projectCwd}>{projectLabel(s.projectCwd)} — not saved</option>
+          ) : null}
+        </select>
+        {projects.length === 0 ? (
+          <p className="mt-1 text-[10px] text-zinc-400">
+            No saved projects yet — Global writes to ~/.lokma/design.
+          </p>
+        ) : null}
+        <div className="mt-2 grid grid-cols-2 gap-2">
           <label htmlFor="design-type" className="block text-[10px] font-medium uppercase tracking-wide text-zinc-400">
             Type
             <select

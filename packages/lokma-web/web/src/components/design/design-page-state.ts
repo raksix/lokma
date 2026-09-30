@@ -1,4 +1,4 @@
-import { DESIGN_SYSTEMS, DESIGN_TYPES, emptyGenerateForm, type GenerateForm } from './design';
+import { DESIGN_CWD_MAX_LEN, DESIGN_SYSTEMS, DESIGN_TYPES, emptyGenerateForm, type GenerateForm } from './design';
 
 /**
  * REQ-168 — the Design Studio is its own page, and its state must survive
@@ -17,10 +17,12 @@ export type DesignPageSnapshot = {
   selected: string | null;
   /** The brief form as it stood (type/system validated against the catalogs; the picked model is remembered — REQ-177). */
   form: GenerateForm;
+  /** REQ-178 — the chosen project cwd; `''` = the global `~/.lokma/design` root. */
+  project: string;
 };
 
 export function defaultDesignPageSnapshot(): DesignPageSnapshot {
-  return { selected: null, form: { ...emptyGenerateForm } };
+  return { selected: null, form: { ...emptyGenerateForm }, project: '' };
 }
 
 /** Tolerant parse: any unknown, corrupt or foreign field falls back to default. */
@@ -34,13 +36,19 @@ export function parseDesignPageSnapshot(raw: string | null | undefined): DesignP
     return out;
   }
   if (typeof parsed !== 'object' || parsed === null) return out;
-  const record = parsed as { selected?: unknown; form?: unknown };
+  const record = parsed as { selected?: unknown; form?: unknown; project?: unknown };
   if (
     typeof record.selected === 'string' &&
     record.selected.length > 0 &&
     record.selected.length <= 200
   ) {
     out.selected = record.selected;
+  }
+  // REQ-178 — the project cwd is restored with the same tolerance: a
+  // non-string, blank or over-long value falls back to the global root.
+  if (typeof record.project === 'string') {
+    const project = record.project.trim();
+    if (project.length > 0 && project.length <= DESIGN_CWD_MAX_LEN) out.project = project;
   }
   if (typeof record.form === 'object' && record.form !== null) {
     const form = record.form as { type?: unknown; brief?: unknown; system?: unknown; model?: unknown };

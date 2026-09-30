@@ -15,7 +15,7 @@ export const DESIGN_PAGE_STATE_KEY = 'lokma-design-page:v1';
 export type DesignPageSnapshot = {
   /** Selected artifact id from the live list (null when nothing is selected). */
   selected: string | null;
-  /** The brief form as it stood (type/system validated against the catalogs). */
+  /** The brief form as it stood (type/system validated against the catalogs; the picked model is remembered — REQ-177). */
   form: GenerateForm;
 };
 
@@ -43,7 +43,7 @@ export function parseDesignPageSnapshot(raw: string | null | undefined): DesignP
     out.selected = record.selected;
   }
   if (typeof record.form === 'object' && record.form !== null) {
-    const form = record.form as { type?: unknown; brief?: unknown; system?: unknown };
+    const form = record.form as { type?: unknown; brief?: unknown; system?: unknown; model?: unknown };
     if (typeof form.type === 'string' && (DESIGN_TYPES as readonly string[]).includes(form.type)) {
       out.form.type = form.type;
     }
@@ -52,6 +52,9 @@ export function parseDesignPageSnapshot(raw: string | null | undefined): DesignP
     }
     if (typeof form.brief === 'string' && form.brief.length <= 2000) {
       out.form.brief = form.brief;
+    }
+    if (typeof form.model === 'string' && form.model.length <= 200) {
+      out.form.model = form.model;
     }
   }
   return out;

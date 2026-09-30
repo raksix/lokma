@@ -57,7 +57,12 @@ const rows: NormalizedArtifact[] = [
   check('long brief rejected', validateGenerateForm({ ...emptyGenerateForm, brief: 'x'.repeat(2001) }) !== null);
   check('bad system rejected', validateGenerateForm({ ...emptyGenerateForm, brief: 'x', system: 'neon' }) !== null);
   const form: GenerateForm = { ...emptyGenerateForm };
-  check('empty form defaults', form.type === 'prototype' && form.system === 'stripe-linear');
+  check('empty form defaults', form.type === 'prototype' && form.system === 'stripe-linear' && form.model === '');
+  check(
+    'valid form passes with a picked model (REQ-177)',
+    validateGenerateForm({ ...emptyGenerateForm, brief: 'x', model: 'commandcode/deepseek/deepseek-v4.1-flash' }) === null,
+  );
+  check('overlong model id rejected', validateGenerateForm({ ...emptyGenerateForm, brief: 'x', model: 'm'.repeat(201) }) !== null);
 }
 
 // filterArtifacts — type filter + search.
@@ -119,6 +124,12 @@ const rows: NormalizedArtifact[] = [
   check('snapshot: foreign type/system fall back to defaults', foreign.form.type === 'prototype' && foreign.form.system === 'stripe-linear');
   check('snapshot: overlong brief dropped', parseDesignPageSnapshot(JSON.stringify({ form: { brief: 'x'.repeat(2001) } })).form.brief === '');
   check('snapshot: non-string selection dropped', parseDesignPageSnapshot(JSON.stringify({ selected: 42 })).selected === null);
+  const restoredModel = parseDesignPageSnapshot(
+    JSON.stringify({ form: { type: 'deck', system: 'paper-ink', brief: 'seed', model: 'commandcode/deepseek/deepseek-v4.1-flash' } }),
+  );
+  check('snapshot: restores the picked model (REQ-177)', restoredModel.form.model === 'commandcode/deepseek/deepseek-v4.1-flash');
+  check('snapshot: overlong model dropped', parseDesignPageSnapshot(JSON.stringify({ form: { model: 'x'.repeat(201) } })).form.model === '');
+  check('snapshot: non-string model dropped', parseDesignPageSnapshot(JSON.stringify({ form: { model: 7 } })).form.model === '');
 }
 
 // REQ-172 — the Design chat's activity chips: append keeps order, caps the

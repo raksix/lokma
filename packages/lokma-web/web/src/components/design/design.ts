@@ -31,12 +31,15 @@ export type GenerateForm = {
   type: string;
   brief: string;
   system: string;
+  /** Picked model id — '' means the configured default chain (REQ-177). */
+  model: string;
 };
 
 export const emptyGenerateForm: GenerateForm = {
   type: 'prototype',
   brief: '',
   system: 'stripe-linear',
+  model: '',
 };
 
 /** Client-side mirror of the server generate rules (server re-validates). */
@@ -49,6 +52,7 @@ export function validateGenerateForm(form: GenerateForm): string | null {
   if (!(DESIGN_SYSTEMS as readonly string[]).includes(form.system)) {
     return 'Pick one of the 4 design systems';
   }
+  if (form.model && form.model.length > 200) return 'Model id too long (200 max)';
   return null;
 }
 

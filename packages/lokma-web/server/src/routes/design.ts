@@ -16,8 +16,9 @@ import {
 
 /**
  * Design Studio — 6 artifact types over bundled systems (W5-18, Docs/34).
- * `POST /api/design/generate { type, brief, system? }` (starter HTML
- * derived from the brief, critiqued before it touches disk);
+ * `POST /api/design/generate { type, brief, system?, model? }` (REQ-177:
+ * the HTML comes from a REAL model call — the request's model, else the
+ * configured default; critiqued before it touches disk);
  * `GET /api/design/list` (newest first);
  * `GET /api/design/systems` (4 bundled cards + project guard hint);
  * `GET /api/design/guard?cwd=` (real `.lokma/DESIGN.md` parse, always 200);
@@ -40,9 +41,9 @@ import {
 
 export async function designRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/design/generate', async (req, reply) => {
-    const body = (req.body ?? {}) as { type?: unknown; brief?: unknown; system?: unknown };
+    const body = (req.body ?? {}) as { type?: unknown; brief?: unknown; system?: unknown; model?: unknown };
     try {
-      const { id, manifest, critique } = await generateArtifact(body.type, body.brief, body.system);
+      const { id, manifest, critique } = await generateArtifact(body.type, body.brief, body.system, body.model);
       return { ok: true, id, manifest, critique };
     } catch (e) {
       if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });

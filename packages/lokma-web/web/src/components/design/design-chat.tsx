@@ -1,6 +1,8 @@
 import * as React from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useProviderStore } from '@/stores';
+import { enabledModels, groupByProvider } from '@/components/providers/models';
 import {
   DESIGN_SYSTEMS,
   DESIGN_TYPES,
@@ -70,6 +72,17 @@ function ArtifactMessage({
 
 export function DesignChat({ studio }: { studio: DesignStudio }) {
   const s = studio;
+  // REQ-177 — the composer's model picker speaks from the same catalog as
+  // the chat composer (only enabled models; Models tab owns the flags).
+  const storeModels = useProviderStore((state) => state.models);
+  const modelGroups = React.useMemo(
+    () => groupByProvider(enabledModels(storeModels)),
+    [storeModels],
+  );
+  const modelInCatalog = React.useMemo(
+    () => modelGroups.some((group) => group.models.some((m) => m.id === s.form.model)),
+    [modelGroups, s.form.model],
+  );
   const threadRef = React.useRef<HTMLDivElement>(null);
   // Keep the newest line in view as artifacts/events/generating land.
   React.useEffect(() => {
@@ -154,6 +167,30 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
             </select>
           </label>
         </div>
+        <label htmlFor="design-model" className="mt-2 block text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+          Model
+          <select
+            id="design-model"
+            data-design-composer-model
+            value={s.form.model}
+            onChange={(e) => s.setForm((f) => ({ ...f, model: e.target.value }))}
+            className={`${selectClass} mt-1`}
+          >
+            <option value="">Default (auto)</option>
+            {s.form.model && !modelInCatalog ? (
+              <option value={s.form.model}>{s.form.model} — not in catalog</option>
+            ) : null}
+            {modelGroups.map((group) => (
+              <optgroup key={group.provider} label={group.provider}>
+                {group.models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
         <label htmlFor="design-brief" className="mt-2 block text-[10px] font-medium uppercase tracking-wide text-zinc-400">
           Brief
         </label>

@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { api, type CritiqueResult, type DesignGuard, type DesignManifest, type DesignSystemMeta } from '@/lib/api';
+import { useProviderStore } from '@/stores';
 import {
   DESIGN_TYPES,
   appendDesignEvent,
@@ -188,6 +189,9 @@ export function useDesignStudio(): DesignStudio {
   React.useEffect(() => {
     void loadList();
     void loadMeta();
+    // REQ-177 — the composer's model picker reads the shared provider
+    // catalog; load it even when Design is the first page opened.
+    void useProviderStore.getState().refresh();
   }, [loadList, loadMeta]);
 
   const loadDetail = React.useCallback(async (id: string) => {
@@ -228,10 +232,11 @@ export function useDesignStudio(): DesignStudio {
         type: form.type,
         brief: form.brief.trim(),
         system: form.system,
+        model: form.model || undefined,
       });
       pushEvent('ok', `Generated ${res.id} — overall ${res.critique.overall}/10`);
       toast(`Generated ${res.id} — overall ${res.critique.overall}/10`);
-      setForm((f) => ({ ...emptyGenerateForm, type: f.type, system: f.system }));
+      setForm((f) => ({ ...emptyGenerateForm, type: f.type, system: f.system, model: f.model }));
       await loadList(res.id);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'generate failed';

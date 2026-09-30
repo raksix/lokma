@@ -36,8 +36,14 @@ export const DEFAULT_DESIGN_MODEL = 'anthropic/claude-sonnet-4-5';
  */
 export const OFFLINE_TEMPLATE_MODEL = 'offline-template';
 
-/** One generation call is bounded — a hung upstream must not wedge the pane. */
-export const DESIGN_GENERATION_TIMEOUT_MS = 120_000;
+/**
+ * One generation call is bounded — a hung upstream must not wedge the pane.
+ * The default model answers a full HTML artifact in ~2 minutes (measured:
+ * 114s on the first live run, then >120s on the next), so the budget sits
+ * well above that; the production nginx /api/ read timeout (300s) is the
+ * outer bound.
+ */
+export const DESIGN_GENERATION_TIMEOUT_MS = 240_000;
 
 /**
  * Quality contract every generated artifact must satisfy (REQ-177 §4):
@@ -204,6 +210,18 @@ export async function generateDesignHtml(req: DesignModelRequest & { model: stri
     { role: 'user', content: buildDesignPrompt(req) },
   ];
   let text = '';
+  // The abort surfaces in adapter-specific shapes (DOMException TimeoutError,
+  // a wrapped ProviderError, ...) — track it on the signal itself so a
+  // timeout maps to the honest design_timeout regardless of the wrapper.
+  const deadline = AbortSignal.timeout(DESIGN_GENERATION_TIMEOUT_MS);
+  let timedOut = false;
+  deadline.addEventListener(
+    'abort',
+    () => {
+      timedOut = true;
+    },
+    { once: true },
+  );
   try {
     for await (const chunk of aiStream({
       provider: upstream.provider,
@@ -211,13 +229,20 @@ export async function generateDesignHtml(req: DesignModelRequest & { model: stri
       messages,
       apiKey: upstream.apiKey,
       baseUrl: upstream.baseUrl,
-      signal: AbortSignal.timeout(DESIGN_GENERATION_TIMEOUT_MS),
+      signal: deadline,
       // Go-style upstreams want a client session id (harmless elsewhere).
       extraHeaders: { 'x-opencode-session': `lokma-design-${Date.now().toString(36)}` },
     })) {
       if (chunk.type === 'text_delta' && chunk.delta) text += chunk.delta;
     }
   } catch (e) {
+    if (timedOut) {
+      throw new DesignError(
+        'design_timeout',
+        'Model "' + req.model + '" did not answer within ' + Math.round(DESIGN_GENERATION_TIMEOUT_MS / 1000) + 's — retry or pick another model.',
+        504,
+      );
+    }
     throw designErrorFromUpstream(e, req.model);
   }
   return extractHtmlDocument(text);

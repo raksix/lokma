@@ -1,5 +1,6 @@
 import {
   DESIGN_EXPORTS,
+  DESIGN_SAMPLES,
   DESIGN_SYSTEMS,
   DESIGN_TYPES,
   appendDesignEvent,
@@ -177,6 +178,26 @@ const rows: NormalizedArtifact[] = [
   }
   check('event cap keeps exactly 40', capped.length === 40);
   check('event cap drops the oldest first', capped[0].id === 6 && capped[39].id === 45);
+}
+
+// REQ-179 — canvas sample brief chips must be valid composer inputs.
+{
+  check('samples: 4 chips', DESIGN_SAMPLES.length === 4);
+  check('samples: unique ids', new Set(DESIGN_SAMPLES.map((s) => s.id)).size === DESIGN_SAMPLES.length);
+  check(
+    'samples: every type is a real DESIGN_TYPE',
+    DESIGN_SAMPLES.every((s) => (DESIGN_TYPES as readonly string[]).includes(s.type)),
+  );
+  check(
+    'samples: non-empty label + brief',
+    DESIGN_SAMPLES.every((s) => s.label.trim().length > 0 && s.brief.trim().length > 0),
+  );
+  check(
+    'samples: briefs pass client validation',
+    DESIGN_SAMPLES.every(
+      (s) => validateGenerateForm({ ...emptyGenerateForm, type: s.type, brief: s.brief }) === null,
+    ),
+  );
 }
 
 console.log(`\nDESIGN PROBE: ${passed} passed, ${failed} failed`);

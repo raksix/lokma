@@ -37,13 +37,14 @@ const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 export async function exportArtifactPng(
   idRaw: unknown,
   opts?: { scale?: unknown },
+  cwdRaw?: unknown,
 ): Promise<{ filename: string; contentType: string; body: Buffer; width: number; height: number }> {
   const scale = opts?.scale === undefined ? 2 : opts.scale;
   if (scale !== 1 && scale !== 2) {
     throw new DesignError('bad_scale', 'scale must be 1 or 2', 400);
   }
   const id = assertArtifactId(idRaw);
-  const { html } = await getArtifact(id); // 404 on unknown.
+  const { html } = await getArtifact(id, cwdRaw); // 404 on unknown.
 
   const chrome = await findChromeBinary();
   if (!chrome) {

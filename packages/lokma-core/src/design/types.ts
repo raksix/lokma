@@ -125,6 +125,8 @@ export type DesignManifest = {
   system: DesignSystem;
   /** Model that generated the artifact (absent on pre-REQ-177 artifacts). */
   model?: string;
+  /** REQ-178 — absolute project dir when stored under a project (absent = global). */
+  project?: string;
   createdAt: string;
   updatedAt: string;
 };

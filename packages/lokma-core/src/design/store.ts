@@ -1,5 +1,5 @@
 import { mkdir, readdir, readFile, rm, stat } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, normalize, resolve } from 'node:path';
 import { ensureDir, expandHome, writeAtomic } from '../utils/fs.js';
 import { buildStoredZip } from '../utils/zip.js';
 import { OFFLINE_TEMPLATE_MODEL, generateDesignHtml, resolveDesignModel } from './generate.js';
@@ -27,6 +27,9 @@ import {
  * Root: `~/.lokma/design/artifacts/<id>/` (Docs/34 §7):
  * `artifact.json` (manifest) + `artifact.html` (source of truth) +
  * `design.md` (system token snapshot) + `critique.json` (last 5D run).
+ * REQ-178: every entry point takes an optional project `cwd` — artifacts
+ * are then stored under `<cwd>/.lokma/design/artifacts/<id>/` and lists
+ * are scoped to that project; no cwd = the global root above.
  * Same store for CLI + web — one loop, like sessions and archify.
  */
 
@@ -36,6 +39,62 @@ export const DESIGN_DIR = '~/.lokma/design/artifacts';
 /** Absolute design root on this machine. */
 export function designRoot(): string {
   return expandHome(DESIGN_DIR);
+}
+
+/** Max length accepted for a project `cwd` argument (parity with the fs routes). */
+export const DESIGN_CWD_MAX_LEN = 500;
+
+/**
+ * REQ-178 — pure: normalize an optional project `cwd` into an absolute path,
+ * or `null` when no project is selected (the global root). Shape-only
+ * validation, no filesystem access: relative paths, null bytes and
+ * over-long input are `bad_cwd` 400; the result is always a clean absolute
+ * path (`..` segments collapse; there is no root to escape).
+ */
+export function normalizeDesignCwd(cwdRaw: unknown): string | null {
+  if (cwdRaw === undefined || cwdRaw === null || cwdRaw === '') return null;
+  if (
+    typeof cwdRaw !== 'string' ||
+    !cwdRaw.trim() ||
+    cwdRaw.length > DESIGN_CWD_MAX_LEN ||
+    cwdRaw.includes('\0')
+  ) {
+    throw new DesignError('bad_cwd', 'cwd must be a directory path', 400);
+  }
+  const expanded = expandHome(cwdRaw.trim());
+  if (!isAbsolute(expanded)) {
+    throw new DesignError('bad_cwd', 'cwd must be absolute (or ~)', 400);
+  }
+  return normalize(expanded);
+}
+
+/**
+ * REQ-178 — normalize + require a real, listable project directory.
+ * Missing → 404 `cwd_not_found`; a file (or an unreadable dir) → 400. Used
+ * by every read/write path that scopes artifacts to a project.
+ */
+export async function resolveDesignCwd(cwdRaw: unknown): Promise<string | null> {
+  const abs = normalizeDesignCwd(cwdRaw);
+  if (abs === null) return null;
+  let st;
+  try {
+    st = await stat(abs);
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException)?.code;
+    if (code === 'ENOENT') {
+      throw new DesignError('cwd_not_found', `no such project directory: ${abs}`, 404);
+    }
+    throw new DesignError('cwd_unusable', `cannot use cwd: ${abs}`, 400);
+  }
+  if (!st.isDirectory()) {
+    throw new DesignError('not_a_directory', `cwd is not a directory: ${abs}`, 400);
+  }
+  return abs;
+}
+
+/** Design root for a resolved cwd (`null` = the global `~/.lokma/design/artifacts`). */
+export function designRootOf(cwd: string | null): string {
+  return cwd === null ? designRoot() : join(cwd, '.lokma', 'design', 'artifacts');
 }
 
 /**
@@ -49,8 +108,8 @@ export function assertArtifactId(raw: unknown): string {
   return raw;
 }
 
-function dirOf(id: string): string {
-  return join(designRoot(), id);
+function dirOf(root: string, id: string): string {
+  return join(root, id);
 }
 
 function slugify(text: string): string {
@@ -98,10 +157,10 @@ function assertHtml(raw: unknown): string {
   return raw;
 }
 
-async function readManifest(id: string): Promise<DesignManifest> {
+async function readManifest(root: string, id: string): Promise<DesignManifest> {
   let raw: string;
   try {
-    raw = await readFile(join(dirOf(id), 'artifact.json'), 'utf-8');
+    raw = await readFile(join(dirOf(root, id), 'artifact.json'), 'utf-8');
   } catch {
     throw new DesignError('design_not_found', `no design: ${id}`, 404);
   }
@@ -116,17 +175,17 @@ async function readManifest(id: string): Promise<DesignManifest> {
   }
 }
 
-async function readHtmlFile(id: string): Promise<string> {
+async function readHtmlFile(root: string, id: string): Promise<string> {
   try {
-    return await readFile(join(dirOf(id), 'artifact.html'), 'utf-8');
+    return await readFile(join(dirOf(root, id), 'artifact.html'), 'utf-8');
   } catch {
     throw new DesignError('design_not_found', `no design: ${id}`, 404);
   }
 }
 
-async function readCritiqueFile(id: string): Promise<CritiqueResult | null> {
+async function readCritiqueFile(root: string, id: string): Promise<CritiqueResult | null> {
   try {
-    const raw = await readFile(join(dirOf(id), 'critique.json'), 'utf-8');
+    const raw = await readFile(join(dirOf(root, id), 'critique.json'), 'utf-8');
     return JSON.parse(raw) as CritiqueResult;
   } catch {
     return null;
@@ -191,15 +250,10 @@ export function critiqueHtml(html: string, system: DesignSystem): CritiqueResult
  * an unusable `cwd` argument.
  */
 export async function readDesignGuard(cwdRaw: unknown): Promise<DesignGuard> {
-  let cwd: string;
-  if (cwdRaw === undefined || cwdRaw === null || cwdRaw === '') {
-    cwd = process.cwd();
-  } else if (typeof cwdRaw !== 'string' || !cwdRaw.trim()) {
-    throw new DesignError('bad_cwd', 'cwd must be a non-empty string', 400);
-  } else {
-    cwd = cwdRaw;
-  }
-  const abs = resolve(expandHome(cwd));
+  // REQ-178 — same cwd semantics as artifact storage: unset = the server
+  // cwd, else the selected project dir. Existence is NOT required (a bare
+  // project reports present: false); only the shape is validated.
+  const abs = normalizeDesignCwd(cwdRaw) ?? resolve(process.cwd());
   let text: string;
   try {
     const st = await stat(join(abs, '.lokma', 'DESIGN.md'));
@@ -229,9 +283,9 @@ export async function readDesignGuard(cwdRaw: unknown): Promise<DesignGuard> {
   };
 }
 
-async function persist(id: string, manifest: DesignManifest, html: string, systemNote: string): Promise<CritiqueResult> {
+async function persist(root: string, id: string, manifest: DesignManifest, html: string, systemNote: string): Promise<CritiqueResult> {
   const critique = critiqueHtml(html, manifest.system);
-  const dir = dirOf(id);
+  const dir = dirOf(root, id);
   await mkdir(dir, { recursive: true });
   await writeAtomic(join(dir, 'artifact.json'), JSON.stringify(manifest, null, 2));
   await writeAtomic(join(dir, 'artifact.html'), html);
@@ -253,20 +307,26 @@ export async function generateArtifact(
   briefRaw: unknown,
   systemRaw: unknown,
   modelRaw?: unknown,
+  cwdRaw?: unknown,
 ): Promise<{ id: string; manifest: DesignManifest; critique: CritiqueResult }> {
   const type = assertType(typeRaw);
   const brief = assertBrief(briefRaw);
   const system = coerceSystem(systemRaw);
-  const model = await resolveDesignModel(modelRaw);
+  // REQ-178 — the project cwd scopes the storage root AND the layered config
+  // read (a project `.lokma/settings.json` can pin the model).
+  const cwd = await resolveDesignCwd(cwdRaw);
+  const root = designRootOf(cwd);
+  const model = await resolveDesignModel(modelRaw, cwd ?? undefined);
   const now = new Date().toISOString();
   const id = `${slugify(brief).slice(0, 32) || 'design'}-${Date.now().toString(36)}`;
   assertArtifactId(id);
-  const manifest: DesignManifest = { id, type, brief, system, model, createdAt: now, updatedAt: now };
+  const manifest: DesignManifest = { id, type, brief, system, model, project: cwd ?? undefined, createdAt: now, updatedAt: now };
   const html =
     model === OFFLINE_TEMPLATE_MODEL
       ? buildArtifactHtml(type, brief, system)
       : await generateDesignHtml({ type, brief, system, model });
   const critique = await persist(
+    root,
     id,
     manifest,
     html,
@@ -279,21 +339,26 @@ export async function generateArtifact(
 export async function updateArtifactHtml(
   idRaw: unknown,
   htmlRaw: unknown,
+  cwdRaw?: unknown,
 ): Promise<{ id: string; manifest: DesignManifest; critique: CritiqueResult }> {
+  const cwd = await resolveDesignCwd(cwdRaw);
+  const root = designRootOf(cwd);
   const id = assertArtifactId(idRaw);
-  const manifest = await readManifest(id); // 404 on unknown before touching disk.
+  const manifest = await readManifest(root, id); // 404 on unknown before touching disk.
   const html = assertHtml(htmlRaw);
   const next: DesignManifest = { ...manifest, updatedAt: new Date().toISOString() };
-  const critique = await persist(id, next, html, 'manual edit');
+  const critique = await persist(root, id, next, html, 'manual edit');
   return { id, manifest: next, critique };
 }
 
 /** Full detail: manifest + HTML + last critique. */
-export async function getArtifact(idRaw: unknown): Promise<DesignDetail> {
+export async function getArtifact(idRaw: unknown, cwdRaw?: unknown): Promise<DesignDetail> {
+  const cwd = await resolveDesignCwd(cwdRaw);
+  const root = designRootOf(cwd);
   const id = assertArtifactId(idRaw);
-  const manifest = await readManifest(id);
-  const html = await readHtmlFile(id);
-  const critique = await readCritiqueFile(id);
+  const manifest = await readManifest(root, id);
+  const html = await readHtmlFile(root, id);
+  const critique = await readCritiqueFile(root, id);
   return { id, manifest, html, critique };
 }
 
@@ -304,39 +369,51 @@ export async function getArtifact(idRaw: unknown): Promise<DesignDetail> {
  * `assertArtifactId`. The id is validated to a single path segment so
  * `rm` can never escape the design root.
  */
-export async function deleteArtifact(idRaw: unknown): Promise<{ id: string }> {
+export async function deleteArtifact(idRaw: unknown, cwdRaw?: unknown): Promise<{ id: string }> {
+  const cwd = await resolveDesignCwd(cwdRaw);
+  const root = designRootOf(cwd);
   const id = assertArtifactId(idRaw);
-  await readManifest(id); // 404 on unknown before touching disk.
-  await rm(dirOf(id), { recursive: true, force: true });
+  await readManifest(root, id); // 404 on unknown before touching disk.
+  await rm(dirOf(root, id), { recursive: true, force: true });
   return { id };
 }
 
 /** Re-run the 5D critique over the stored HTML (persists the result). */
-export async function critiqueArtifact(idRaw: unknown): Promise<{ id: string; critique: CritiqueResult }> {
+export async function critiqueArtifact(idRaw: unknown, cwdRaw?: unknown): Promise<{ id: string; critique: CritiqueResult }> {
+  const cwd = await resolveDesignCwd(cwdRaw);
+  const root = designRootOf(cwd);
   const id = assertArtifactId(idRaw);
-  const manifest = await readManifest(id);
-  const html = await readHtmlFile(id);
+  const manifest = await readManifest(root, id);
+  const html = await readHtmlFile(root, id);
   const critique = critiqueHtml(html, manifest.system);
-  await writeAtomic(join(dirOf(id), 'critique.json'), JSON.stringify(critique, null, 2));
+  await writeAtomic(join(dirOf(root, id), 'critique.json'), JSON.stringify(critique, null, 2));
   return { id, critique };
 }
 
-/** List artifacts (newest first, capped). Missing/corrupt dirs are skipped. */
-export async function listArtifacts(): Promise<{ items: DesignSummary[]; count: number }> {
-  await ensureDir(DESIGN_DIR);
+/**
+ * List artifacts (newest first, capped) — REQ-178: scoped to the selected
+ * project `cwd` when given, else the global root. Missing/corrupt dirs are
+ * skipped; `project`/`root` echo the resolved scope back to the caller.
+ */
+export async function listArtifacts(
+  cwdRaw?: unknown,
+): Promise<{ items: DesignSummary[]; count: number; project: string | null; root: string }> {
+  const cwd = await resolveDesignCwd(cwdRaw);
+  const root = designRootOf(cwd);
+  await ensureDir(root);
   let names: string[];
   try {
-    names = await readdir(designRoot());
+    names = await readdir(root);
   } catch {
-    return { items: [], count: 0 };
+    return { items: [], count: 0, project: cwd, root };
   }
   const items: DesignSummary[] = [];
   for (const name of names.slice(0, DESIGN_LIST_CAP * 2)) {
     if (!/^[a-z0-9][a-z0-9-]{1,63}$/.test(name)) continue;
     try {
-      const manifest = await readManifest(name);
-      const html = await readHtmlFile(name);
-      const critique = await readCritiqueFile(name);
+      const manifest = await readManifest(root, name);
+      const html = await readHtmlFile(root, name);
+      const critique = await readCritiqueFile(root, name);
       items.push({ ...manifest, bytes: html.length, overall: critique ? critique.overall : null });
     } catch {
       continue;
@@ -344,23 +421,26 @@ export async function listArtifacts(): Promise<{ items: DesignSummary[]; count: 
     if (items.length >= DESIGN_LIST_CAP) break;
   }
   items.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
-  return { items, count: items.length };
+  return { items, count: items.length, project: cwd, root };
 }
 
 /** Export an artifact — real file bytes for formats the server serves. */
 export async function exportArtifact(
   idRaw: unknown,
   formatRaw: unknown,
+  cwdRaw?: unknown,
 ): Promise<{ filename: string; contentType: string; body: string | Buffer }> {
+  const cwd = await resolveDesignCwd(cwdRaw);
+  const root = designRootOf(cwd);
   const id = assertArtifactId(idRaw);
-  const manifest = await readManifest(id);
-  const html = await readHtmlFile(id);
+  const manifest = await readManifest(root, id);
+  const html = await readHtmlFile(root, id);
   const format = typeof formatRaw === 'string' ? formatRaw : '';
   if (format === 'html') {
     return { filename: `${id}.html`, contentType: 'text/html; charset=utf-8', body: html };
   }
   if (format === 'json') {
-    const critique = await readCritiqueFile(id);
+    const critique = await readCritiqueFile(root, id);
     return {
       filename: `${id}.json`,
       contentType: 'application/json; charset=utf-8',
@@ -370,7 +450,7 @@ export async function exportArtifact(
   if (format === 'zip') {
     let designMd = '';
     try {
-      designMd = await readFile(join(dirOf(id), 'design.md'), 'utf-8');
+      designMd = await readFile(join(dirOf(root, id), 'design.md'), 'utf-8');
     } catch {
       designMd = '# DESIGN.md snapshot unavailable\n';
     }

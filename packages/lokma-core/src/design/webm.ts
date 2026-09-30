@@ -56,7 +56,7 @@ export function buildDesignWebmFrameHtml(html: string, t: number): string {
  * frame screenshot failed) or `encode_failed` (500 — ffmpeg errored or
  * emitted non-WebM bytes).
  */
-export async function exportArtifactWebm(idRaw: unknown): Promise<{
+export async function exportArtifactWebm(idRaw: unknown, cwdRaw?: unknown): Promise<{
   filename: string;
   contentType: string;
   body: Buffer;
@@ -66,7 +66,7 @@ export async function exportArtifactWebm(idRaw: unknown): Promise<{
   frames: number;
 }> {
   const id = assertArtifactId(idRaw);
-  const { html } = await getArtifact(id); // 404 on unknown.
+  const { html } = await getArtifact(id, cwdRaw); // 404 on unknown.
 
   const chrome = await findChromeBinary();
   const ffmpeg = await findFfmpegBinary();

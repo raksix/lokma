@@ -19,7 +19,8 @@ import {
  * `POST /api/design/generate { type, brief, system?, model? }` (REQ-177:
  * the HTML comes from a REAL model call — the request's model, else the
  * configured default; critiqued before it touches disk);
- * `GET /api/design/list` (newest first);
+ * `GET /api/design/list?cwd=` (newest first; REQ-178: scoped to a project
+ * cwd when given, else the global `~/.lokma/design/artifacts` root);
  * `GET /api/design/systems` (4 bundled cards + project guard hint);
  * `GET /api/design/guard?cwd=` (real `.lokma/DESIGN.md` parse, always 200);
  * `GET /api/design/:id` (manifest + HTML + last critique);
@@ -41,9 +42,9 @@ import {
 
 export async function designRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/design/generate', async (req, reply) => {
-    const body = (req.body ?? {}) as { type?: unknown; brief?: unknown; system?: unknown; model?: unknown };
+    const body = (req.body ?? {}) as { type?: unknown; brief?: unknown; system?: unknown; model?: unknown; cwd?: unknown };
     try {
-      const { id, manifest, critique } = await generateArtifact(body.type, body.brief, body.system, body.model);
+      const { id, manifest, critique } = await generateArtifact(body.type, body.brief, body.system, body.model, body.cwd);
       return { ok: true, id, manifest, critique };
     } catch (e) {
       if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
@@ -51,9 +52,10 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
-  app.get('/api/design/list', async () => {
-    const { items, count } = await listArtifacts();
-    return { items, count };
+  app.get('/api/design/list', async (req) => {
+    const query = req.query as { cwd?: unknown };
+    const { items, count, project, root } = await listArtifacts(query.cwd);
+    return { items, count, project, root };
   });
 
   app.get('/api/design/systems', async () => {
@@ -74,8 +76,9 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/api/design/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
+    const query = req.query as { cwd?: unknown };
     try {
-      return { ok: true, ...(await getArtifact(id)) };
+      return { ok: true, ...(await getArtifact(id, query.cwd)) };
     } catch (e) {
       if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
       throw e;
@@ -84,9 +87,9 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
 
   app.put('/api/design/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const body = (req.body ?? {}) as { html?: unknown };
+    const body = (req.body ?? {}) as { html?: unknown; cwd?: unknown };
     try {
-      return { ok: true, ...(await updateArtifactHtml(id, body.html)) };
+      return { ok: true, ...(await updateArtifactHtml(id, body.html, body.cwd)) };
     } catch (e) {
       if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
       throw e;
@@ -95,8 +98,9 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
 
   app.post('/api/design/:id/critique', async (req, reply) => {
     const { id } = req.params as { id: string };
+    const query = req.query as { cwd?: unknown };
     try {
-      return { ok: true, ...(await critiqueArtifact(id)) };
+      return { ok: true, ...(await critiqueArtifact(id, query.cwd)) };
     } catch (e) {
       if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
       throw e;
@@ -105,8 +109,9 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
 
   app.delete('/api/design/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
+    const query = req.query as { cwd?: unknown };
     try {
-      const { id: deleted } = await deleteArtifact(id);
+      const { id: deleted } = await deleteArtifact(id, query.cwd);
       return { ok: true, id: deleted };
     } catch (e) {
       if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
@@ -116,12 +121,12 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/api/design/:id/export', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const query = req.query as { format?: unknown; scale?: unknown };
+    const query = req.query as { format?: unknown; scale?: unknown; cwd?: unknown };
     try {
       if (query.format === 'png') {
         // `?scale=` arrives as a string — garbage becomes NaN → bad_scale 400.
         const scale = query.scale === undefined ? undefined : { scale: Number(query.scale) };
-        const png = await exportArtifactPng(id, scale);
+        const png = await exportArtifactPng(id, scale, query.cwd);
         return reply
           .header('Content-Type', png.contentType)
           .header('Content-Disposition', `attachment; filename="${png.filename}"`)
@@ -130,7 +135,7 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
           .send(png.body);
       }
       if (query.format === 'webm') {
-        const webm = await exportArtifactWebm(id);
+        const webm = await exportArtifactWebm(id, query.cwd);
         return reply
           .header('Content-Type', webm.contentType)
           .header('Content-Disposition', `attachment; filename="${webm.filename}"`)
@@ -140,7 +145,7 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
           .header('X-Video-Frames', String(webm.frames))
           .send(webm.body);
       }
-      const { filename, contentType, body } = await exportArtifact(id, query.format);
+      const { filename, contentType, body } = await exportArtifact(id, query.format, query.cwd);
       return reply
         .header('Content-Type', contentType)
         .header('Content-Disposition', `attachment; filename="${filename}"`)
@@ -155,8 +160,9 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
   // HTML with no CDN). Inline, never an attachment.
   app.get('/api/design/:id/view', async (req, reply) => {
     const { id } = req.params as { id: string };
+    const query = req.query as { cwd?: unknown };
     try {
-      const { manifest, html } = await getArtifact(id);
+      const { manifest, html } = await getArtifact(id, query.cwd);
       void manifest;
       return reply.header('Content-Type', 'text/html; charset=utf-8').send(html);
     } catch (e) {

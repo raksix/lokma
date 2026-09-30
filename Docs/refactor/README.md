@@ -197,3 +197,4 @@
 - [REQ-176](finished/REQ-176-markdown-tablo-render.md) — Sohbette markdown tablo render edilsin (GFM tablo bloğu + gerçek <table>, hizalama, overflow-x; ham `|` kalmasın) — done (canlı prob 22/22: hizalama + gerçek <table> + reload + 390px; ham delimiter yok) · [ss1 önce](assets/REQ-176-ss1-tablo-ham.png) · [ss2 sonra](assets/REQ-176-ss2-after-table.png) · [ss3 mobil](assets/REQ-176-ss3-mobile-390.png)
 - [REQ-177](REQ-177-design-gercek-model.md) — Design üretimi GERÇEK modele bağlansın (şu an deterministik şablon!) + model seçici — pending · [ss1](assets/REQ-177-ss1-design-form.png)
 - [REQ-178](REQ-178-design-proje-secimi.md) — Design'e proje (workspace/cwd) seçimi: list/generate/guard cwd alır, artifact'lar projenin .lokma/design'ına yazılır — pending
+- [REQ-179](REQ-179-design-gorsel-kalite.md) — Design görsel kalite: native <select>'ler gitsin (mavi sistem vurgusu), hiyerarşi/boş durum düzelsin — pending

@@ -1,8 +1,10 @@
 import * as React from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SelectMenu, type SelectMenuGroup, type SelectMenuOption } from '@/components/ui/select-menu';
 import { useProviderStore, useSessionStore } from '@/stores';
 import { enabledModels, groupByProvider } from '@/components/providers/models';
+import { cn } from '@/lib/utils';
 import {
   DESIGN_SYSTEMS,
   DESIGN_TYPES,
@@ -19,17 +21,26 @@ import type { DesignStudio } from './use-design-studio';
  * be two stacked cards ("Brief" + "Artifacts") is now a single message flow:
  * every artifact reads as a user brief with its status chips, session events
  * ("Generated …", "HTML saved") land as narration chips, and the composer at
- * the bottom owns Type / System / brief — Generate is the send action.
+ * the bottom owns Project / Type / System / Model / brief — Generate is the
+ * send action.
+ *
+ * REQ-179 — the composer controls are the app's own SelectMenu: no native
+ * <select>, so the OS blue highlight is gone in both themes; labels and meta
+ * text sit on passing contrast tokens (zinc-500 on cream, zinc-400 on the
+ * dark panels).
  */
-
-const selectClass =
-  'h-7 w-full rounded-md border border-line bg-white px-1.5 text-[11px] focus:border-terracotta/30 focus:outline-none dark:bg-[#0F0F11]';
 
 const EVENT_CLASS: Record<DesignEvent['kind'], string> = {
   ok: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300',
-  info: 'border-line bg-muted/40 text-zinc-500',
+  info: 'border-line bg-muted/40 text-zinc-500 dark:text-zinc-400',
   error: 'border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300',
 };
+
+const CHIP_CLASS =
+  'rounded-full border border-line bg-white px-1.5 py-0.5 text-[10px] text-zinc-500 dark:bg-[#1E1E21] dark:text-zinc-400';
+
+const LABEL_CLASS = 'block text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400';
+const META_CLASS = 'text-zinc-500 dark:text-zinc-400';
 
 function ArtifactMessage({
   row,
@@ -42,39 +53,30 @@ function ArtifactMessage({
 }) {
   return (
     <div className="space-y-1.5">
-      <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">You</p>
+      <p className={cn('text-[10px] font-medium uppercase tracking-wide', META_CLASS)}>You</p>
       <button
         data-design-msg={row.id}
         onClick={() => onSelect(row.id)}
-        title={`${row.type} · ${row.system} · ${overallLabel(row.overall)}`}
-        className={`block w-full rounded-xl border px-2.5 py-2 text-left text-[12px] leading-5 ${
+        title={row.type + ' · ' + row.system + ' · ' + overallLabel(row.overall)}
+        className={cn(
+          'block w-full rounded-xl border px-2.5 py-2 text-left text-[12px] leading-5',
           active
             ? 'border-terracotta/50 bg-terracotta/10'
-            : 'border-line bg-white hover:bg-[#F7F5F1] dark:bg-[#1E1E21] dark:hover:bg-[#242427]'
-        }`}
+            : 'border-line bg-white hover:bg-[#F7F5F1] dark:bg-[#1E1E21] dark:hover:bg-[#242427]',
+        )}
       >
         {row.brief}
       </button>
       <div className="flex flex-wrap items-center gap-1 pl-0.5">
-        <span className="rounded-full border border-line bg-white px-1.5 py-0.5 text-[10px] text-zinc-500 dark:bg-[#1E1E21]">
-          {row.type}
-        </span>
-        <span className="rounded-full border border-line bg-white px-1.5 py-0.5 text-[10px] text-zinc-500 dark:bg-[#1E1E21]">
-          {row.system}
-        </span>
+        <span className={CHIP_CLASS}>{row.type}</span>
+        <span className={CHIP_CLASS}>{row.system}</span>
         {row.project ? (
-          <span
-            data-design-msg-project
-            title={row.project}
-            className="rounded-full border border-line bg-white px-1.5 py-0.5 text-[10px] text-zinc-500 dark:bg-[#1E1E21]"
-          >
+          <span data-design-msg-project title={row.project} className={CHIP_CLASS}>
             {projectLabel(row.project)}
           </span>
         ) : null}
-        <span className="rounded-full border border-line bg-white px-1.5 py-0.5 text-[10px] text-zinc-500 dark:bg-[#1E1E21]">
-          {overallLabel(row.overall)}
-        </span>
-        <span className="text-[10px] text-zinc-400">{formatUpdated(row.updatedAt)}</span>
+        <span className={CHIP_CLASS}>{overallLabel(row.overall)}</span>
+        <span className={cn('text-[10px]', META_CLASS)}>{formatUpdated(row.updatedAt)}</span>
       </div>
     </div>
   );
@@ -101,6 +103,41 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
     () => modelGroups.some((group) => group.models.some((m) => m.id === s.form.model)),
     [modelGroups, s.form.model],
   );
+
+  // REQ-179 — the SelectMenu options carry the labels the old <option> rows
+  // used, including the honest fallbacks ('not saved' / 'not in catalog').
+  const projectOptions = React.useMemo<SelectMenuOption[]>(() => {
+    const rows: SelectMenuOption[] = [{ value: '', label: 'Global (~)' }];
+    for (const p of projects) rows.push({ value: p.cwd, label: p.name + ' — ' + p.cwd });
+    if (s.projectCwd && !projects.some((p) => p.cwd === s.projectCwd)) {
+      rows.push({ value: s.projectCwd, label: projectLabel(s.projectCwd) + ' — not saved' });
+    }
+    return rows;
+  }, [projects, s.projectCwd]);
+  const typeOptions = React.useMemo<SelectMenuOption[]>(
+    () => DESIGN_TYPES.map((t) => ({ value: t, label: t })),
+    [],
+  );
+  const systemOptions = React.useMemo<SelectMenuOption[]>(
+    () => DESIGN_SYSTEMS.map((system) => ({ value: system, label: system })),
+    [],
+  );
+  const modelOptions = React.useMemo<SelectMenuOption[]>(() => {
+    const rows: SelectMenuOption[] = [{ value: '', label: 'Default (auto)' }];
+    if (s.form.model && !modelInCatalog) {
+      rows.push({ value: s.form.model, label: s.form.model + ' — not in catalog' });
+    }
+    return rows;
+  }, [s.form.model, modelInCatalog]);
+  const modelGrouped = React.useMemo<SelectMenuGroup[]>(
+    () =>
+      modelGroups.map((group) => ({
+        label: group.provider,
+        options: group.models.map((m) => ({ value: m.id, label: m.label })),
+      })),
+    [modelGroups],
+  );
+
   const threadRef = React.useRef<HTMLDivElement>(null);
   // Keep the newest line in view as artifacts/events/generating land.
   React.useEffect(() => {
@@ -116,10 +153,10 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
     >
       <div ref={threadRef} data-design-thread className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3">
         {s.loading && s.items.length === 0 ? (
-          <p className="text-[11px] text-zinc-400">Loading artifacts…</p>
+          <p className={cn('text-[11px]', META_CLASS)}>Loading artifacts…</p>
         ) : null}
         {!s.loading && s.error ? (
-          <p className="text-[11px] text-rose-600">
+          <p className="text-[11px] text-rose-600 dark:text-rose-300">
             {s.error}{' '}
             <button className="underline" onClick={s.reload}>
               Retry
@@ -127,7 +164,7 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
           </p>
         ) : null}
         {!s.loading && !s.error && ordered.length === 0 && s.events.length === 0 && !s.generating ? (
-          <p className="text-[11px] text-zinc-400">No artifacts yet — write your first brief below.</p>
+          <p className={cn('text-[11px]', META_CLASS)}>No artifacts yet — write your first brief below.</p>
         ) : null}
         {ordered.map((row) => (
           <ArtifactMessage key={row.id} row={row} active={row.id === s.selected} onSelect={s.setSelected} />
@@ -136,7 +173,7 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
           <div
             key={e.id}
             data-design-event
-            className={`inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-[10px] ${EVENT_CLASS[e.kind]}`}
+            className={cn('inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-[10px]', EVENT_CLASS[e.kind])}
           >
             <span className="truncate">{e.text}</span>
           </div>
@@ -144,97 +181,51 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
         {s.generating ? (
           <div
             data-design-event
-            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${EVENT_CLASS.info}`}
+            className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]', EVENT_CLASS.info)}
           >
             <Loader2 className="h-3 w-3 animate-spin" /> Generating…
           </div>
         ) : null}
       </div>
       <div data-design-composer className="shrink-0 border-t border-line bg-[#FDFCFB] p-3 dark:bg-[#1E1E21]">
-        <label htmlFor="design-project" className="block text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-          Project
-        </label>
-        <select
-          id="design-project"
-          data-design-composer-project
+        <SelectMenu
+          label="Project"
           value={s.projectCwd}
-          onChange={(e) => s.changeProject(e.target.value)}
-          className={`${selectClass} mt-1`}
-        >
-          <option value="">Global (~)</option>
-          {projects.map((p) => (
-            <option key={p.id} value={p.cwd}>
-              {p.name} — {p.cwd}
-            </option>
-          ))}
-          {s.projectCwd && !projects.some((p) => p.cwd === s.projectCwd) ? (
-            <option value={s.projectCwd}>{projectLabel(s.projectCwd)} — not saved</option>
-          ) : null}
-        </select>
+          onChange={s.changeProject}
+          options={projectOptions}
+          triggerAttrs={{ 'data-design-composer-project': '' }}
+        />
         {projects.length === 0 ? (
-          <p className="mt-1 text-[10px] text-zinc-400">
+          <p className={cn('mt-1 text-[10px]', META_CLASS)}>
             No saved projects yet — Global writes to ~/.lokma/design.
           </p>
         ) : null}
         <div className="mt-2 grid grid-cols-2 gap-2">
-          <label htmlFor="design-type" className="block text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-            Type
-            <select
-              id="design-type"
-              data-design-composer-type
-              value={s.form.type}
-              onChange={(e) => s.setForm((f) => ({ ...f, type: e.target.value }))}
-              className={`${selectClass} mt-1`}
-            >
-              {DESIGN_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label htmlFor="design-system" className="block text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-            System
-            <select
-              id="design-system"
-              data-design-composer-system
-              value={s.form.system}
-              onChange={(e) => s.setForm((f) => ({ ...f, system: e.target.value }))}
-              className={`${selectClass} mt-1`}
-            >
-              {DESIGN_SYSTEMS.map((system) => (
-                <option key={system} value={system}>
-                  {system}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SelectMenu
+            label="Type"
+            value={s.form.type}
+            onChange={(value) => s.setForm((f) => ({ ...f, type: value }))}
+            options={typeOptions}
+            triggerAttrs={{ 'data-design-composer-type': '' }}
+          />
+          <SelectMenu
+            label="System"
+            value={s.form.system}
+            onChange={(value) => s.setForm((f) => ({ ...f, system: value }))}
+            options={systemOptions}
+            triggerAttrs={{ 'data-design-composer-system': '' }}
+          />
         </div>
-        <label htmlFor="design-model" className="mt-2 block text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-          Model
-          <select
-            id="design-model"
-            data-design-composer-model
-            value={s.form.model}
-            onChange={(e) => s.setForm((f) => ({ ...f, model: e.target.value }))}
-            className={`${selectClass} mt-1`}
-          >
-            <option value="">Default (auto)</option>
-            {s.form.model && !modelInCatalog ? (
-              <option value={s.form.model}>{s.form.model} — not in catalog</option>
-            ) : null}
-            {modelGroups.map((group) => (
-              <optgroup key={group.provider} label={group.provider}>
-                {group.models.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </label>
-        <label htmlFor="design-brief" className="mt-2 block text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+        <SelectMenu
+          className="mt-2"
+          label="Model"
+          value={s.form.model}
+          onChange={(value) => s.setForm((f) => ({ ...f, model: value }))}
+          options={modelOptions}
+          groups={modelGrouped}
+          triggerAttrs={{ 'data-design-composer-model': '' }}
+        />
+        <label htmlFor="design-brief" className={cn('mt-2', LABEL_CLASS)}>
           Brief
         </label>
         <textarea
@@ -250,13 +241,15 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
           }}
           rows={3}
           placeholder="e.g. pricing page, 3 tiers, terracotta, Stripe polish…"
-          className="mt-1 w-full resize-none rounded-lg border border-line bg-white p-2.5 text-[12px] leading-5 focus:border-terracotta/30 focus:outline-none dark:bg-[#0F0F11]"
+          className="mt-1 w-full resize-none rounded-lg border border-line bg-white p-2.5 text-[12px] leading-5 text-ink placeholder:text-zinc-400 focus:border-terracotta/30 focus:outline-none dark:bg-[#0F0F11] dark:text-white dark:placeholder:text-zinc-500"
         />
-        {s.formError ? <p className="mt-1 text-[11px] text-rose-600">{s.formError}</p> : null}
+        {s.formError ? (
+          <p className="mt-1 text-[11px] text-rose-600 dark:text-rose-300">{s.formError}</p>
+        ) : null}
         <Button
           data-design-generate
           size="sm"
-          className="mt-2 h-8 w-full gap-1.5 text-xs"
+          className="mt-2 h-9 w-full gap-1.5 text-[12px]"
           onClick={() => void s.runGenerate()}
           disabled={s.generating}
         >

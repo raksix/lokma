@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { SelectMenu, type SelectMenuOption } from '@/components/ui/select-menu';
 import { api } from '@/lib/api';
 import { DESIGN_TYPES, artifactBadge, overallLabel, type NormalizedArtifact } from './design';
 import type { DesignStudio } from './use-design-studio';
@@ -19,8 +20,11 @@ import type { DesignStudio } from './use-design-studio';
 
 const PREVIEW_CAP = 24;
 
-const selectClass =
-  'h-7 rounded-md border border-line bg-white px-1.5 text-[11px] focus:border-terracotta/30 focus:outline-none dark:bg-[#0F0F11]';
+/** REQ-179 — the type filter is the app's SelectMenu, not a native select. */
+const TYPE_FILTER_OPTIONS: SelectMenuOption[] = [
+  { value: 'all', label: 'all types' },
+  ...DESIGN_TYPES.map((t) => ({ value: t, label: t })),
+];
 
 function Artboard({
   row,
@@ -56,14 +60,14 @@ function Artboard({
             title={`${row.brief} preview`}
           />
         ) : (
-          <span className="grid h-full w-full place-items-center font-mono text-[11px] text-zinc-400">
+          <span className="grid h-full w-full place-items-center font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
             {artifactBadge(row.type)}
           </span>
         )}
       </span>
       <span className="flex items-center gap-1 px-2 py-1">
         <span className="min-w-0 flex-1 truncate text-[10px]">{row.brief}</span>
-        <span className="shrink-0 text-[10px] text-zinc-400">{overallLabel(row.overall)}</span>
+        <span className="shrink-0 text-[10px] text-zinc-500 dark:text-zinc-400">{overallLabel(row.overall)}</span>
       </span>
     </button>
   );
@@ -84,39 +88,36 @@ export function DesignArtboards({ studio }: { studio: DesignStudio }) {
             className="h-7 pl-7 text-[11px]"
           />
         </div>
-        <select
-          aria-label="Filter by type"
+        <SelectMenu
+          ariaLabel="Filter by type"
+          size="xs"
+          align="end"
           value={s.typeFilter}
-          onChange={(e) => s.setTypeFilter(e.target.value)}
-          className={selectClass}
-        >
-          <option value="all">all types</option>
-          {DESIGN_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+          onChange={s.setTypeFilter}
+          options={TYPE_FILTER_OPTIONS}
+          triggerClassName="w-[112px]"
+          triggerAttrs={{ 'data-design-strip-filter': '' }}
+        />
         {s.loading ? (
-          <span className="text-[10px] text-zinc-400">Loading…</span>
+          <span className="text-[10px] text-zinc-500 dark:text-zinc-400">Loading…</span>
         ) : s.error ? (
-          <span className="min-w-0 flex-1 truncate text-[10px] text-rose-600">
+          <span className="min-w-0 flex-1 truncate text-[10px] text-rose-600 dark:text-rose-300">
             {s.error}{' '}
             <button className="underline" onClick={s.reload}>
               Retry
             </button>
           </span>
         ) : null}
-        <span className="ml-auto text-[10px] text-zinc-400">
+        <span className="ml-auto text-[10px] text-zinc-500 dark:text-zinc-400">
           {s.filtered.length}/{s.items.length}
         </span>
       </div>
       {s.items.length === 0 && !s.loading && !s.error ? (
-        <p className="px-2.5 pb-2 pt-1 text-[11px] text-zinc-400">
+        <p className="px-2.5 pb-2 pt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
           No artifacts yet — write a brief and Generate your first one.
         </p>
       ) : s.filtered.length === 0 ? (
-        <p className="px-2.5 pb-2 pt-1 text-[11px] text-zinc-400">No artifacts match.</p>
+        <p className="px-2.5 pb-2 pt-1 text-[11px] text-zinc-500 dark:text-zinc-400">No artifacts match.</p>
       ) : (
         <div className="flex gap-2 overflow-x-auto px-2.5 py-2">
           {s.filtered.map((row, i) => (

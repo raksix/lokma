@@ -1,6 +1,6 @@
 # REQ-178 — Design'de proje (workspace/cwd) seçimi olsun
 
-**Status:** pending
+**Status:** in-progress
 **Tarih:** 2026-09-30
 **Kaynak:** Kullanıcı mesajı (30 Eyl 2026):
 > "design de proje seçme falan da yok"
@@ -42,3 +42,4 @@
 ## Notlar
 
 - Write-only: kod yazılmadı; worker uygular. İlişkili: REQ-177 (gerçek model), REQ-172 (sayfa düzeni).
+- 2026-09-30 tur 1: core store + server rotaları cwd ile donatıldı (commit `db611a0`): `normalizeDesignCwd`/`resolveDesignCwd`/`designRootOf` + tüm uçlarda `cwd` (list/generate/guard/get/put/delete/critique/export/view, png+webm dahil); manifest'te `project` alanı. Kanıt: `store.test.ts` 27/27, generate 24, raster 15, webm 23; kök tsc 0; core+server build yeşil. Sırada: UI proje seçici (localStorage) + canlı prob + kapanış.

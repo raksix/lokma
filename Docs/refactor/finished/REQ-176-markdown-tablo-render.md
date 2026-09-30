@@ -1,6 +1,6 @@
 # REQ-176 — Sohbette markdown TABLO render edilmiyor (ham `|` metni kalıyor)
 
-**Status:** pending
+**Status:** done (2026-09-30 — kod `e1bab02`+`c20a78e`, prob `88e3387`)
 **Tarih:** 2026-09-30
 **Kaynak:** Kullanıcı mesajı + ekran görüntüsü (30 Eyl 2026):
 > "tablo falan parse edemiyor düzügnce onu da düzelt"
@@ -43,6 +43,13 @@ Asistan cevabındaki markdown tablosu **ham metin** olarak görünüyor: `| Katm
 1. Kontroller canlıda PASS + kanıt (prob çıktısı + before/after ekran görüntüsü + bundle hash).
 2. Atomik İngilizce commit(ler) + `git push origin main`.
 3. Bu dosya: `Status: done` + hash'ler; `git mv` → `Docs/refactor/finished/`; README index güncellenir; `Docs/00-LOKMA-KONTEKST.md`'ye kronoloji satırı.
+
+## Kanıt (kapanış, 2026-09-30)
+
+- **Canlı prob** `scripts/probe-markdown-table.cjs` **22/22 PASS** (gerçek UI + loopback stub; her koşu kendi oturumunu/açtığı kaydı siler): gerçek `<table>` render; başlıklar `Katman / Ne çıktı / Sayı / Not`; hizalama delimiter'dan `left,center,right,left`; hücrede `**bold**` → `<strong>`, `` `code` `` → `<code>`; `\|` kaçışı hücre içinde `a | b`; ekranda ham `|---`/`|:--` YOK; delimitersiz `fiyat | fayda` satırı prose kaldı; overflow-x sarmalayıcı (`auto`); akış sırasında 0 sayfa hatası; **reload sonrası tablo kalır** (kalıcı transcript yolu); **390px'te yatay taşma yok** (−5px). Ekran: [ss2 sonra](assets/REQ-176-ss2-after-table.png) + [ss3 mobil 390](assets/REQ-176-ss3-mobile-390.png) (önce: ss1, kullanıcı).
+- Birim: `bun src/components/chat/lokma-message.test.ts` — REQ-176 bloğu (hizalama varyantları, eksik/fazla hücre, kaçışlı `|`, ardışık tablolar, yarım akış prose, delimiter uyuşmazlığı reddi) + tüm eski bloklar PASS; web `tsc -b` 0; kök `bun x tsc --noEmit` 0.
+- Build/deploy: steril web build → `index-MDI1XgpY.js`; servis edilen bundle == disk; pm2 `lokma-web` :3457.
+- Prob dersi (skill'e işlendi): istemci varsayılan-model zinciri boş `lokma-model` anahtarında koşuyu gerçek upstream'e çeviriyor — prob artık `lokma-model`'i stub'a pinler ve stub isabetini DOM assert'lerinden ÖNCE doğrular.
 
 ## Notlar
 

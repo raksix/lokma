@@ -1,9 +1,10 @@
 # REQ-178 — Design'de proje (workspace/cwd) seçimi olsun
 
-**Status:** in-progress
+**Status:** done (2026-09-30 — kod `db611a0`+`0485b9e`+`41a0490`, prob `066e845`; canlı prob 31/31 + UI smoke 16/16)
 **Tarih:** 2026-09-30
 **Kaynak:** Kullanıcı mesajı (30 Eyl 2026):
 > "design de proje seçme falan da yok"
+**Ek:** `assets/REQ-178-ss1-global.png` · `assets/REQ-178-ss2-project.png`
 
 ## Bugünkü durum
 
@@ -44,3 +45,4 @@
 - Write-only: kod yazılmadı; worker uygular. İlişkili: REQ-177 (gerçek model), REQ-172 (sayfa düzeni).
 - 2026-09-30 tur 1: core store + server rotaları cwd ile donatıldı (commit `db611a0`): `normalizeDesignCwd`/`resolveDesignCwd`/`designRootOf` + tüm uçlarda `cwd` (list/generate/guard/get/put/delete/critique/export/view, png+webm dahil); manifest'te `project` alanı. Kanıt: `store.test.ts` 27/27, generate 24, raster 15, webm 23; kök tsc 0; core+server build yeşil. Sırada: UI proje seçici (localStorage) + canlı prob + kapanış.
 - 2026-09-30 tur 2: UI proje seçici + istemci cwd plumbing CANLI (commit `41a0490`; ek olarak list uç noktasının hata gövdesi tekilleştirildi `0485b9e`): composer'da Project select (kayıtlı projeler + `Global (~)`), tüm design çağrıları cwd taşır, seçim `lokma-design-page:v1` snapshot'ında kalıcı, satır/narration proje adı taşır, header'da kapsam çipi. Kanıt: design probe 55/55, kök tsc 0, web build yeşil, servis edilen bundle == disk (`index-DlQFJRCt.js`), canlı API: `list?cwd=` scoped + `cwd_not_found` 404 (curl), UI smoke 16/16 (kapsam değişimi + reload kalıcılığı; ekran görüntüleri `assets/REQ-178-ss1-global.png` / `ss2-project.png`). Sırada: `scripts/probe-design-project-scope.cjs` (iki projeli dosya sistemi + liste ayrışması kanıtı) + kapanış.
+- 2026-09-30 tur 3 (KAPANIŞ): canlı prob `scripts/probe-design-project-scope.cjs` **31/31 PASS** (commit `066e845`) — iki geçici projede offline-template üretimi: manifest `project` alanını taşıyor, dosyalar `<proj>/.lokma/design/artifacts/<id>/` altına düşüyor, global kök el değmemiş; A listesi yalnızca id_a'yı, B listesi yalnızca id_b'yi gösteriyor, global (cwd'siz) liste İKİSİNİ DE göstermiyor → havuzlar ayrık; detail yanlış projede ve global kapsamda 404 `design_not_found`; guard seçili projenin DESIGN.md'sini okuyor (A: 8 H2 `ok:true`, B: `present:false`); cwd argümanı hataları dürüst (relative 400 `bad_cwd`, eksik dizin 404 `cwd_not_found`, dosya 400 `not_a_directory`); delete yanlış kapsamda 404, doğru kapsamda YALNIZ kendi artifact'ını siliyor (B sağlam — izolasyon); temizlik: iki kapsam boş (200 + count 0), geçici proje ağaçları silindi, global kök iki id'den de temiz. Kapılar: store 27/27 + generate 24/24, kök `bun x tsc --noEmit` 0, servis edilen bundle == disk `index-DlQFJRCt.js`, tokenless `/api/auth/me` 401 (gate ON).

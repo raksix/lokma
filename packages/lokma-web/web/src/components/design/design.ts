@@ -47,6 +47,46 @@ export const emptyGenerateForm: GenerateForm = {
   model: '',
 };
 
+/**
+ * REQ-179 — example brief chips for the canvas empty state: one click parks
+ * the text (and its natural type) in the composer, so a first artifact never
+ * starts from a blank page. Pure data, pinned by the unit probe (real type,
+ * non-empty brief, unique ids, passes client validation).
+ */
+export type DesignSample = {
+  id: string;
+  label: string;
+  brief: string;
+  type: (typeof DESIGN_TYPES)[number];
+};
+
+export const DESIGN_SAMPLES: DesignSample[] = [
+  {
+    id: 'pricing',
+    label: 'Pricing page',
+    type: 'prototype',
+    brief: 'SaaS pricing page — three tiers, annual/monthly toggle, one plan highlighted, FAQ strip.',
+  },
+  {
+    id: 'onboarding',
+    label: 'Mobile onboarding',
+    type: 'mobile',
+    brief: 'Mobile onboarding — three steps with progress dots, a skip link, illustration area.',
+  },
+  {
+    id: 'deck-cover',
+    label: 'Deck cover',
+    type: 'deck',
+    brief: 'Investor deck cover — bold serif title, one-line subtitle, quiet grid backdrop.',
+  },
+  {
+    id: 'editorial',
+    label: 'Editorial page',
+    type: 'document',
+    brief: 'Editorial article page — paper tones, wide margins, one pull quote, calm reading rhythm.',
+  },
+];
+
 /** Client-side mirror of the server generate rules (server re-validates). */
 export function validateGenerateForm(form: GenerateForm): string | null {
   if (!(DESIGN_TYPES as readonly string[]).includes(form.type)) {

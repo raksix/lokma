@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
-import { formatUpdated, projectLabel, scoreTone, type DesignExportFormat } from './design';
+import { DESIGN_SAMPLES, formatUpdated, projectLabel, scoreTone, type DesignExportFormat } from './design';
 import { DesignArtboards } from './design-artboards';
 import { DesignChat } from './design-chat';
 import { useDesignStudio, type DesignStudio } from './use-design-studio';
@@ -327,12 +327,37 @@ export function DesignPage() {
                   title="Design preview"
                 />
               ) : (
-                <div data-design-empty className="grid h-full place-items-center px-6">
-                  <div className="text-center">
+                <div data-design-empty className="grid h-full place-items-center overflow-y-auto px-6 py-8">
+                  <div className="w-full max-w-md text-center">
                     <Sparkles className="mx-auto h-5 w-5 text-terracotta" />
-                    <p className="mt-2 font-serif text-[15px]">
-                      {s.detailLoading ? 'Loading…' : (s.detailError ?? "Brief yaz ve Generate'e bas")}
-                    </p>
+                    {s.detailLoading ? (
+                      <p className="mt-2 font-serif text-[15px] text-ink dark:text-white">Loading…</p>
+                    ) : s.detailError ? (
+                      <p className="mt-2 text-[12px] leading-5 text-rose-600 dark:text-rose-300">{s.detailError}</p>
+                    ) : (
+                      <>
+                        <p className="mt-2 font-serif text-[16px] text-ink dark:text-white">Start with a brief</p>
+                        <p className="mx-auto mt-1 max-w-[42ch] text-[12px] leading-5 text-zinc-500 dark:text-zinc-400">
+                          Write it on the left, then press{' '}
+                          <span className="font-medium text-terracotta">Generate</span>. Or pick a sample — it fills
+                          the brief for you:
+                        </p>
+                        <div data-design-samples className="mt-4 flex flex-wrap justify-center gap-1.5">
+                          {DESIGN_SAMPLES.map((sample) => (
+                            <button
+                              key={sample.id}
+                              type="button"
+                              data-design-sample={sample.id}
+                              title={sample.brief}
+                              onClick={() => s.applySample(sample)}
+                              className="rounded-full border border-line bg-white px-2.5 py-1 text-[11px] text-zinc-600 transition-colors hover:border-terracotta/50 hover:bg-[#F7F5F1] hover:text-ink dark:bg-[#1E1E21] dark:text-zinc-300 dark:hover:bg-[#242427] dark:hover:text-white"
+                            >
+                              {sample.label}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               )}

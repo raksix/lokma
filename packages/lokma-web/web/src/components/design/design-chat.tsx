@@ -27,7 +27,9 @@ import type { DesignStudio } from './use-design-studio';
  * REQ-179 — the composer controls are the app's own SelectMenu: no native
  * <select>, so the OS blue highlight is gone in both themes; labels and meta
  * text sit on passing contrast tokens (zinc-500 on cream, zinc-400 on the
- * dark panels).
+ * dark panels). The composer also gained a title row ("New artifact" + the
+ * shortcut hint) and a divided brief group, and the empty thread renders a
+ * guiding card instead of a lone line.
  */
 
 const EVENT_CLASS: Record<DesignEvent['kind'], string> = {
@@ -164,7 +166,16 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
           </p>
         ) : null}
         {!s.loading && !s.error && ordered.length === 0 && s.events.length === 0 && !s.generating ? (
-          <p className={cn('text-[11px]', META_CLASS)}>No artifacts yet — write your first brief below.</p>
+          <div
+            data-design-thread-empty
+            className="rounded-xl border border-dashed border-line bg-white/70 p-3 dark:bg-[#0F0F11]/50"
+          >
+            <p className="text-[12px] font-medium text-ink dark:text-white">No artifacts yet</p>
+            <p className={cn('mt-1 text-[11px] leading-5', META_CLASS)}>
+              Describe the artifact below — Type and System set the style; Generate renders it on the canvas and saves
+              it to {projectLabel(s.projectCwd)}.
+            </p>
+          </div>
         ) : null}
         {ordered.map((row) => (
           <ArtifactMessage key={row.id} row={row} active={row.id === s.selected} onSelect={s.setSelected} />
@@ -188,6 +199,10 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
         ) : null}
       </div>
       <div data-design-composer className="shrink-0 border-t border-line bg-[#FDFCFB] p-3 dark:bg-[#1E1E21]">
+        <div className="mb-2 flex items-baseline justify-between gap-2">
+          <p className="font-serif text-[13px] text-ink dark:text-white">New artifact</p>
+          <span className={cn('text-[10px]', META_CLASS)}>⌘/Ctrl + Enter generates</span>
+        </div>
         <SelectMenu
           label="Project"
           value={s.projectCwd}
@@ -225,36 +240,41 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
           groups={modelGrouped}
           triggerAttrs={{ 'data-design-composer-model': '' }}
         />
-        <label htmlFor="design-brief" className={cn('mt-2', LABEL_CLASS)}>
-          Brief
-        </label>
-        <textarea
-          id="design-brief"
-          data-design-brief
-          value={s.form.brief}
-          onChange={(e) => s.setForm((f) => ({ ...f, brief: e.target.value }))}
-          onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-              e.preventDefault();
-              void s.runGenerate();
-            }
-          }}
-          rows={3}
-          placeholder="e.g. pricing page, 3 tiers, terracotta, Stripe polish…"
-          className="mt-1 w-full resize-none rounded-lg border border-line bg-white p-2.5 text-[12px] leading-5 text-ink placeholder:text-zinc-400 focus:border-terracotta/30 focus:outline-none dark:bg-[#0F0F11] dark:text-white dark:placeholder:text-zinc-500"
-        />
-        {s.formError ? (
-          <p className="mt-1 text-[11px] text-rose-600 dark:text-rose-300">{s.formError}</p>
-        ) : null}
-        <Button
-          data-design-generate
-          size="sm"
-          className="mt-2 h-9 w-full gap-1.5 text-[12px]"
-          onClick={() => void s.runGenerate()}
-          disabled={s.generating}
-        >
-          <Sparkles className="h-3.5 w-3.5" /> {s.generating ? 'Generating…' : 'Generate'}
-        </Button>
+        <div className="mt-3 border-t border-line pt-2.5">
+          <label htmlFor="design-brief" className={LABEL_CLASS}>
+            Brief
+          </label>
+          <textarea
+            id="design-brief"
+            data-design-brief
+            value={s.form.brief}
+            onChange={(e) => s.setForm((f) => ({ ...f, brief: e.target.value }))}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                e.preventDefault();
+                void s.runGenerate();
+              }
+            }}
+            rows={3}
+            placeholder="e.g. pricing page, 3 tiers, terracotta, Stripe polish…"
+            className="mt-1 w-full resize-none rounded-lg border border-line bg-white p-2.5 text-[12px] leading-5 text-ink placeholder:text-zinc-400 focus:border-terracotta/30 focus:outline-none dark:bg-[#0F0F11] dark:text-white dark:placeholder:text-zinc-500"
+          />
+          {s.formError ? (
+            <p className="mt-1 text-[11px] text-rose-600 dark:text-rose-300">{s.formError}</p>
+          ) : null}
+          <Button
+            data-design-generate
+            size="sm"
+            className="mt-2 h-9 w-full gap-1.5 text-[12px]"
+            onClick={() => void s.runGenerate()}
+            disabled={s.generating}
+          >
+            <Sparkles className="h-3.5 w-3.5" /> {s.generating ? 'Generating…' : 'Generate'}
+          </Button>
+          {s.generating ? (
+            <p className={cn('mt-1.5 text-center text-[10px]', META_CLASS)}>This can take up to ~2 minutes.</p>
+          ) : null}
+        </div>
       </div>
     </aside>
   );

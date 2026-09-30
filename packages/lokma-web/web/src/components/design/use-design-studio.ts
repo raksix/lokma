@@ -12,6 +12,7 @@ import {
   validateGenerateForm,
   type DesignEvent,
   type DesignExportFormat,
+  type DesignSample,
   type GenerateForm,
   type NormalizedArtifact,
 } from './design';
@@ -83,6 +84,8 @@ export type DesignStudio = {
   formError: string | null;
   generating: boolean;
   runGenerate: () => Promise<void>;
+  /** REQ-179 — a sample brief chip (canvas empty state) fills the composer. */
+  applySample: (sample: DesignSample) => void;
   systems: DesignSystemMeta[];
   guard: DesignGuard | null;
   systemMeta: DesignSystemMeta | undefined;
@@ -272,6 +275,17 @@ export function useDesignStudio(): DesignStudio {
     }
   }, [form, loadList, pushEvent, projectCwd]);
 
+  // REQ-179 — a sample chip fills the brief (and its natural type), clears a
+  // stale validation error and parks the caret in the composer textarea so
+  // Generate is one keystroke away. The composer owns the `design-brief` id.
+  const applySample = React.useCallback((sample: DesignSample) => {
+    setFormError(null);
+    setForm((f) => ({ ...f, brief: sample.brief, type: sample.type }));
+    if (typeof document === 'undefined') return;
+    const el = document.getElementById('design-brief');
+    if (el instanceof HTMLTextAreaElement) el.focus();
+  }, []);
+
   const runSave = React.useCallback(async () => {
     if (!selected) return;
     const parsed = parseHtmlEdit(htmlEdit);
@@ -427,6 +441,7 @@ export function useDesignStudio(): DesignStudio {
     formError,
     generating,
     runGenerate,
+    applySample,
     systems,
     guard,
     systemMeta,

@@ -4,7 +4,7 @@ import { Header } from '@/components/header';
 import { Sidebar } from '@/components/sidebar';
 import { InspectorPanel } from '@/components/providers';
 import type { InspectorTab } from '@/components/providers';
-import { EXPAND_PROJECT_EVENT, ProjectModal, SessionsSidebar } from '@/components/sessions';
+import { EXPAND_PROJECT_EVENT, ProjectModal, SessionsSidebar, planProjectAnswer } from '@/components/sessions';
 import { FOCUS_FILES_EVENT } from '@/components/files';
 import { Chat, INITIAL_PREFIX } from '@/components/chat';
 import { BotsMode } from '@/components/bots/bots-mode';
@@ -440,19 +440,22 @@ export function AppShell({ sessionId }: { sessionId: string }) {
 
   const resolveAgentProject = React.useCallback(
     (outcome: 'done' | 'cancelled') => {
-      const pending = agentProject;
-      if (!pending) return;
+      // The decision is pure (project-answer.ts) so the cancel path is unit-
+      // tested: 'cancelled' only acks; 'done' also reveals + switches.
+      const plan = planProjectAnswer(agentProject, outcome);
       // Idempotent: Open and a queued dismiss can both land — the first wins.
+      if (!plan) return;
       setAgentProject(null);
-      sendProjectAck(pending.actionId, outcome);
-      if (outcome !== 'done') return;
+      sendProjectAck(plan.actionId, plan.outcome);
       // The record and its session already exist server-side — completing
       // the move is this: open the project's group in the tree, then land
       // the user in the fresh session (REQ-145 immediacy, no extra clicks).
-      window.dispatchEvent(
-        new CustomEvent(EXPAND_PROJECT_EVENT, { detail: { projectId: pending.projectId } }),
-      );
-      switchSession(pending.targetSessionId);
+      if (plan.expandProjectId) {
+        window.dispatchEvent(
+          new CustomEvent(EXPAND_PROJECT_EVENT, { detail: { projectId: plan.expandProjectId } }),
+        );
+      }
+      if (plan.switchSessionId) switchSession(plan.switchSessionId);
     },
     [agentProject, sendProjectAck, switchSession],
   );

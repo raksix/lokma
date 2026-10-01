@@ -3,6 +3,7 @@ import { browserTabs } from '../browser/browser.js';
 import { can, findOrCreateProject, getUserById, isBootstrapped, listProjects, visibleProjects } from '../auth/store.js';
 import { SessionStore, locateSession } from '../session/store.js';
 import { terminalManager } from '../terminal/terminal.js';
+import { mintCallId } from './executor.js';
 import type { ToolDefinition } from './registry.js';
 
 /**
@@ -49,6 +50,13 @@ function newUiSessionId(): string {
 
 export type UiActionPayload = {
   action: 'open_browser' | 'open_terminal' | 'open_session' | 'send_to_session' | 'open_project';
+  /**
+   * REQ-182: caller-minted frame id. open_project must know the id BEFORE
+   * the frame ships — it registers its ack gate first, so a client that
+   * answers instantly can never beat the registration — so it mints the id
+   * itself; the loop mints one for every other tool.
+   */
+  actionId?: string;
   url?: string;
   tabId?: string;
   terminalId?: string;
@@ -58,6 +66,8 @@ export type UiActionPayload = {
   projectId?: string;
   /** REQ-180: resolved project directory (canonical, no trailing slash). */
   cwd?: string;
+  /** REQ-182: display name, so the modal/toast needs no refetch. */
+  projectName?: string;
 };
 
 /**
@@ -80,7 +90,15 @@ export type UiControlOpts = {
    */
   userId?: string;
   /** Forwards the payload as a `ui_action` frame (the loop binds `send`). */
-  emit: (payload: UiActionPayload) => void;
+  emit: (payload: UiActionPayload) => string;
+  /**
+   * REQ-182: begins waiting for the user's answer to an open_project frame
+   * — 'done' when they confirm (or nobody is attached to answer), 'cancelled'
+   * when they dismiss the modal. MUST be invoked BEFORE emit so the gate
+   * exists before any client can reply. Optional: CLI and test hosts without
+   * a UI skip the wait and the call reports 'done'.
+   */
+  beginProjectAck?: (info: { actionId: string; projectId: string; sessionId: string }) => Promise<'done' | 'cancelled'>;
   /**
    * REQ-147: append + run a user message in ANOTHER session. Bound by the
    * server (it owns the run queue + auth); without it the tool fails
@@ -232,8 +250,26 @@ export function buildUiControlTools(cwd: string, opts: UiControlOpts): ToolDefin
         });
         // REQ-094: stamp the creator or the fresh session is superadmin-only.
         await projectStore.writeMeta(sessionId, { ownerId: user.id });
-        opts.emit({ action: 'open_project', projectId: project.id, cwd: project.cwd, targetSessionId: sessionId });
-        return { ok: true, projectId: project.id, name: project.name, cwd: project.cwd, sessionId, created };
+        // REQ-182: register the ack wait BEFORE the frame ships — the id is
+        // minted here so the gate and the frame share it, and an instantly
+        // answering client can never find the gate missing.
+        const actionId = mintCallId('ui');
+        const ack = opts.beginProjectAck?.({ actionId, projectId: project.id, sessionId });
+        opts.emit({ action: 'open_project', actionId, projectId: project.id, projectName: project.name, cwd: project.cwd, targetSessionId: sessionId });
+        // The record is already complete when the modal opens, so a missing
+        // answer (or an aborted run) never rolls anything back — it only
+        // changes the outcome the model reads: 'done' means confirmed OR
+        // nobody was attached to confirm; 'cancelled' is an explicit
+        // dismissal (or the run was stopped while the modal waited).
+        let status: 'done' | 'cancelled' = 'done';
+        if (ack) {
+          try {
+            status = await ack;
+          } catch {
+            status = 'cancelled';
+          }
+        }
+        return { ok: true, status, projectId: project.id, name: project.name, cwd: project.cwd, sessionId, created };
       },
     },
     {

@@ -1,6 +1,6 @@
 # REQ-181 — UI'daki her yüzey ajanın aracı olsun (harness aracı katalogu)
 
-**Status:** in-progress (2026-10-01) — tick 7: wave-4 tools landed (commit ba39e17) — `cron_list`/`cron_create` + `plugin_list`/`plugin_install` + `trace_list`/`trace_get` registered in the loop (same core modules the panes use; wave-4 probe 61/61 under isolated HOME, wire probe 20/20 — block == registry ∩ catalog, 46 tools, server dist deployed + lokma-server recycled); rail wiring + `terminal_write` + live catalog probe remain
+**Status:** in-progress (2026-10-01) — tick 8: wave-5 `terminal_write` landed (commit ae18d86) — the agent types into the SAME live shells the TerminalPane drives (`terminal/terminal.ts`): default target is the session's newest running shell, `enter:false` sends raw key sequences, the write returns the bounded fresh output, cross-session ids are refused (`not_your_terminal`), dead/unknown shells answer `terminal_exited`/`terminal_not_found` (wave-5 probe 19/19; catalog now 47 tools, prompt carries `- Terminal: open_terminal, terminal_write`; tsc 0, core+server dist rebuilt, lokma-server recycled, health 200); remaining: rail wiring (inspector/activity/settings lists derive from the catalog) + live catalog probe `scripts/probe-surface-tool-catalog.cjs`
 **Tarih:** 2026-10-01
 **Kaynak:** Kullanıcı mesajı (1 Ekim 2026):
 > "Lokmada uida ben ne yapabiliyorsam onları direkt lokmanın harnessi de mcp ya da skill olarak kullanbilecek.

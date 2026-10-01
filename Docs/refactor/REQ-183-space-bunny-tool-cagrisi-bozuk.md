@@ -1,6 +1,6 @@
 # REQ-183 — space-bunny-alpha tool çağrısı yapamıyor (gerçek `tools[]` düşüyor + gövdesiz `<tool>` sızıyor)
 
-**Status:** in-progress (tur 1/5 — predicate + test matrisi landed, `82a64b7`)
+**Status:** in-progress (tur 2/5 — parse salvage + dual-channel drop landed; tur 1: `82a64b7`)
 **Tarih:** 2026-10-01
 **Kaynak:** Kullanıcı mesajı (1 Ekim 2026):
 > "sapce bunny modelinde tool çağrısı da yapamıo ona da serisinden bi fix"
@@ -50,7 +50,9 @@ Sonuç (`openai.ts:547-551`): `flattenHistory = true` → `buildBody` yeniden ku
 
 **Landed (tur 1 — `82a64b7`):** capability probe sıkılaştırma — `snippetErrorCode()` (regex'siz `code` okuyucu) + `NON_TOOL_ERROR_CODES`; `unsupported_model` / `model_not_found` / `invalid_api_key` gövdeleri hiçbir probe'a takılmaz; pairing reddi artık tools probe'una düşmez (yanlış kalıcı `nativeToolsRejected` işareti kapandı). Testler: 4 negatif + 1 pozitif matris + stub akış testi (model reddi TEK istek + `http_error`; retry/şema düşürme yok). **159/159 PASS**, root `tsc` 0.
 
-**Kalan turlar:** (2) `parse.ts` gövdesiz `<tool name="x">` salvage + `finish({haveNativeCalls})` dual-channel temizlik + `parse.test.ts`; (3) loop/tui wiring; (4) canlı prob `scripts/probe-space-bunny-tools.cjs` (3 koşu: `role:'tool'` var + transcript'te `<tool` YOK + stays-gone temizlik); (5) katalog rozeti + close-out.
+**Landed (tur 2 — `6e87a27`):** `parse.ts` — kapanışsız/gövdesiz trailing `<tool name="x">` artık `input:{}` ile GERÇEK çağrıya dönüşür (stream mark'ıyla; yarım gövde ve `>`-siz dev blok yine metin kalır — mevcut fail-open guard'ı korunur); `finish({haveNativeCalls:true})` native çağrı zaten turu taşımışsa aynı artığı DÜŞÜRÜR (hayalet çağrı yok). 14 yeni assert; parse probe 104/104 PASS; root tsc 0; concept build yeşil.
+
+**Kalan turlar:** (3) loop/tui wiring — `agent-loop.ts` (`attemptFilter.finish` :635) ve `cli/tui.ts` (`filter.finish()` :333) `{ haveNativeCalls: nativeCalls.length > 0 }` geçirsin; (4) canlı prob `scripts/probe-space-bunny-tools.cjs` (3 koşu: `role:'tool'` var + transcript'te `<tool` YOK + stays-gone temizlik); (5) katalog rozeti + close-out.
 
 ## Kapsam
 

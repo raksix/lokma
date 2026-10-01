@@ -10,6 +10,8 @@ export * from './attachments.js';
 export * from './design.js';
 export * from './archify.js';
 export * from './testing.js';
+// REQ-181 — the catalog-derived `<available_surfaces>` prompt block.
+export * from './surfaces-prompt.js';
 export * from './executor.js';
 export * from './parse.js';
 export * from './result-budget.js';

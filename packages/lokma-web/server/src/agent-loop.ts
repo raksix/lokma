@@ -6,6 +6,8 @@ import {
   buildBrowserTools,
   buildBuiltinTools,
   buildDesignTools,
+  buildSkillsSystemPrompt,
+  buildSurfaceSystemPrompt,
   buildTestingTools,
   buildTodoTools,
   buildToolSystemPrompt,
@@ -20,6 +22,7 @@ import {
   parseAskBlocks,
   parseToolBlocks,
   runApprovedCall,
+  scan,
   SessionStore,
   ToolRegistry,
   toolResultCarrier,
@@ -436,8 +439,22 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
   registry.alias('ask', 'ask_user');
   registry.alias('clarify', 'ask_user');
   const toolSystem = buildToolSystemPrompt(registry.list().map((t) => ({ name: t.name, description: t.description })));
+  // REQ-181: the catalog's other half — the UI surfaces the registered tools
+  // mirror (built from `@lokma/shared` SURFACES, never a hand list) plus the
+  // skill index. `buildSkillsSystemPrompt` was dead code before this wiring:
+  // the `<available_skills>` block now actually reaches the model.
+  const surfaceSystem = buildSurfaceSystemPrompt(registry.list().map((t) => t.name));
+  let skillsSystem = '';
+  try {
+    skillsSystem = buildSkillsSystemPrompt(await scan({ dirs: ['skills', '~/.lokma/skills'] }));
+  } catch {
+    // The skill index is an adjunct — a broken skills dir never fails a run.
+  }
   const preamble = opts.systemPreamble?.trim() ? `${opts.systemPreamble.trim()}\n\n` : '';
-  const system = `${preamble}${toolSystem}`;
+  const system = [preamble, toolSystem, surfaceSystem, skillsSystem]
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .join('\n\n');
 
   const messages: ProviderMessage[] = [
     { role: 'system', content: system },

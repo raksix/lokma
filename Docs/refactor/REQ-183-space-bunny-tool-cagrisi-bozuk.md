@@ -1,6 +1,6 @@
 # REQ-183 — space-bunny-alpha tool çağrısı yapamıyor (gerçek `tools[]` düşüyor + gövdesiz `<tool>` sızıyor)
 
-**Status:** pending
+**Status:** in-progress (tur 1/5 — predicate + test matrisi landed, `82a64b7`)
 **Tarih:** 2026-10-01
 **Kaynak:** Kullanıcı mesajı (1 Ekim 2026):
 > "sapce bunny modelinde tool çağrısı da yapamıo ona da serisinden bi fix"
@@ -36,6 +36,21 @@ Sonuç (`openai.ts:547-551`): `flattenHistory = true` → `buildBody` yeniden ku
 **(2) Gövdesiz `<tool>` parser'dan kaçıyor.** `COMPLETE_BLOCK` (`parse.ts:65`) `<tool name="x">…</tool>` ya da `<tool name="x" />` bekliyor. Gövdesiz + kapanışsız `<tool name="list_files">` **hiç eşleşmez** → çağrı çalıştırılmaz, blok metin olarak sohbete yazılır (transcript'te gördüğümüz satır). Üstelik `openai.ts:447` kendi prompt'unda `<tool name="...">` biçimini **dayatıyor**, yani kaçış yolu de bu.
 
 **(3) Model hatası dürüst gösterilmiyor.** `unsupported_model` gerçek bir upstream hatası; `openai.ts:561-565` `http_error` fırlatır → loop'un retry'sı → kullanıcı sonunda "hiçbir şey olmuyor" görüyor. Doğrusu: viewId'li id upstream'e **asla gönderilmemeli**, `shortModelId` tek doğruluk kaynağı olmalı.
+
+## İlerleme (tur 1/5 — 1 Ekim 2026)
+
+**Ölçüm düzeltmesi (önemli):** REQ yazılırken `/tmp/probe_predicate.mjs` içindeki fonksiyon kaynaktan import edilmiş **gerçek** fonksiyon değil, elle yazılmış bir **kopyaydı** (kopya `invalid_request_error` ve `function` kelimelerini arıyordu). Gerçek `looksLikeToolPairingError` kaynaktan import edilip aynı gövdeyle koşturuldu: `false` — yani "unsupported_model yanlış eşleşiyor" iddiası gerçek kodda **doğrulanmadı** (`unsupported_model` gövdesi → her iki probe da `false`; fonksiyon 5832d85'ten beri aynı şekilde, git geçmişi kanıtlı).
+
+**Gerçek arıza bu turda yeniden üretildi** (gerçek adapter + gerçek 47 tool'luk registry + `reasoningEffort=max` + `stream:true`; oturum `sess_mupsivmh_4tvi` şekli):
+
+- V2: model yalnız metin yazdı: `I'll take a look at the workspace structure.<br>` + `<tool name="list_files">` — **native çağrı YOK**, çağrı çalışmadı (kullanıcının gördüğü ekranın birebir şekli).
+- V3: native `list_files` çağrısı geldi AMA metinde `<tool name="memory_read">` artığı da sızdı.
+- Yani model **aralıklı olarak** parçalı markup yazıyor; block filter kapanışsız-gövdesiz artığı fail-open ile **metne** çeviriyor → çağrı kayboluyor.
+- Session kanıtı: `usage.jsonl` iki turda da `outputTokens:6` (yalnız çıplak tag), transcript'te `role:'tool'` satırı yok; oturum 2'de "çalışan" tool çağrıları aslında `deepseek-v4.1-flash` koşularıydı (meta'da space-bunny yazsa da — koşu modeli değil).
+
+**Landed (tur 1 — `82a64b7`):** capability probe sıkılaştırma — `snippetErrorCode()` (regex'siz `code` okuyucu) + `NON_TOOL_ERROR_CODES`; `unsupported_model` / `model_not_found` / `invalid_api_key` gövdeleri hiçbir probe'a takılmaz; pairing reddi artık tools probe'una düşmez (yanlış kalıcı `nativeToolsRejected` işareti kapandı). Testler: 4 negatif + 1 pozitif matris + stub akış testi (model reddi TEK istek + `http_error`; retry/şema düşürme yok). **159/159 PASS**, root `tsc` 0.
+
+**Kalan turlar:** (2) `parse.ts` gövdesiz `<tool name="x">` salvage + `finish({haveNativeCalls})` dual-channel temizlik + `parse.test.ts`; (3) loop/tui wiring; (4) canlı prob `scripts/probe-space-bunny-tools.cjs` (3 koşu: `role:'tool'` var + transcript'te `<tool` YOK + stays-gone temizlik); (5) katalog rozeti + close-out.
 
 ## Kapsam
 

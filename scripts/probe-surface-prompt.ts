@@ -133,8 +133,14 @@ try {
     blockNames.includes('cron_list') && blockNames.includes('plugin_list') && blockNames.includes('trace_list'),
     'cron/plugins/observability families advertised (wave 4)',
   );
-  check(!cap.toolNames.includes('terminal_write'), 'terminal_write is NOT registered yet (wave 5)');
-  check(!blockNames.includes('terminal_write'), 'unregistered catalog tools are never advertised');
+  check(
+    cap.toolNames.includes('open_terminal') && cap.toolNames.includes('terminal_write'),
+    'terminal family registered on the wire (wave 5)',
+  );
+  check(
+    blockNames.includes('terminal_write'),
+    'terminal family advertised (wave 5)',
+  );
 
   // ── <available_skills>: the once-dead builder now reaches the model ────
   check(cap.system.includes('<available_skills>'), 'system prompt carries <available_skills>');

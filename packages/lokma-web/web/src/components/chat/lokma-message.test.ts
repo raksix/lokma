@@ -5,7 +5,9 @@
  * Not imported by app code, so the Vite bundle ignores it.
  */
 import { applyServerFrame, dropRequest, initialWsUiState, permissionAnswer, questionAnswer } from '@/lib/ws';
-import { describeToolCall, formatBytes, parseMarkdownBlocks, parseTableAlign, reasoningPreview, sanitizeMdUrl, splitCodeFences, splitTableRow, stripThinkingMarkup, summarizeInput, summarizeResult, transcriptToolEntry } from './lokma-message';
+import { describeToolCall, formatBytes, parseMarkdownBlocks, parseTableAlign, reasoningPreview, renderInline, sanitizeMdUrl, splitCodeFences, splitTableRow, stripThinkingMarkup, summarizeInput, summarizeResult, transcriptToolEntry } from './lokma-message';
+import { Fragment, createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 function assert(cond: boolean, label: string): void {
   if (!cond) throw new Error(`FAIL: ${label}`);
@@ -213,3 +215,28 @@ console.log('lokma-message.test.ts: REQ-139 reasoning-preview checks passed');
   assert(parseTableAlign('|---|---|') !== null && parseTableAlign('nope') === null, 'parseTableAlign validates');
 }
 console.log('lokma-message.test.ts: REQ-176 table checks passed');
+
+// REQ-184 — intraword `_x_` must survive the inline pass. CommonMark flanking:
+// an opening `_` may not follow a word char, a closing `_` may not precede one.
+// `__init__` (double underscore) is not strong emphasis in this renderer and
+// stays literal — documented behavior, tested here.
+{
+  const inline = (text: string): string =>
+    renderToStaticMarkup(createElement(Fragment, null, ...renderInline(text, 'x')));
+  assert(inline('foo_bar_baz') === 'foo_bar_baz', 'intraword pair stays literal');
+  assert(inline('Session sess_a_b created') === 'Session sess_a_b created', 'session-id form renders exact');
+  assert(inline('_lorem_') === '<em>lorem</em>', 'bare pair is still italic');
+  assert(inline('a _b_ c') === 'a <em>b</em> c', 'mid-sentence pair is still italic');
+  assert(inline('__init__') === '__init__', 'double underscore stays literal (documented)');
+  assert(inline('**bold**') === '<strong class="font-semibold">bold</strong>', 'bold unchanged');
+  assert(inline('*star*') === '<em>star</em>', 'star italic unchanged');
+  assert(
+    inline('`a_b_c`') ===
+      '<code class="rounded border border-line bg-muted px-1 py-px font-mono text-[12px] dark:bg-[#1E1E21]">a_b_c</code>',
+    'code span content untouched',
+  );
+  const link = inline('[l](/u)');
+  assert(link.indexOf('href="/u"') !== -1 && link.slice(-6) === '>l</a>', 'link unchanged');
+  assert(inline('~~s~~') === '<del class="text-zinc-500">s</del>', 'strike unchanged');
+}
+console.log('lokma-message.test.ts: REQ-184 intraword-underscore checks passed');

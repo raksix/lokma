@@ -423,10 +423,15 @@ export function CodeBlock({
 // ─── Inline + block renderer (React elements, never raw HTML) ───────────────
 
 /** Inline spans: **bold**, *italic*, `code`, ~~strike~~, [label](url). Pure text in, React nodes out. */
-function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
+export function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
   const out: React.ReactNode[] = [];
-  // link | bold | italic | code | strike — leftmost match wins each step
-  const re = /\[([^\]]+)\]\(([^)\s]+)\)|\*\*([^*]+)\*\*|\*([^*\n]+)\*|_([^_\n]+)_|`([^`\n]+)`|~~([^~\n]+)~~/g;
+  // link | bold | italic | code | strike — leftmost match wins each step.
+  // REQ-184: the `_..._` alternative honours CommonMark flanking — an opening
+  // underscore must not follow a word char and a closing one must not precede
+  // one, so intraword pairs (`sess_a_b`, `foo_bar_baz`) stay literal instead
+  // of being eaten as `<em>`. `__x__` is NOT strong emphasis here: its second
+  // underscore sits intraword, so it stays literal too (documented + tested).
+  const re = /\[([^\]]+)\]\(([^)\s]+)\)|\*\*([^*]+)\*\*|\*([^*\n]+)\*|(?<![\w])_([^_\n]+)_(?![\w])|`([^`\n]+)`|~~([^~\n]+)~~/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let k = 0;

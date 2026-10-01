@@ -271,12 +271,9 @@ async function api(path, opts) {
       const titled = Array.prototype.slice.call(document.querySelectorAll('[title]'));
       const rowEl = titled.find((el) => (el.getAttribute('title') || '').indexOf(a.id) !== -1) || null;
       const dot = rowEl ? rowEl.querySelector('span[title]') : null;
-      // The marker row renders through the inline markdown pass, which
-      // currently consumes intraword underscore pairs (sess_x_y -> sessxy).
-      // Accept either form so the check survives a future CommonMark fix.
-      const flatId = a.id.split('_').join('');
-      const chatMarker =
-        txt.indexOf('Session ' + a.id + ' created') !== -1 || txt.indexOf('Session ' + flatId + ' created') !== -1;
+      // REQ-184: intraword underscores now survive the inline markdown pass,
+      // so the marker must render exactly — no flat-form tolerance.
+      const chatMarker = txt.indexOf('Session ' + a.id + ' created') !== -1;
       return {
         chatHeader: mono,
         switched: mono.indexOf(a.id) !== -1,

@@ -48,6 +48,14 @@ import {
 } from './grouping';
 
 /**
+ * REQ-182: fired by the shell when a project record was just opened for the
+ * user (agent `open_project` or the create modal) — the sidebar opens that
+ * project's group so the fresh session is visible where the user lands.
+ * Mirrors the FOCUS_FILES_EVENT signal pattern (no store state needed).
+ */
+export const EXPAND_PROJECT_EVENT = 'lokma-expand-project';
+
+/**
  * SessionsSidebar — real session list for the left explorer.
  * Ported from `concept/.../layout/SidebarLeft.tsx` (sessions tab) and wired
  * to `GET /api/sessions` summaries via sessionStore: Today/Yesterday/Earlier
@@ -737,6 +745,11 @@ export function SessionsSidebar({
   // projects entirely (server projects may legally have an empty cwd),
   // and the server defaults those sessions to its working dir.
   const handleProjectCreated = React.useCallback((project: { id: string; name: string; cwd: string }) => {
+    // REQ-182: reveal the fresh project's group in the tree right away — the
+    // same signal the agent path fires (the row lands once sessions refresh).
+    window.dispatchEvent(
+      new CustomEvent(EXPAND_PROJECT_EVENT, { detail: { projectId: project.id } }),
+    );
     void refreshProjects();
     const cwd = project.cwd?.trim() ? project.cwd.trim() : undefined;
     void createSession(cwd ? { cwd } : {}).then((id) => {
@@ -920,6 +933,26 @@ export function SessionsSidebar({
       return next;
     });
   }, []);
+
+  // REQ-182: a project was just opened for the user (agent or modal) —
+  // expand its group. Search keeps its own transient collapse
+  // (REQ-141), so the signal is ignored while a filter is active.
+  React.useEffect(() => {
+    const onExpandProject = (e: Event) => {
+      if (query.trim()) return;
+      const projectId = (e as CustomEvent<{ projectId?: string }>).detail?.projectId;
+      if (!projectId) return;
+      setExpandedProjects((prev) => {
+        const key = `entity:${projectId}`;
+        if (prev.has(key)) return prev;
+        const next = new Set(prev);
+        next.add(key);
+        return next;
+      });
+    };
+    window.addEventListener(EXPAND_PROJECT_EVENT, onExpandProject);
+    return () => window.removeEventListener(EXPAND_PROJECT_EVENT, onExpandProject);
+  }, [query]);
 
   return (
     <div className="flex flex-col overflow-hidden">

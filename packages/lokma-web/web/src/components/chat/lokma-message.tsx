@@ -118,6 +118,15 @@ export function describeToolCall(tool: string, input: unknown): string {
       const cmd = [strField(p, 'command'), args].filter(Boolean).join(' ');
       return cmd ? `Ran ${cmd}` : 'Ran command';
     }
+    case 'open_project': {
+      // REQ-182: the live row reads exactly what happened — "Open project
+      // "fermag" at /root/fermag" — never the raw argument JSON.
+      const name = strField(p, 'name');
+      const cwd = strField(p, 'cwd');
+      if (name && cwd) return `Open project "${name}" at ${cwd}`;
+      if (name) return `Open project "${name}"`;
+      return 'Open project';
+    }
     case 'claim_todo':
       return `Claimed ${strField(p, 'todoId') || 'todo'}`;
     case 'complete_todo':

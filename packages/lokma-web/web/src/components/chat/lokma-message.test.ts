@@ -86,6 +86,8 @@ assert(describeToolCall('list_files', { path: '.' }) === 'Listed .', 'list sente
 assert(describeToolCall('list_files', '{"path":"."}') === 'Listed .', 'stringified input parsed');
 assert(describeToolCall('search_files', { query: 'auth' }) === 'Searched “auth”', 'search sentence');
 assert(describeToolCall('run_command', { command: 'bun', args: ['run', 'build'] }) === 'Ran bun run build', 'run sentence');
+assert(describeToolCall('open_project', { name: 'fermag', cwd: '/root/fermag' }) === 'Open project "fermag" at /root/fermag', 'open project sentence');
+assert(describeToolCall('open_project', '{"name":"fermag","cwd":"/root/fermag"}') === 'Open project "fermag" at /root/fermag', 'open project stringified input');
 assert(describeToolCall('mystery_tool', { a: 1 }) === 'mystery_tool · {"a":1}', 'unknown tool falls back');
 assert(formatBytes(2697) === '2.6KB' && formatBytes(512) === '512B', 'byte labels');
 assert(summarizeResult('list_files', { ok: true, result: { entries: [1, 2, 3] } }) === '3 entries', 'list count shown');

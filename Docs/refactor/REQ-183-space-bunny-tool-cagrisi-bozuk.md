@@ -1,6 +1,6 @@
 # REQ-183 — space-bunny-alpha tool çağrısı yapamıyor (gerçek `tools[]` düşüyor + gövdesiz `<tool>` sızıyor)
 
-**Status:** in-progress (tur 2/5 — parse salvage + dual-channel drop landed; tur 1: `82a64b7`)
+**Status:** in-progress (tur 3/5 — loop/tui wiring landed; tur 1-3: `82a64b7` `6e87a27` `509e192`)
 **Tarih:** 2026-10-01
 **Kaynak:** Kullanıcı mesajı (1 Ekim 2026):
 > "sapce bunny modelinde tool çağrısı da yapamıo ona da serisinden bi fix"
@@ -52,7 +52,9 @@ Sonuç (`openai.ts:547-551`): `flattenHistory = true` → `buildBody` yeniden ku
 
 **Landed (tur 2 — `6e87a27`):** `parse.ts` — kapanışsız/gövdesiz trailing `<tool name="x">` artık `input:{}` ile GERÇEK çağrıya dönüşür (stream mark'ıyla; yarım gövde ve `>`-siz dev blok yine metin kalır — mevcut fail-open guard'ı korunur); `finish({haveNativeCalls:true})` native çağrı zaten turu taşımışsa aynı artığı DÜŞÜRÜR (hayalet çağrı yok). 14 yeni assert; parse probe 104/104 PASS; root tsc 0; concept build yeşil.
 
-**Kalan turlar:** (3) loop/tui wiring — `agent-loop.ts` (`attemptFilter.finish` :635) ve `cli/tui.ts` (`filter.finish()` :333) `{ haveNativeCalls: nativeCalls.length > 0 }` geçirsin; (4) canlı prob `scripts/probe-space-bunny-tools.cjs` (3 koşu: `role:'tool'` var + transcript'te `<tool` YOK + stays-gone temizlik); (5) katalog rozeti + close-out.
+**Landed (tur 3 — `509e192`):** loop/tui wiring — `agent-loop.ts:635` artık `attemptFilter.finish({ haveNativeCalls: nativeCalls.length > 0 })`, `cli/tui.ts:333` artık `filter.finish({ haveNativeCalls: nativeCalls.length > 0 })`. Native çağrı turu taşıdıysa trailing gövdesiz `<tool>` artığı düşer (hayalet çağrı yok); çağrı yoksa parse salvage'ı onu gerçek çağrıya çevirir. Kanıt: root tsc 0, parse probe 104/104, agent-loop probe 31/31, core+server dist yeniden derlendi (dist grep: `haveNativeCalls` server `agent-loop.js:482`), `pm2 restart lokma-server` → uptime 9s, `/health` + `/api/health` 200, `lokma-web` :3457 200.
+
+**Kalan turlar:** (4) canlı prob `scripts/probe-space-bunny-tools.cjs` (3 koşu: `role:'tool'` var + transcript'te `<tool` YOK + stays-gone temizlik); (5) katalog rozeti (`models.ts` — `unsupported_model` dönen viewId işaretlenir) + close-out.
 
 ## Kapsam
 

@@ -640,6 +640,46 @@ assert(looksLikeToolsUnsupported(400, 'tools are not supported by this model'), 
 assert(!looksLikeToolsUnsupported(400, 'invalid api key'), 'an unrelated 400 is never treated as a tools probe');
 assert(looksLikeToolPairingError(400, 'tool_call_id must be provided for each tool message'), 'tool pairing errors are detected');
 assert(!looksLikeToolPairingError(500, 'boom'), 'non-400/422 stays out of the pairing probe');
+// REQ-183: model/key/quota refusals are never capability-probe hits — a false
+// match silently reshapes the request instead of surfacing the honest error.
+const unsupportedModelBody = JSON.stringify({
+  error: {
+    message: 'Model "commandcode/stealth/space-bunny-alpha" is not supported on this endpoint.',
+    type: 'invalid_request_error',
+    param: 'model',
+    code: 'unsupported_model',
+  },
+});
+assert(!looksLikeToolPairingError(400, unsupportedModelBody), 'unsupported_model is never a pairing probe');
+assert(!looksLikeToolsUnsupported(400, unsupportedModelBody), 'unsupported_model is never a tools probe');
+assert(
+  !looksLikeToolPairingError(400, '{"error":{"message":"Invalid API key","code":"invalid_api_key"}}'),
+  'invalid_api_key is never a pairing probe',
+);
+assert(
+  !looksLikeToolsUnsupported(400, '{"error":{"message":"Invalid API key","code":"invalid_api_key"}}'),
+  'invalid_api_key is never a tools probe',
+);
+assert(
+  !looksLikeToolPairingError(400, '{"error":{"message":"You have insufficient credits to make this request.","code":"BAD_REQUEST"}}'),
+  'insufficient credits is never a pairing probe',
+);
+assert(
+  !looksLikeToolPairingError(400, '{"error":{"message":"Model not found","code":"model_not_found"}}'),
+  'model_not_found is never a pairing probe',
+);
+const realPairingBody = JSON.stringify({
+  error: {
+    message: 'An assistant message with tool_calls must be followed by tool messages responding to each tool_call_id.',
+    type: 'invalid_request_error',
+    param: 'messages',
+  },
+});
+assert(looksLikeToolPairingError(400, realPairingBody), 'a real pairing rejection still matches');
+assert(
+  !looksLikeToolsUnsupported(400, realPairingBody),
+  'a pairing rejection is owned by the pairing probe, not the tools probe',
+);
 
 // 9d. Live stub: chat/completions carries tools[] and flushes native calls.
 const seenChatTools: { path: string; tools: unknown; choice: unknown; msgs: unknown } = {
@@ -802,6 +842,49 @@ try {
   assert(text === 'flat-ok', 'the flattened turn still streams its answer');
 } finally {
   pairStub.server.close();
+}
+
+// 9g. REQ-183: a model refusal is thrown as-is — never reshaped by a probe
+// (a false capability hit would silently retry and drop tools[] from the retry).
+let refusalRequests = 0;
+const refusalStub = await listen((req, res) => {
+  let body = '';
+  req.on('data', (c) => {
+    body += c;
+  });
+  req.on('end', () => {
+    refusalRequests += 1;
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(unsupportedModelBody);
+  });
+});
+try {
+  let thrown: unknown = null;
+  try {
+    for await (const chunk of new OpenAIAdapter().stream({
+      model: 'commandcode/stealth/space-bunny-alpha',
+      messages: [{ role: 'user', content: 'list files' }],
+      apiKey: 'stub-key',
+      baseUrl: `${refusalStub.base}/v1`,
+      tools: [{ name: 'list_files', description: 'List files', parameters: { type: 'object', properties: {} } }],
+    })) {
+      void chunk;
+    }
+  } catch (e) {
+    thrown = e;
+  }
+  assert(thrown instanceof ProviderError, 'a model refusal surfaces as a ProviderError');
+  assert(
+    thrown instanceof ProviderError && thrown.code === 'http_error',
+    'the refusal keeps its honest http_error code',
+  );
+  assert(
+    thrown instanceof ProviderError && thrown.message.indexOf('unsupported_model') >= 0,
+    'the upstream refusal message is not swallowed',
+  );
+  assert(refusalRequests === 1, `a model refusal is never retried, got ${refusalRequests} requests`);
+} finally {
+  refusalStub.server.close();
 }
 
 // ── 10. REQ-128: Anthropic native tools (the protocol Claude Code speaks) ─

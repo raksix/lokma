@@ -410,12 +410,41 @@ export function markNativeToolsRejected(base: string, model: string): void {
 }
 
 /**
+ * REQ-183: the JSON `code` an upstream error body carries, lowercased — ''
+ * when it has none. Plain index scanning (no regex) so no escape layer can
+ * silently alter the needle.
+ */
+function snippetErrorCode(snippet: string): string {
+  const at = snippet.indexOf('"code"');
+  if (at < 0) return '';
+  const rest = snippet.slice(at + '"code"'.length);
+  const q1 = rest.indexOf('"');
+  if (q1 < 0) return '';
+  const q2 = rest.indexOf('"', q1 + 1);
+  if (q2 < 0) return '';
+  return rest.slice(q1 + 1, q2).toLowerCase();
+}
+
+/**
+ * REQ-183: codes that name a model/key problem — never a tool-shape
+ * rejection. A capability probe that matched one of these would silently
+ * retry and reshuffle the wire shape instead of surfacing the honest error.
+ */
+const NON_TOOL_ERROR_CODES = ['unsupported_model', 'model_not_found', 'invalid_api_key'];
+
+/**
  * Does this upstream error look like "tools unsupported"? Kept narrow so a
  * genuine bad-request (bad key, bad model, bad message) is NOT swallowed
  * as a capability probe — only explicit tool/function wording counts.
  */
 export function looksLikeToolsUnsupported(status: number, snippet: string): boolean {
   if (status !== 400 && status !== 404 && status !== 422 && status !== 500) return false;
+  // REQ-183: a bad model/key is a refusal to run, not a capability answer.
+  if (NON_TOOL_ERROR_CODES.indexOf(snippetErrorCode(snippet)) >= 0) return false;
+  // REQ-183: a rejected native PAIRING belongs to the pairing probe below —
+  // reading it here would disable tools for the pair (and need two retries)
+  // instead of flattening the history once.
+  if (looksLikeToolPairingError(status, snippet)) return false;
   const s = snippet.toLowerCase();
   if (s.indexOf('tool') < 0 && s.indexOf('function') < 0) return false;
   return (
@@ -437,6 +466,10 @@ export function looksLikeToolsUnsupported(status: number, snippet: string): bool
  */
 export function looksLikeToolPairingError(status: number, snippet: string): boolean {
   if (status !== 400 && status !== 422) return false;
+  // REQ-183: `unsupported_model` / `model_not_found` / `invalid_api_key`
+  // bodies may carry tool-ish words ("tool_calls not supported for this
+  // model") — those are model/key refusals, not pairing rejections.
+  if (NON_TOOL_ERROR_CODES.indexOf(snippetErrorCode(snippet)) >= 0) return false;
   const s = snippet.toLowerCase();
   return (
     s.indexOf('tool_call_id') >= 0 ||

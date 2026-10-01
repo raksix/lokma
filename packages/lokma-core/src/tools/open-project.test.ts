@@ -181,6 +181,23 @@ async function main(): Promise<void> {
     'open: the frame carries projectId + cwd + the new session',
   );
 
+  // --- honest cwd failures: never a silent success ---
+  await writeFile(join(HOME, 'not-a-dir.txt'), 'x', 'utf-8');
+  await expectRejects(
+    () => openTool.handler({ cwd: join(HOME, 'not-a-dir.txt') }, undefined),
+    'cannot use cwd',
+    'open: a path that is a file is refused honestly',
+  );
+  await expectRejects(
+    () => openTool.handler({ cwd: '/dev/null/child' }, undefined),
+    'cannot use cwd',
+    'open: an uncreatable cwd is refused honestly',
+  );
+  assert(
+    (await listProjects()).every((p) => !p.cwd.includes('not-a-dir.txt') && !p.cwd.includes('/dev/null')),
+    'open: failed cwd attempts left no records',
+  );
+
   // --- idempotency: same cwd again ---
   const second = (await openTool.handler({ cwd: projectDir }, undefined)) as OpenResult;
   assert(second.created === false && second.projectId === first.projectId, 'idempotent: second call reuses the record');

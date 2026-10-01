@@ -1,6 +1,6 @@
 # REQ-184 — Sohbette satır-içi markdown `_x_` (intraword alt çizgi) yutuluyor
 
-**Status:** pending
+**Status:** done (1 Ekim 2026 — tur 1: `356bd0c` `74dcbaf`; birim 100/100 + canlı prob 9/9; kapanış: bu kapanış docs commit'i)
 **Tarih:** 2026-10-01
 **Kaynak:** REQ-182 canlı doğrulaması sırasında bulundu (ölçümlü tespit — kullanıcı mesajı değil; REQ-183'ün "ölçüldü" kaydı gibi bir iç bulgu).
 
@@ -33,7 +33,14 @@
 
 - `packages/lokma-web/web/src/components/chat/lokma-message.tsx` — `renderInline` regex + yorum
 - `packages/lokma-web/web/src/components/chat/lokma-message.test.ts` — regresyon blokları
-- `scripts/probe-open-project-ui.cjs` — `chatMarker` tam-forma döner
+- `scripts/probe-open-project-ui.cjs` — `chatMarker` tam-forma döner (düz-form toleransı kaldırıldı)
+- `scripts/probe-intraword-underscore.cjs` — YENİ canlı prob (sıfır model çağrısı; sunucu-yazımı marker ile deployed bundle'da birebir render doğrulaması)
+
+## Kanıt (tur 1, tamamlandı)
+
+- Birim `bun src/components/chat/lokma-message.test.ts`: **100 PASS / 0 FAIL** — yeni REQ-184 bloğu 10 kontrol (intraword literal; `_lorem_` ve `a _b_ c` italik kalır; `__init__` literal; bold/star/code/link/strike aynen; kod span içi dokunulmaz). Proven-to-fail: eski regex `sess_a_b` içinde `_a_` yakalayıp `sessab` üretiyordu; yeni regex eşleşme döndürmüyor.
+- Canlı prob `scripts/probe-intraword-underscore.cjs` **9/9 PASS** (deployed bundle, minted Bearer, gate ON, SIFIR model çağrısı): taze oturumun sunucu-yazımı marker'ı (`sess_muq6o0ef_m9rp` sınıfı — 2 alt çizgi) sohbette **birebir** render edildi, düz form YOK, 0 sayfa hatası; temizlik stays-gone (API 404 + diskte dosya yok) + geçici dizin silindi.
+- Kapılar: kök `bun x tsc --noEmit` 0; steril web build yeşil (`index-BXYs68rF.js`); `pm2 restart lokma-web` sonrası servis edilen bundle == disk hash; chunk içinde yeni lookbehind'lı regex byte düzeyinde doğrulandı; tokenless `/api/auth/me` 401.
 
 ## Bitirme (done)
 

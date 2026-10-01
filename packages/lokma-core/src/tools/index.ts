@@ -21,6 +21,7 @@ export * from './usage-tools.js';
 export * from './cron-tools.js';
 export * from './plugin-tools.js';
 export * from './observability-tools.js';
+export * from './terminal-tools.js';
 // REQ-181 — the catalog-derived `<available_surfaces>` prompt block.
 export * from './surfaces-prompt.js';
 export * from './executor.js';

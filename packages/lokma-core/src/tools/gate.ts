@@ -114,6 +114,10 @@ export function describeToolCall(tool: string, input: unknown): string {
       const cmd = arg('command');
       return cmd ? `Open a terminal running \`${cmd}\`` : 'Open a terminal pane';
     }
+    case 'terminal_write': {
+      const typed = arg('data');
+      return typed ? `Type into terminal: ${typed.slice(0, 60)}` : 'Type into a terminal';
+    }
     case 'open_session': {
       const title = arg('title');
       return title ? `Open session "${title}"` : 'Open a new session pane';

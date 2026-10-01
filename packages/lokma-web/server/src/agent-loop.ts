@@ -14,6 +14,7 @@ import {
   buildSkillTools,
   buildSkillsSystemPrompt,
   buildSurfaceSystemPrompt,
+  buildTerminalTools,
   buildTestingTools,
   buildTodoTools,
   buildToolSystemPrompt,
@@ -460,6 +461,11 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
   for (const tool of buildCronTools()) registry.register(tool);
   for (const tool of buildPluginTools()) registry.register(tool);
   for (const tool of buildObservabilityTools()) registry.register(tool);
+  // REQ-181 wave 5: terminal — `terminal_write` types into the SAME live
+  // shells the TerminalPane drives (`terminal/terminal.ts`); without an
+  // explicit terminalId it targets the newest shell this session opened, so
+  // `open_terminal` then `terminal_write` chains with no id bookkeeping.
+  for (const tool of buildTerminalTools({ sessionId: opts.sessionId })) registry.register(tool);
   // REQ-135: the blocking ask. Native models call `ask_user` as a function;
   // the loop intercepts it below (it owns the wait). `ask` is the name models
   // reach for first — alias it rather than answering `Unknown tool: ask`.

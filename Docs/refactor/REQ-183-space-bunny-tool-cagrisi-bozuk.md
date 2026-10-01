@@ -1,6 +1,6 @@
 # REQ-183 — space-bunny-alpha tool çağrısı yapamıyor (gerçek `tools[]` düşüyor + gövdesiz `<tool>` sızıyor)
 
-**Status:** in-progress (tur 3/5 — loop/tui wiring landed; tur 1-3: `82a64b7` `6e87a27` `509e192`)
+**Status:** in-progress (tur 4/5 — canlı prob yeşil; tur 1-4: `82a64b7` `6e87a27` `509e192` `a0673aa`)
 **Tarih:** 2026-10-01
 **Kaynak:** Kullanıcı mesajı (1 Ekim 2026):
 > "sapce bunny modelinde tool çağrısı da yapamıo ona da serisinden bi fix"
@@ -54,7 +54,16 @@ Sonuç (`openai.ts:547-551`): `flattenHistory = true` → `buildBody` yeniden ku
 
 **Landed (tur 3 — `509e192`):** loop/tui wiring — `agent-loop.ts:635` artık `attemptFilter.finish({ haveNativeCalls: nativeCalls.length > 0 })`, `cli/tui.ts:333` artık `filter.finish({ haveNativeCalls: nativeCalls.length > 0 })`. Native çağrı turu taşıdıysa trailing gövdesiz `<tool>` artığı düşer (hayalet çağrı yok); çağrı yoksa parse salvage'ı onu gerçek çağrıya çevirir. Kanıt: root tsc 0, parse probe 104/104, agent-loop probe 31/31, core+server dist yeniden derlendi (dist grep: `haveNativeCalls` server `agent-loop.js:482`), `pm2 restart lokma-server` → uptime 9s, `/health` + `/api/health` 200, `lokma-web` :3457 200.
 
-**Kalan turlar:** (4) canlı prob `scripts/probe-space-bunny-tools.cjs` (3 koşu: `role:'tool'` var + transcript'te `<tool` YOK + stays-gone temizlik); (5) katalog rozeti (`models.ts` — `unsupported_model` dönen viewId işaretlenir) + close-out.
+**Landed (tur 4 — `a0673aa`):** canlı prob `scripts/probe-space-bunny-tools.cjs` — kullanıcının ekranındaki id (`commandcode/stealth/space-bunny-alpha`) + `thinking max`, gerçek sunucu (127.0.0.1:3456). Üç bölüm yeşil:
+
+- **A — 3 ardışık koşu: 29/29 PASS** (`/tmp/probe183-a.log`). Her koşuda native `tool_start` + eşleşen ok `tool_result` + transcript'te gerçek `role:'tool'` satırı (sırayla `list_files`, `read_file`, `read_file`); 2. ve 3. koşuda GERÇEK dosya içeriği (BANANA-42 / PINEAPPLE-99) transcript'e ulaştı; görünür akışta ve TÜM transcript'te SIFIR `<tool`; oturum + proje dizini + temp dizin **stays-gone**.
+- **B — plan modu reddi: 9/9 PASS** (`/tmp/probe183-b2.log`). İzole temp-cwd `.lokma/settings.json` (`defaultMode: plan`) → write denemesi `Denied by permissions: write_file` sonucu, dosya diskte YOK, transcript'te denial satırı. (İlk B koşusunun turn-2 çağrısı aşağıdaki asılma olayına takıldı; reddi kaydı zaten diskteydi; sonraki koşu tamamen geçti.)
+- **C — auto modu onay akışı: 10/10 PASS** (`/tmp/probe183-c.log`). `permission_request` (write_file) → prob `allow` → çağrı koştu → dosya diskte + içerik birebir + transcript `ok:true`.
+- Prob sertleştirmeleri: `--section=a|b|c` seçici; `api()`'de 20 sn fetch timeout (kilitli sunucu cleanup'ı asmasın); run başına 150 sn settle timeout; token runtime'da mint edilir, asla loglanmaz.
+
+**Olay notu (bu REQ'in kapsamı dışında — ayrı araştırma gerekir):** tur 4 sırasında iki anomali görüldü: (1) 23:00:39'da `lokma-server` (bun 1.2.3) B koşusu başlarken TÜMÜYLE kilitlendi — 68% CPU spin, 9+ dakika health yanıtsız, log durdu; `pm2 restart lokma-server` ile döndü. (2) Aynı dönemde iki CommandCode streaming çağrısı harness içinde sessizce asıldı (turn-1 hiç yanıtlanmadı; turn-2 >2.5 dk) — aynı ANDA curl 9/9 ve taze bun süreci 6/6 sorunsuzken. Upstream temiz; asılma sınıfı harness/bun liveness tarafında; takip edilmeli.
+
+**Kalan turlar:** (5) katalog rozeti (`models.ts` — `unsupported_model` dönen viewId işaretlenir) + close-out.
 
 ## Kapsam
 

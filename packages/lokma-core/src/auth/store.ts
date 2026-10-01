@@ -545,6 +545,52 @@ export async function createProject(
   return row;
 }
 
+/**
+ * Name derived from a cwd's last segment (REQ-180) — the server-side twin
+ * of the client's `suggestProjectName`; truncated to the store's 60-char
+ * name bound so a long directory name never fails the create.
+ */
+export function projectNameFromCwd(cwd: string): string {
+  const trimmed = cwd.trim().replace(/[/]+$/, '');
+  const last = trimmed.slice(trimmed.lastIndexOf('/') + 1).trim();
+  return (last || 'project').slice(0, 60);
+}
+
+/**
+ * REQ-180: find-or-create behind the `open_project` agent tool. A project
+ * IS its cwd, so a second call for the same (owner, cwd) reuses the first
+ * record (`created: false`) instead of minting a duplicate — the REST POST
+ * stays create-only. The find→create window is serialized so two parallel
+ * tool calls in one run cannot both create.
+ */
+let projectCreateChain: Promise<unknown> = Promise.resolve();
+
+function underProjectCreateLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = projectCreateChain.then(fn, fn);
+  projectCreateChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+export async function findOrCreateProject(
+  owner: User,
+  input: { name?: string; cwd: string; visibility?: ProjectVisibility },
+): Promise<{ project: Project; created: boolean }> {
+  if (typeof input.cwd !== 'string' || !input.cwd.trim()) {
+    throw new AuthError('bad_cwd', 'cwd must be a directory path (created if missing)', 400);
+  }
+  const cwd = await resolveCwd(input.cwd);
+  return underProjectCreateLock(async () => {
+    const existing = (await readProjects()).find((p) => p.cwd === cwd && p.ownerId === owner.id);
+    if (existing) return { project: existing, created: false };
+    const name = input.name?.trim() ? input.name.trim() : projectNameFromCwd(cwd);
+    const project = await createProject(owner, { name, cwd, visibility: input.visibility });
+    return { project, created: true };
+  });
+}
+
 export async function patchProject(
   id: string,
   patch: { name?: unknown; cwd?: unknown; visibility?: unknown },

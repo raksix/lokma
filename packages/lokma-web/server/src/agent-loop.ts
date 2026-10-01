@@ -364,8 +364,12 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
   // REQ-057: UI-control tools run the server effect (browser tab, shell,
   // session) and emit a `ui_action` frame per call so connected clients
   // open/focus the matching pane — the harness drives its own surface.
+  // REQ-180: the project tools also receive the acting user id so
+  // `open_project` re-checks `project:create` against the auth store
+  // exactly like the REST route.
   for (const tool of buildUiControlTools(opts.cwd, {
     sessionId: opts.sessionId,
+    userId: opts.userId,
     emit: (payload) =>
       opts.send({ type: 'ui_action', actionId: mintCallId('ui'), ...payload, sessionId: opts.sessionId }),
     deliver: opts.deliverSessionPrompt,

@@ -109,8 +109,16 @@ try {
   check(blockNames.includes('archify_render'), 'archify_render listed');
   check(blockNames.includes('testing_run'), 'testing_run listed');
   check(blockNames.includes('open_browser'), 'open_browser listed');
-  check(!cap.toolNames.includes('skill_view'), 'skill_view is NOT registered (later wave)');
-  check(!blockNames.includes('skill_view'), 'unregistered catalog tools are never advertised');
+  check(
+    cap.toolNames.includes('skill_view') && cap.toolNames.includes('skill_patch'),
+    'skills family registered on the wire (wave 2)',
+  );
+  check(
+    blockNames.includes('vault_search') && blockNames.includes('memory_write'),
+    'vault/memory family advertised (wave 2)',
+  );
+  check(!cap.toolNames.includes('cron_list'), 'cron_list is NOT registered yet (wave 3)');
+  check(!blockNames.includes('cron_list'), 'unregistered catalog tools are never advertised');
 
   // ── <available_skills>: the once-dead builder now reaches the model ────
   check(cap.system.includes('<available_skills>'), 'system prompt carries <available_skills>');

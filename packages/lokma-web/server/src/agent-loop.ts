@@ -6,12 +6,14 @@ import {
   buildBrowserTools,
   buildBuiltinTools,
   buildDesignTools,
+  buildSkillTools,
   buildSkillsSystemPrompt,
   buildSurfaceSystemPrompt,
   buildTestingTools,
   buildTodoTools,
   buildToolSystemPrompt,
   buildUiControlTools,
+  buildVaultMemoryTools,
   createBlockFilter,
   decideToolCall,
   executeToolCall,
@@ -432,6 +434,12 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
   for (const tool of buildDesignTools(opts.cwd)) registry.register(tool);
   for (const tool of buildArchifyTools()) registry.register(tool);
   for (const tool of buildTestingTools({ executeCheck: opts.testExecuteCheck })) registry.register(tool);
+  // REQ-181 wave 2: vault + memory + skills — the agent reads and writes the
+  // SAME stores the Vault/Memory/Skills surfaces use (FTS search over
+  // ~/.lokma/vault, entry-level memory edits with the live budget guards,
+  // and skill view/patch through the curator registry).
+  for (const tool of buildVaultMemoryTools()) registry.register(tool);
+  for (const tool of buildSkillTools()) registry.register(tool);
   // REQ-135: the blocking ask. Native models call `ask_user` as a function;
   // the loop intercepts it below (it owns the wait). `ask` is the name models
   // reach for first — alias it rather than answering `Unknown tool: ask`.

@@ -82,6 +82,13 @@ export type AgentLoopOpts = {
   waitApproval: (req: { requestId: string; tool: string; description: string }) => Promise<ApprovalDecision>;
   /** Resolves from the client's `ask_response`; rejects on abort. */
   waitAnswer: (req: { requestId: string; question: string; choices?: string[] }) => Promise<string>;
+  /**
+   * REQ-182: begins the open_project confirmation wait (see
+   * UiControlOpts.beginProjectAck in lokma-core) — the WS host registers the
+   * session's ack gate under the frame id; hosts without a UI leave it
+   * undefined and the tool skips the wait entirely.
+   */
+  beginProjectAck?: (info: { actionId: string; projectId: string; sessionId: string }) => Promise<'done' | 'cancelled'>;
   /** Parent abort (WS `abort` / socket close) — rejects waits, kills turns. */
   signal: AbortSignal;
   /**
@@ -370,9 +377,17 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
   for (const tool of buildUiControlTools(opts.cwd, {
     sessionId: opts.sessionId,
     userId: opts.userId,
-    emit: (payload) =>
-      opts.send({ type: 'ui_action', actionId: mintCallId('ui'), ...payload, sessionId: opts.sessionId }),
+    emit: (payload) => {
+      // REQ-182: honour a caller-minted actionId (open_project registers its
+      // ack gate under that id BEFORE the frame ships); everyone else gets a
+      // fresh one. The id comes back so a tool can reference its own frame.
+      const actionId = payload.actionId ?? mintCallId('ui');
+      opts.send({ type: 'ui_action', actionId, ...payload, sessionId: opts.sessionId });
+      return actionId;
+    },
     deliver: opts.deliverSessionPrompt,
+    // REQ-182: the open_project confirmation wait (see ui-control.ts).
+    beginProjectAck: opts.beginProjectAck,
   })) {
     registry.register(tool);
   }

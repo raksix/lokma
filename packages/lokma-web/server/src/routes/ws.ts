@@ -112,6 +112,13 @@ const MAX_CONTEXT_FILES = 5;
 const MAX_CONTEXT_BYTES = 20 * 1024;
 /** A gate left unanswered this long auto-denies (the loop must not hang). */
 const APPROVAL_TIMEOUT_MS = 10 * 60_000;
+/**
+ * REQ-182: the open_project modal wait. Shorter than an approval on purpose —
+ * the record is already complete when the modal opens, so this bound only
+ * decides how long an attached-but-silent client (stale tab, observer socket)
+ * may hold the run before it proceeds as confirmed.
+ */
+const PROJECT_ACK_TIMEOUT_MS = 3 * 60_000;
 
 /**
  * REQ-116 FAZ B — one headless-engine turn for `claude-code/*` models.
@@ -577,6 +584,25 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
               }, APPROVAL_TIMEOUT_MS);
               state.gates.set(requestId, { kind: 'answer', resolve, reject, timer });
             }),
+          // REQ-182: the open_project confirmation wait (registered before
+          // the frame ships — see ui-control.ts). With no attached socket
+          // nobody can confirm: resolve 'done' immediately, because the
+          // record already exists and only the MODAL interaction is being
+          // reported. An attached-but-silent client is bounded by
+          // PROJECT_ACK_TIMEOUT_MS so a stale tab stalls a run for minutes,
+          // never forever.
+          beginProjectAck: ({ actionId }) =>
+            new Promise<'done' | 'cancelled'>((resolve, reject) => {
+              if (state.sockets.size === 0) {
+                resolve('done');
+                return;
+              }
+              const timer = setTimeout(() => {
+                state.gates.delete(actionId);
+                resolve('done');
+              }, PROJECT_ACK_TIMEOUT_MS);
+              state.gates.set(actionId, { kind: 'project_ack', resolve, reject, timer });
+            }),
           signal: ctrl.signal,
         });
         if (state.abort === ctrl) state.abort = null;
@@ -905,6 +931,20 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
           }
         } catch (e) {
           app.log.warn(`[ws] approvals record failed session=${sessionId}: ${String(e)}`);
+        }
+      } else if (msg.type === 'project_ack') {
+        // REQ-182: the open_project modal's answer — resolve the gate the
+        // tool is suspended on. A late ack (gate already timed out) is
+        // logged, never an error: the user's click still closed their modal,
+        // the run simply moved on without it.
+        const ackGate = runState.gates.get(msg.actionId);
+        if (ackGate?.kind === 'project_ack') {
+          clearTimeout(ackGate.timer);
+          runState.gates.delete(msg.actionId);
+          ackGate.resolve(msg.outcome);
+          app.log.info('[ws] project_ack ' + msg.actionId + ' -> ' + msg.outcome);
+        } else {
+          app.log.info('[ws] project_ack ' + msg.actionId + ' (no pending gate)');
         }
       } else if (msg.type === 'sessions_list') {
         // REQ-149: sidebar rows over the socket + a live subscription

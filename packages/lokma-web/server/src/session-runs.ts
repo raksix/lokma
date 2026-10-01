@@ -32,7 +32,9 @@ export type QueuedPrompt = {
 
 export type PendingGate =
   | { kind: 'approval'; tool: string; resolve: (d: ApprovalDecision) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }
-  | { kind: 'answer'; resolve: (a: string) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> };
+  | { kind: 'answer'; resolve: (a: string) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }
+  // REQ-182: the open_project modal's answer ('done' | 'cancelled').
+  | { kind: 'project_ack'; resolve: (o: 'done' | 'cancelled') => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> };
 
 export type SessionRunState = {
   queue: QueuedPrompt[];

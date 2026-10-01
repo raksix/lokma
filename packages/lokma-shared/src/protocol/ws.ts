@@ -98,6 +98,15 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('abort'), sessionId: z.string() }),
   z.object({ type: z.literal('permission_response'), requestId: z.string(), decision: z.enum(['allow', 'deny', 'always']) }),
   z.object({ type: z.literal('ask_response'), requestId: z.string(), answer: z.string() }),
+  // REQ-182: the open_project modal answers the agent's call — 'done' (the
+  // user confirmed, or no UI was attached to ask) or 'cancelled' (the user
+  // dismissed it). Keyed by the frame's actionId; resolves the pending
+  // project gate so the tool result carries the outcome the user chose.
+  z.object({
+    type: z.literal('project_ack'),
+    actionId: z.string().min(1).max(64),
+    outcome: z.enum(['done', 'cancelled']),
+  }),
   // Terminal pane (W3-10): stdin + resize + kill travel over the same
   // `/ws/:sessionId` socket; output comes back as `terminal/data|exit`.
   z.object({
@@ -195,6 +204,8 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
     prompt: z.string().max(8000).optional(),
     projectId: z.string().max(64).optional(),
     cwd: z.string().max(500).optional(),
+    // REQ-182: display name so the confirmation modal/toast needs no refetch.
+    projectName: z.string().max(60).optional(),
     sessionId: z.string(),
   }),
   // REQ-149: answers to `sessions_list` / `transcript_get` and the live

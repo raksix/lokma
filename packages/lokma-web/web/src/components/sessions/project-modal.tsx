@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ChevronUp, Folder, FolderOpen, FolderPlus, X } from 'lucide-react';
+import { Bot, ChevronUp, Folder, FolderOpen, FolderPlus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api, type FsListRes, type ProjectVisibility } from '@/lib/api';
@@ -12,17 +12,35 @@ import { emptyProjectForm, suggestProjectCwd, suggestProjectName, validateProjec
  * Explorer form: same `POST /api/projects` call, but impossible to miss
  * and with the server error surfaced in the modal (the inline form's
  * failures looked like "nothing happens").
+ *
+ * REQ-182 adds `mode: 'agent-open'`: the agent already created the record
+ * via the open_project tool, so the modal opens as a confirmation with the
+ * locked values — its answer resolves the agent's wait ('done' on Open,
+ * 'cancelled' on dismiss) and it NEVER re-POSTs (a second record would be
+ * born). One component, two purposes (DRY).
  */
+export type ProjectModalMode = 'create' | 'agent-open';
+
 export function ProjectModal({
   open,
   onClose,
   onCreated,
+  mode = 'create',
+  agentValue = null,
+  onResolve,
 }: {
   open: boolean;
   onClose: () => void;
   /** Fired with the new project so the caller refreshes + opens a session. */
-  onCreated: (project: { id: string; name: string; cwd: string }) => void;
+  onCreated?: (project: { id: string; name: string; cwd: string }) => void;
+  /** REQ-182: 'create' posts a new record; 'agent-open' confirms an existing one. */
+  mode?: ProjectModalMode;
+  /** REQ-182 (agent-open): the values the agent already created — locked. */
+  agentValue?: { name: string; cwd: string } | null;
+  /** REQ-182 (agent-open): the user's answer — fired exactly once per open. */
+  onResolve?: (outcome: 'done' | 'cancelled') => void;
 }) {
+  const agentOpen = mode === 'agent-open';
   const [form, setForm] = React.useState({ ...emptyProjectForm });
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -34,14 +52,22 @@ export function ProjectModal({
   const panelRef = React.useRef<HTMLDivElement>(null);
   useFocusTrap(open, panelRef, { onEscape: onClose });
 
+  // REQ-182: agent-open seeds from PRIMITIVE fields, so a caller handing a
+  // fresh object identity every render never re-seeds the form mid-open.
+  const agentName = agentValue?.name ?? '';
+  const agentCwd = agentValue?.cwd ?? '';
   React.useEffect(() => {
     if (!open) return;
-    setForm({ ...emptyProjectForm });
+    setForm(
+      agentOpen
+        ? { ...emptyProjectForm, name: agentName, cwd: agentCwd }
+        : { ...emptyProjectForm },
+    );
     setError(null);
     setPickerOpen(false);
     setPickerData(null);
     setPickerError(null);
-  }, [open ]);
+  }, [open, agentOpen, agentName, agentCwd]);
 
   const loadDir = React.useCallback((path?: string) => {
     setPickerBusy(true);
@@ -67,6 +93,13 @@ export function ProjectModal({
   if (!open) return null;
 
   const submit = async () => {
+    // REQ-182: the record already exists (the agent created it before the
+    // frame shipped) — the confirmation only answers its wait. Never POST
+    // again: a second record would be born.
+    if (agentOpen) {
+      onResolve?.('done');
+      return;
+    }
     const problem = validateProjectForm(form);
     if (problem) {
       setError(problem);
@@ -82,7 +115,7 @@ export function ProjectModal({
         visibility: form.visibility as ProjectVisibility,
       });
       emitToast(`Project "${res.project.name}" created`);
-      onCreated(res.project);
+      onCreated?.(res.project);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Project create failed');
@@ -96,7 +129,7 @@ export function ProjectModal({
       className="fixed inset-0 z-[60] grid place-items-center bg-black/40 p-4"
       role="dialog"
       aria-modal="true"
-      aria-label="New project"
+      aria-label={agentOpen ? 'Open project' : 'New project'}
       onClick={onClose}
     >
       <div
@@ -105,19 +138,35 @@ export function ProjectModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2.5">
-          <FolderPlus className="h-4 w-4 text-terracotta" />
-          <span className="text-sm font-semibold">New project</span>
+          {agentOpen ? (
+            <FolderOpen className="h-4 w-4 text-terracotta" />
+          ) : (
+            <FolderPlus className="h-4 w-4 text-terracotta" />
+          )}
+          <span className="text-sm font-semibold">{agentOpen ? 'Open project' : 'New project'}</span>
           <button
             type="button"
             onClick={onClose}
-            data-autofocus
-            aria-label="Close new project"
+            data-autofocus={agentOpen ? undefined : true}
+            aria-label={agentOpen ? 'Dismiss the agent-opened project' : 'Close new project'}
             className="ml-auto grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-muted"
           >
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
         <div className="space-y-2.5 p-4">
+          {/* REQ-182: WHO opened this is the first thing the modal says —
+              the agent already created the record, the user only confirms
+              (or dismisses) and never re-fills a form. */}
+          {agentOpen ? (
+            <div
+              className="flex items-center gap-2 rounded-md border border-line bg-muted/40 px-2.5 py-1.5 text-[11px] text-zinc-500"
+              data-agent-open-banner=""
+            >
+              <Bot className="h-3.5 w-3.5 shrink-0 text-terracotta" />
+              <span>Agent is opening this project</span>
+            </div>
+          ) : null}
           <div>
             <label htmlFor="project-name" className="mb-1 block text-[11px] font-medium text-zinc-500">
               Project name
@@ -141,7 +190,8 @@ export function ProjectModal({
                 if (e.key === 'Escape') onClose();
               }}
               placeholder="My project"
-              className="h-8 text-sm"
+              className={agentOpen ? 'h-8 text-sm bg-muted/40 text-zinc-500' : 'h-8 text-sm'}
+              readOnly={agentOpen}
               autoFocus
             />
           </div>
@@ -169,19 +219,22 @@ export function ProjectModal({
                   if (e.key === 'Escape') onClose();
                 }}
                 placeholder="/mnt/apopic/my-project (created if missing)"
-                className="h-8 font-mono text-xs"
+                className={agentOpen ? 'h-8 font-mono text-xs bg-muted/40 text-zinc-500' : 'h-8 font-mono text-xs'}
+                readOnly={agentOpen}
               />
-              <Button
-                type="button"
-                variant="outline"
-                aria-label={pickerOpen ? 'Close folder browser' : 'Browse server folders'}
-                title="Browse server folders"
-                className="h-8 shrink-0 gap-1.5 px-2.5 text-xs"
-                onClick={() => (pickerOpen ? setPickerOpen(false) : openPicker())}
-              >
-                <FolderOpen className="h-3.5 w-3.5" />
-                Browse
-              </Button>
+              {agentOpen ? null : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  aria-label={pickerOpen ? 'Close folder browser' : 'Browse server folders'}
+                  title="Browse server folders"
+                  className="h-8 shrink-0 gap-1.5 px-2.5 text-xs"
+                  onClick={() => (pickerOpen ? setPickerOpen(false) : openPicker())}
+                >
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  Browse
+                </Button>
+              )}
             </div>
             {pickerOpen ? (
               <div className="mt-1.5 overflow-hidden rounded-md border border-line" aria-label="Folder browser">
@@ -269,23 +322,30 @@ export function ProjectModal({
               </div>
             ) : null}
           </div>
-          <div>
-            <label htmlFor="project-visibility" className="mb-1 block text-[11px] font-medium text-zinc-500">
-              Visibility
-            </label>
-            <select
-              id="project-visibility"
-              value={form.visibility}
-              onChange={(e) => setForm((f) => ({ ...f, visibility: e.target.value as 'private' | 'public' }))}
-              className="h-8 w-full rounded-md border border-line bg-white px-2 text-sm dark:bg-[#1E1E21]"
-            >
-              <option value="private">Private</option>
-              <option value="public">Public</option>
-            </select>
-          </div>
+          {agentOpen ? null : (
+            <div>
+              <label htmlFor="project-visibility" className="mb-1 block text-[11px] font-medium text-zinc-500">
+                Visibility
+              </label>
+              <select
+                id="project-visibility"
+                value={form.visibility}
+                onChange={(e) => setForm((f) => ({ ...f, visibility: e.target.value as 'private' | 'public' }))}
+                className="h-8 w-full rounded-md border border-line bg-white px-2 text-sm dark:bg-[#1E1E21]"
+              >
+                <option value="private">Private</option>
+                <option value="public">Public</option>
+              </select>
+            </div>
+          )}
           {error ? <div className="text-xs text-red-600">{error}</div> : null}
-          <Button className="h-8 w-full text-sm" disabled={busy} onClick={() => void submit()}>
-            {busy ? 'Creating…' : 'Create project'}
+          <Button
+            className="h-8 w-full text-sm"
+            disabled={busy}
+            data-autofocus={agentOpen ? true : undefined}
+            onClick={() => void submit()}
+          >
+            {busy ? 'Creating…' : agentOpen ? 'Open project' : 'Create project'}
           </Button>
         </div>
       </div>

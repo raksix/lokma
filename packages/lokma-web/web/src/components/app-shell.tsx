@@ -4,7 +4,7 @@ import { Header } from '@/components/header';
 import { Sidebar } from '@/components/sidebar';
 import { InspectorPanel } from '@/components/providers';
 import type { InspectorTab } from '@/components/providers';
-import { SessionsSidebar } from '@/components/sessions';
+import { EXPAND_PROJECT_EVENT, ProjectModal, SessionsSidebar } from '@/components/sessions';
 import { FOCUS_FILES_EVENT } from '@/components/files';
 import { Chat, INITIAL_PREFIX } from '@/components/chat';
 import { BotsMode } from '@/components/bots/bots-mode';
@@ -422,6 +422,48 @@ export function AppShell({ sessionId }: { sessionId: string }) {
   // transcript timeline.
   const uiActions = ws.uiActions;
   const dismissUiAction = ws.dismissUiAction;
+
+  /**
+   * REQ-182 — the agent-open project modal. The open_project tool creates
+   * the record + session server-side FIRST, then ships the frame and waits
+   * for the client's answer; parking the payload in state lets the modal
+   * outlive the one-shot queue entry and answer with `project_ack`.
+   */
+  const [agentProject, setAgentProject] = React.useState<{
+    actionId: string;
+    projectId: string;
+    projectName: string;
+    cwd: string;
+    targetSessionId: string;
+  } | null>(null);
+  const sendProjectAck = ws.sendProjectAck;
+
+  const resolveAgentProject = React.useCallback(
+    (outcome: 'done' | 'cancelled') => {
+      const pending = agentProject;
+      if (!pending) return;
+      // Idempotent: Open and a queued dismiss can both land — the first wins.
+      setAgentProject(null);
+      sendProjectAck(pending.actionId, outcome);
+      if (outcome !== 'done') return;
+      // The record and its session already exist server-side — completing
+      // the move is this: open the project's group in the tree, then land
+      // the user in the fresh session (REQ-145 immediacy, no extra clicks).
+      window.dispatchEvent(
+        new CustomEvent(EXPAND_PROJECT_EVENT, { detail: { projectId: pending.projectId } }),
+      );
+      switchSession(pending.targetSessionId);
+    },
+    [agentProject, sendProjectAck, switchSession],
+  );
+
+  // REQ-182: the run can end while the modal waits (stop pressed, ack timed
+  // out) — close it with the run so a dead gate never holds the screen. No
+  // ack is sent: the gate is gone, a late answer would only be logged.
+  React.useEffect(() => {
+    if (agentProject && ws.done) setAgentProject(null);
+  }, [agentProject, ws.done]);
+
   React.useEffect(() => {
     if (uiActions.length === 0) return;
     for (const entry of uiActions) {
@@ -475,10 +517,35 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           selectSession(id);
         }
         emitToast('Agent sent a message to another session');
+      } else if (entry.action === 'open_project' && entry.projectId && entry.targetSessionId) {
+        // REQ-182: the record already exists — park the frame, open the
+        // confirmation modal, and let its answer resolve the agent's wait.
+        const cwd = entry.cwd ?? '';
+        const projectName = entry.projectName || cwd.split('/').filter(Boolean).pop() || 'project';
+        setAgentProject({
+          actionId: entry.actionId,
+          projectId: entry.projectId,
+          projectName,
+          cwd,
+          targetSessionId: entry.targetSessionId,
+        });
+        emitToast(`Agent opened project "${projectName}"${cwd ? ` at ${cwd}` : ''}`);
       }
       dismissUiAction(entry.actionId);
     }
   }, [uiActions, dismissUiAction, isMobile, tiling, inspectorSide, openBrowserPane, requestBrowserOpen, requestInspectorTab, requestSessionTab, refreshSessions, selectSession]);
+
+  // REQ-182 — mounted in every mode: the frame can arrive while the user is
+  // in Bots or Design, and the confirmation must not hide behind chat.
+  const agentProjectModal = agentProject ? (
+    <ProjectModal
+      open
+      mode="agent-open"
+      agentValue={{ name: agentProject.projectName, cwd: agentProject.cwd }}
+      onClose={() => resolveAgentProject('cancelled')}
+      onResolve={resolveAgentProject}
+    />
+  ) : null;
 
   // Global shortcuts — every combo is listed in the SHORTCUTS registry so
   // the help dialog (`?`) can never drift from what the keys actually do.
@@ -648,6 +715,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
             <LazyArchifyModal open={archifyOpen} onClose={() => setArchifyOpen(false)} />
           </React.Suspense>
         ) : null}
+        {agentProjectModal}
         <ToastHost />
       </div>
     );
@@ -720,6 +788,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
             <LazyArchifyModal open={archifyOpen} onClose={() => setArchifyOpen(false)} />
           </React.Suspense>
         ) : null}
+        {agentProjectModal}
         <ToastHost />
       </div>
     );
@@ -820,6 +889,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
             <LazyArchifyModal open={archifyOpen} onClose={() => setArchifyOpen(false)} />
           </React.Suspense>
         ) : null}
+        {agentProjectModal}
         <ToastHost />
       </div>
     );
@@ -962,6 +1032,7 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           <LazyArchifyModal open={archifyOpen} onClose={() => setArchifyOpen(false)} />
         </React.Suspense>
       ) : null}
+      {agentProjectModal}
       <ToastHost />
     </div>
   );

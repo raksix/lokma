@@ -150,6 +150,11 @@ for (const name of [
   ok(surfaceTool(name) !== undefined, `scope tool declared: ${name}`);
 }
 
+// REQ-180 wave: the project tools are declared in this table too — the core
+// permission sets read them from here, never from a second list.
+ok(surfaceTool('open_project')?.surface === 'sessions', 'open_project belongs to sessions');
+ok(surfaceTool('list_projects')?.surface === 'sessions', 'list_projects belongs to sessions');
+
 // ── Ownership + gate derivation ───────────────────────────────────────────
 ok(surfaceTool('design_generate')?.surface === 'design', 'design tools belong to the design surface');
 ok(surfaceTool('read_file')?.surface === 'files', 'workspace reads belong to files');

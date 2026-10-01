@@ -113,6 +113,10 @@ export const SURFACES: readonly Surface[] = [
     tools: [
       { name: 'open_session', summary: 'Open a new chat session pane, optionally carrying a first prompt that auto-sends', gate: 'write' },
       { name: 'send_to_session', summary: 'Send a user message to an existing session; it runs there, behind any run it already has', gate: 'write' },
+      // REQ-180 — projects live where sessions live: the explorer groups
+      // sessions by project, and opening a project opens a session in it.
+      { name: 'open_project', summary: 'Create a project record and open a session in it; idempotent per name and cwd', gate: 'write' },
+      { name: 'list_projects', summary: 'List the projects the current user may see, with ids, cwd and visibility', gate: 'read' },
     ],
   },
   // ── Files (workspace tools, jail-scoped to the session cwd) ─────────────

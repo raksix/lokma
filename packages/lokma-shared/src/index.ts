@@ -17,6 +17,9 @@ export * from './schemas/config.js';
 export * from './schemas/todo.js';
 export * from './schemas/vault.js';
 
+// Surfaces (REQ-181 — rail/activity/tool catalog, single source of truth)
+export * from './surfaces.js';
+
 // Protocol
 export * from './protocol/ws.js';
 export * from './protocol/types.js';

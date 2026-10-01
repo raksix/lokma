@@ -1,4 +1,4 @@
-import type { Permissions } from '@lokma/shared';
+import { surfaceToolNamesByGate, type Permissions } from '@lokma/shared';
 
 /**
  * Permission gate — one decision function behind every tool call.
@@ -11,49 +11,37 @@ import type { Permissions } from '@lokma/shared';
 
 export type GateDecision = 'allow' | 'ask' | 'deny';
 
-/** Tools that only read — safe to auto-run in `auto` mode. */
-export const READ_TOOLS: ReadonlySet<string> = new Set([
-  'read_file',
-  'list_files',
-  'search_files',
-  'glob',
-  'grep',
-  // REQ-180: the permission-filtered project list is a read.
-  'list_projects',
-]);
+/**
+ * REQ-181 — the four tool classes below are DERIVED from the surface
+ * catalog (`packages/lokma-shared/src/surfaces.ts`): every catalog tool row
+ * declares its `gate`, and these sets are its projections. Adding a row
+ * there is the only edit a new tool needs — this file keeps no second,
+ * hand-maintained list.
+ *
+ * read — only reads: auto-runs in `auto`, allowed in `plan`.
+ */
+export const READ_TOOLS: ReadonlySet<string> = new Set(surfaceToolNamesByGate('read'));
 
-/** Tools that mutate disk or spawn processes — need approval by default. */
-export const WRITE_TOOLS: ReadonlySet<string> = new Set([
-  'write_file',
-  'edit_file',
-  'run_command',
-  'claim_todo',
-  'complete_todo',
-  'send_file',
-  // REQ-180: opening a project persists a project record + session
-  // transcript server-side, so it asks in `auto` and is refused in `plan`.
-  'open_project',
-]);
+/**
+ * write — mutates disk or persists server state: asks in `auto`, refused in
+ * `plan` (REQ-180's open_project is one of these).
+ */
+export const WRITE_TOOLS: ReadonlySet<string> = new Set(surfaceToolNamesByGate('write'));
 
 /**
  * REQ-154: browser-engine tools act on a real page (scroll/click/type) via
  * the host browser engine — not on disk, so they are neither reads nor
  * writes: gated like writes (ask in `auto`, refused in `plan`).
  */
-export const BROWSER_TOOLS: ReadonlySet<string> = new Set([
-  'browser_read_page',
-  'browser_scroll',
-  'browser_click',
-  'browser_type',
-  'browser_screenshot',
-]);
+export const BROWSER_TOOLS: ReadonlySet<string> = new Set(surfaceToolNamesByGate('browser'));
 
 /**
- * REQ-135: tools whose whole point is talking to the user. Gating them would
- * ask the user to approve being asked — the loop answers with a question card
- * instead. An explicit `deny` entry still wins (operator intent).
+ * REQ-135: interactive tools' whole point is talking to the user. Gating
+ * them would ask the user to approve being asked, so `decideToolCall`
+ * allows them outright — an explicit `deny` entry still wins (operator
+ * intent).
  */
-export const INTERACTIVE_TOOLS: ReadonlySet<string> = new Set(['ask_user']);
+export const INTERACTIVE_TOOLS: ReadonlySet<string> = new Set(surfaceToolNamesByGate('interactive'));
 
 /** Exact or prefix match: `write` covers `write_file`, `read` covers reads. */
 function listed(entries: readonly string[], tool: string): boolean {

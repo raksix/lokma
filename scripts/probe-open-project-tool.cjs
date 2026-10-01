@@ -115,6 +115,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       if (msg.type === 'permission_request') {
         ws.send(JSON.stringify({ type: 'permission_response', requestId: msg.requestId, decision: 'allow' }));
       }
+      if (msg.type === 'ui_action' && msg.action === 'open_project') {
+        // REQ-182: the tool waits for the modal's answer. A probe IS the UI
+        // here — confirm immediately; a real client renders the modal.
+        ws.send(JSON.stringify({ type: 'project_ack', actionId: msg.actionId, outcome: 'done' }));
+      }
       if (msg.type === 'done' || msg.type === 'run_end' || msg.type === 'error') {
         clearTimeout(timer);
         resolve(msg);
@@ -158,6 +163,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check(Boolean(openResult) && openResult.isError !== true, 'open_project tool_result is error-free');
   check(Boolean(payload) && payload.ok === true, 'result says ok:true');
   check(Boolean(payload) && payload.created === true, 'result says created:true');
+  check(Boolean(payload) && payload.status === 'done', 'result says status:done (the ack resolved the wait)');
   check(Boolean(payload) && payload.cwd === projectCwd, 'result cwd matches the requested path');
   check(Boolean(payload) && typeof payload.projectId === 'string' && payload.projectId.length > 0, 'result carries a projectId');
   const projectId = payload?.projectId;

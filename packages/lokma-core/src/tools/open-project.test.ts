@@ -68,7 +68,7 @@ async function expectRejects(fn: () => Promise<unknown>, needle: string, label: 
 
 const AUTO = { allow: [] as string[], deny: [] as string[], defaultMode: 'auto' as const };
 
-type OpenResult = { ok: boolean; projectId: string; name: string; cwd: string; sessionId: string; created: boolean };
+type OpenResult = { ok: boolean; status: 'done' | 'cancelled'; projectId: string; name: string; cwd: string; sessionId: string; created: boolean };
 type ListResult = {
   projects: Array<{ id: string; name: string; cwd: string; visibility: string; sessionCount: number }>;
   count: number;
@@ -115,7 +115,7 @@ async function main(): Promise<void> {
   // --- un-bootstrapped instance: honest paths, no records invented ---
   // This block must run BEFORE the owner is resolved: on the standalone
   // flag the resolve step itself creates the first admin.
-  const anonTools = buildUiControlTools(workspaceCwd, { sessionId: 'sess_anon', emit: () => {} });
+  const anonTools = buildUiControlTools(workspaceCwd, { sessionId: 'sess_anon', emit: () => 'ui_probe' });
   const anonOpen = anonTools.find((t) => t.name === 'open_project');
   const anonList = anonTools.find((t) => t.name === 'list_projects');
   assert(anonOpen !== undefined && anonList !== undefined, 'tools: both project tools register without a user');
@@ -156,7 +156,10 @@ async function main(): Promise<void> {
   const tools = buildUiControlTools(workspaceCwd, {
     sessionId: 'sess_runner',
     userId: owner.id,
-    emit: (payload) => frames.push(payload),
+    emit: (payload) => {
+      frames.push(payload);
+      return payload.actionId ?? 'ui_probe';
+    },
   });
   const openTool = tools.find((t) => t.name === 'open_project');
   const listTool = tools.find((t) => t.name === 'list_projects');
@@ -180,6 +183,9 @@ async function main(): Promise<void> {
     frames[0].projectId === first.projectId && frames[0].cwd === projectDir && frames[0].targetSessionId === first.sessionId,
     'open: the frame carries projectId + cwd + the new session',
   );
+  assert(frames[0].actionId !== undefined, 'open: the frame carries the id the ack gate would use (REQ-182)');
+  assert(frames[0].projectName === 'fermag', 'open: the frame carries the display name (REQ-182)');
+  assert(first.status === 'done', 'open: without a UI host the result reports done (no wait)');
 
   // --- honest cwd failures: never a silent success ---
   await writeFile(join(HOME, 'not-a-dir.txt'), 'x', 'utf-8');
@@ -244,7 +250,7 @@ async function main(): Promise<void> {
     name: 'Worker',
     password: 'password-123',
   });
-  const calisanTools = buildUiControlTools(workspaceCwd, { sessionId: 'sess_worker', userId: calisan.id, emit: () => {} });
+  const calisanTools = buildUiControlTools(workspaceCwd, { sessionId: 'sess_worker', userId: calisan.id, emit: () => 'ui_probe' });
   const calisanOpen = calisanTools.find((t) => t.name === 'open_project');
   const calisanList = calisanTools.find((t) => t.name === 'list_projects');
   if (!calisanOpen || !calisanList) throw new Error('unreachable');
@@ -271,6 +277,52 @@ async function main(): Promise<void> {
     const calisanMade = (await calisanOpen.handler({ cwd: calisanDir }, undefined)) as OpenResult;
     assert(calisanMade.created === true, 'authority: the open policy lets a calisan create');
     await saveAuthSettings({ projectCreation: 'members' });
+  }
+
+  // --- REQ-182: the open_project confirmation contract ---
+  {
+    const ackDir = join(HOME, 'work', 'ack-app');
+    const events: string[] = [];
+    let ackInfo: { actionId: string; projectId: string; sessionId: string } | null = null;
+    let releaseAck: (o: 'done' | 'cancelled') => void = () => {};
+    const ackFrames: UiActionPayload[] = [];
+    const ackTools = buildUiControlTools(workspaceCwd, {
+      sessionId: 'sess_ack',
+      userId: owner.id,
+      emit: (payload) => {
+        events.push('emit');
+        ackFrames.push(payload);
+        return payload.actionId ?? 'ui_probe';
+      },
+      beginProjectAck: (info) => {
+        events.push('register');
+        ackInfo = info;
+        return new Promise<'done' | 'cancelled'>((resolve) => {
+          releaseAck = resolve;
+        });
+      },
+    });
+    const ackOpen = ackTools.find((t) => t.name === 'open_project');
+    assert(ackOpen !== undefined, 'ack: open_project tool present');
+    if (!ackOpen) throw new Error('unreachable');
+    const pending = ackOpen.handler({ cwd: ackDir }, undefined) as Promise<OpenResult>;
+    // Give the handler a beat to reach its await, then answer as the modal.
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    assert(events.join(',') === 'register,emit', 'ack: the gate registers BEFORE the frame ships');
+    assert(ackInfo !== null && ackFrames.length === 1, 'ack: one registration, one frame');
+    const info = ackInfo as { actionId: string } | null;
+    assert(info !== null && ackFrames[0]?.actionId === info.actionId, 'ack: the frame carries the very id the gate waits on');
+    releaseAck('cancelled');
+    const ackResult = await pending;
+    assert(ackResult.status === 'cancelled', 'ack: a dismissed modal returns cancelled (never a silent success)');
+    assert(
+      ackResult.ok === true && ackResult.created === true,
+      'ack: the record was complete before the modal — cancel changes the outcome, not the write',
+    );
+    assert(
+      (await listProjects()).filter((p) => p.cwd === ackDir).length === 1,
+      'ack: exactly one complete record — no half write, no rollback race',
+    );
   }
 
   // --- jail: opening a project elsewhere never widens the session tools ---

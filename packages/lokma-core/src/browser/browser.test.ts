@@ -93,7 +93,10 @@ async function main(): Promise<void> {
   const emitted: UiActionPayload[] = [];
   const tools = buildUiControlTools('/tmp', {
     sessionId: 'sess_tool',
-    emit: (payload) => emitted.push(payload),
+    emit: (payload) => {
+      emitted.push(payload);
+      return 'ui_probe';
+    },
   });
   const openBrowser = tools.find((t) => t.name === 'open_browser');
   assert(openBrowser !== undefined, 'open_browser tool is registered');
@@ -114,7 +117,10 @@ async function main(): Promise<void> {
   const deliveries: { sessionId: string; message: string }[] = [];
   const uiTools = buildUiControlTools('/tmp', {
     sessionId: 'sess_src',
-    emit: (payload) => emitted.push(payload),
+    emit: (payload) => {
+      emitted.push(payload);
+      return 'ui_probe';
+    },
     deliver: async (target) => {
       deliveries.push(target);
       return { ok: true, queued: false };
@@ -140,7 +146,7 @@ async function main(): Promise<void> {
     await expectRejects(sendTool.handler({ sessionId: 'sess_src', message: 'hi' }, undefined), 'running session', 'tool: self-target refused');
     assert(deliveries.length === 1, 'tool: self-target never reaches delivery');
     // No delivery channel (CLI-style surface) fails honestly.
-    const bare = buildUiControlTools('/tmp', { sessionId: 'sess_src', emit: () => {} }).find(
+    const bare = buildUiControlTools('/tmp', { sessionId: 'sess_src', emit: () => 'ui_probe' }).find(
       (t) => t.name === 'send_to_session',
     );
     assert(bare !== undefined, 'send_to_session exists without a channel too');
@@ -148,7 +154,7 @@ async function main(): Promise<void> {
     // A refused delivery surfaces as a real tool error (code preserved).
     const refusing = buildUiControlTools('/tmp', {
       sessionId: 'sess_src',
-      emit: () => {},
+      emit: () => 'ui_probe',
       deliver: async () => ({ ok: false, code: 'session_not_found', message: 'No such session: sess_x' }),
     }).find((t) => t.name === 'send_to_session');
     await expectRejects(refusing?.handler({ sessionId: 'sess_x', message: 'hi' }, undefined) ?? Promise.resolve(), 'No such session', 'tool: refused delivery surfaces the server message');

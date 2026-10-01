@@ -5,8 +5,11 @@ import {
   buildAttachmentTools,
   buildBrowserTools,
   buildBuiltinTools,
+  buildCronTools,
   buildDesignTools,
   buildGitTools,
+  buildObservabilityTools,
+  buildPluginTools,
   buildProviderTools,
   buildSkillTools,
   buildSkillsSystemPrompt,
@@ -450,6 +453,13 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
   for (const tool of buildGitTools(opts.cwd)) registry.register(tool);
   for (const tool of buildProviderTools()) registry.register(tool);
   for (const tool of buildUsageTools(opts.cwd)) registry.register(tool);
+  // REQ-181 wave 4: cron + plugins + observability — the agent drives the
+  // SAME modules their panes render: the job store (`cron/cron.ts`), the
+  // plugin registry (`plugins/registry.ts`) and the agent trace builder
+  // (`observability/trace.ts`).
+  for (const tool of buildCronTools()) registry.register(tool);
+  for (const tool of buildPluginTools()) registry.register(tool);
+  for (const tool of buildObservabilityTools()) registry.register(tool);
   // REQ-135: the blocking ask. Native models call `ask_user` as a function;
   // the loop intercepts it below (it owns the wait). `ask` is the name models
   // reach for first — alias it rather than answering `Unknown tool: ask`.

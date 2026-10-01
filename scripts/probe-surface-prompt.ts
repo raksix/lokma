@@ -125,8 +125,16 @@ try {
     blockNames.includes('git_diff') && blockNames.includes('model_probe') && blockNames.includes('usage_report'),
     'git/providers/usage families advertised (wave 3)',
   );
-  check(!cap.toolNames.includes('cron_list'), 'cron_list is NOT registered yet (wave 3b)');
-  check(!blockNames.includes('cron_list'), 'unregistered catalog tools are never advertised');
+  check(
+    cap.toolNames.includes('cron_list') && cap.toolNames.includes('plugin_install') && cap.toolNames.includes('trace_get'),
+    'cron/plugins/observability families registered on the wire (wave 4)',
+  );
+  check(
+    blockNames.includes('cron_list') && blockNames.includes('plugin_list') && blockNames.includes('trace_list'),
+    'cron/plugins/observability families advertised (wave 4)',
+  );
+  check(!cap.toolNames.includes('terminal_write'), 'terminal_write is NOT registered yet (wave 5)');
+  check(!blockNames.includes('terminal_write'), 'unregistered catalog tools are never advertised');
 
   // ── <available_skills>: the once-dead builder now reaches the model ────
   check(cap.system.includes('<available_skills>'), 'system prompt carries <available_skills>');

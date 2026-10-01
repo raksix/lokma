@@ -17,6 +17,10 @@ export * from './skills-inspect.js';
 export * from './git-tools.js';
 export * from './provider-tools.js';
 export * from './usage-tools.js';
+// REQ-181 wave 4 — surface tool families (Cron, Plugins, Observability).
+export * from './cron-tools.js';
+export * from './plugin-tools.js';
+export * from './observability-tools.js';
 // REQ-181 — the catalog-derived `<available_surfaces>` prompt block.
 export * from './surfaces-prompt.js';
 export * from './executor.js';

@@ -117,7 +117,15 @@ try {
     blockNames.includes('vault_search') && blockNames.includes('memory_write'),
     'vault/memory family advertised (wave 2)',
   );
-  check(!cap.toolNames.includes('cron_list'), 'cron_list is NOT registered yet (wave 3)');
+  check(
+    cap.toolNames.includes('git_status') && cap.toolNames.includes('provider_add') && cap.toolNames.includes('usage_report'),
+    'git/providers/usage families registered on the wire (wave 3)',
+  );
+  check(
+    blockNames.includes('git_diff') && blockNames.includes('model_probe') && blockNames.includes('usage_report'),
+    'git/providers/usage families advertised (wave 3)',
+  );
+  check(!cap.toolNames.includes('cron_list'), 'cron_list is NOT registered yet (wave 3b)');
   check(!blockNames.includes('cron_list'), 'unregistered catalog tools are never advertised');
 
   // ── <available_skills>: the once-dead builder now reaches the model ────

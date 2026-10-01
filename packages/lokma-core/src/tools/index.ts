@@ -13,6 +13,10 @@ export * from './testing.js';
 // REQ-181 wave 2 — surface tool families (Vault/Memory, Skills).
 export * from './vault-memory.js';
 export * from './skills-inspect.js';
+// REQ-181 wave 3 — surface tool families (Git, Providers/Models, Usage).
+export * from './git-tools.js';
+export * from './provider-tools.js';
+export * from './usage-tools.js';
 // REQ-181 — the catalog-derived `<available_surfaces>` prompt block.
 export * from './surfaces-prompt.js';
 export * from './executor.js';

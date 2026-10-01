@@ -6,6 +6,8 @@ import {
   buildBrowserTools,
   buildBuiltinTools,
   buildDesignTools,
+  buildGitTools,
+  buildProviderTools,
   buildSkillTools,
   buildSkillsSystemPrompt,
   buildSurfaceSystemPrompt,
@@ -13,6 +15,7 @@ import {
   buildTodoTools,
   buildToolSystemPrompt,
   buildUiControlTools,
+  buildUsageTools,
   buildVaultMemoryTools,
   createBlockFilter,
   decideToolCall,
@@ -440,6 +443,13 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
   // and skill view/patch through the curator registry).
   for (const tool of buildVaultMemoryTools()) registry.register(tool);
   for (const tool of buildSkillTools()) registry.register(tool);
+  // REQ-181 wave 3: git + providers/models + usage — the Git pane's RepoGit
+  // (status/diff/commit), the Providers registry (add + a REAL single-token
+  // model probe) and the Usage ledger summary, again the same core modules
+  // their REST routes and panes call.
+  for (const tool of buildGitTools(opts.cwd)) registry.register(tool);
+  for (const tool of buildProviderTools()) registry.register(tool);
+  for (const tool of buildUsageTools(opts.cwd)) registry.register(tool);
   // REQ-135: the blocking ask. Native models call `ask_user` as a function;
   // the loop intercepts it below (it owns the wait). `ask` is the name models
   // reach for first — alias it rather than answering `Unknown tool: ask`.

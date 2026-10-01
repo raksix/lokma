@@ -23,6 +23,8 @@ export const GIT_LOG_DEFAULT_MAX = 20;
 export const GIT_LOG_HARD_MAX = 100;
 /** Bytes of push output kept for the pane (remote chatter trimmed to the tail). */
 const PUSH_TAIL_CHARS = 2000;
+/** Hard cap for one `git diff` payload (bigger patches trim to the head). */
+export const GIT_DIFF_HARD_CHARS = 120_000;
 
 /** One changed path: staged (index) vs worktree states kept separate. */
 export type GitFileChange = {
@@ -225,6 +227,41 @@ export class RepoGit {
       });
     }
     return { branch, commits };
+  }
+
+  /**
+   * Unified diff of the working tree (`staged: true` = the index against
+   * HEAD), optionally narrowed to one repo-relative path. The patch text is
+   * capped at `GIT_DIFF_HARD_CHARS`; a trimmed result reports
+   * `truncated: true` so callers never mistake a cut for the whole diff.
+   */
+  async diff(opts: { path?: unknown; staged?: unknown } = {}): Promise<{
+    path: string | null;
+    staged: boolean;
+    bytes: number;
+    truncated: boolean;
+    patch: string;
+  }> {
+    if (!(await isRepo(this.root))) throw new GitError('not_a_repo', `${this.root} is not a git repository`, 400);
+    const staged = opts.staged === true;
+    const relPath = typeof opts.path === 'string' && opts.path.trim() ? opts.path.trim() : null;
+    // A leading dash would read as a git flag; `--` already separates
+    // revisions from paths, so only the path itself needs the guard.
+    if (relPath && relPath.startsWith('-')) {
+      throw new GitError('bad_path', 'path must be repo-relative and must not start with a dash', 400);
+    }
+    const args = ['diff', '--no-color'];
+    if (staged) args.push('--cached');
+    if (relPath) args.push('--', relPath);
+    const { stdout } = await runGit(this.root, args, GIT_TIMEOUT_MS);
+    const truncated = stdout.length > GIT_DIFF_HARD_CHARS;
+    return {
+      path: relPath,
+      staged,
+      bytes: stdout.length,
+      truncated,
+      patch: truncated ? stdout.slice(0, GIT_DIFF_HARD_CHARS) : stdout,
+    };
   }
 
   /**

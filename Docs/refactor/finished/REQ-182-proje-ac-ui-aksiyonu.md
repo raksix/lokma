@@ -1,6 +1,6 @@
 # REQ-182 — "Proje aç" UI'da da tek tıkla olsun: modal ajandan da açılabilsin
 
-**Status:** pending
+**Status:** done (2026-10-01) — commit'ler: `2ada6b6` + `6c301fa` + `4524707` + `1a0a68d` + `010c364` + `e19e8c1` + prob `d1ce350` + bu kapanış docs commit'i
 **Tarih:** 2026-10-01
 **Kaynak:** Kullanıcı mesajı (1 Ekim 2026):
 > "kanka amına koyayım proje aç diyince skill gibi proje açıcak dişrekt dosya oalrak açıo sikicem amk."
@@ -56,3 +56,13 @@
 - **Write-only:** kod yazılmadı. İki tık yerine tek akış prensibi (REQ-145 dersi) bu REQ'in omurgası: "modal açıldı" diye bırakmak, kullanıcıya bir adım daha atmak demektir.
 - Aynı modal iki modda çalışacağı için **ikinci bir modal yazılmaz** (DRY, proje kuralları #8/#9).
 - Risk notu: `ui_action` reducer'ı `web/src/lib/ws.ts`'te generic; yeni eylem eklerken `dismissUiAction` tek-seferlik davranışı bozulursa modal her karede yeniden açılır (sonsuz döngü görünümü) — prob bunu ayrıca assert eder.
+
+## Kapanış (kanıt, 2026-10-01)
+
+- Canlı prob `scripts/probe-open-project-ui.cjs` **43/43** (iki tur, gerçek model, minted Bearer, gate ON):
+  - **A) iptal yolu:** modal ajan değerleriyle açılır (name/cwd kilitli + banner), toast + `Open project "..." at ...` satırı görünür, dismiss → tool sonucu `status:'cancelled'`, kayıt BÜTÜN kalır (disk'te cwd dahil), oturum SWITCH ETMEZ;
+  - **B) onay yolu:** `Open` → `status:'done'`, modal kapanır, sidebar proje grubu AÇILIR, sohbet yeni oturuma geçer (header kimliği + `Open session` işareti + `Session <id> created` satırı);
+  - **tek yazma yolu:** koşu boyunca **0** `POST /api/projects` (modal asla yeniden kayıt açmaz);
+  - **temizlik:** 2 proje + 3 oturum + 2 geçici dizin silindi, hepsi stays-gone re-check (çift silme) + 0 JS hatası.
+- Birimler: `project-modal.test.ts` 23/23 (iki mod + iptal + wire), komşu `lokma-message.test.ts` PASS; kök `bun x tsc --noEmit` 0; steril web build yeşil; `pm2 restart lokma-web` sonrası servis edilen bundle == disk `index-eH9oY9q_.js`; tokenless `/api/auth/me` 401 (gate ON).
+- Doğrulama sırasında BULUNAN iz (bu REQ kapsamı dışı): `renderInline` intraword `_x_` çiftlerini yutuyor (`Session sess_a_b created` ekranda `sessab`) → [REQ-184](../REQ-184-markdown-intraword-underscore.md) açıldı.

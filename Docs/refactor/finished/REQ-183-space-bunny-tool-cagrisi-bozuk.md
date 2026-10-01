@@ -1,6 +1,6 @@
 # REQ-183 — space-bunny-alpha tool çağrısı yapamıyor (gerçek `tools[]` düşüyor + gövdesiz `<tool>` sızıyor)
 
-**Status:** in-progress (tur 4/5 — canlı prob yeşil; tur 1-4: `82a64b7` `6e87a27` `509e192` `a0673aa`)
+**Status:** done (1 Ekim 2026 — turlar 1-5: `82a64b7` `6e87a27` `509e192` `a0673aa` `6c2848b` `41e3a01`; kapanış: bu kapanış docs commit'i)
 **Tarih:** 2026-10-01
 **Kaynak:** Kullanıcı mesajı (1 Ekim 2026):
 > "sapce bunny modelinde tool çağrısı da yapamıo ona da serisinden bi fix"
@@ -63,7 +63,11 @@ Sonuç (`openai.ts:547-551`): `flattenHistory = true` → `buildBody` yeniden ku
 
 **Olay notu (bu REQ'in kapsamı dışında — ayrı araştırma gerekir):** tur 4 sırasında iki anomali görüldü: (1) 23:00:39'da `lokma-server` (bun 1.2.3) B koşusu başlarken TÜMÜYLE kilitlendi — 68% CPU spin, 9+ dakika health yanıtsız, log durdu; `pm2 restart lokma-server` ile döndü. (2) Aynı dönemde iki CommandCode streaming çağrısı harness içinde sessizce asıldı (turn-1 hiç yanıtlanmadı; turn-2 >2.5 dk) — aynı ANDA curl 9/9 ve taze bun süreci 6/6 sorunsuzken. Upstream temiz; asılma sınıfı harness/bun liveness tarafında; takip edilmeli.
 
-**Kalan turlar:** (5) katalog rozeti (`models.ts` — `unsupported_model` dönen viewId işaretlenir) + close-out.
+**Landed (tur 5 — `6c2848b`):** katalog rozeti — `errors.ts` artık upstream JSON `code`'unu YAPISAL taşıyor (`ProviderError.upstreamCode` + `isModelUnavailableError` sınıflayıcısı; `unsupported_model` / `model_not_found`); `agent-loop` refüste id'yi hatırlıyor (`model-status.ts`) ve retry bütçesini yakmadan duruyor; `GET /api/models` + refresh + PATCH çıktıları eşleşen girdiye `unsupported: true` ekliyor (KIRPMA YOK — rozet); UI üç yüzeyde "not on server" rozetini çiziyor (Composer dropdown, Models sekmesi, Default-model picker option'ı). Birimler: adapters **162/162** (+1 yapısal kod vakası), model-status **8/8** (yeni), katalog regresyonu **12/12**; kök `tsc` 0; ai+core+server dist yenilendi (`dist/agent-loop.js`'te `markModelUnsupported`); sterilize web build → `index-B7Lku5ge.js`; `pm2 restart lokma-server` + `lokma-web`; servis bundle == disk, chip canlı chunk'ta.
+
+**Landed (tur 5 — `41e3a01`):** canlı prob `scripts/probe-unsupported-model-badge.cjs` — **16/16 PASS** (iki ardışık koşu; log `/tmp/probe183-d.log`): geçici provider → stub gerçek `unsupported_model` 400'ü → deployed loop stub'a **tek POST** ile fail-fast + dürüst hata frame'i + transcript'te `[run failed` satırı → aynı `GET /api/models` girdiyi `"unsupported":true` ile rozetliyor (kırpılmıyor); temizlik session+provider+temp **stays-gone**; gate tokenless `/api/auth/me` **401**.
+
+**Kalan turlar:** kalmadı — 5/5, REQ kapandı.
 
 ## Kapsam
 

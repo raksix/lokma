@@ -1,6 +1,6 @@
 # REQ-180 — "Proje aç" bir araç olsun: ajan workspace projesi açabilsin
 
-**Status:** pending
+**Status:** done (2026-10-01) — commit'ler: `1ffa050` + `77b9586` + `e7dcb55` + `8ff93a8` + `87e516f` + `69de4e7` + `f0b8f91` + bu kapanış docs commit'i
 **Tarih:** 2026-10-01
 **Kaynak:** Kullanıcı mesajı (1 Ekim 2026), ekran görüntüsü ile:
 > "kanka amına koyayım proje aç diyince skill gibi proje açıcak dişrekt dosya oalrak açıo sikicem amk.
@@ -59,6 +59,16 @@ bunun için detaylı refacktlrer oluştur"
 1. Kontroller PASS + kanıt (prob çıktısı + transcript satırı + diskteki kayıt).
 2. Atomik İngilizce commit(ler) + push (her adım ayrı commit; örn. önce core tool + test, sonra server wiring, sonra UI dalı).
 3. Dosya: `Status: done` + hash'ler; `git mv` → `finished/`; `Docs/refactor/README.md` index satırı; `Docs/00-LOKMA-KONTEKST.md` kronoloji.
+
+## Kapanış (kanıt)
+
+**Worker turu 2 (1 Eki 2026) — REQ-180 kapatıldı.**
+
+- Birim prob (`HOME=$(mktemp -d) LOKMA_PROBE_BOOT=1 bun src/tools/open-project.test.ts`) → **45/45 PASS**: gate sınıflandırması + insan cümlesi, türetilen ad, `~` genişletme, mkdir, sıralı + paralel idempotency (tek kayıt), oturumun yaratıcı damgası (REQ-094), tek `ui_action` frame'i, görünürlük filtreli liste, yetki paritesi (superadmin / çalışan / members / open), jail (proje başka dizinde açılsa da oturum araçları cwd dışına çıkamıyor), dürüst cwd hataları.
+- Kök `bun x tsc --noEmit` → 0; sterilize build (`env -u NODE_CHANNEL_FD -u NODE_ENV bun run build`, shared → ai → core → server) yeşil; `pm2 restart lokma-server` sonrası `/health` 200.
+- **Canlı E2E `scripts/probe-open-project-tool.cjs` → 24/24 PASS** (gerçek model `commandcode/deepseek/deepseek-v4.1-flash`): ajan `open_project` çağırdı — dosya arkeolojisi araçları (glob/grep/read_file/write_file) HİÇ kullanılmadı; sonuç `ok:true` + `created:true` + `projectId` + cwd; kayıt `GET /api/projects`'te tek satır; cwd diskte oluştu (mkdir -p); `ui_action` frame'i sokette (projectId + cwd + taze oturum id); transcript'te `open_project` satırı kalıcı (projectId taşıyor); projede açılan oturum GET 200; temizlik: kayıt silindi (200) → bounded yeniden kontrolde yok + geçici dizinler diskten silindi.
+- Canlı idempotency (ikinci çağrı `created:false`) birim probda kanıtlı; canlı prob tek turluk akışı doğrular.
+- Sırada: **REQ-182** (UI dalı — modal ajan-çağrılabilir) → **REQ-181** (yüzey kataloğu).
 
 ## Notlar
 

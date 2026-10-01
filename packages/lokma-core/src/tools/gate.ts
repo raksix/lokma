@@ -18,6 +18,8 @@ export const READ_TOOLS: ReadonlySet<string> = new Set([
   'search_files',
   'glob',
   'grep',
+  // REQ-180: the permission-filtered project list is a read.
+  'list_projects',
 ]);
 
 /** Tools that mutate disk or spawn processes — need approval by default. */
@@ -28,6 +30,9 @@ export const WRITE_TOOLS: ReadonlySet<string> = new Set([
   'claim_todo',
   'complete_todo',
   'send_file',
+  // REQ-180: opening a project persists a project record + session
+  // transcript server-side, so it asks in `auto` and is refused in `plan`.
+  'open_project',
 ]);
 
 /**
@@ -129,6 +134,13 @@ export function describeToolCall(tool: string, input: unknown): string {
       const target = arg('sessionId');
       return target ? `Send a message to session ${target}` : 'Send a message to another session';
     }
+    case 'open_project': {
+      const name = arg('name');
+      const cwd = arg('cwd') ?? 'a workspace path';
+      return name ? `Open project "${name}" at ${cwd}` : `Open project at ${cwd}`;
+    }
+    case 'list_projects':
+      return 'List projects';
     default:
       return `Run ${tool}`;
   }

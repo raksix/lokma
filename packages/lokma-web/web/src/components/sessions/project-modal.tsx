@@ -41,7 +41,15 @@ export function ProjectModal({
   onResolve?: (outcome: 'done' | 'cancelled') => void;
 }) {
   const agentOpen = mode === 'agent-open';
-  const [form, setForm] = React.useState({ ...emptyProjectForm });
+  // REQ-182: agent-open seeds from PRIMITIVE fields, so a caller handing a
+  // fresh object identity every render never re-seeds the form mid-open.
+  const agentName = agentValue?.name ?? '';
+  const agentCwd = agentValue?.cwd ?? '';
+  // The seed is RENDER-time (a lazy initializer, not just the effect below),
+  // so the first paint already carries the agent's values.
+  const [form, setForm] = React.useState(() =>
+    agentOpen ? { ...emptyProjectForm, name: agentName, cwd: agentCwd } : { ...emptyProjectForm },
+  );
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   // REQ-084 folder picker — server directory browser (dirs only, dot-entries hidden).
@@ -52,10 +60,6 @@ export function ProjectModal({
   const panelRef = React.useRef<HTMLDivElement>(null);
   useFocusTrap(open, panelRef, { onEscape: onClose });
 
-  // REQ-182: agent-open seeds from PRIMITIVE fields, so a caller handing a
-  // fresh object identity every render never re-seeds the form mid-open.
-  const agentName = agentValue?.name ?? '';
-  const agentCwd = agentValue?.cwd ?? '';
   React.useEffect(() => {
     if (!open) return;
     setForm(

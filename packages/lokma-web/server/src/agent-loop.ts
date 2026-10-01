@@ -632,7 +632,11 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
         streamFailed = e;
       }
       if (streamFailed === null) {
-        const finished = attemptFilter.finish();
+        // REQ-183: a trailing bodyless `<tool …>` opener is dropped as the
+        // native calls' leftover when they already carried this attempt;
+        // without native calls the filter salvages it as the call the model
+        // meant to make (input {}, the tool schema fills in).
+        const finished = attemptFilter.finish({ haveNativeCalls: nativeCalls.length > 0 });
         if (finished.tail) {
           clean += finished.tail;
           opts.send({ type: 'text_delta', delta: finished.tail, sessionId: opts.sessionId });

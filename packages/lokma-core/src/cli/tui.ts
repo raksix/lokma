@@ -330,7 +330,10 @@ async function runPrompt(opts: {
       return { inputChars, outputChars, turns: turn, aborted: false };
     }
 
-    const end = filter.finish();
+    // REQ-183: trailing bodyless `<tool …>` leftover is dropped when native
+    // calls already carried the turn; otherwise the filter salvages it as
+    // the call the model meant to make.
+    const end = filter.finish({ haveNativeCalls: nativeCalls.length > 0 });
     // REQ-118 FAZ B: merge gateway-typed native calls (deduped by
     // tool+input so a dual-channel echo never executes twice).
     {

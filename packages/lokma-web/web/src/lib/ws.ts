@@ -201,6 +201,17 @@ export function questionAnswer(requestId: string, answer: string): string {
   return checked({ type: 'ask_response', requestId, answer });
 }
 
+/**
+ * REQ-182: answer an `open_project` confirmation frame — resolves the
+ * agent's wait with the outcome the user actually chose ('done' = the
+ * modal's Open button, 'cancelled' = the user dismissed it). The project
+ * record itself was created before the frame shipped; this only reports
+ * how the modal interaction went.
+ */
+export function projectAckMessage(actionId: string, outcome: 'done' | 'cancelled'): string {
+  return checked({ type: 'project_ack', actionId, outcome });
+}
+
 /** Write stdin bytes to a live shell (server answers with `terminal/data`). */
 export function terminalInput(terminalId: string, data: string): string {
   return checked({ type: 'terminal/input', terminalId, data });

@@ -11,6 +11,7 @@ import {
   dropRequest,
   initialWsUiState,
   permissionAnswer,
+  projectAckMessage,
   promptMessage,
   questionAnswer,
   reconnectDelay,
@@ -99,6 +100,12 @@ export type UseWs = {
   killTerminal: (terminalId: string) => void;
   /** Drop one consumed agent UI action from the queue (REQ-057). */
   dismissUiAction: (actionId: string) => void;
+  /**
+   * REQ-182: answer an `open_project` confirmation frame — 'done' confirms
+   * (or nobody was attached to confirm), 'cancelled' means the user
+   * dismissed the modal. Resolves the server gate the tool waits on.
+   */
+  sendProjectAck: (actionId: string, outcome: 'done' | 'cancelled') => void;
   reconnect: () => void;
   disconnect: () => void;
   connect: () => void;
@@ -341,6 +348,12 @@ export function useWs(sessionId: string): UseWs {
     setUi((prev) => ({ ...prev, uiActions: prev.uiActions.filter((a) => a.actionId !== actionId) }));
   }, []);
 
+  /** REQ-182: resolve the agent's open_project wait (see UseWs above). */
+  const sendProjectAck = useCallback((actionId: string, outcome: 'done' | 'cancelled') => {
+    if (!actionId) return;
+    socketSend(wsRef.current, projectAckMessage(actionId, outcome));
+  }, []);
+
   /**
    * REQ-132: called by the chat shell right after a finished run's transcript
    * was refetched. Dropping the live buffers is what stops the reply (and its
@@ -378,6 +391,7 @@ export function useWs(sessionId: string): UseWs {
     resizeTerminal,
     killTerminal,
     dismissUiAction,
+    sendProjectAck,
     reconnect: connect,
     disconnect,
     connect,

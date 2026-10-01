@@ -568,6 +568,14 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
           store,
           send,
           deliverSessionPrompt,
+          // REQ-181: the Testing Lab's check runner — the same in-process
+          // `app.inject` contract as the REST route (a target exercises the
+          // REAL handler), bound here because only the server owns `app`.
+          testExecuteCheck: async (target: string) => {
+            const res = await app.inject({ method: 'GET', url: target });
+            const raw = res.body;
+            return { status: res.statusCode, body: typeof raw === 'string' ? raw : String(raw ?? '') };
+          },
           waitApproval: ({ requestId, tool }) =>
             new Promise<ApprovalDecision>((resolve, reject) => {
               const timer = setTimeout(() => {

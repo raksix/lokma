@@ -1,9 +1,12 @@
 import {
   AskUserInput,
+  buildArchifyTools,
   buildAskTools,
   buildAttachmentTools,
   buildBrowserTools,
   buildBuiltinTools,
+  buildDesignTools,
+  buildTestingTools,
   buildTodoTools,
   buildToolSystemPrompt,
   buildUiControlTools,
@@ -21,6 +24,7 @@ import {
   ToolRegistry,
   toolResultCarrier,
   type BrowserToolEngine,
+  type ExecuteCheck,
   type ParsedToolCall,
   type SessionDeliveryResult,
   type SessionMessage,
@@ -125,6 +129,12 @@ export type AgentLoopOpts = {
    * fails honestly instead of faking a delivery.
    */
   deliverSessionPrompt?: (target: { sessionId: string; message: string }) => Promise<SessionDeliveryResult>;
+  /**
+   * REQ-181: Testing Lab runner — the web server binds an in-process
+   * `app.inject` checker (the same contract the REST route uses); hosts
+   * without one get the honest `runner_unavailable` result.
+   */
+  testExecuteCheck?: ExecuteCheck;
 };
 
 export type AgentLoopResult = {
@@ -412,6 +422,13 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
   for (const tool of buildTodoTools({ sessionId: opts.sessionId, userId: opts.userId })) {
     registry.register(tool);
   }
+  // REQ-181 wave 1: the UI's own surfaces open to the agent — Design Studio,
+  // Archify and the Testing Lab tools wrap the SAME core modules their REST
+  // routes and panes call (one implementation, no parallel re-write). The
+  // Testing Lab needs the host-bound runner; without one it answers honestly.
+  for (const tool of buildDesignTools(opts.cwd)) registry.register(tool);
+  for (const tool of buildArchifyTools()) registry.register(tool);
+  for (const tool of buildTestingTools({ executeCheck: opts.testExecuteCheck })) registry.register(tool);
   // REQ-135: the blocking ask. Native models call `ask_user` as a function;
   // the loop intercepts it below (it owns the wait). `ask` is the name models
   // reach for first — alias it rather than answering `Unknown tool: ask`.

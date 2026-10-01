@@ -1,6 +1,6 @@
 # REQ-181 — UI'daki her yüzey ajanın aracı olsun (harness aracı katalogu)
 
-**Status:** in-progress (2026-10-01) — tick 3: wave-1 tools landed (design/archify/testing families registered in the loop, probe 40/40 + server dist deployed); rail wiring, prompt block and remaining families follow
+**Status:** in-progress (2026-10-01) — tick 4: prompt block landed — `<available_surfaces>` derives from the catalog (registry ∩ catalog birebir, stub-captured 14/14) and `<available_skills>` now actually reaches the model (`buildSkillsSystemPrompt` was dead code; unit 15/15, probe 14/14, server dist deployed); rail wiring + remaining tool families follow
 **Tarih:** 2026-10-01
 **Kaynak:** Kullanıcı mesajı (1 Ekim 2026):
 > "Lokmada uida ben ne yapabiliyorsam onları direkt lokmanın harnessi de mcp ya da skill olarak kullanbilecek.

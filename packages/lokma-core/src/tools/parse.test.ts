@@ -314,4 +314,65 @@ function assert(cond: boolean, label: string): void {
   assert(end.asks.length === 1 && end.asks[0]?.choices?.length === 2, 'trailing dangling ask surfaced');
 }
 
+// ─── REQ-183: dangling bodyless <tool> salvage + dual-channel drop ───
+{
+  // The measured leak shape: the model wrote a bodyless opener and the
+  // stream ended — the call it meant to make, recovered with empty input.
+  const f = createBlockFilter();
+  const shown = f.push('I will look at the workspace. <tool name="list_files">');
+  const end = f.finish();
+  assert(end.toolCalls.length === 1 && end.toolCalls[0]?.tool === 'list_files', 'trailing bodyless opener salvaged');
+  assert(JSON.stringify(end.toolCalls[0]?.input) === '{}', 'salvaged call runs with empty input');
+  assert(!(shown + end.tail).includes('<tool'), 'dangling markup never leaks');
+  assert((shown + end.tail).includes('I will look at the workspace.'), 'leading text stays visible');
+}
+{
+  // Chunk-split torture: the opener arrives across pushes with a newline.
+  const f = createBlockFilter();
+  let shown = '';
+  shown += f.push('Checking now');
+  shown += f.push('\n<tool name="list');
+  shown += f.push('_files">\n');
+  const end = f.finish();
+  assert(end.toolCalls.length === 1 && end.toolCalls[0]?.tool === 'list_files', 'split dangling opener salvaged');
+  assert(!(shown + end.tail).includes('<tool'), 'split dangling markup never leaks');
+}
+{
+  // A half-written body is not a call — stays text (fail-open, no phantom).
+  const f = createBlockFilter();
+  const shown = f.push('Writing <tool name="write_file">{"path": "a.ts"');
+  const end = f.finish();
+  assert(end.toolCalls.length === 0, 'half-written body yields no call');
+  assert((shown + end.tail).includes('<tool'), 'half-written markup stays text');
+}
+{
+  // Dual channel: native calls already carried the turn — the leftover
+  // markup is dropped, never executed as a phantom second call.
+  const f = createBlockFilter();
+  const shown = f.push('I will list the files. ');
+  f.push('<tool name="memory_read">');
+  const end = f.finish({ haveNativeCalls: true });
+  assert(end.toolCalls.length === 0, 'native-carried turn yields no phantom call');
+  assert(!(shown + end.tail).includes('<tool'), 'leftover markup dropped with native calls');
+  assert((shown + end.tail).trim() === 'I will list the files.', 'text before the leftover survives');
+}
+{
+  // Bare <tool fragment (stream cut mid-opener) is dropped in the native case too.
+  const f = createBlockFilter();
+  const shown = f.push('working <tool');
+  const end = f.finish({ haveNativeCalls: true });
+  assert(!(shown + end.tail).includes('<tool'), 'bare fragment dropped with native calls');
+}
+{
+  // The salvaged call carries a stream mark so persist order stays intact.
+  const f = createBlockFilter();
+  let shown = '';
+  shown += f.push('Intro <tool name="read_file">{"path": "a.ts"}</tool> mid');
+  shown += f.push(' ... <tool name="list_files">');
+  const end = f.finish();
+  const visible = shown + end.tail;
+  assert(end.toolCalls.length === 2, 'complete plus salvaged calls both parsed');
+  assert(end.marks.length === 2 && end.marks[1]?.at === visible.length, 'salvage mark sits at end of visible text');
+}
+
 console.log(`\nparse probe: ${passed} passed`);

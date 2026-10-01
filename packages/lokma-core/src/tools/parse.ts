@@ -299,14 +299,53 @@ export function stripModelBlocks(text: string): string {
 }
 
 /**
+ * REQ-183: a TRAILING, never-closed <tool …> opener is the shape a
+ * schema-starved model emits when the wire dropped its tools[] (measured
+ * live: the turn text ended with a bodyless opener, no native tool_calls,
+ * no role:'tool' row). With native calls already carrying the turn it is
+ * their leftover slop and is dropped; without them it becomes the call the
+ * model meant to make — input {}, the tool schema fills in defaults. A
+ * half-written body (opener plus partial content, no close) still fails
+ * open as text: no guessed arguments, no phantom calls. The opener must
+ * carry its closing > to be claimed — a giant never-closing blob stays text.
+ */
+function takeDanglingTool(
+  text: string,
+  drop: boolean,
+): { at: number; text: string; call: ParsedToolCall | null } | null {
+  let at = text.lastIndexOf('<tool');
+  while (at >= 0) {
+    const rest = text.slice(at);
+    // <tool_result / <tool_call / <tools continue the word — not our tag.
+    if (/^<tool\b/.test(rest)) {
+      if (drop) return { at, text: text.slice(0, at), call: null };
+      const m = /^<tool\b([^>]*)>\s*$/.exec(rest);
+      if (m) {
+        const call = toToolCall(m[1] ?? '', undefined, false);
+        if (call.tool && call.parseError === undefined) {
+          return { at, text: text.slice(0, at), call };
+        }
+      }
+      return null;
+    }
+    at = text.lastIndexOf('<tool', at - 1);
+  }
+  return null;
+}
+
+/**
  * Incremental filter for live streams — chunk boundaries can split a block,
  * so complete blocks are held back until they close. `push()` returns only
  * the clean text safe to forward; `finish()` drains the tail plus the calls.
  * Fail-open: unclosed markup older than the buffer cap flows through as text.
+ * REQ-183: at finish, a trailing bodyless <tool name="x"> becomes a real
+ * call with input {}; finish({ haveNativeCalls: true }) says native calls
+ * already carried the turn, so the same trailing markup is dropped as their
+ * leftover instead of executing a phantom call.
  */
 export function createBlockFilter(): {
   push(delta: string): string;
-  finish(): { tail: string; toolCalls: ParsedToolCall[]; asks: ParsedAsk[]; marks: StreamMark[] };
+  finish(opts?: { haveNativeCalls?: boolean }): { tail: string; toolCalls: ParsedToolCall[]; asks: ParsedAsk[]; marks: StreamMark[] };
 } {
   let buffer = '';
   const toolCalls: ParsedToolCall[] = [];
@@ -315,7 +354,7 @@ export function createBlockFilter(): {
   const marks: StreamMark[] = [];
   let emitted = 0;
 
-  function drain(force: boolean): string {
+  function drain(force: boolean, haveNativeCalls: boolean): string {
     let out = '';
     for (;;) {
       // All shapes compete by EARLIEST match index (REQ-119 lesson: a fixed
@@ -380,6 +419,19 @@ export function createBlockFilter(): {
           buffer = buffer.slice(0, askAt);
         }
       }
+      // REQ-183: a trailing never-closed tool opener — the shape a
+      // schema-starved model emitted when the wire dropped tools[]. With
+      // native calls already carrying the turn it is dropped as their
+      // leftover; without them it becomes the call the model meant to make
+      // (input {}, the tool schema fills in). Half-written bodies stay text.
+      const dangling = takeDanglingTool(buffer, haveNativeCalls);
+      if (dangling) {
+        if (dangling.call) {
+          marks.push({ at: emitted + out.length + dangling.at });
+          toolCalls.push(dangling.call);
+        }
+        buffer = dangling.text;
+      }
       out += buffer;
       buffer = '';
       emitted += out.length;
@@ -411,10 +463,10 @@ export function createBlockFilter(): {
   return {
     push(delta: string): string {
       buffer += delta;
-      return drain(false);
+      return drain(false, false);
     },
-    finish(): { tail: string; toolCalls: ParsedToolCall[]; asks: ParsedAsk[]; marks: StreamMark[] } {
-      const tail = drain(true);
+    finish(opts?: { haveNativeCalls?: boolean }): { tail: string; toolCalls: ParsedToolCall[]; asks: ParsedAsk[]; marks: StreamMark[] } {
+      const tail = drain(true, opts?.haveNativeCalls === true);
       return { tail, toolCalls, asks, marks };
     },
   };

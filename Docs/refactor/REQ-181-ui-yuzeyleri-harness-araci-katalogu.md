@@ -1,6 +1,6 @@
 # REQ-181 — UI'daki her yüzey ajanın aracı olsun (harness aracı katalogu)
 
-**Status:** in-progress (2026-10-01) — tick 6: wave-3 tools landed (commit 3c25208) — `git_status`/`git_diff`/`git_commit` + `provider_add`/`model_probe` + `usage_report` registered in the loop (same core modules the panes use; probe 61/61 under isolated HOME, live wire probe 18/18 — block == registry ∩ catalog, 40 tools, server dist deployed + lokma-server recycled); rail wiring + wave-3b (cron/plugins) + terminal remain
+**Status:** in-progress (2026-10-01) — tick 7: wave-4 tools landed (commit ba39e17) — `cron_list`/`cron_create` + `plugin_list`/`plugin_install` + `trace_list`/`trace_get` registered in the loop (same core modules the panes use; wave-4 probe 61/61 under isolated HOME, wire probe 20/20 — block == registry ∩ catalog, 46 tools, server dist deployed + lokma-server recycled); rail wiring + `terminal_write` + live catalog probe remain
 **Tarih:** 2026-10-01
 **Kaynak:** Kullanıcı mesajı (1 Ekim 2026):
 > "Lokmada uida ben ne yapabiliyorsam onları direkt lokmanın harnessi de mcp ya da skill olarak kullanbilecek.

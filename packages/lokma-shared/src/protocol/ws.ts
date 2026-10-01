@@ -182,15 +182,19 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
   // session panes) through the same socket. Tools run server-side AND emit
   // one of these so every connected client opens/focuses the matching pane —
   // the user sees exactly what the agent did, live.
+  // REQ-180: `open_project` carries the registered project id + its cwd
+  // beside the fresh session id (`targetSessionId`).
   z.object({
     type: z.literal('ui_action'),
     actionId: z.string().min(1).max(64),
-    action: z.enum(['open_browser', 'open_terminal', 'open_session', 'send_to_session']),
+    action: z.enum(['open_browser', 'open_terminal', 'open_session', 'send_to_session', 'open_project']),
     url: z.string().max(2048).optional(),
     tabId: z.string().max(64).optional(),
     terminalId: z.string().max(64).optional(),
     targetSessionId: z.string().max(128).optional(),
     prompt: z.string().max(8000).optional(),
+    projectId: z.string().max(64).optional(),
+    cwd: z.string().max(500).optional(),
     sessionId: z.string(),
   }),
   // REQ-149: answers to `sessions_list` / `transcript_get` and the live

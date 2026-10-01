@@ -9,7 +9,7 @@
 import { createServer, type Server } from 'node:http';
 import { type AddressInfo } from 'node:net';
 import { AnthropicAdapter, toAnthropicMessages, toAnthropicTools } from './anthropic';
-import { ProviderError } from './errors';
+import { ProviderError, isModelUnavailableError } from './errors';
 import { nativeCallInput, nativeCallToToolBlock, nativeToolsBlocked, looksLikeToolPairingError, looksLikeToolsUnsupported, OpenAIAdapter, responsesHttpError, shortModelId, toChatMessages, toChatTools, ToolCallAccumulator, toResponsesInput, toResponsesTools, unseenSuffix, usesResponsesApi } from './openai';
 import { OPENAI_COMPAT_WIRE_EFFORTS, RESPONSES_WIRE_EFFORTS, activeEffort, anthropicThinkingBudget, clampEffort, looksLikeReasoningUnsupported, reasoningBlocked, reasoningKey, resetReasoningMemory } from './reasoning';
 import { zodToJsonSchema } from './tools-schema';
@@ -883,6 +883,17 @@ try {
     'the upstream refusal message is not swallowed',
   );
   assert(refusalRequests === 1, `a model refusal is never retried, got ${refusalRequests} requests`);
+  assert(
+    thrown instanceof ProviderError && thrown.upstreamCode === 'unsupported_model',
+    'the refusal carries the upstream JSON code structurally (no message parsing)',
+  );
+  assert(isModelUnavailableError(thrown), 'the refusal classifies as model-availability (catalog badge source)');
+  assert(
+    !isModelUnavailableError(new ProviderError('http_error', 'plain 400', 400, null)) &&
+      !isModelUnavailableError(new ProviderError('http_error', 'other code', 400, 'bad_request')) &&
+      !isModelUnavailableError(new Error('not a provider error')),
+    'unrelated failures never classify as model-availability',
+  );
 } finally {
   refusalStub.server.close();
 }

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { applyModelFlags, getCatalog, invalidateCatalog, providerOfId, type CatalogModel } from '@lokma/ai';
+import { annotateModelSupport, type ModelSupportFlag } from '../model-status.js';
 import { loadConfig, saveGlobal } from '@lokma/core';
 import { listProviderViews, probeProvider, providerNeedsKey, resolveApiKey } from './providers.js';
 
@@ -111,9 +112,11 @@ export function mergeLiveIds(base: CatalogModel[], outcomes: LiveProbeOutcome[])
  * same id. Bare upstream ids gain a `provider/` prefix so picker badges stay
  * honest (REQ-030).
  */
-export async function getMergedCatalog(): Promise<CatalogModel[]> {
+export async function getMergedCatalog(): Promise<Array<CatalogModel & ModelSupportFlag>> {
   const base = await getCatalog();
-  return mergeLiveIds(base, await probeAllEnabled());
+  // REQ-183: ids refused upstream ride along with `unsupported: true` so the
+  // pickers can mark them ("not on server") instead of offering a dead model.
+  return annotateModelSupport(mergeLiveIds(base, await probeAllEnabled()));
 }
 
 export async function modelRoutes(app: FastifyInstance): Promise<void> {
@@ -133,7 +136,7 @@ export async function modelRoutes(app: FastifyInstance): Promise<void> {
     const base = await getCatalog();
     const outcomes = await probeAllEnabled();
     const cfg = await loadConfig(process.cwd());
-    const models = applyModelFlags(mergeLiveIds(base, outcomes), cfg.models ?? {});
+    const models = applyModelFlags(annotateModelSupport(mergeLiveIds(base, outcomes)), cfg.models ?? {});
     const providers: RefreshProviderRow[] = outcomes.map((o): RefreshProviderRow => {
       if (o.status === 'ok') return { id: o.viewId, ok: true, modelCount: o.count, latencyMs: o.latencyMs };
       if (o.status === 'skipped') {

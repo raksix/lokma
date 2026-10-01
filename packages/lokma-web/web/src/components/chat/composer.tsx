@@ -278,7 +278,7 @@ export function Composer({
 
   const groupedModels = React.useMemo(() => {
     const q = modelQuery.trim().toLowerCase();
-    const groups = new Map<string, { id: string; label: string; provider: string }[]>();
+    const groups = new Map<string, { id: string; label: string; provider: string; unsupported?: boolean }[]>();
     // Single source: the Models tab owns enable/disable — only enabled
     // models are offered here (concept note: "Only enabled models appear
     // in Composer + Ctrl+M").
@@ -578,6 +578,14 @@ export function Composer({
                             <span className="flex items-center gap-1.5">
                               {model === m.id && <span className="h-1.5 w-1.5 rounded-full bg-terracotta" />}
                               {m.label}
+                              {m.unsupported === true && (
+                                <span
+                                  className="shrink-0 rounded border border-amber-300 bg-amber-50 px-1 py-px text-[9px] font-medium text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-500"
+                                  title="Upstream reported this model id as unsupported on this endpoint"
+                                >
+                                  not on server
+                                </span>
+                              )}
                             </span>
                           </Button>
                         ))}

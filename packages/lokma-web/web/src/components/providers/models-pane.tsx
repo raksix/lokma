@@ -200,8 +200,13 @@ export function ModelsPane() {
                         className="accent-[#C96442]"
                         aria-label={`Enable ${m.id}`}
                       />
-                      <span className="truncate font-mono" title={m.id}>
-                        {m.label || m.id}
+                      <span className="flex min-w-0 items-center gap-1.5 font-mono" title={m.id}>
+                        <span className="truncate">{m.label || m.id}</span>
+                        {m.unsupported === true && (
+                          <span className="shrink-0 rounded border border-amber-300 bg-amber-50 px-1 py-px text-[9px] font-medium text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-500">
+                            not on server
+                          </span>
+                        )}
                       </span>
                       <span
                         className={cn(

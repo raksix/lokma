@@ -191,7 +191,7 @@ export type ProviderTestRes = {
 export type ProviderMutationRes = { ok: boolean; provider: ProviderInfo };
 export type CreateProviderBody = { id: string; name: string; baseUrl: string; apiKey?: string; enabled?: boolean };
 export type PatchProviderBody = { name?: string; baseUrl?: string; enabled?: boolean; priority?: number; apiKey?: string };
-export type ModelInfo = { id: string; label: string; provider: string; enabled: boolean };
+export type ModelInfo = { id: string; label: string; provider: string; enabled: boolean; unsupported?: boolean };
 export type ModelsRes = { models: ModelInfo[]; count: number; enabledCount: number; cached: boolean };
 export type ModelsMutationRes = {
   ok: boolean;

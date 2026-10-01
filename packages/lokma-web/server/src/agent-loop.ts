@@ -43,10 +43,11 @@ import {
   type ToolEvent,
   type ToolResultCarrier,
 } from '@lokma/core';
-import { ProviderError, stream as aiStream, zodToJsonSchema, type ProviderMessage } from '@lokma/ai';
+import { ProviderError, isModelUnavailableError, stream as aiStream, zodToJsonSchema, type ProviderMessage } from '@lokma/ai';
 import { DEFAULT_LOOP_MAX_TURNS } from '@lokma/shared';
 import type { Permissions, ReasoningEffort, ServerMessage } from '@lokma/shared';
 import { defaultBrowserEngine } from './browser-engine.js';
+import { markModelUnsupported } from './model-status.js';
 
 /**
  * Agent tool loop — the WS `prompt` path with real tool/permission/ask
@@ -684,6 +685,14 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
       // pool) never clear on retry — fail fast with the honest message
       // instead of burning the retry budget. Rate limits still retry.
       const failCode = streamFailed instanceof ProviderError ? streamFailed.code : null;
+      // REQ-183: an upstream that refuses the model ID itself
+      // (`unsupported_model` / `model_not_found`) is permanent — remember the
+      // id so `GET /api/models` can badge the catalog entry, and fail fast
+      // instead of burning the retry budget on a refusal that cannot heal.
+      if (isModelUnavailableError(streamFailed)) {
+        markModelUnsupported(opts.model);
+        break;
+      }
       if (failCode === 'region_blocked' || failCode === 'insufficient_credits') break;
       if (attempt > maxRetries) break;
       const waitMs = retryDelayMs(retryDelaysMs, attempt);

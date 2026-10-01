@@ -167,7 +167,7 @@ export function responsesHttpError(status: number, snippet: string, base: string
       status,
     );
   }
-  return new ProviderError('http_error', 'Upstream HTTP ' + status + ' from ' + base + tail, status);
+  return new ProviderError('http_error', 'Upstream HTTP ' + status + ' from ' + base + tail, status, snippetErrorCode(snippet) || null);
 }
 
 /**
@@ -596,6 +596,10 @@ export class OpenAIAdapter implements ProviderAdapter {
           'http_error',
           `Upstream HTTP ${res.status} from ${base}${snippet ? ` — ${snippet}` : ''}`,
           res.status,
+          // REQ-183: carry the upstream JSON `code` (e.g. `unsupported_model`)
+          // structurally — the loop and the catalog badge read it, and no
+          // caller has to parse the message.
+          snippetErrorCode(snippet) || null,
         );
       }
     }

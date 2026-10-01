@@ -113,6 +113,7 @@ export function DefaultModelPicker({ onSaved }: { onSaved?: () => Promise<void> 
             {enabled.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.label || m.id}
+                {m.unsupported === true ? ' (not on server)' : ''}
               </option>
             ))}
             {configuredKnown && <option value={configured ?? ''}>{configured} (unavailable)</option>}

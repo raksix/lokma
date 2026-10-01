@@ -1,4 +1,5 @@
 import { CircleUserRound, Database, FlaskConical, GitBranch, Globe, MessagesSquare, Settings, Terminal } from 'lucide-react';
+import { surfacesWithHost, type Surface, type SurfaceId } from '@lokma/shared/surfaces';
 import { cn } from '@/lib/utils';
 import { INSPECTOR_DRAG_MIME, encodeInspectorDrag, isPaneOnlyTab, type RailDropId } from '@/components/panes/panes';
 import type { InspectorTab } from '@/components/providers';
@@ -14,6 +15,11 @@ import type { SidebarSide } from './responsive';
  * bottom: settings + account. Purely presentational: the parent owns the
  * active key and maps each click to a sidebar (Explorer vs Inspector +
  * requested Inspector tab). No data layer, lucide icons only.
+ *
+ * REQ-181 — the three groups are PROJECTIONS of the shared surface catalog
+ * (`activity-top` / `activity-pane` / `activity-bottom`): ids, order and
+ * labels come from that single table; the icon map below is the only
+ * web-side registration.
  */
 export type ActivityKey =
   | 'sessions'
@@ -31,22 +37,36 @@ interface ActivityItem {
   Icon: typeof MessagesSquare;
 }
 
-const TOP_ITEMS: ActivityItem[] = [
-  { key: 'sessions', label: 'Sessions', Icon: MessagesSquare },
-  { key: 'git', label: 'Git', Icon: GitBranch },
-];
+/**
+ * lucide icon per catalog surface id — React components stay in the web
+ * layer; the projection below throws when a surface has no icon, so a new
+ * catalog row fails loudly instead of silently dropping off the bar.
+ */
+const ACTIVITY_ICONS: Partial<Record<SurfaceId, typeof MessagesSquare>> = {
+  sessions: MessagesSquare,
+  git: GitBranch,
+  terminal: Terminal,
+  browser: Globe,
+  vault: Database,
+  testing: FlaskConical,
+  settings: Settings,
+  account: CircleUserRound,
+};
 
-const PANE_ITEMS: ActivityItem[] = [
-  { key: 'terminal', label: 'Terminal', Icon: Terminal },
-  { key: 'browser', label: 'Browser', Icon: Globe },
-  { key: 'vault', label: 'Vault', Icon: Database },
-  { key: 'testing', label: 'Testing Lab', Icon: FlaskConical },
-];
+/** Project one catalog surface into an activity button (throws when its icon is missing). */
+function activityItemFor(surface: Surface): ActivityItem {
+  const Icon = ACTIVITY_ICONS[surface.id];
+  if (!Icon) {
+    throw new Error('activity bar: no icon registered for surface ' + surface.id);
+  }
+  return { key: surface.id as ActivityKey, label: surface.label, Icon };
+}
 
-const BOTTOM_ITEMS: ActivityItem[] = [
-  { key: 'settings', label: 'Settings', Icon: Settings },
-  { key: 'account', label: 'Account', Icon: CircleUserRound },
-];
+const TOP_ITEMS: ActivityItem[] = surfacesWithHost('activity-top').map(activityItemFor);
+
+const PANE_ITEMS: ActivityItem[] = surfacesWithHost('activity-pane').map(activityItemFor);
+
+const BOTTOM_ITEMS: ActivityItem[] = surfacesWithHost('activity-bottom').map(activityItemFor);
 
 export const ACTIVITY_ITEMS: ActivityItem[] = [...TOP_ITEMS, ...PANE_ITEMS, ...BOTTOM_ITEMS];
 
@@ -111,12 +131,19 @@ export function activityOpensPaneTab(key: ActivityKey): boolean {
  * of an Inspector tab (Vault left the panes, same wave as the rail). The
  * icon stays visible; it no longer drags, because a modal surface has no
  * pane drop target.
+ * REQ-181 — projected from the catalog: the pane-group activity hosts
+ * whose `opens` is a settings-section.
  */
-export const ACTIVITY_MODAL_SECTIONS: Record<'vault', SettingsSectionId> = {
-  vault: 'vault',
-};
+export type ActivityModalKey = 'vault';
 
-export type ActivityModalKey = keyof typeof ACTIVITY_MODAL_SECTIONS;
+export const ACTIVITY_MODAL_SECTIONS: Record<ActivityModalKey, SettingsSectionId> = Object.fromEntries(
+  surfacesWithHost('activity-pane')
+    .filter(
+      (surface): surface is Surface & { section: SettingsSectionId } =>
+        surface.opens === 'settings-section' && surface.section !== undefined,
+    )
+    .map((surface) => [surface.id, surface.section] as const),
+) as Record<ActivityModalKey, SettingsSectionId>;
 
 /** True when this activity entry opens the Settings modal, never a pane/tab. */
 export function isActivityModalKey(key: ActivityKey): key is ActivityModalKey {

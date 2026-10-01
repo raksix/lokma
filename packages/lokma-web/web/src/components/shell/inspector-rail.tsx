@@ -1,4 +1,5 @@
 import { Activity, BarChart3, Beaker, Brain, Clock3, Cpu, Folder, FolderOpen, GitBranch, Globe, HardDrive, Info, Layers, ListTodo, Package, Plug2, Puzzle, Settings, Star, Terminal, Users, Workflow } from 'lucide-react';
+import { surfacesWithHost, type Surface, type SurfaceId } from '@lokma/shared/surfaces';
 import { cn } from '@/lib/utils';
 import { INSPECTOR_DRAG_MIME, encodeInspectorDrag } from '@/components/panes/panes';
 import type { InspectorTab } from '@/components/providers';
@@ -12,7 +13,15 @@ import type { ExplorerSide, SidebarSide } from './responsive';
  * 24 menus stay reachable without the wide panel open. Purely
  * presentational: the parent owns the active tab and reveals the Inspector
  * panel on select. Follows the REQ-007 swap via the `side` prop.
+ *
+ * REQ-181 — the item list is no longer hand-maintained: it is a PROJECTION
+ * of the shared surface catalog (`@lokma/shared` surfaces.ts — the single
+ * source for the rail, the activity bar and the agent tool families). Ids,
+ * order and labels come from the catalog; the only rail-side registration
+ * left is the lucide icon map below (React components cannot live in the
+ * pure-data shared table).
  */
+
 /**
  * REQ-163 — rail entries that open a Settings modal SECTION instead of an
  * Inspector tab (Agent Hub moved out of the panes). One map, one truth: the
@@ -21,28 +30,33 @@ import type { ExplorerSide, SidebarSide } from './responsive';
  * REQ-164 — Orchestration joined the map (same wave). REQ-165 — Vault and
  * Memory followed (their icons stay, their pane/tab definitions are gone).
  * REQ-166 — Skills followed last (same wave: icon stays, pane definitions gone).
+ * REQ-181 — the map is projected from the catalog: every inspector-hosted
+ * settings-section surface except `settings` itself (that entry is the
+ * modal's home and keeps its legacy tab/deep-link behavior).
  */
-export const RAIL_MODAL_SECTIONS: Record<
-  'agents' | 'orchestration' | 'vault' | 'memory' | 'skills',
-  SettingsSectionId
-> = {
-  agents: 'agents',
-  orchestration: 'orchestration',
-  vault: 'vault',
-  memory: 'memory',
-  skills: 'skills',
-};
+export type RailModalTab = 'agents' | 'orchestration' | 'vault' | 'memory' | 'skills';
+
+export const RAIL_MODAL_SECTIONS: Record<RailModalTab, SettingsSectionId> = Object.fromEntries(
+  surfacesWithHost('inspector')
+    .filter(
+      (surface): surface is Surface & { section: SettingsSectionId } =>
+        surface.opens === 'settings-section' && surface.id !== 'settings' && surface.section !== undefined,
+    )
+    .map((surface) => [surface.id, surface.section] as const),
+) as Record<RailModalTab, SettingsSectionId>;
 
 /**
  * REQ-167 — rail entries that launch their OWN standalone modal (neither a
  * pane/tab nor a Settings section): the Archify icon opens the Archify
  * modal. The icon stays, never drags and never becomes a tiling tab; the
  * AppShell owns the modal state and the mobile tools strip routes here too.
+ * REQ-181 — projected from the catalog (`opens: 'standalone-modal'`).
  */
-export const RAIL_STANDALONE_MODALS = ['archify'] as const;
+export type RailStandaloneModalTab = 'archify';
 
-/** Rail tabs that launch a standalone modal (REQ-167). */
-export type RailStandaloneModalTab = (typeof RAIL_STANDALONE_MODALS)[number];
+export const RAIL_STANDALONE_MODALS: readonly RailStandaloneModalTab[] = surfacesWithHost('inspector')
+  .filter((surface) => surface.opens === 'standalone-modal')
+  .map((surface) => surface.id as RailStandaloneModalTab);
 
 /** True when this rail entry opens a standalone modal (REQ-167). */
 export function isRailStandaloneModalTab(tab: InspectorRailTab): tab is RailStandaloneModalTab {
@@ -58,9 +72,6 @@ export function isRailNonPaneTab(tab: InspectorRailTab): tab is RailModalTab | R
   return isRailModalTab(tab) || isRailStandaloneModalTab(tab);
 }
 
-/** Rail tabs that launch the Settings modal instead of a pane (REQ-163). */
-export type RailModalTab = keyof typeof RAIL_MODAL_SECTIONS;
-
 export type InspectorRailTab = InspectorTab | RailModalTab | RailStandaloneModalTab;
 
 /** True when this rail entry opens the Settings modal, never a pane/tab. */
@@ -74,36 +85,54 @@ interface InspectorRailItem {
   Icon: typeof Info;
 }
 
-export const INSPECTOR_RAIL_ITEMS: InspectorRailItem[] = [
-  // REQ-043 — Files first (VS Code Explorer position): its page shows
-  // ONLY files, separate from every other Inspector tab.
-  { tab: 'files', label: 'Files', Icon: FolderOpen },
-  { tab: 'providers', label: 'Providers', Icon: Plug2 },
-  { tab: 'models', label: 'Models', Icon: Layers },
-  { tab: 'usage', label: 'Usage', Icon: BarChart3 },
-  { tab: 'settings', label: 'Settings', Icon: Settings },
-  { tab: 'terminal', label: 'Terminal', Icon: Terminal },
-  { tab: 'git', label: 'Git', Icon: GitBranch },
-  { tab: 'browser', label: 'Browser', Icon: Globe },
-  { tab: 'agents', label: 'Agents', Icon: Users },
-  { tab: 'orchestration', label: 'Orchestration', Icon: Cpu },
-  { tab: 'vault', label: 'Vault', Icon: Folder },
-  { tab: 'skills', label: 'Skills', Icon: Puzzle },
-  { tab: 'archify', label: 'Archify', Icon: Workflow },
-  // REQ-168 — Design left the rail: it is the third top-level mode and lives
-  // behind the header `lokma · Bots · Design` switch as its own page.
-  { tab: 'testing', label: 'Testing', Icon: Beaker },
-  // REQ-169 — Setup is conditional at render time: hidden once the instance
-  // is bootstrapped (first admin registered). It stays in this canonical
-  // list so the pane registration + programmatic access are unchanged.
-  { tab: 'setup', label: 'Setup', Icon: HardDrive },
-  { tab: 'plugins', label: 'Plugins', Icon: Package },
-  { tab: 'observability', label: 'Observability', Icon: Activity },
-  { tab: 'cron', label: 'Cron', Icon: Clock3 },
-  { tab: 'extras', label: 'Extras', Icon: Star },
-  { tab: 'memory', label: 'Memory', Icon: Brain },
-  { tab: 'todos', label: 'Todos', Icon: ListTodo },
-];
+/**
+ * lucide icon per catalog surface id — the one rail fact the shared
+ * catalog cannot carry (React components stay in the web layer). The
+ * projection below throws when a catalog surface has no icon registered,
+ * so a new surface fails loudly instead of silently dropping off the rail.
+ */
+const SURFACE_ICONS: Partial<Record<SurfaceId, typeof Info>> = {
+  files: FolderOpen,
+  providers: Plug2,
+  models: Layers,
+  usage: BarChart3,
+  settings: Settings,
+  terminal: Terminal,
+  git: GitBranch,
+  browser: Globe,
+  agents: Users,
+  orchestration: Cpu,
+  vault: Folder,
+  skills: Puzzle,
+  archify: Workflow,
+  testing: Beaker,
+  setup: HardDrive,
+  plugins: Package,
+  observability: Activity,
+  cron: Clock3,
+  extras: Star,
+  memory: Brain,
+  todos: ListTodo,
+};
+
+/** Rail-renderable surface id — a catalog id that is also a rail tab. */
+type InspectorRailSurfaceId = Extract<SurfaceId, InspectorRailTab>;
+
+/** Project one catalog surface into a rail button (throws when its icon is missing). */
+function railItemFor(surface: Surface): InspectorRailItem {
+  const Icon = SURFACE_ICONS[surface.id];
+  if (!Icon) {
+    throw new Error('inspector rail: no icon registered for surface ' + surface.id);
+  }
+  return { tab: surface.id as InspectorRailSurfaceId, label: surface.label, Icon };
+}
+
+/**
+ * REQ-181 — the rail list is a projection of the catalog's `inspector`
+ * host: ids, order and labels all come from the catalog table (adding a
+ * surface = one catalog row + one icon above).
+ */
+export const INSPECTOR_RAIL_ITEMS: InspectorRailItem[] = surfacesWithHost('inspector').map(railItemFor);
 
 /**
  * REQ-169 — the displayed rail list is conditional: once the instance is

@@ -15,6 +15,8 @@ import {
   visibleInspectorRailItems,
 } from './inspector-rail';
 import { encodeInspectorDrag, isRailDropId, parseInspectorDrop } from '@/components/panes/panes';
+import { surfacesWithHost } from '@lokma/shared/surfaces';
+import { SETTINGS_SECTIONS } from '@/components/settings/settings';
 
 let passed = 0;
 let failed = 0;
@@ -131,6 +133,41 @@ check(
   }),
 );
 check('REQ-169 canonical table still carries Setup (pane registration untouched)', INSPECTOR_RAIL_ITEMS.some((item) => item.tab === 'setup'));
+
+// REQ-181 — the rail list and the two modal maps are PROJECTIONS of the
+// shared surface catalog (pkg lokma-shared/src/surfaces.ts), not
+// hand-maintained tables: ids, order and labels must be the catalog's.
+const catalogRail = surfacesWithHost('inspector');
+check(
+  'REQ-181 rail list is the catalog projection (same ids, order and labels)',
+  INSPECTOR_RAIL_ITEMS.length === catalogRail.length &&
+    INSPECTOR_RAIL_ITEMS.every(
+      (item, index) => String(item.tab) === catalogRail[index].id && item.label === catalogRail[index].label,
+    ),
+);
+const catalogModalSections = catalogRail.filter(
+  (surface) => surface.opens === 'settings-section' && surface.id !== 'settings',
+);
+check(
+  'REQ-181 RAIL_MODAL_SECTIONS is the catalog projection',
+  Object.keys(RAIL_MODAL_SECTIONS).length === catalogModalSections.length &&
+    catalogModalSections.every(
+      (surface) => (RAIL_MODAL_SECTIONS as Record<string, string | undefined>)[surface.id] === surface.section,
+    ),
+);
+const catalogStandalone = catalogRail.filter((surface) => surface.opens === 'standalone-modal');
+check(
+  'REQ-181 RAIL_STANDALONE_MODALS is the catalog projection',
+  RAIL_STANDALONE_MODALS.length === catalogStandalone.length &&
+    catalogStandalone.every((surface) => (RAIL_STANDALONE_MODALS as readonly string[]).includes(surface.id)),
+);
+const settingsSectionIds = new Set<string>(SETTINGS_SECTIONS.map((section) => section.id));
+check(
+  'REQ-181 every catalog settings-section surface opens a real Settings section',
+  catalogRail
+    .filter((surface) => surface.opens === 'settings-section')
+    .every((surface) => surface.section !== undefined && settingsSectionIds.has(surface.section)),
+);
 
 console.log(`inspector-rail.test.ts: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

@@ -13,6 +13,7 @@ import {
   type ActivityKey,
 } from './activity-bar';
 import { isRailDropId } from '@/components/panes/panes';
+import { surfacesWithHost } from '@lokma/shared/surfaces';
 
 let passed = 0;
 let failed = 0;
@@ -81,6 +82,30 @@ check(
   (['sessions', 'git', 'terminal', 'browser', 'testing', 'settings', 'account'] as ActivityKey[]).every(
     (key) => isActivityModalKey(key) === false,
   ),
+);
+
+// REQ-181 — the three groups are PROJECTIONS of the shared surface catalog
+// (activity-top / activity-pane / activity-bottom), not hand-maintained
+// arrays; the modal map is the catalog's pane-group settings-section rows.
+const catalogActivity = [
+  ...surfacesWithHost('activity-top'),
+  ...surfacesWithHost('activity-pane'),
+  ...surfacesWithHost('activity-bottom'),
+];
+check(
+  'REQ-181 activity list is the catalog projection (group order, then catalog order)',
+  ACTIVITY_ITEMS.length === catalogActivity.length &&
+    ACTIVITY_ITEMS.every(
+      (item, index) => String(item.key) === catalogActivity[index].id && item.label === catalogActivity[index].label,
+    ),
+);
+const catalogActivityModal = surfacesWithHost('activity-pane').filter((surface) => surface.opens === 'settings-section');
+check(
+  'REQ-181 ACTIVITY_MODAL_SECTIONS is the catalog projection',
+  Object.keys(ACTIVITY_MODAL_SECTIONS).length === catalogActivityModal.length &&
+    catalogActivityModal.every(
+      (surface) => (ACTIVITY_MODAL_SECTIONS as Record<string, string | undefined>)[surface.id] === surface.section,
+    ),
 );
 
 console.log(`activity-bar.test.ts: ${passed} passed, ${failed} failed`);

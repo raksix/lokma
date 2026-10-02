@@ -161,7 +161,7 @@
 - [REQ-140](finished/REQ-140-prompt-rail-jump-list.md) — Chat dot rail lists only the user's own prompts (whole transcript, prompts above the render window included) and a click widens the window then lands on that prompt — done
 - [REQ-141](finished/REQ-141-sidebar-group-persistence.md) — Sidebar group folding (Home included) is stored in `localStorage` under `lokma-sidebar-groups` and comes back after a reload; the search-time collapse stays transient and never overwrites the user's layout — done
 - [REQ-142](finished/REQ-142-day-only-normal-view.md) — The normal sidebar view groups *every* session by day only (Today · Yesterday · Last week · Last month · Older, no Projects/Home), the project view is untouched, and the chosen view is persisted — done
-- [REQ-143](finished/REQ-143-compact-effort-menu.md) — The composer Effort menu lost its per-rung descriptions and got compact: 168px wide, one line per rung, a fixed marker column so the active dot does not shift the label; rows expose `data-effort-option`.
+- [REQ-143](finished/REQ-143-compact-effort-menu.md) — done (birim + canlı prob; `mode-chip` tek kaynak deseni sonraki turlarda uygulandı)
 - [REQ-144](finished/REQ-144-pane-poll-stability.md) — Panes stop reloading themselves: `useKnownSession` hands out a value-stable summary across the 4 s list poll and Files/Browser/Git bind to the new `useKnownCwd` primitive, so the tree no longer collapses, clears the selection or refetches while you read it — done
 - [REQ-145](finished/REQ-145-browser-split-yan-pane.md) — Opening something in the browser splits the workspace and docks the page in a side pane — done
 - [REQ-146](finished/REQ-146-acik-browser-yeniden-kullan.md) — An already-open browser is reused (same tab/pane, and the open pane follows the agent's URL) instead of opening a second one — done
@@ -176,9 +176,9 @@
 - [REQ-155](finished/REQ-155-ajan-sohbete-dosya-gondersin.md) — The agent must send files/images into the chat directly (screenshots from the browser tools) instead of printing a file path — done (send_file tool + transcript attachments + auto-delivered screenshots; live E2E 11/11, screenshot lands in the session workspace)
 - [REQ-156](finished/REQ-156-mesaj-tek-cizim.md) — A message sent once painted two or three times: the same transcript row reached the cache from more than one socket, and the composer had no double-submit guard — done
 - [REQ-157](finished/REQ-157-sohbet-tasma-duzeltmesi.md) — Long message/tool text overflowed the chat (missing min-w-0 chain on tool rows, no break-words/break-all on bodies and JSON blocks) — done
-- [REQ-158](finished/REQ-158-terminal-coklu-mesaj-bash-simgesi.md) — Terminal: duplicate typed lines + the synthetic `$` prompt glyph removed
-- [REQ-159](finished/REQ-159-terminal-yazmiyor-canli-sinir.md) — Terminal "yazmıyor": the live-terminal limit wedged (idle user shells are now handed back; agent shells survive).
-- [REQ-160](finished/REQ-160-ekler-yenilemede-kayboluyor.md) — Agent-sent chat attachments vanished on reload: `toTranscriptRow` dropped them from socket rows
+- [REQ-158](finished/REQ-158-terminal-coklu-mesaj-bash-simgesi.md) — done (xterm geçişinde kalıcı olarak çözüldü; `isDuplicateFrame` penceresi kalktı)
+- [REQ-159](finished/REQ-159-terminal-yazmiyor-canli-sinir.md) — done (idle shell geri dönüşü; REQ-162 xterm geçişiyle pekişti)
+- [REQ-160](finished/REQ-160-ekler-yenilemede-kayboluyor.md) — done (`toTranscriptRow` alanı tamam; REQ-155 attachments alanı)
 - [REQ-161](finished/REQ-161-bots-ayri-mod-grok-ux.md) — Bots ayrı bir mod olsun: üstte lokma/Bots geçişi, oturum paneli yerine bot listesi (+ New Bot), Grok tarzı sohbet UX'i ve iki rail girişinin kaldırılması — done
 - [REQ-162](finished/REQ-162-terminal-gercek-emulator.md) — Terminal gerçek emülatör olsun: yanıp sönen imleç, silmenin ekrana yansıması, renkler ve vim/htop (xterm.js) — done
 - [REQ-163](finished/REQ-163-agent-hub-modal-settings.md) — Agent Hub pane değil: Settings modalına bölüm olarak taşınsın; rail ikonu modalı açar — done (live probe 29/29)

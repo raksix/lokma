@@ -150,5 +150,16 @@ const withAttachment = toTranscriptRow({
 assert.equal(withAttachment.attachments?.length, 1, 'attachment kept on the row');
 assert.equal(withAttachment.attachments?.[0]?.mime, 'image/png', 'attachment mime kept');
 
+// 10. REQ-186: user-attached images ride the wire row for the same reason —
+// without this the sent image renders live and vanishes on the next reload.
+const withImage = toTranscriptRow({
+  role: 'user',
+  content: 'look',
+  timestamp: 'now',
+  images: [{ name: 'shot.png', mime: 'image/png', dataBase64: 'QUJD' }],
+});
+assert.equal(withImage.images?.length, 1, 'user image kept on the row');
+assert.equal(withImage.images?.[0]?.mime, 'image/png', 'user image mime kept');
+
 unsubscribeSocket(listWatcher);
-console.log('REQ-149 session feed: 9 groups, all checks passed');
+console.log('REQ-149 session feed: 10 groups, all checks passed');

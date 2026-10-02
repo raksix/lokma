@@ -79,6 +79,12 @@ export const TranscriptRowSchema = z.object({
   toolName: z.string().optional(),
   /** REQ-155: agent-sent files — images inline, other files become cards. */
   attachments: z.array(SessionAttachmentSchema).optional(),
+  /**
+   * REQ-186: images the user attached to this prompt — the socket is the
+   * chat's primary source after a reload, so dropping them here would make
+   * every sent image vanish on refresh (same trap as `attachments`).
+   */
+  images: z.array(PromptImageSchema).optional(),
 });
 export type TranscriptRow = z.infer<typeof TranscriptRowSchema>;
 

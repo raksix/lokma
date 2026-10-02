@@ -39,6 +39,7 @@ import {
   type ExecuteCheck,
   type ParsedToolCall,
   type SessionDeliveryResult,
+  type SessionImage,
   type SessionMessage,
   type ToolEvent,
   type ToolResultCarrier,
@@ -240,6 +241,14 @@ const HISTORY_MESSAGE_CAP = 30;
 const HISTORY_CHAR_CAP = 48_000;
 const HISTORY_CHAT_TRUNC = 8_000;
 const HISTORY_TOOL_TRUNC = 2_000;
+/**
+ * REQ-186: total base64 characters of user-attached images replayed upstream.
+ * One prompt can carry up to `PROMPT_MAX_IMAGES` × ~2M chars, and replaying
+ * every turn's images unbounded would inflate the request body past what any
+ * provider accepts — so images budget out oldest-first (newest keeps: the
+ * prompt being answered always rides whole). ~4M chars ≈ 3 MB of images.
+ */
+const HISTORY_IMAGE_CHAR_CAP = 4_000_000;
 
 /** Cut `text` to `cap` chars, marking the cut so the model knows. */
 export function truncateHistoryText(text: string, cap: number): string {
@@ -282,6 +291,11 @@ export function toolRowParts(content: string): { argumentsJson: string; body: st
  * the model a wall of `<tool_result>` text instead of the tool protocol it
  * actually speaks. Anything unpaired (no id, no assistant row ahead of it)
  * degrades to that text blob, so a `tool_call_id` is never left dangling.
+ *
+ * REQ-186: user rows carrying `images` replay their bytes as provider
+ * content parts (newest-first, `HISTORY_IMAGE_CHAR_CAP`) — the previous
+ * turn's screenshot stays visible to the model, and a history stripped of
+ * images is exactly the "görseli görmüyor" bug this closes.
  * Pure — probe it directly.
  */
 export function buildLoopHistory(messages: SessionMessage[]): ProviderMessage[] {
@@ -291,9 +305,14 @@ export function buildLoopHistory(messages: SessionMessage[]): ProviderMessage[] 
     content: string;
     toolCallId?: string;
     toolName?: string;
+    images?: SessionImage[];
   };
   const rows: Row[] = [];
   let chars = 0;
+  // REQ-186: images are budgeted separately from text (they are bytes, not
+  // context the truncation markers describe). Newest-first — the row being
+  // answered is processed first and keeps its images before older turns.
+  let imageChars = 0;
   for (let i = recent.length - 1; i >= 0; i--) {
     const m = recent[i];
     if (!m) continue;
@@ -304,6 +323,19 @@ export function buildLoopHistory(messages: SessionMessage[]): ProviderMessage[] 
     // answered); older rows are truncated per-role so giants cannot evict
     // the conversation the model is supposed to remember.
     const isNewest = i === recent.length - 1;
+    // REQ-186: user-attached images — the model actually sees them only if
+    // they ride a provider message, so map the row's bytes back onto the
+    // wire shape here. `spent` only counts toward the budget once the row is
+    // accepted (a row dropped by the text cap spends nothing).
+    let spent = 0;
+    const keptImages: SessionImage[] = [];
+    if (m.role === 'user' && m.images?.length) {
+      for (const image of m.images) {
+        if (imageChars + spent + image.dataBase64.length > HISTORY_IMAGE_CHAR_CAP) break;
+        spent += image.dataBase64.length;
+        keptImages.push(image);
+      }
+    }
     const row: Row =
       m.role === 'tool'
         ? {
@@ -315,10 +347,14 @@ export function buildLoopHistory(messages: SessionMessage[]): ProviderMessage[] 
         : {
             role: m.role === 'assistant' ? 'assistant' : 'user',
             content: isNewest ? m.content : truncateHistoryText(m.content, HISTORY_CHAT_TRUNC),
+            ...(keptImages.length > 0 ? { images: keptImages } : {}),
           };
-    if (!row.content.trim()) continue;
+    // REQ-186: an image-only prompt has no text but IS a message — only rows
+    // carrying neither text nor images are dropped.
+    if (!row.content.trim() && !row.images?.length) continue;
     chars += row.content.length;
     if (chars > HISTORY_CHAR_CAP && rows.length > 0) break;
+    imageChars += spent;
     rows.unshift(row);
   }
 
@@ -362,6 +398,11 @@ export function buildLoopHistory(messages: SessionMessage[]): ProviderMessage[] 
         role: 'user',
         content: `<tool_result tool="${row.toolName ?? 'unknown'}" id="${row.toolCallId ?? ''}">${row.content}</tool_result>`,
       });
+    } else if (row.role === 'user' && row.images?.length) {
+      // REQ-186: the adapter turns these into real image content parts next
+      // to the text (chat `image_url`, Responses `input_image`, Anthropic
+      // base64 block) — this is the hop that makes the model SEE the image.
+      out.push({ role: 'user', content: row.content, images: row.images });
     } else {
       out.push({ role: row.role, content: row.content });
     }

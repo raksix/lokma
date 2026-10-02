@@ -131,3 +131,45 @@ assert(maxToolConcurrency('4') === 4, 'a sane override is honoured');
 assert(maxToolConcurrency('999') === 32, 'a huge override is clamped to 32');
 
 console.log(`agent-loop-turnend probe: ${passed} passed`);
+
+/* REQ-186 — user-attached images replay to the provider as real bytes. */
+const imgRow = (chars: number, name: string) => ({ name, mime: 'image/png', dataBase64: 'A'.repeat(chars) });
+
+// 6a. The newest user row keeps its images — this is the hop that makes the
+// model actually SEE the attached screenshot (adapters emit content parts
+// from here; dropping it is exactly the "gorseli gormuyor" bug).
+const imageHistory = buildLoopHistory([
+  { role: 'user', content: 'earlier', timestamp: 't1' },
+  { role: 'assistant', content: 'ok', timestamp: 't2' },
+  { role: 'user', content: 'look at this', timestamp: 't3', images: [imgRow(120, 'shot.png')] },
+]);
+const imgUser = [...imageHistory].reverse().find((m) => m.role === 'user');
+assert(imgUser?.images?.length === 1, 'newest user row replays its image');
+assert(imgUser?.images?.[0]?.dataBase64.length === 120, 'image bytes survive the mapping');
+
+// 6b. Images budget out oldest-first: a fresh prompt keeps its bytes even
+// when the previous turn already spent most of the cap.
+const budgetHistory = buildLoopHistory([
+  { role: 'user', content: 'old giant', timestamp: 't1', images: [imgRow(3_000_000, 'old.png')] },
+  { role: 'assistant', content: 'seen', timestamp: 't2' },
+  { role: 'user', content: 'new', timestamp: 't3', images: [imgRow(2_000_000, 'new.png')] },
+]);
+const oldImageRow = budgetHistory.find((m) => m.role === 'user' && m.content === 'old giant');
+const newImageRow = budgetHistory.find((m) => m.role === 'user' && m.content === 'new');
+assert(newImageRow?.images?.[0]?.dataBase64.length === 2_000_000, 'newest keeps its image under the cap');
+assert(oldImageRow?.images === undefined, 'older images drop when the budget is spent');
+
+// 6c. An image-only prompt has no text but must not be dropped.
+const imageOnly = buildLoopHistory([
+  { role: 'user', content: '', timestamp: 't1', images: [imgRow(60, 'only.png')] },
+]);
+assert(imageOnly.length === 1 && imageOnly[0]?.images?.[0]?.mime === 'image/png', 'image-only prompt rides');
+
+// 6d. Within budget, recent turns all keep theirs.
+const bothSmall = buildLoopHistory([
+  { role: 'user', content: 'first', timestamp: 't1', images: [imgRow(60, 'a.png')] },
+  { role: 'user', content: 'second', timestamp: 't2', images: [imgRow(60, 'b.png')] },
+]);
+assert(bothSmall.filter((m) => m.images?.length).length === 2, 'both recent turns keep their images');
+
+console.log(`agent-loop-images probe: ${passed} passed`);

@@ -58,6 +58,9 @@ export function toTranscriptRow(message: SessionMessage): TranscriptRow {
   // the socket is the chat's primary source after a reload, so dropping them
   // here made every screenshot vanish on refresh.
   if (message.attachments?.length) row.attachments = message.attachments;
+  // REQ-186: same contract for user-attached images — without this the sent
+  // image renders live and disappears on the next transcript reload.
+  if (message.images?.length) row.images = message.images;
   return row;
 }
 

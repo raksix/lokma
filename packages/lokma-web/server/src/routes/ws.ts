@@ -845,7 +845,10 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
 
       if (msg.type === 'prompt') {
         const prompt = msg.prompt.trim();
-        if (!prompt) return;
+        // REQ-186: an image-only prompt is legitimate (paste a screenshot and
+        // hit Enter with no text) — only a frame carrying neither is dropped.
+        const images = msg.images ?? [];
+        if (!prompt && images.length === 0) return;
         const cwd = await effectiveCwd();
         // Claim attribution is resolved now (the socket may be gone by turn time).
         // REQ-112: fall back to the handshake user — headers/cookies miss
@@ -865,7 +868,17 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
             return;
           }
         }
-        await new SessionStore(cwd).append(sessionId, { role: 'user', content: prompt, timestamp: new Date().toISOString() });
+        await new SessionStore(cwd).append(sessionId, {
+          role: 'user',
+          content: prompt,
+          timestamp: new Date().toISOString(),
+          // REQ-186: the transcript row is the single source of truth for the
+          // attached images — the loop replays these bytes to the provider
+          // (`buildLoopHistory`) and the chat re-renders them after a reload.
+          ...(images.length > 0
+            ? { images: images.map((i) => ({ name: i.name, mime: i.mime, dataBase64: i.dataBase64 })) }
+            : {}),
+        });
         const depth = enqueuePrompt(sessionId, {
           prompt,
           model: msg.model?.trim() || undefined,

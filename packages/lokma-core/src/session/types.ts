@@ -18,6 +18,15 @@ export type SessionMessage = {
    * frame validator strips unknown keys — keep both in sync).
    */
   attachments?: SessionAttachment[];
+  /**
+   * REQ-186: images the USER attached to this prompt. The bytes live on the
+   * row itself (the JSONL transcript is the single source of truth): the web
+   * renders them inline under the user bubble, and `buildLoopHistory` replays
+   * them to the provider as real content parts, so the model actually sees
+   * the image — on the turn it was sent and on follow-up turns. Mirrored in
+   * `lokma-shared` `TranscriptRowSchema` — keep both in sync.
+   */
+  images?: SessionImage[];
 };
 
 /** One chat attachment (path relative to the session cwd). */
@@ -26,6 +35,16 @@ export type SessionAttachment = {
   name: string;
   mime: string;
   size: number;
+};
+
+/** One user-attached image (REQ-186) — shape of the protocol's `PromptImage`. */
+export type SessionImage = {
+  /** Original file name (display only). */
+  name: string;
+  /** Image MIME type (the composer re-encodes to image/jpeg). */
+  mime: string;
+  /** Raw base64 payload (no `data:` prefix) — the provider wire shape. */
+  dataBase64: string;
 };
 
 export type SessionMeta = {

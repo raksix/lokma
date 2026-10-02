@@ -43,7 +43,12 @@ export type TranscriptMessage = {
   toolCallId?: string;
   /** REQ-155: agent-sent files (images render inline, others get cards). */
   attachments?: ChatAttachment[];
+  /** REQ-186: images the USER attached to this prompt (raw base64 bytes). */
+  images?: TranscriptImage[];
 };
+
+/** One user-attached image row (REQ-186) — mirrors the protocol `PromptImage`. */
+export type TranscriptImage = { name: string; mime: string; dataBase64: string };
 export type PendingMessage = { key: number; text: string };
 /** REQ-111: one stream cut per `tool_start` (arrival order, see `@/lib/ws`). */
 export type ToolMark = { callId: string; at: number };
@@ -216,6 +221,37 @@ function formatTime(iso: string | undefined): string {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+/**
+ * REQ-186 — one user-attached image under the bubble. The bytes live on the
+ * transcript row (base64), so no fetch is needed: the data URL IS the render.
+ * Click opens a blob URL in a new tab (Chrome blocks top-level `data:` URLs).
+ */
+function UserImage({ image }: { image: TranscriptImage }) {
+  const src = React.useMemo(() => `data:${image.mime};base64,${image.dataBase64}`, [image]);
+  const open = React.useCallback(() => {
+    try {
+      const binary = atob(image.dataBase64);
+      const bytes = new Uint8Array(binary.length);
+      for (let k = 0; k < binary.length; k++) bytes[k] = binary.charCodeAt(k);
+      const url = URL.createObjectURL(new Blob([bytes], { type: image.mime }));
+      window.open(url, '_blank');
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch {
+      // Decode failure stays silent — the inline render is the primary view.
+    }
+  }, [image]);
+  return (
+    <button
+      type="button"
+      onClick={open}
+      title={image.name}
+      className="cursor-zoom-in overflow-hidden rounded-lg border border-line bg-white shadow-sm transition hover:border-line-strong dark:bg-[#0F0F11]"
+    >
+      <img src={src} alt={image.name} className="max-h-[240px] w-auto max-w-full" />
+    </button>
+  );
+}
+
 function UserRow({
   index,
   message,
@@ -270,9 +306,18 @@ function UserRow({
           </div>
         ) : (
           <>
-            <div className="mt-1.5 rounded-2xl rounded-tl-sm border border-line bg-white p-3.5 shadow-sm transition group-hover:border-line-strong group-hover:shadow-md dark:bg-[#1E1E21]">
-              <div className="text-[13.5px] leading-[1.6] whitespace-pre-wrap break-words">{message.content}</div>
-            </div>
+            {message.content.trim() ? (
+              <div className="mt-1.5 rounded-2xl rounded-tl-sm border border-line bg-white p-3.5 shadow-sm transition group-hover:border-line-strong group-hover:shadow-md dark:bg-[#1E1E21]">
+                <div className="text-[13.5px] leading-[1.6] whitespace-pre-wrap break-words">{message.content}</div>
+              </div>
+            ) : null}
+            {message.images?.length ? (
+              <div className="mt-1.5 flex flex-wrap gap-2" data-user-images="1">
+                {message.images.map((image, k) => (
+                  <UserImage key={`${k}-${image.name}`} image={image} />
+                ))}
+              </div>
+            ) : null}
             <div className="mt-1 flex flex-wrap gap-1 opacity-0 transition group-hover:opacity-100">
               <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={() => setEditing(true)}>
                 <Pencil className="mr-1 h-3 w-3" /> Edit

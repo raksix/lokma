@@ -1,0 +1,65 @@
+## Overall
+
+A single full‑bleed dark IDE‑style window (Lokma) in a 16:9 desktop frame. Everything is near‑black with hairline separators; the only saturated colour is a warm orange/amber accent plus a few green status dots. The window is split into **six vertical bands**: icon rail → session sidebar → chat column → browser column → collapsed right dock → bottom status bar.
+
+---
+
+## 1. Far‑left icon rail (narrow, ~48 px)
+
+- **Top strip:** a `>_` prompt/terminal glyph and a panel‑toggle (rectangle with a divided left edge) icon.
+- **Below:** a single vertical stack of thin line icons — a chat/session bubble (this one is **active**, drawn in orange, with a slim orange bar pinned to the window's left edge), a wrench, a `>_` terminal, a globe, a database cylinder, a flask/beaker.
+- **Bottom:** a gear (settings) and a circled person (account) icon, both dim grey.
+
+## 2. Session sidebar (~380 px)
+
+A scrollable list of sessions grouped by project, with a slim grey scrollbar hugging the right edge.
+
+- **Project header rows:** a right‑pointing `›` disclosure chevron, the project name in dim monospace (`deneme`, `soolva`, `kbuhazirllk`, `fermaz`), a right‑aligned count (`34`, `3`, `1`) in small grey, then a vertical‑dots kebab and a `+` add button.
+- **Session rows:** a small bullet dot, a truncated title, and a kebab `⋮` at the right edge. Inactive titles are medium grey; the **active session** row is a slightly lighter rounded block with a bright white bold title and a **green dot** where the bullet would be.
+- **Collapsed overflows:** centred grey underlined links reading `+241 more` / `+29 more`.
+
+## 3. Top bar (spans the chat + browser columns)
+
+- **Left:** a white rounded pill logo — a black rounded square with a white `L`, followed by the black word `lokma`. Then two grey nav labels, **Bots** and **Design**.
+- **Centre‑right:** a small **green dot** followed by `2.7k · $0.00` in light grey.
+
+## 4. Centre column — chat panel (~740 px)
+
+- **Tab strip:** a 6‑dot drag handle, then three tabs each with a small chat‑bubble glyph and an `✕` — `bana bir site yap…`, `Untitled session`, `Untitled ses…`. The active tab is filled lighter and has a bright white underline. Right of the tabs: a `+`, then three pane‑layout icons (split‑right, split‑bottom, picture‑in‑picture), a fullscreen bracket icon, and `✕`.
+- **Sub‑toolbar:** the monospace session id `sess_mupsivmh_4tvi` in dim grey on the left; on the right a `+`, a small "people/branch" glyph, and the word **Open** in white.
+- **Thread:** alternating message rows. Agent = a **white circle with a black `L`**, bold white name `Lokma` + grey timestamp. User = a **dark‑grey circle with a person outline**, bold white `You` + grey timestamp. User text sits in a **rounded bubble filled a shade lighter than the panel**; agent text sits directly on the background. A raw tool line `<tool name="list_files">` renders in monospace. Beneath it a row of grey action chips: **Copy** (overlapping squares), **Fork** (branch), **Rewind** (clock‑arrow).
+- **Floating widget:** a small vertical pill pinned to the right edge of the thread, with an **orange dot** at the top and a grey dot below — like a minimap/anchor indicator.
+- **Meta line:** tiny grey text `2.7k · $0.00 · commandcode/stealth/space-bunny-alpha · thinking: max · akıl yürütme yayınlanmadı`.
+- **Composer card** (rounded, one step lighter than the panel): top row = `Type @path to attach workspace files`, plus a pill toggle with a smiley and a list icon, plus a model chip showing an `L` avatar, `space-bunny-al…` and a chevron. Middle = the big input `Ask Lokma — @file for context, / for commands`. Bottom row = paperclip, microphone, an **orange‑outlined pill with a brain icon reading “Thinking Max”** with a chevron, grey hint text `Enter send · Shift+Enter newline · / commands`, and on the right a **rust/brown rounded “Send” button** with a tiny sparkle icon.
+
+## 5. Right column — browser panel (~750 px)
+
+- **Header:** a globe glyph + `Browser` tab with `✕`; the same `+` / pane‑icon trio / `✕` cluster on the right.
+- **Toolbar card:** back and forward chevrons, a circular reload arrow, then a pill address field with a **green status dot** and the monospace placeholder `Type a web address…`, with a **Go** button on its right end.
+- **Body:** empty black canvas, with a centred **dashed-outline** empty‑state box reading `Type an address above and press Enter.` in grey.
+
+## 6. Far‑right collapsed dock (~40 px, clipped)
+
+A vertical rail of tiny collapsed panel tabs: a truncated heading (`Sea…`), then a stack of `›` chevron headers, then a long column of document/page icons — each drawn in dim grey.
+
+## 7. Bottom status bar (full width, ~28 px)
+
+A single row of small grey icon + label pairs on near‑black: a **green dot** + pulse glyph `gateway · 67ms`, a monitor icon `fermaz-website`, a chip icon `cpu 99.5%`, a memory icon `ram 56.1 GB / 62.6 GB`, a lightning bolt `167 tok/s`.
+
+---
+
+## Colour summary
+
+| Role | Colour |
+|---|---|
+| Window background | near‑black `#0b0b0d` |
+| Panel / sidebar / cards | one to three steps lighter, `#131316`–`#1c1c20` |
+| User bubble fill | mid dark grey `#2a2a2f` |
+| Hairline borders/dividers | `#26262b` |
+| Primary text | white / `#f2f2f4` |
+| Secondary text | mid grey `#8b8b93` |
+| Hint / placeholder | dim grey `#6e6e76`, monospace for ids and URLs |
+| Accent (active rail icon + edge bar, Thinking Max outline, floating dot) | orange/amber |
+| Send button | rust / warm brown |
+| Status (2.7k dot, address‑bar dot, active session dot, gateway dot) | green |
+| Logo pill & agent avatar | pure white with black `L` |

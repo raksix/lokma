@@ -366,6 +366,7 @@ export function Chat({
         model: s.model || undefined,
         contextPaths: s.contextPaths.length ? s.contextPaths : undefined,
         reasoningEffort: s.reasoningEffort === 'off' ? undefined : s.reasoningEffort,
+        images: s.images.length ? s.images : undefined,
       });
     },
     [sendText],
@@ -550,7 +551,7 @@ export function Chat({
     (prompt: string) => {
       if (transcript.length === 0 && pending.length === 0 && !stream) {
         // Starter cards honour the persisted thinking pick (REQ-133).
-        send({ text: prompt, model, contextPaths: [], reasoningEffort: readThinking() });
+        send({ text: prompt, model, contextPaths: [], reasoningEffort: readThinking(), images: [] });
         return;
       }
       api

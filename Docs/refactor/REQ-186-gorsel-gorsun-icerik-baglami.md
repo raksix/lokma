@@ -55,6 +55,7 @@ Ek gözlem: bu oturumda ekran görüntüleri şu biçimde geliyor:
 ## İş günlüğü
 
 - Tur 1 (2026-10-02): Provider katmanı — ProviderMessage.images alanı (+ ProviderImage tipi, messageImages/imageDataUrl yardımcıları); üç wire dönüştürücü görseli gerçek içerik parçası olarak üretiyor (chat image_url, Responses input_text/input_image, Anthropic base64 image bloğu). Yeni birim prob images.test.ts 17/17 PASS; adapters.test.ts 162/162 regresyon temiz; kök tsc 0; lokma-ai dist yeniden derlendi. Sıradaki: composer (data URL + maxEdge küçültme) + protokol alanı.
+- Tur 2 (2026-10-02): Composer + protokol — `prompt` frame `images` taşıyor (PromptImageSchema name/mime/dataBase64; PROMPT_MAX_IMAGES=6, PROMPT_IMAGE_BASE64_CHARS=2M; shared ws.test 20/20). Composer görseli tarayıcıda createImageBitmap + canvas ile JPEG'e çevirir: maxEdge 1568 (gerekirse 1176→882/quality ladder), şeffaflık beyaza kompozit, aşım dürüst hatayla reddedilir; marker `[image attached: …]` + "downscaled from WxH" notu (chat.test 4 downscale senaryosu). Wire: ComposerSend.images → sendText → promptMessage → frame; WS maxPayload 1MB→16MB (eski tavan ilk gerçek ekran görüntüsünde soketi 1009 ile kapatırdı). Kök tsc 0, web build yeşil (index-DmMBZxyp.js), served bundle == disk, lokma-web + lokma-server restart, health 200. Sıradaki: sunucu tarafı — ws.ts prompt handler'ın images'ı kullanıcı satırına yazması, runAgentLoop'un ProviderMessage.images ile beslemesi, kullanıcı mesajında görsel render'ı.
 
 ## Bitirme (done)
 

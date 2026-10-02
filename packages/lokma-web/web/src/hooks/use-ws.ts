@@ -24,6 +24,7 @@ import {
   wsUrl,
   type CostTotal,
   type PermissionRequest,
+  type PromptImage,
   type QuestionRequest,
   type ReasoningEffort,
   type ServerMessage,
@@ -48,7 +49,13 @@ import {
  * sidebar keeps its 4 s REST poll only as a socket-less fallback.
  */
 
-export type SendOpts = { model?: string; contextPaths?: string[]; reasoningEffort?: ReasoningEffort };
+export type SendOpts = {
+  model?: string;
+  contextPaths?: string[];
+  reasoningEffort?: ReasoningEffort;
+  /** REQ-186: attached images (downscaled base64) riding the prompt frame. */
+  images?: PromptImage[];
+};
 
 export type UseWs = {
   status: WsStatus;

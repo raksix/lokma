@@ -6,6 +6,8 @@
 import { strict as assert } from 'node:assert';
 import {
   ClientMessageSchema,
+  PROMPT_IMAGE_BASE64_CHARS,
+  PROMPT_MAX_IMAGES,
   ServerMessageSchema,
   decodeClientMessage,
   encodeServerMessage,
@@ -79,4 +81,24 @@ assert.equal(ServerMessageSchema.safeParse({ type: 'transcript', sessionId: 's' 
 const encoded = encodeServerMessage({ type: 'sessions', sessions: [row] });
 assert.deepEqual(JSON.parse(encoded), { type: 'sessions', sessions: [row] });
 
-console.log('REQ-149 ws protocol frames: 16/16 checks passed');
+// ── REQ-186: attached images on the prompt frame ───────────────────────────
+const img = { name: 'shot.png', mime: 'image/jpeg', dataBase64: 'aGVsbG8=' };
+const withImages = decodeClientMessage(JSON.stringify({ type: 'prompt', prompt: 'look', images: [img] }));
+assert.equal(withImages?.type, 'prompt', 'prompt with images parses');
+assert.equal(withImages?.type === 'prompt' ? (withImages.images ?? []).length : -1, 1, 'image payload survives');
+assert.equal(
+  decodeClientMessage(
+    JSON.stringify({ type: 'prompt', prompt: 'x', images: Array.from({ length: PROMPT_MAX_IMAGES + 1 }, () => img) }),
+  ),
+  null,
+  'more images than the cap are rejected',
+);
+assert.equal(
+  decodeClientMessage(
+    JSON.stringify({ type: 'prompt', prompt: 'x', images: [{ ...img, dataBase64: 'z'.repeat(PROMPT_IMAGE_BASE64_CHARS + 1) }] }),
+  ),
+  null,
+  'an oversized payload is rejected',
+);
+
+console.log('REQ-149 ws protocol frames: 20/20 checks passed');

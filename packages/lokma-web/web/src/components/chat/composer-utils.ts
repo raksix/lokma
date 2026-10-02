@@ -77,9 +77,36 @@ export function hasOsFiles(types: ReadonlyArray<string>): boolean {
   return types.includes('Files');
 }
 
-/** Compact `<attachment>` marker for an image (vision bytes travel as follow-up). */
-export function formatImageMarker(name: string, dims: string, sizeKb: number): string {
-  return `[image: ${name} (${dims}, ${sizeKb} KB) — describe the image in text for full context]`;
+/** Compact `[image attached: …]` marker for an image riding a prompt (REQ-186). */
+export function formatImageMarker(name: string, dims: string, sizeKb: number, scaledFrom?: string): string {
+  const note = scaledFrom ? ` — downscaled from ${scaledFrom}` : '';
+  return `[image attached: ${name} (${dims}, ${sizeKb} KB)${note}]`;
+}
+
+/**
+ * REQ-186: the longest edge an image keeps before it rides the wire. Large
+ * screenshots (4K+) are downscaled to this so the base64 payload fits the WS
+ * frame budget; vision models read comfortably at this size.
+ */
+export const MAX_IMAGE_EDGE = 1568;
+
+/**
+ * Scale one image down to `maxEdge` (never up) — pure integer math so the
+ * composer probe covers the sizing without a browser.
+ */
+export function downscaleDims(
+  width: number,
+  height: number,
+  maxEdge: number = MAX_IMAGE_EDGE,
+): { width: number; height: number; scaled: boolean } {
+  const longest = Math.max(width, height);
+  if (!Number.isFinite(longest) || longest <= maxEdge) return { width, height, scaled: false };
+  const ratio = maxEdge / longest;
+  return {
+    width: Math.max(1, Math.round(width * ratio)),
+    height: Math.max(1, Math.round(height * ratio)),
+    scaled: true,
+  };
 }
 /** Starter prompts for the hero cards — each creates a real session on click. */
 export const STARTER_PROMPTS: { title: string; desc: string; prompt: string }[] = [

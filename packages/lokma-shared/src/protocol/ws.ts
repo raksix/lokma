@@ -50,6 +50,26 @@ export const SessionAttachmentSchema = z.object({
 });
 export type SessionAttachment = z.infer<typeof SessionAttachmentSchema>;
 
+/**
+ * REQ-186 — one user-attached image riding a `prompt` frame.
+ *
+ * The composer downscales + JPEG-encodes in the browser and ships the raw
+ * base64 payload (no `data:` prefix — `ProviderImage` shape verbatim), so the
+ * server can hand the same bytes to the provider without a second decode.
+ * Caps are hard: `MAX` entries per prompt and a per-image char budget that
+ * keeps the whole frame under the WS `maxPayload`.
+ */
+export const PROMPT_MAX_IMAGES = 6;
+/** ~1.5 MB binary per image (base64 is ~4/3 of the payload). */
+export const PROMPT_IMAGE_BASE64_CHARS = 2_000_000;
+
+export const PromptImageSchema = z.object({
+  name: z.string().min(1).max(200),
+  mime: z.string().min(1).max(80),
+  dataBase64: z.string().min(1).max(PROMPT_IMAGE_BASE64_CHARS),
+});
+export type PromptImage = z.infer<typeof PromptImageSchema>;
+
 /** One persisted transcript line (mirrors `SessionMessage` in lokma-core). */
 export const TranscriptRowSchema = z.object({
   role: z.enum(SESSION_ROLES),
@@ -94,6 +114,9 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
     contextPaths: z.array(z.string()).max(5).optional(),
     // Thinking budget for this prompt (REQ-133).
     reasoningEffort: z.enum(REASONING_EFFORTS).optional(),
+    // REQ-186: attached images as real bytes — the server stores them on the
+    // user row and the adapters emit them as content parts next to the text.
+    images: z.array(PromptImageSchema).max(PROMPT_MAX_IMAGES).optional(),
   }),
   z.object({ type: z.literal('abort'), sessionId: z.string() }),
   z.object({ type: z.literal('permission_response'), requestId: z.string(), decision: z.enum(['allow', 'deny', 'always']) }),

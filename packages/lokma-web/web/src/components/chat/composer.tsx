@@ -12,14 +12,14 @@ import {
   Square,
   X,
 } from 'lucide-react';
-import type { ReasoningEffort } from '@lokma/shared/protocol/ws';
+import { PROMPT_IMAGE_BASE64_CHARS, PROMPT_MAX_IMAGES, type PromptImage, type ReasoningEffort } from '@lokma/shared/protocol/ws';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { api, type SlashCommandInfo } from '@/lib/api';
 import { useProviderStore } from '@/stores';
 import { emitToast } from '@/components/shell';
-import { formatImageMarker, hasOsFiles, isImageAttachment, isSlashPrefix, parseMentions, parseSlashCommand, removeMention } from './composer-utils';
+import { MAX_IMAGE_EDGE, downscaleDims, formatImageMarker, hasOsFiles, isImageAttachment, isSlashPrefix, parseMentions, parseSlashCommand, removeMention } from './composer-utils';
 import { appendMention } from '@/components/files';
 import { enabledModels } from '@/components/providers/models';
 
@@ -33,7 +33,7 @@ import { enabledModels } from '@/components/providers/models';
  * images attach as thumbnail + marker), stop fires the WS interrupt.
  */
 
-export type ComposerSend = { text: string; model: string; contextPaths: string[]; reasoningEffort: ReasoningEffort };
+export type ComposerSend = { text: string; model: string; contextPaths: string[]; reasoningEffort: ReasoningEffort; images: PromptImage[] };
 
 type QueuedPrompt = { key: number; text: string };
 
@@ -84,8 +84,95 @@ function readMode(): 'steer' | 'queue' {
   }
 }
 
-/** One file queued on the composer — text inlines content, images show a thumbnail + marker. */
-type Attachment = { name: string; content: string; kind: 'text' | 'image'; previewUrl?: string };
+/** One file queued on the composer — text inlines content, images carry a thumbnail + real wire bytes (REQ-186). */
+type Attachment = { name: string; content: string; kind: 'text' | 'image'; previewUrl?: string; image?: PromptImage };
+
+/** One wire-ready image (REQ-186) — the encoded payload plus display facts. */
+type EncodedImage = {
+  image: PromptImage;
+  width: number;
+  height: number;
+  sourceWidth: number;
+  sourceHeight: number;
+  scaled: boolean;
+  bytes: number;
+};
+
+/**
+ * Downscale + encode one image for the prompt frame (REQ-186). The frame
+ * budget is finite (the server caps WS payloads), so an oversize encode
+ * steps down a ladder of edges/qualities; a payload that still exceeds the
+ * shared protocol cap is refused with an honest error instead of wedging
+ * the socket.
+ */
+async function encodeImageForWire(file: File): Promise<EncodedImage> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error(`${file.name}: image could not be decoded`);
+  }
+  try {
+    const steps: { edge: number; quality: number }[] = [
+      { edge: MAX_IMAGE_EDGE, quality: 0.85 },
+      { edge: 1176, quality: 0.8 },
+      { edge: 882, quality: 0.75 },
+    ];
+    for (const step of steps) {
+      const { width, height, scaled } = downscaleDims(bitmap.width, bitmap.height, step.edge);
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error(`${file.name}: this browser cannot encode images`);
+      // JPEG has no alpha — composite over white so transparent PNGs don't
+      // come out black.
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(bitmap, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/jpeg', step.quality);
+      const comma = dataUrl.indexOf(',');
+      const dataBase64 = comma === -1 ? '' : dataUrl.slice(comma + 1);
+      const encoded: EncodedImage = {
+        image: { name: file.name, mime: 'image/jpeg', dataBase64 },
+        width,
+        height,
+        sourceWidth: bitmap.width,
+        sourceHeight: bitmap.height,
+        scaled,
+        bytes: Math.round(dataBase64.length * 0.75),
+      };
+      if (dataBase64.length > 0 && dataBase64.length <= PROMPT_IMAGE_BASE64_CHARS) return encoded;
+    }
+    throw new Error(`${file.name}: image stays too large to send after downscaling — try a smaller crop`);
+  } finally {
+    bitmap.close();
+  }
+}
+
+/** Read a pasted/dropped image — thumbnail + marker, plus the real wire bytes (REQ-186). */
+async function readImageAttachment(file: File): Promise<Attachment> {
+  if (file.size > MAX_IMAGE_BYTES) {
+    return Promise.reject(new Error(`${file.name}: images must be under 5MB`));
+  }
+  const previewUrl = URL.createObjectURL(file);
+  try {
+    const encoded = await encodeImageForWire(file);
+    const sizeKb = Math.max(1, Math.round(encoded.bytes / 1024));
+    const dims = `${encoded.width}x${encoded.height}`;
+    const scaledFrom = encoded.scaled ? `${encoded.sourceWidth}x${encoded.sourceHeight}` : undefined;
+    return {
+      name: file.name,
+      content: formatImageMarker(file.name, dims, sizeKb, scaledFrom),
+      kind: 'image',
+      previewUrl,
+      image: encoded.image,
+    };
+  } catch (e) {
+    URL.revokeObjectURL(previewUrl);
+    throw e;
+  }
+}
 
 /** Release a thumbnail object URL (no-op for text attachments). */
 function revokeAttachment(a: Attachment): void {
@@ -124,32 +211,6 @@ function readAttachment(file: File): Promise<string> {
     };
     reader.onerror = () => reject(new Error(`${file.name}: could not be read`));
     reader.readAsText(file);
-  });
-}
-
-/** Read a pasted/dropped image — thumbnail preview plus a compact marker (vision bytes are follow-up). */
-function readImageAttachment(file: File): Promise<Attachment> {
-  if (file.size > MAX_IMAGE_BYTES) {
-    return Promise.reject(new Error(`${file.name}: images must be under 5MB`));
-  }
-  const previewUrl = URL.createObjectURL(file);
-  const sizeKb = Math.max(1, Math.round(file.size / 1024));
-  return new Promise((resolve) => {
-    let settled = false;
-    const done = (dims: string): void => {
-      if (settled) return;
-      settled = true;
-      resolve({ name: file.name, content: formatImageMarker(file.name, dims, sizeKb), kind: 'image', previewUrl });
-    };
-    try {
-      const probe = new Image();
-      probe.onload = () => done(`${probe.naturalWidth}x${probe.naturalHeight}`);
-      probe.onerror = () => done('dimensions unknown');
-      probe.src = previewUrl;
-      window.setTimeout(() => done('dimensions unknown'), 3000);
-    } catch {
-      done('dimensions unknown');
-    }
   });
 }
 
@@ -308,7 +369,11 @@ export function Composer({
       let full = body;
       if (attachments.length) {
         full += attachments
-          .map((a) => `\n\n<attachment name="${a.name}">\n${a.content}\n</attachment>`)
+          .map((a) =>
+            a.kind === 'image'
+              ? `\n\n${a.content}`
+              : `\n\n<attachment name="${a.name}">\n${a.content}\n</attachment>`,
+          )
           .join('');
       }
       if (!full.trim()) return;
@@ -328,7 +393,8 @@ export function Composer({
         for (const a of attachments) revokeAttachment(a);
         setAttachments([]);
       }
-      onSend({ text: full, model, contextPaths: parseMentions(body).map((m) => m.path), reasoningEffort: thinking });
+      const images = attachments.flatMap((a) => (a.kind === 'image' && a.image ? [a.image] : []));
+      onSend({ text: full, model, contextPaths: parseMentions(body).map((m) => m.path), reasoningEffort: thinking, images });
     },
     [attachments, commands, contextPaths, model, onSend, thinking],
   );
@@ -362,6 +428,14 @@ export function Composer({
     if (arr.length === 0) return;
     if (attachments.length + arr.length > MAX_ATTACH_FILES) {
       emitToast(`At most ${MAX_ATTACH_FILES} files per message`);
+      return;
+    }
+    // REQ-186: images ride the prompt frame as bytes — the protocol caps how
+    // many fit, so refuse the excess here instead of failing the send.
+    const imagesHeld = attachments.filter((a) => a.kind === 'image').length;
+    const incomingImages = arr.filter((f) => isImageAttachment(f.name, f.type)).length;
+    if (imagesHeld + incomingImages > PROMPT_MAX_IMAGES) {
+      emitToast(`At most ${PROMPT_MAX_IMAGES} images per message`);
       return;
     }
     void Promise.all(arr.map(readOneAttachment))

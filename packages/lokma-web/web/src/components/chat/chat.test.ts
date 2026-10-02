@@ -5,7 +5,9 @@
  * Not imported by app code, so the Vite bundle ignores it.
  */
 import {
+  MAX_IMAGE_EDGE,
   STARTER_PROMPTS,
+  downscaleDims,
   formatImageMarker,
   hasOsFiles,
   isImageAttachment,
@@ -54,6 +56,16 @@ assert(
   'prompt frame carries contextPaths',
 );
 
+// 4b. REQ-186: attached images ride the prompt frame as real bytes; a send
+// without images leaves the field off the wire entirely (no empty arrays).
+const imgFrame = JSON.parse(
+  promptMessage('look', 'sess_1', {
+    images: [{ name: 'shot.png', mime: 'image/jpeg', dataBase64: 'aGVsbG8=' }],
+  }),
+) as Record<string, unknown>;
+assert(Array.isArray(imgFrame.images) && (imgFrame.images as unknown[]).length === 1, 'prompt frame carries images');
+assert(!('images' in (JSON.parse(promptMessage('plain', 'sess_1')) as Record<string, unknown>)), 'no images key without attachments');
+
 // 5. Hero content is real (each card maps to a session-creating prompt).
 assert(STARTER_PROMPTS.length === 3, 'three starter cards');
 assert(STARTER_PROMPTS.every((s) => s.prompt.length > 10), 'starter prompts are sendable');
@@ -88,9 +100,24 @@ assert(hasOsFiles(['Files']) === true, 'OS file drag detected');
 assert(hasOsFiles(['application/x-lokma-file', 'text/plain']) === false, 'explorer drag is not OS files');
 assert(hasOsFiles(['text/plain']) === false, 'plain text drag is not OS files');
 assert(
-  formatImageMarker('shot.png', '800x600', 120) ===
-    '[image: shot.png (800x600, 120 KB) — describe the image in text for full context]',
+  formatImageMarker('shot.png', '800x600', 120) === '[image attached: shot.png (800x600, 120 KB)]',
   'image marker format exact',
 );
+assert(
+  formatImageMarker('shot.png', '1568x882', 245, '3840x2160') ===
+    '[image attached: shot.png (1568x882, 245 KB) — downscaled from 3840x2160]',
+  'downscaled marker names the source size',
+);
+
+// 8. REQ-186 downscale sizing: 4K screenshots step down to MAX_IMAGE_EDGE,
+// small images ride untouched, degenerate dims never divide by zero.
+const big = downscaleDims(3840, 2160);
+assert(big.width === MAX_IMAGE_EDGE && big.height === 882 && big.scaled, '4K downscales to the edge cap');
+const tall = downscaleDims(1080, 2400);
+assert(tall.height === MAX_IMAGE_EDGE && tall.width === 706 && tall.scaled, 'portrait downscales on its long edge');
+const small = downscaleDims(800, 600);
+assert(small.width === 800 && small.height === 600 && !small.scaled, 'small images are untouched');
+const degenerate = downscaleDims(0, 0);
+assert(degenerate.width === 0 && degenerate.height === 0 && !degenerate.scaled, 'degenerate dims pass through');
 
 console.log('chat.test.ts: REQ-097 paste/drop checks passed');

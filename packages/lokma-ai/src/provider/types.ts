@@ -36,7 +36,45 @@ export type ProviderMessage = {
    * `tool` rows reference call ids the upstream never saw (HTTP 400).
    */
   toolCalls?: ProviderToolCall[];
+  /**
+   * `user` rows: images attached to this message (REQ-186). Adapters that
+   * carry vision emit them as content parts next to the text; adapters
+   * that cannot simply ignore the field. Entries must be image/* with a
+   * real base64 payload — messageImages() drops the rest.
+   */
+  images?: ProviderImage[];
 };
+
+/**
+ * One image riding a user message (REQ-186). dataBase64 is the raw base64
+ * payload WITHOUT a data: prefix — adapters assemble the wire shape per
+ * API (chat-completions image_url object, Responses input_image string,
+ * Anthropic base64 source block).
+ */
+export type ProviderImage = {
+  /** Image MIME type (image/png, image/jpeg, ...). */
+  mime: string;
+  /** Raw base64 payload (no data: prefix). */
+  dataBase64: string;
+};
+
+/** Valid image/* entries of a message (junk mime / empty payload dropped). */
+export function messageImages(message: ProviderMessage): ProviderImage[] {
+  const images = message.images;
+  if (!images || images.length === 0) return [];
+  return images.filter(
+    (image) =>
+      typeof image.mime === 'string' &&
+      image.mime.startsWith('image/') &&
+      typeof image.dataBase64 === 'string' &&
+      image.dataBase64.length > 0,
+  );
+}
+
+/** data: URL for one image — the single shape both OpenAI wires want. */
+export function imageDataUrl(image: ProviderImage): string {
+  return 'data:' + image.mime + ';base64,' + image.dataBase64;
+}
 
 /** One tool schema for native function-calling upstreams (REQ-118). */
 export type ProviderToolSchema = {

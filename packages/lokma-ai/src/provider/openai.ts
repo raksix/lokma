@@ -11,6 +11,7 @@ import {
   type ActiveReasoning,
 } from './reasoning.js';
 import type { ReasoningEffort } from '@lokma/shared/protocol/ws';
+import { imageDataUrl, messageImages } from './types.js';
 import type { AdapterStreamOpts, ProviderAdapter, ProviderMessage, ProviderToolSchema, StreamChunk } from './types.js';
 
 /**
@@ -49,12 +50,17 @@ export function usesResponsesApi(baseUrl: string, model: string): boolean {
   return baseUrl.includes('opencode.ai/zen') && shortModelId(model).includes('muse-spark');
 }
 
+/** One content part of a user turn (REQ-186): text plus attached images. */
+export type ResponsesContentPart =
+  | { type: 'input_text'; text: string }
+  | { type: 'input_image'; image_url: string };
+
 /**
  * One Responses `input` entry — plain turns ride as role/content, tool
  * results return natively (REQ-118 FAZ B.2).
  */
 export type ResponsesInputItem =
-  | { role: string; content: string }
+  | { role: string; content: string | ResponsesContentPart[] }
   | { type: 'function_call_output'; call_id: string; output: string };
 
 const TOOL_RESULT_OPEN = '<tool_result';
@@ -82,6 +88,17 @@ function resultAttr(attrs: string, name: string): string | null {
 export function toResponsesInput(messages: ProviderMessage[]): ResponsesInputItem[] {
   const out: ResponsesInputItem[] = [];
   for (const m of messages) {
+    // REQ-186: a user row carrying attached images becomes a content-parts
+    // array (input_text + input_image). Tool-result splitting below never
+    // applies to it — attachments ride only the fresh prompt.
+    const images = m.role === 'user' ? messageImages(m) : [];
+    if (images.length > 0) {
+      const parts: ResponsesContentPart[] = [];
+      if (m.content) parts.push({ type: 'input_text', text: m.content });
+      for (const image of images) parts.push({ type: 'input_image', image_url: imageDataUrl(image) });
+      out.push({ role: 'user', content: parts });
+      continue;
+    }
     if (m.role !== 'user' || m.content.indexOf(TOOL_RESULT_OPEN) < 0) {
       if (m.role === 'tool') out.push({ role: 'user', content: m.content });
       else out.push({ role: m.role, content: m.content });
@@ -289,6 +306,20 @@ export function toChatMessages(messages: ProviderMessage[], opts?: { flatten?: b
   const flatten = opts?.flatten === true;
   const out: Record<string, unknown>[] = [];
   for (const m of messages) {
+    // REQ-186: attached images ride as image_url content parts; text-only
+    // messages keep the plain string content every upstream already takes.
+    if (m.role === 'user') {
+      const images = messageImages(m);
+      if (images.length > 0) {
+        const parts: Record<string, unknown>[] = [];
+        if (m.content) parts.push({ type: 'text', text: m.content });
+        for (const image of images) {
+          parts.push({ type: 'image_url', image_url: { url: imageDataUrl(image) } });
+        }
+        out.push({ role: 'user', content: parts });
+        continue;
+      }
+    }
     if (m.role === 'tool') {
       const id = typeof m.toolCallId === 'string' ? m.toolCallId.trim() : '';
       if (flatten) {

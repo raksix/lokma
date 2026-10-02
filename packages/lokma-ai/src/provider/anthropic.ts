@@ -9,6 +9,7 @@ import {
   reasoningBlocked,
   reasoningKey,
 } from './reasoning.js';
+import { messageImages } from './types.js';
 import type { AdapterStreamOpts, ProviderAdapter, ProviderMessage, ProviderToolSchema, StreamChunk } from './types.js';
 
 /**
@@ -32,7 +33,8 @@ type Block =
   | { type: 'text'; text: string }
   | { type: 'thinking'; thinking: string }
   | { type: 'tool_use'; id: string; name: string; input: unknown }
-  | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean };
+  | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean }
+  | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
 
 type AnthropicMessage = { role: 'user' | 'assistant'; content: string | Block[] };
 
@@ -67,6 +69,20 @@ export function toAnthropicMessages(messages: ProviderMessage[]): AnthropicMessa
       continue;
     }
     flushResults();
+    // REQ-186: attached images become base64 image blocks next to the text
+    // (user turns only — assistant rows never carry attachments).
+    if (m.role === 'user') {
+      const images = messageImages(m);
+      if (images.length > 0) {
+        const blocks: Block[] = [];
+        if (m.content) blocks.push({ type: 'text', text: m.content });
+        for (const image of images) {
+          blocks.push({ type: 'image', source: { type: 'base64', media_type: image.mime, data: image.dataBase64 } });
+        }
+        out.push({ role: 'user', content: blocks });
+        continue;
+      }
+    }
     if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0) {
       const blocks: Block[] = [];
       if (m.content) blocks.push({ type: 'text', text: m.content });

@@ -1,6 +1,6 @@
 # REQ-186 — Yüklenen görseller gerçekten görülsün (görsel içeriği konuşmaya girsin)
 
-**Status:** pending
+**Status:** in-progress
 **Tarih:** 2026-10-01
 **Kaynak:** Kullanıcı mesajı (1 Ekim 2026):
 > "kanka resim atınca resmi görmüyor ve attığım remsi de mesaj içeriğinde görebielyim aq sik sik işler resim dosya falan attığımda alıp görebilsin"
@@ -51,6 +51,10 @@ Ek gözlem: bu oturumda ekran görüntüleri şu biçimde geliyor:
 - `~/.hermes/config.yaml` → `auxiliary.vision` (kanal seçimi, model id'si tek kaynak)
 - MCP listesi: `image-picker` (`analyze_images` kredisiz) ve `mcp_vision_analyze_image` referansları
 - Lokma tarafı eşdeğer: `packages/lokma-core/src/tools/attachments.ts` + `REQ-155` ek renderer'ı (dosya/görsel sohbete) — Lokma için de aynı kural geçerli
+
+## İş günlüğü
+
+- Tur 1 (2026-10-02): Provider katmanı — ProviderMessage.images alanı (+ ProviderImage tipi, messageImages/imageDataUrl yardımcıları); üç wire dönüştürücü görseli gerçek içerik parçası olarak üretiyor (chat image_url, Responses input_text/input_image, Anthropic base64 image bloğu). Yeni birim prob images.test.ts 17/17 PASS; adapters.test.ts 162/162 regresyon temiz; kök tsc 0; lokma-ai dist yeniden derlendi. Sıradaki: composer (data URL + maxEdge küçültme) + protokol alanı.
 
 ## Bitirme (done)
 

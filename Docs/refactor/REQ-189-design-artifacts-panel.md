@@ -1,7 +1,7 @@
 # REQ-189 — Artifacts paneli açılır-kapanır olsun (sağda gizli panel)
 
-**Status:** in-progress (tick 1/5 — state layer: snapshot + hook toggle)
-**Tarih:** 2026-10-02
+**Status:** in-progress (tick 2/5 — markup: the panel is a closable right column, cb5f1ed)
+**Tarih:** 2026-10-02 · tur 2: 2026-10-03
 **Kaynak:** Kullanıcı mesajı (2 Ekim 2026):
 > "arttaki articfast açılır kapabilir olsun."
 
@@ -51,3 +51,16 @@
 
 - **Write-only:** kod yazılmadı.
 - Tasarım kararı: liste **gizli panel** olur ama **seçim sonrası kapanmaz** — kapatıp her seferinde açmak zorlamak, canvas'ı kullanan iş akışını bozar.
+
+## Uygulama (tick 1-2)
+
+- **tick 1 · `7a75f83`** — state katmanı: snapshot `artifactsPanel` (yalnız açık `true` geri yüklenir; `"true"`/`1`/bozuk payload paneli **kapalı** tutar) + `toggleArtifactsPanel()` tek yazar + birim testleri.
+- **tick 2 · `cb5f1ed`** — markup: `design-artboards.tsx` panel gövdesi oldu (arama, `SelectMenu` tip filtresi, canlı sandbox önizlemeler, 380-440px sağ kolon, kendi kaydırması, boş durum); `design-page.tsx` canvas+panel'i tek satıra aldı (panel kapanınca genişlik canvas'a geri döner), araç çubuğuna `aria-expanded`/`aria-controls` + sayı rozetli açma düğmesi, açılışta panele odak; Esc yalnız panel **mount** iken dinleyici kaydediyor.
+
+### Ölçülen kapılar (tick 2)
+
+- Birim: design 67/67 · kök `bun x tsc --noEmit` 0 · sterilize build yeşil.
+- Canlı: `pm2 restart lokma-web` → servis edilen bundle `index-DTS946yu.js` == disk; token'siz `/api/auth/me` **401** (login gate açık).
+- Yeni prob `scripts/probe-design-artifacts-panel.cjs` **35/35**: varsayılan kapalı (DOM'da yok), canvas 1115px → açınca 695px, panel 420px sağda, aria bağı çözülüyor, seçim paneli kapatmıyor ve canvas'ı değiştiriyor, Esc ve X kapatıyor, reload sonrası durum korunuyor, 1500px ve 390px'te taşma yok.
+- **Kardeş prob'lar**: `[data-design-strip]` artık sadece panel açıkken var; `probe-design-visual.cjs` ve `probe-design-studio-layout.cjs` paneli önce açıyor (layout probunda **strip kontrolünden önce** — sonra açmak kapalı paneli okuyup alakasız kırmızı veriyor).
+- **Regresyon tabanı (ölçüldü, tahmin değil):** bu değişiklik `git stash` ile geri alınıp yeniden build+koşuldu — `probe-design-studio-layout` değişiklik **öncesi 9**, **sonrası 7** failure. 7'si aynı: Generate sonrası zincir (canlı model kredisi gerektiriyor). Çıkan 2 fark, özelliği olmayan baseline'da **var olamayacak** olan yeni panel kontrolleri. Yani hiçbir yeşil kontrol kaybolmadı.

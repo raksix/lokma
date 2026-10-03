@@ -1,6 +1,6 @@
 # REQ-193 — Browser uzak sunucuda çalışsın: gerçek proxy ile localhost/pört tünelleme
 
-**Status:** pending
+**Status:** in-progress (slice 1 + 2 done: URL policy, HTML rewriter)
 **Tarih:** 2026-10-03
 **Kaynak:** Kullanıcı mesajı (3 Ekim 2026):
 > "browser tunnelleme pport tunneleme falan tam olarak çalışmıo lokma uzak suncuuda kuruluyorken"
@@ -19,6 +19,10 @@ Ekranlar: `upload_20261003_100701_3.png` + `upload_20261003_102102_4.png` (ikisi
 4. **Tunnel olmadığı için ajanın browser engine'i bu sitede zaten ayrı yoldan gidiyor:** `packages/lokma-web/server/src/browser-engine.ts` gerçek Chromium ile geziyor (REQ-154) — yani **iki farklı tarayıcı yolu** var (istemci iframe + sunucu Playwright) ve uzak kurulumda ikisi de tutarsız davranıyor.
 
 ## Kapsam
+
+0. **Yapılan dilimler (bu dosya kapanırken güncellenir):**
+   - Slice 1 — `packages/lokma-core/src/browser/url-policy.ts` + `url-policy.test.ts` (51/51). Tek SSRF politikası: `http(s)` only, credential reddi, uzunluk cap'i, loopback/RFC1918/link-local/CGNAT/multicast literal reddi (DNS'siz, senkron), `LOKMA_BROWSER_LOCAL_HOSTS` allowlist'i (`host` ya da `host:port` → tek port açar). Commit `7a805de`.
+   - Slice 2 — `packages/lokma-web/server/src/browser-proxy/rewrite.ts` + `rewrite.test.ts` (49/49). Tek yeniden yazan modül: `<base href>` injection, mutlu `src/href/poster/action` → proxy, `srcset/imagesrcset` aday aday, `ws:`/`wss:` → ws proxy, `data:/blob:/about:/mailto:/tel:/javascript:` dokunulmaz. Korumalı bölgeler (script/style/textarea içeriği + yorum) bayt-aynı; **açılış etiketi** ayrı yakalanır (aksi halde `<script src>` kendisi yeniden yazılmıyordu). Commit `1482746`.
 
 1. **Sunucu tarafı proxy ucu (tek yol, tüm iframe trafiği buradan):** `GET /api/browser/proxy?url=…` → sunucu hedefi **kendi ağından** çeker, HTML'i yeniden yazar (`<base>`, link/script/img kaynakları proxy'ye çevrilir) ve döner. Böylece:
    - `127.0.0.1:3014` **sunucudaki** port olur (istemci localhost'u değil) → ekrandaki hata çözülür;

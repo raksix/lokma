@@ -177,3 +177,38 @@ export function isPipedUrl(input: string | null | undefined): boolean {
     return false;
   }
 }
+
+/** REQ-193 — the server route that fetches a page on the pane's behalf. */
+export const BROWSER_PROXY_PATH = '/api/browser/proxy';
+
+/**
+ * REQ-193 — which URL the pane's iframe actually loads.
+ *
+ * The pane used to hand the tab URL straight to the iframe, so a
+ * `http://127.0.0.1:3014` tab asked the CLIENT's browser for a loopback that
+ * only exists on the box Lokma runs on — the "127.0.0.1 bağlanmayı reddetti"
+ * error. Every page now travels through the server proxy, which fetches from
+ * the server's own network, rewrites the document and serves it from the app's
+ * origin (so `X-Frame-Options` / CSP `frame-ancestors` stop mattering too).
+ *
+ * The YouTube rewrites keep their direct URLs and stay in FRONT of the proxy:
+ * the no-cookie embed plays natively (better quality than any front-end) and
+ * Piped frames cleanly, so routing them through the proxy would only cost
+ * quality. That is why the order is embed → proxy and not the reverse.
+ *
+ * Blank page → empty (the pane renders its own "type an address" card instead
+ * of a frame).
+ */
+export function frameSrcFor(targetUrl: string): string {
+  const raw = targetUrl.trim();
+  if (!raw || raw === BROWSER_BLANK_URL) return '';
+  const embed = paneUrlFor(raw);
+  if (embed) return embed;
+  return BROWSER_PROXY_PATH + '?url=' + encodeURIComponent(raw);
+}
+
+/** REQ-193: true when the frame is served by the proxy rather than directly. */
+export function isProxySrc(input: string | null | undefined): boolean {
+  if (!input) return false;
+  return input.startsWith(BROWSER_PROXY_PATH + '?url=');
+}

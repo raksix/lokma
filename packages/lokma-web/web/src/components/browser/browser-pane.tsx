@@ -16,8 +16,9 @@ import {
   BROWSER_BLANK_URL,
   canGoBack,
   canGoForward,
+  frameSrcFor,
   isPipedUrl,
-  paneUrlFor,
+  isProxySrc,
   tabLabel,
   validateTabUrl,
 } from './browser';
@@ -126,15 +127,14 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
     setAddress(tab.url === BROWSER_BLANK_URL ? '' : tab.url);
   }, []);
 
-  // REQ-150/153 — decide what the iframe actually loads: video links get
-  // YouTube's own no-cookie player, other youtube.com pages (home, channels,
-  // search) go through the Piped front-end because YouTube refuses framing and
-  // has no embed for them.
-  const frameSrc = React.useMemo(
-    () => paneUrlFor(selected?.url ?? '') ?? selected?.url ?? '',
-    [selected?.url],
-  );
+  // REQ-150/153/193 — decide what the iframe actually loads. YouTube video
+  // links keep the native no-cookie embed and other YouTube pages keep Piped
+  // (both frame natively and play better than any front-end); EVERY other page
+  // is fetched by the server proxy, so a `127.0.0.1` tab means the SERVER's
+  // loopback instead of the client's — the exact bug this remote install hit.
+  const frameSrc = React.useMemo(() => frameSrcFor(selected?.url ?? ''), [selected?.url]);
   const viaPiped = React.useMemo(() => isPipedUrl(frameSrc) && frameSrc !== selected?.url, [frameSrc, selected?.url]);
+  const viaProxy = React.useMemo(() => isProxySrc(frameSrc), [frameSrc]);
 
   // A refused frame never fires `onLoad`, so nothing would ever tell the user
   // why the body is blank. After 2.5 s without a load, show a hint (honest
@@ -267,6 +267,20 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
             data-piped-chip="1"
           >
             Piped
+          </span>
+        ) : null}
+        {viaProxy ? (
+          /* REQ-193 — the frame is fetched by the SERVER, not the browser.
+             That is what makes a 127.0.0.1 / LAN address on a remote install
+             openable at all, but it also means the page has no cookies of its
+             own, so the chip stays visible instead of the user guessing why a
+             login page loops. */
+          <span
+            title="Sayfa sunucu üzerinden çekiliyor (yerel/LAN adresleri böyle açılır). Çerezler hedef siteye taşınmaz — giriş gerektiren sayfaları harici sekmede açın."
+            className="shrink-0 rounded border border-line px-1.5 py-0.5 text-[10px] font-medium text-zinc-500"
+            data-proxy-chip="1"
+          >
+            Sunucu
           </span>
         ) : null}
         {selected?.lastAgentUseAt ? (

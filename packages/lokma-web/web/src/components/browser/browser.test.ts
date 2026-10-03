@@ -4,13 +4,16 @@
  */
 import {
   BROWSER_BLANK_URL,
+  BROWSER_PROXY_PATH,
   BROWSER_URL_CAP,
   canGoBack,
   canGoForward,
   embedUrlFor,
+  frameSrcFor,
   groupByAgent,
   historyPosition,
   isPipedUrl,
+  isProxySrc,
   paneUrlFor,
   shortScope,
   tabLabel,
@@ -119,6 +122,30 @@ check('a watch link still prefers the no-cookie player',
 check('non-YouTube sites are left alone', paneUrlFor('https://example.com/foo') === null);
 check('garbage is left alone', paneUrlFor('not a url') === null && paneUrlFor('') === null);
 check('isPipedUrl spots the front-end', isPipedUrl('https://piped.video/trending') === true && isPipedUrl('https://youtube.com/') === false && isPipedUrl(null) === false);
+
+// frameSrcFor (REQ-193) — the pane must stop handing raw URLs to the iframe,
+// which is what made a server-side 127.0.0.1 tab ask the CLIENT for a loopback
+// that does not exist on the user's machine.
+const loopbackSrc = frameSrcFor('http://127.0.0.1:3014/');
+check('a loopback tab is fetched by the server, not the client',
+  loopbackSrc === BROWSER_PROXY_PATH + '?url=' + encodeURIComponent('http://127.0.0.1:3014/'));
+check('a normal page also goes through the proxy',
+  frameSrcFor('https://example.com/docs') === BROWSER_PROXY_PATH + '?url=' + encodeURIComponent('https://example.com/docs'));
+check('the target url survives encoding round-trip',
+  decodeURIComponent(frameSrcFor('https://example.com/a?b=1&c=2#z').split('?url=')[1]) === 'https://example.com/a?b=1&c=2#z');
+check('a query with & does not split into a second parameter',
+  frameSrcFor('https://example.com/?a=1&b=2').split('?url=').length === 2);
+check('youtube video keeps the native no-cookie embed (quality over proxy)',
+  frameSrcFor('https://www.youtube.com/watch?v=dQw4w9WgXcQ') === 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+check('a youtube page without an embed keeps Piped, not the proxy',
+  frameSrcFor('https://www.youtube.com/') === 'https://piped.video/');
+check('the blank page renders no frame at all',
+  frameSrcFor(BROWSER_BLANK_URL) === '' && frameSrcFor('') === '' && frameSrcFor('   ') === '');
+check('whitespace around a url is trimmed before it is encoded',
+  frameSrcFor('  https://example.com/x  ') === BROWSER_PROXY_PATH + '?url=' + encodeURIComponent('https://example.com/x'));
+check('isProxySrc tells proxy from embed', isProxySrc(loopbackSrc) === true
+  && isProxySrc('https://www.youtube-nocookie.com/embed/abc') === false
+  && isProxySrc('') === false && isProxySrc(null) === false);
 
 console.log(`browser probe: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

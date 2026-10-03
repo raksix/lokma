@@ -68,3 +68,20 @@ Birim: `versions.test.ts` **53/53** (ledger, yazmadan-önce-arşivle, 409 kilidi
 
 **Kalan:** `POST /api/design/:id/tweak` ucu (ajan yama üretimi + `expectedSha` koruması) → versiyon seçici/geri alma UI'ı → düzenlenebilir alan yüzeyleri (type/system/model/token/density/content) → `packages/lokma-shared` transcript/artifact alanları → `scripts/probe-design-tweak-versions.cjs`.
 
+### Tur 3/5 — tweak ucu + yama üretimi (`edd453f`)
+
+Agent yamaları hazır; UI ve düzenlenebilir alan yüzeyleri sonraki turlarda.
+
+- `POST /api/design/:id/tweak` + `GET .../versions` + `POST .../revert` ucu canlıda. Tweak **aynı** artifact id'sine yeni sürüm olarak düşer; liste büyümez.
+- **Token sözleşmesi ölçülüyor:** belge 24K altındaysa **tamamı** gider (tek yeniden yazım); üstündeyse model hedef **indeksini** görür (başlık + 1.2K önizleme + bayt) ve yalnız **değişen bölümü** yazar. Böylece prompt büyüklüğü artifact boyutuna bağlı **değil**.
+- Belge H2'lere bölünür ve **tam bayt offsetleri** taşır → `applyTweakedSections` dokunulmayan bölümleri **harf harf** kopyalar; modelin değiştirmediği markup sessizce yeniden yazılamaz.
+- Yama işaretleri **HTML yorumu** (`<!--lokma:section 3-->`): sızarsa inert olur. Yarım kapanan, numarası tutmayan, çift gelen, **olmayan bölümü** hedefleyen veya hiçbir şey değiştirmeyen yanıt **typed DesignError** atar — mevcut sürüm **bozulmaz**, kısmi yazım yok (REQ-183).
+- `expectedSha` **iki kez** kilit: metered model çağrısından **önce** (bayat panel kredi yakmasın) ve yazma anında (eşzamanlı yazma → 409).
+- **DRY düzeltmesi:** `model-call.ts` model taşımasını `generate.ts`'ten çıkardı (provider çözümleme, streaming, timeout, hata eşleme tek yer). Bağımlılık **tek yönlü** — generate taşımayı import eder, tersi değil; ilk denemede oluşan döngü bu yüzden kırıldı.
+- Birim: `tweak.test.ts` **44/44** (offset sözleşmesi "baş + bölümler girdiyi birebir yeniden kurar", prompt tavanı, her reddediliş **kendi code/status**'uyla, splice kuyruk kaybı). Mevcut süitler yeşil kaldı: generate **24**, versions **53**, store **27** (taşıma çıkarımının regresyon kanıtı). tsc 0, sunucu build, web build.
+
+**Canlı doğrulama (dağıtılmış sunucu, gerçek token):** generate v1'i `origin=generate` ile tohumluyor · notsuz tweak → 400 `bad_tweak` · bayat sha → **model çağrısından önce** 409 `stale_version` · ikisinden sonra sürüm sayısı **değişmiyor** · revert eksik gövdeyi dürüstçe 409, bilinmeyen sürümü 404 · prob artifact silindi ve 404 kaldı · tokenless `/api/auth/me` **401** (giriş kapısı kapalı).
+
+**Not — ölçüm disiplini:** `pm2 restart lokma-server` sırasında sunucu çöktü (`parse.ts` içinde kardeş oturumun REQ-196 dosyasında çift `ZW_RE` bildirimi). Bu **benim** alanım değildi; dosya o arada kendiliğinden düzeldi, core dist yeniden derlenip sunucu **online + /health 200** ile ayağa kalktı. Kardeşin `tools/parse.*` değişikliklerine **dokunulmadı** ve commitime **swept edilmedi** — işte HEAD'te kendi hunk'larıyla duruyorlar. Kardeşin kendi `parse.test.ts` probunda 1 assertion hâlâ kırmızı (`path is a clean filename`), o da benim REQ'im değil.
+
+**Kalan:** versiyon seçici/geri alma UI'ı (artboard) → düzenlenebilir alan yüzeyleri (type/system/model/token/density/content) → `packages/lokma-shared` transcript/artifact alanları → `scripts/probe-design-tweak-versions.cjs` (tarayıcı UA'sız, sadece REST sözleşmesi ölçen).

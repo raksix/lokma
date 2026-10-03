@@ -132,6 +132,16 @@
 - **Follow-up (Furkan):** *"tasarım için de shadcn kullanak — https://ui.shadcn.com/"* → Design system = **shadcn/ui** (Radix+Tailwind, `npx shadcn@latest add`, CSS vars themes) — canonical for all Lokma UI (panes, dialogs, forms, charts) — complements 34-DESIGN's `DESIGN.md` brand contract + Archify diagrams
 - **Docs updated:** `02-TEKNIK-KARARLAR.md` — Stack section marked ✅ Selected, 4 new fixed rows (Design system/Domain/Desktop/License) + 5 new Decision Log rows + pending footer cleared → Phase 0 unblocked
 
+
+### 2026-10-03 13:10 UTC — REQ-190 tur 3/5: design tweak ucu + ajan yaması (`edd453f`)
+- **Yeni yetenek:** `POST /api/design/:id/tweak` (kısa değişiklik cümlesi → **aynı** artifact'ın yeni sürümü), `GET .../versions`, `POST .../revert`. Öncesinde düzenleme = sıfırdan yeniden üretim (yeni id, liste büyür, eski tasarım "kaybolur").
+- **Token sözleşmesi:** belge 24K altındaysa tamamı gider; üstündeyse model yalnız **hedef indeksini** (başlık + önizleme) alıp değişen H2 bölümünü yazar. Prompt, artifact boyutuna bağlı değil.
+- **Dürüstlük:** yarım/çift/bilinmeyen bölüm/hiiç değişiklik durumlarında typed hata, mevcut sürüm bozulmaz — kısmi yazım yok. `expectedSha` metered çağrıdan **önce** ve yazma anında iki kez kilit.
+- **DRY:** `design/model-call.ts` model taşımasını tek yere indirdi (generate + tweak aynı provider/timeout/hata eşlemesini paylaşır).
+- **Kapılar:** `tweak.test.ts` 44/44 · generate 24 · versions 53 · store 27 (regresyon) · tsc 0 · sunucu + web build yeşil · canlı bundle disk ile eşleşti · prob artifact silindi (404) · tokenless 401.
+- **Ölçüm notu:** `lokma-server` restart'ında kardeş oturumun REQ-196 dosyasındaki çift bildirim yüzünden çöktü; dosya kendiliğinden düzeldi, dist yeniden derlenip sunucu online + `/health 200` oldu. Kardeşin `tools/parse.*` işi **dokunulmadan** commit dışı bırakıldı.
+- **Kalan:** versiyon seçici/geri alma UI · düzenlenebilir alan yüzeyleri · `lokma-shared` alanları · `probe-design-tweak-versions.cjs`.
+
 ## Bekleyen Sorular (Furkan'a)
 - [x] GitHub repo: `raksix/lokma` PUBLIC — done 2026-08-31
 - [x] İlk provider multi-provider (Anthropic + OpenAI/DeepSeek/Google/Ollama/OpenRouter) — specced

@@ -21,7 +21,20 @@ type Snapshot = {
 
 let cache: Snapshot | null = null;
 
-export function parseFrontmatter(raw: string): { name: string; description: string; category: string } | null {
+/**
+ * Frontmatter fields we read. `scope` and `group` are optional free-form
+ * strings (REQ-192) — a missing one simply leaves the skill out of a scoped
+ * picker rather than inventing a value.
+ */
+export type SkillFrontmatter = {
+  name: string;
+  description: string;
+  category: string;
+  scope?: string;
+  group?: string;
+};
+
+export function parseFrontmatter(raw: string): SkillFrontmatter | null {
   const m = raw.match(/^---\s*\n([\s\S]*?)\n---/);
   if (!m) return null;
   const fm = m[1];
@@ -32,7 +45,15 @@ export function parseFrontmatter(raw: string): { name: string; description: stri
   const name = get('name');
   const description = get('description');
   if (!name || !description) return null;
-  return { name, description, category: get('category') || 'general' };
+  const scope = get('scope');
+  const group = get('group');
+  return {
+    name,
+    description,
+    category: get('category') || 'general',
+    ...(scope ? { scope } : {}),
+    ...(group ? { group } : {}),
+  };
 }
 
 /** Linked files = references/* + templates/* + scripts/* + assets/*. */
@@ -76,6 +97,8 @@ async function scanDir(dir: string): Promise<Skill[]> {
           category: fm.category || cat.name,
           path: skPath,
           linked_files: linked,
+          ...(fm.scope ? { scope: fm.scope } : {}),
+          ...(fm.group ? { group: fm.group } : {}),
         });
       } catch {}
     }
@@ -93,6 +116,8 @@ async function scanDir(dir: string): Promise<Skill[]> {
           category: fm.category,
           path: flatSkill,
           linked_files: await linkedFiles(join(full, cat.name)),
+          ...(fm.scope ? { scope: fm.scope } : {}),
+          ...(fm.group ? { group: fm.group } : {}),
         });
       }
     } catch {}

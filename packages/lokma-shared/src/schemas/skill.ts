@@ -12,6 +12,14 @@ export const SkillSchema = z.object({
   category: z.string().min(1),
   path: z.string().min(1), // absolute path to SKILL.md
   linked_files: z.array(z.string()).default([]), // auto-discovered references/*
+  /**
+   * REQ-192 — free-form capability scope from the SKILL.md frontmatter.
+   * `design` is the first consumer: only scoped skills are selectable in the
+   * Design Studio, so a scopeless skill can never be presented as one.
+   */
+  scope: z.string().optional(),
+  /** REQ-192 — picker group inside the scope (`style`, `layout`, …). */
+  group: z.string().optional(),
 });
 
 export type Skill = z.infer<typeof SkillSchema>;

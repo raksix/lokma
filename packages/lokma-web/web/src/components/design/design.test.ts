@@ -164,6 +164,20 @@ const rows: NormalizedArtifact[] = [
   check('toRow omits a missing project', rowGlobal.project === undefined);
 }
 
+// REQ-189 — the Artifacts panel is CLOSED by default and restores only on an
+// explicit `true`. Every other shape (missing, string, number, null) keeps the
+// canvas full width; that asymmetry is the acceptance criterion, so it is
+// pinned here rather than re-derived by the live probe.
+{
+  check('snapshot: the artifacts panel defaults to closed', parseDesignPageSnapshot(null).artifactsPanel === false);
+  check('snapshot: a pre-REQ-189 snapshot keeps the panel closed', parseDesignPageSnapshot(JSON.stringify({ selected: 'a' })).artifactsPanel === false);
+  check('snapshot: an explicit true restores the open panel', parseDesignPageSnapshot(JSON.stringify({ artifactsPanel: true })).artifactsPanel === true);
+  check('snapshot: an explicit false keeps the panel closed', parseDesignPageSnapshot(JSON.stringify({ artifactsPanel: false })).artifactsPanel === false);
+  check('snapshot: a stringy true does NOT open the panel', parseDesignPageSnapshot(JSON.stringify({ artifactsPanel: 'true' })).artifactsPanel === false);
+  check('snapshot: a numeric 1 does NOT open the panel', parseDesignPageSnapshot(JSON.stringify({ artifactsPanel: 1 })).artifactsPanel === false);
+  check('snapshot: a corrupt payload keeps the panel closed', parseDesignPageSnapshot('{oops').artifactsPanel === false);
+}
+
 // REQ-172 — the Design chat's activity chips: append keeps order, caps the
 // tail and never mutates the previous list.
 {

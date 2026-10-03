@@ -72,6 +72,14 @@ export type DesignStudio = {
   q: string;
   setQ: (value: string) => void;
   filtered: NormalizedArtifact[];
+  /**
+   * REQ-189 — the right-hand Artifacts panel is closed by default (the canvas
+   * keeps the full width) and its open state is part of the page snapshot.
+   * `toggleArtifactsPanel()` is the ONLY way it flips — selecting an artifact
+   * never closes it, so the list stays reusable.
+   */
+  artifactsPanel: boolean;
+  toggleArtifactsPanel: () => void;
   selected: string | null;
   setSelected: (id: string) => void;
   sel: NormalizedArtifact | null;
@@ -122,6 +130,8 @@ export function useDesignStudio(): DesignStudio {
   const [projectCwd, setProjectCwd] = React.useState<string>(snapshot.project);
   const [typeFilter, setTypeFilter] = React.useState<string>('all');
   const [q, setQ] = React.useState('');
+  // REQ-189 — the artifacts panel is a secondary surface, closed on arrival.
+  const [artifactsPanel, setArtifactsPanel] = React.useState<boolean>(snapshot.artifactsPanel);
   const [selected, setSelected] = React.useState<string | null>(snapshot.selected);
   const [detail, setDetail] = React.useState<{ manifest: DesignManifest; critique: CritiqueResult | null } | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
@@ -163,8 +173,8 @@ export function useDesignStudio(): DesignStudio {
 
   // Persist the remembered pieces on every change (cheap, serialized JSON).
   React.useEffect(() => {
-    writeDesignPageSnapshot({ selected, form, project: projectCwd });
-  }, [selected, form, projectCwd]);
+    writeDesignPageSnapshot({ selected, form, project: projectCwd, artifactsPanel });
+  }, [selected, form, projectCwd, artifactsPanel]);
 
   const loadList = React.useCallback(async (cwd: string, selectId?: string) => {
     const run = (listRunRef.current += 1);
@@ -391,6 +401,13 @@ export function useDesignStudio(): DesignStudio {
     setDrawer((current) => (current === next ? null : next));
   }, []);
 
+  // REQ-189 — the toggle is a functional update so the panel never depends on a
+  // stale closure, and it is the ONLY writer: `selectArtifact` deliberately
+  // leaves the panel alone (picking an artifact must not hide the list).
+  const toggleArtifactsPanel = React.useCallback(() => {
+    setArtifactsPanel((current) => !current);
+  }, []);
+
   // REQ-178 — switching projects re-scopes the studio: the previous list
   // belongs to the old root (its artifacts are unreadable from the new
   // one), so the canvas clears and the reload effect fetches the new root.
@@ -429,6 +446,8 @@ export function useDesignStudio(): DesignStudio {
     q,
     setQ,
     filtered,
+    artifactsPanel,
+    toggleArtifactsPanel,
     selected,
     setSelected: selectArtifact,
     sel,

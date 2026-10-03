@@ -19,10 +19,17 @@ export type DesignPageSnapshot = {
   form: GenerateForm;
   /** REQ-178 — the chosen project cwd; `''` = the global `~/.lokma/design` root. */
   project: string;
+  /**
+   * REQ-189 — is the right-hand Artifacts panel open? Default `false`: the
+   * list is a SECONDARY surface, so the canvas owns the full width until the
+   * user asks for the panel. Only a literal `true` restores it; every other
+   * value (missing, corrupt, foreign) keeps the panel closed.
+   */
+  artifactsPanel: boolean;
 };
 
 export function defaultDesignPageSnapshot(): DesignPageSnapshot {
-  return { selected: null, form: { ...emptyGenerateForm }, project: '' };
+  return { selected: null, form: { ...emptyGenerateForm }, project: '', artifactsPanel: false };
 }
 
 /** Tolerant parse: any unknown, corrupt or foreign field falls back to default. */
@@ -36,7 +43,10 @@ export function parseDesignPageSnapshot(raw: string | null | undefined): DesignP
     return out;
   }
   if (typeof parsed !== 'object' || parsed === null) return out;
-  const record = parsed as { selected?: unknown; form?: unknown; project?: unknown };
+  const record = parsed as { selected?: unknown; form?: unknown; project?: unknown; artifactsPanel?: unknown };
+  // REQ-189 — the panel is restored ONLY on an explicit `true`; a missing or
+  // foreign value keeps it closed rather than guessing.
+  out.artifactsPanel = record.artifactsPanel === true;
   if (
     typeof record.selected === 'string' &&
     record.selected.length > 0 &&

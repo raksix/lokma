@@ -13,20 +13,28 @@ import {
   RefreshCw,
   RotateCcw,
   Sparkles,
+  SlidersHorizontal,
   Trash2,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
 import { SelectMenu, type SelectMenuOption } from '@/components/ui/select-menu';
+import { useProviderStore } from '@/stores';
+import { enabledModels } from '@/components/providers/models';
 import {
   DESIGN_SAMPLES,
+  DESIGN_TWEAK_FIELDS,
   DESIGN_TWEAK_NOTE_CAP,
+  buildFieldTweakNote,
+  fieldControl,
+  fieldCurrentValue,
   formatUpdated,
   projectLabel,
   scoreTone,
   versionLabel,
   type DesignExportFormat,
+  type DesignTweakField,
 } from './design';
 import { DesignArtboards } from './design-artboards';
 import { DesignChat } from './design-chat';
@@ -220,6 +228,7 @@ function VersionsDrawer({ studio }: { studio: DesignStudio }) {
         </button>
       </div>
       <div className="space-y-2 p-3 pt-2">
+        <TweakFieldStrip studio={s} />
         <textarea
           data-design-tweak-input
           value={s.tweakNote}
@@ -311,6 +320,146 @@ function VersionsDrawer({ studio }: { studio: DesignStudio }) {
           </ol>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * REQ-190 §3 — the editable field surfaces, one control per field.
+ *
+ * The free-text tweak box below already exists; this row is the Figma-flavoured
+ * shortcut over the SAME write path — a field pick does not generate an
+ * artifact, it fills the tweak sentence and runs it, so there is exactly one
+ * metered write route in the drawer (the DRY rule from REQ-188's parity work).
+ *
+ * Honesty rules that shaped this:
+ *  - `fieldCurrentValue` returns `null` for palette/density/content because the
+ *    manifest does not record them. The chip then reads "—" (not the first
+ *    option), so the surface never claims a current value it does not know.
+ *  - a pick equal to the current value produces no note at all, so the button
+ *    stays disabled instead of burning a metered rewrite that changes nothing.
+ *  - Model options come from the LIVE catalog; with no catalog loaded the
+ *    model control is disabled rather than offering an empty picker.
+ */
+function TweakFieldStrip({ studio }: { studio: DesignStudio }) {
+  const s = studio;
+  const [open, setOpen] = React.useState<DesignTweakField | null>(null);
+  const [content, setContent] = React.useState('');
+  const systemIds = React.useMemo(() => s.systems.map((x) => ({ id: x.id, name: x.name })), [s.systems]);
+  // REQ-190 §3 — the model field reads the SAME catalog the composer's model
+  // picker reads (enabled models from the provider store), never a second copy
+  // of a model list.
+  const storeModels = useProviderStore((st) => st.models);
+  const modelIds = React.useMemo(
+    () => enabledModels(storeModels).map((m) => ({ id: m.id, name: m.label })),
+    [storeModels],
+  );
+
+  const manifest = s.detail?.manifest ?? null;
+  const busy = s.tweaking || !s.selected;
+
+  const apply = (field: DesignTweakField, value: string) => {
+    const note = buildFieldTweakNote(field, value, fieldCurrentValue(field, manifest));
+    if (!note) return;
+    s.setTweakNote(note);
+    setOpen(null);
+    setContent('');
+    void s.runTweakNote(note);
+  };
+
+  return (
+    <div data-design-field-strip className="border-b border-line pb-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <SlidersHorizontal className="h-3 w-3 text-terracotta" />
+        <span className="text-[10px] text-zinc-400">Edit fields</span>
+        {DESIGN_TWEAK_FIELDS.map((field) => {
+          const control = fieldControl(field, field === 'system' ? systemIds : modelIds);
+          const current = fieldCurrentValue(field, manifest);
+          const selected = open === field;
+          if (control.kind === 'text') {
+            return (
+              <button
+                key={field}
+                data-design-field-toggle="content"
+                aria-expanded={selected}
+                disabled={busy}
+                onClick={() => setOpen(selected ? null : 'content')}
+                className="rounded border border-line px-1.5 py-0.5 text-[10px] hover:bg-muted disabled:opacity-40"
+              >
+                {control.label}
+              </button>
+            );
+          }
+          const disabled = busy || control.options.length === 0;
+          return (
+            <button
+              key={field}
+              data-design-field-toggle={field}
+              aria-expanded={selected}
+              disabled={disabled}
+              title={control.options.length === 0 ? `No ${control.label.toLowerCase()} options loaded` : undefined}
+              onClick={() => setOpen(selected ? null : field)}
+              className="rounded border border-line px-1.5 py-0.5 text-[10px] hover:bg-muted disabled:opacity-40"
+            >
+              {control.label}
+              <span className="ml-1 text-zinc-400">
+                {current === null ? '—' : current}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {open === 'content' ? (
+        <div className="mt-1.5 flex items-end gap-1.5">
+          <textarea
+            data-design-field-content
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            rows={2}
+            placeholder="Paste the new copy for this design"
+            aria-label="Replacement copy"
+            className="min-w-0 flex-1 rounded-md border border-line bg-white p-1.5 text-[11px] leading-4 focus:border-terracotta/30 focus:outline-none dark:bg-[#0F0F11]"
+          />
+          <Button
+            data-design-field-apply="content"
+            size="sm"
+            className="h-7 shrink-0 text-[11px]"
+            disabled={busy || !content.trim()}
+            onClick={() => apply('content', content)}
+          >
+            Apply
+          </Button>
+        </div>
+      ) : null}
+      {open !== null && open !== 'content'
+        ? (() => {
+            const control = fieldControl(open, open === 'system' ? systemIds : modelIds);
+            const current = fieldCurrentValue(open, manifest);
+            const rows: SelectMenuOption[] = control.options.map((o) => ({ value: o.value, label: o.label }));
+            return (
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {rows
+                  .filter((o) => o.value !== current)
+                  .map((o) => (
+                    <Button
+                      key={o.value}
+                      data-design-field-apply={o.value}
+                      size="sm"
+                      variant="secondary"
+                      className="h-6 px-2 text-[10px]"
+                      disabled={busy}
+                      onClick={() => apply(open, o.value)}
+                    >
+                      {o.label}
+                    </Button>
+                  ))}
+                {rows.every((o) => o.value === current) ? (
+                  <span className="text-[10px] text-zinc-400">Nothing else to pick here yet</span>
+                ) : null}
+              </div>
+            );
+          })()
+        : null}
     </div>
   );
 }

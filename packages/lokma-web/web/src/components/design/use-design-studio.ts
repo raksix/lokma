@@ -141,6 +141,12 @@ export type DesignStudio = {
   tweakError: string | null;
   tweaking: boolean;
   runTweak: () => Promise<void>;
+  /**
+   * REQ-190 §3 — the shared metered write path. A field pick builds its tweak
+   * sentence with `buildFieldTweakNote` and calls this, so the free-text box
+   * and the field controls share ONE implementation (and one re-entry guard).
+   */
+  runTweakNote: (note: string) => Promise<void>;
   /** Revert to an earlier ledger entry (the server appends it as a new current). */
   reverting: number | null;
   runRevert: (version: number) => Promise<void>;
@@ -499,51 +505,61 @@ export function useDesignStudio(): DesignStudio {
   // same reason generate has one): a double click behind a disabled button can
   // still fire twice, and every call here costs a metered model run.
   const tweakingRef = React.useRef(false);
-  const runTweak = React.useCallback(async () => {
-    if (!selected || tweakingRef.current) return;
-    const local = validateTweakNote(tweakNote);
-    if (local) {
-      setTweakError(local);
-      return;
-    }
-    tweakingRef.current = true;
-    setTweaking(true);
-    setTweakError(null);
-    try {
-      const res = await api.tweakDesign(selected, {
-        note: tweakNote.trim(),
-        ...(projectCwd ? { cwd: projectCwd } : {}),
-        ...(detailShaRef.current ? { expectedSha: detailShaRef.current } : {}),
-      });
-      pushEvent(
-        'ok',
-        `Tweaked ${selected} — v${res.currentVersion}${res.replaced.length > 0 ? ` · ${res.replaced.length} section(s)` : ''}`,
-      );
-      toast(`Tweaked — v${res.currentVersion}`);
-      // The composer empties only after the server accepted it, so a failed
-      // tweak leaves the user's sentence in place to retry.
-      setTweakNote('');
-      // Reload the body AND the ledger: the viewer iframe is keyed on the
-      // manifest's updatedAt, and the picker on the newest entry.
-      await loadDetail(selected, projectCwd);
-      await loadVersions(selected, projectCwd);
-      void loadList(projectCwd, selected);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'tweak failed';
-      setTweakError(message);
-      pushEvent('error', `Tweak failed — ${message}`);
-      toast(message);
-      // A 409 `stale_version` means the ledger moved under us — re-read it so
-      // the picker stops offering the version the user can no longer target.
-      if (e instanceof ApiError && e.status === 409) {
-        await loadVersions(selected, projectCwd);
-        await loadDetail(selected, projectCwd);
+  // REQ-190 §3 — the ONE metered write path. Both the free-text composer and a
+  // field pick (type/system/palette/density/model/content) call this with a
+  // sentence; there is no second tweak implementation to drift.
+  const runTweakNote = React.useCallback(
+    async (note: string) => {
+      if (!selected || tweakingRef.current) return;
+      const local = validateTweakNote(note);
+      if (local) {
+        setTweakError(local);
+        return;
       }
-    } finally {
-      tweakingRef.current = false;
-      setTweaking(false);
-    }
-  }, [selected, tweakNote, projectCwd, loadDetail, loadVersions, loadList, pushEvent]);
+      tweakingRef.current = true;
+      setTweaking(true);
+      setTweakError(null);
+      try {
+        const res = await api.tweakDesign(selected, {
+          note: note.trim(),
+          ...(projectCwd ? { cwd: projectCwd } : {}),
+          ...(detailShaRef.current ? { expectedSha: detailShaRef.current } : {}),
+        });
+        pushEvent(
+          'ok',
+          `Tweaked ${selected} — v${res.currentVersion}${res.replaced.length > 0 ? ` · ${res.replaced.length} section(s)` : ''}`,
+        );
+        toast(`Tweaked — v${res.currentVersion}`);
+        // The composer empties only after the server accepted it, so a failed
+        // tweak leaves the user's sentence in place to retry.
+        setTweakNote('');
+        // Reload the body AND the ledger: the viewer iframe is keyed on the
+        // manifest's updatedAt, and the picker on the newest entry.
+        await loadDetail(selected, projectCwd);
+        await loadVersions(selected, projectCwd);
+        void loadList(projectCwd, selected);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'tweak failed';
+        setTweakError(message);
+        pushEvent('error', `Tweak failed — ${message}`);
+        toast(message);
+        // A 409 `stale_version` means the ledger moved under us — re-read it so
+        // the picker stops offering the version the user can no longer target.
+        if (e instanceof ApiError && e.status === 409) {
+          await loadVersions(selected, projectCwd);
+          await loadDetail(selected, projectCwd);
+        }
+      } finally {
+        tweakingRef.current = false;
+        setTweaking(false);
+      }
+    },
+    [selected, projectCwd, loadDetail, loadVersions, loadList, pushEvent],
+  );
+
+  const runTweak = React.useCallback(async () => {
+    await runTweakNote(tweakNote);
+  }, [runTweakNote, tweakNote]);
 
   const runRevert = React.useCallback(
     async (version: number) => {
@@ -664,6 +680,7 @@ export function useDesignStudio(): DesignStudio {
     tweakError,
     tweaking,
     runTweak,
+    runTweakNote,
     reverting,
     runRevert,
   };

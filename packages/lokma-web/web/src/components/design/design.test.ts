@@ -3,9 +3,14 @@ import {
   DESIGN_SAMPLES,
   DESIGN_SYSTEMS,
   DESIGN_TYPES,
+  DESIGN_TWEAK_FIELDS,
   appendDesignEvent,
   artifactBadge,
+  buildFieldTweakNote,
   emptyGenerateForm,
+  fieldControl,
+  fieldCurrentValue,
+  fieldOptions,
   filterArtifacts,
   formatUpdated,
   overallLabel,
@@ -275,6 +280,74 @@ const rows: NormalizedArtifact[] = [
 
   check('revert lands on the version AFTER the current one', versionAfterRevert(3, 1) === 4);
   check('revert from v0 starts the ledger at v1', versionAfterRevert(0, 0) === 1);
+}
+
+// ─── REQ-190 §3 — editable field surfaces ────────────────────────────────────
+{
+  const systems = [
+    { id: 'stripe-linear', name: 'Stripe/Linear' },
+    { id: 'omp-dark', name: 'OMP Midnight' },
+  ];
+  const manifest = { type: 'prototype', system: 'stripe-linear', model: 'deepseek/deepseek-v4.1-flash' };
+
+  check('six editable fields', DESIGN_TWEAK_FIELDS.length === 6);
+  check(
+    'every field has exactly one control',
+    DESIGN_TWEAK_FIELDS.every((f) => fieldControl(f, systems).field === f),
+  );
+
+  // The option rows come from the LIVE catalogs, never a re-declared list.
+  check('type options mirror DESIGN_TYPES', fieldOptions('type', systems).length === DESIGN_TYPES.length);
+  check(
+    'system options mirror the catalog that was passed in',
+    fieldOptions('system', systems).map((o) => o.value).join(',') === 'stripe-linear,omp-dark',
+  );
+  check('palette options carry name + hex', fieldOptions('palette', systems).every((o) => o.label.includes('#')));
+  check('density has three steps', fieldOptions('density', systems).length === 3);
+  check('an empty system catalog yields no options', fieldOptions('system', []).length === 0);
+
+  // Content is the free-text one; everything else is a select.
+  check('content is a text control', fieldControl('content', systems).kind === 'text');
+  check('type is a select control', fieldControl('type', systems).kind === 'select');
+  check('a text control carries no options', fieldControl('content', systems).options.length === 0);
+
+  // Honesty: the manifest records type/system/model and nothing else, so the
+  // other three must answer null rather than a fabricated "current" value.
+  check('current type is read from the manifest', fieldCurrentValue('type', manifest) === 'prototype');
+  check('current system is read from the manifest', fieldCurrentValue('system', manifest) === 'stripe-linear');
+  check('current model is read from the manifest', fieldCurrentValue('model', manifest) === 'deepseek/deepseek-v4.1-flash');
+  check('palette has no recorded current value', fieldCurrentValue('palette', manifest) === null);
+  check('density has no recorded current value', fieldCurrentValue('density', manifest) === null);
+  check('content has no recorded current value', fieldCurrentValue('content', manifest) === null);
+  check('no manifest means no current value', fieldCurrentValue('type', null) === null);
+  check('a manifest without a model reports null', fieldCurrentValue('model', { type: 'deck', system: 'omp-dark' }) === null);
+
+  // A field pick builds the tweak sentence the metered path already understands.
+  const noteType = buildFieldTweakNote('type', 'deck', 'prototype');
+  check('type pick names the new type', noteType !== null && noteType.includes('deck'));
+  check('type pick passes the shared validator', validateTweakNote(noteType ?? '') === null);
+  const noteSystem = buildFieldTweakNote('system', 'omp-dark', 'stripe-linear');
+  check('system pick names the new system', noteSystem !== null && noteSystem.includes('omp-dark'));
+  const noteDensity = buildFieldTweakNote('density', 'spacious', null);
+  check('density pick carries the step', noteDensity !== null && noteDensity.includes('spacious'));
+  const notePalette = buildFieldTweakNote('palette', 'terracotta', null);
+  check('palette pick carries the hex the agent needs', notePalette !== null && notePalette.includes('#C96442'));
+  const noteModel = buildFieldTweakNote('model', 'some/model', 'deepseek/deepseek-v4.1-flash');
+  check('model pick names the model', noteModel !== null && noteModel.includes('some/model'));
+  const noteContent = buildFieldTweakNote('content', 'New headline', null);
+  check('content pick carries the replacement copy', noteContent !== null && noteContent.includes('New headline'));
+
+  // A no-op or empty pick never becomes a metered call.
+  check('picking the current type produces no note', buildFieldTweakNote('type', 'prototype', 'prototype') === null);
+  check('picking the current system produces no note', buildFieldTweakNote('system', 'stripe-linear', 'stripe-linear') === null);
+  check('an empty value produces no note', buildFieldTweakNote('type', '   ', 'prototype') === null);
+  check('an unknown palette id still says what it asked for', (buildFieldTweakNote('palette', 'chartreuse', null) ?? '').includes('chartreuse'));
+  check(
+    'every produced note fits the shared tweak cap',
+    [noteType, noteSystem, noteDensity, notePalette, noteModel, noteContent].every(
+      (n) => n !== null && n.length <= DESIGN_TWEAK_NOTE_CAP,
+    ),
+  );
 }
 
 console.log(`\nDESIGN PROBE: ${passed} passed, ${failed} failed`);

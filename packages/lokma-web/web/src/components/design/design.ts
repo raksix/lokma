@@ -238,6 +238,107 @@ export function versionAfterRevert(currentVersion: number, restoredFrom: number)
   return Math.max(currentVersion + 1, 1);
 }
 
+// ─── REQ-190 §3 — editable field surfaces (one control per field) ───────────
+
+/**
+ * REQ-190 §3 — the Figma-flavoured edit surface: a fixed, small set of fields
+ * the user can change on the artifact in front of them instead of retyping a
+ * whole brief. Each field is ONE control plus the free-text tweak sentence
+ * that already exists; picking a field does not invent a second write path.
+ */
+export const DESIGN_TWEAK_FIELDS = ['type', 'system', 'palette', 'density', 'model', 'content'] as const;
+export type DesignTweakField = (typeof DESIGN_TWEAK_FIELDS)[number];
+
+/** Palette choices the picker offers — a name + the hex it asks for. */
+export const DESIGN_PALETTES = [
+  { id: 'terracotta', label: 'Terracotta', hex: '#C96442' },
+  { id: 'ink', label: 'Ink', hex: '#262624' },
+  { id: 'sage', label: 'Sage', hex: '#5E7D5A' },
+  { id: 'ocean', label: 'Ocean', hex: '#2F5D7C' },
+  { id: 'plum', label: 'Plum', hex: '#6B4E71' },
+] as const;
+
+/** Density steps — spacing rhythm, not font size. */
+export const DESIGN_DENSITIES = ['compact', 'regular', 'spacious'] as const;
+export type DesignDensity = (typeof DESIGN_DENSITIES)[number];
+
+/** The two things a field pick must be able to say about itself. */
+export type DesignFieldControl = {
+  field: DesignTweakField;
+  label: string;
+  /** `select` rows carry options; `text` is the free-content block. */
+  kind: 'select' | 'text';
+  options: { value: string; label: string }[];
+};
+
+/**
+ * Build the picker rows for one field. `systems` is the LIVE system catalog
+ * (REQ-191 replaces the bundled four), so this never re-declares the list.
+ */
+export function fieldOptions(
+  field: DesignTweakField,
+  systems: readonly { id: string; name: string }[],
+): { value: string; label: string }[] {
+  if (field === 'type') return DESIGN_TYPES.map((t) => ({ value: t, label: t }));
+  if (field === 'system') return systems.map((s) => ({ value: s.id, label: s.name }));
+  if (field === 'density') return DESIGN_DENSITIES.map((d) => ({ value: d, label: d }));
+  if (field === 'palette') return DESIGN_PALETTES.map((p) => ({ value: p.id, label: `${p.label} ${p.hex}` }));
+  if (field === 'model') return [];
+  return [];
+}
+
+/**
+ * REQ-190 §3 — what the artifact's manifest actually records for a field, or
+ * `null` when the manifest does NOT know it. Palette, density and content live
+ * only inside the generated HTML, so reporting a "current" value for them
+ * would be a fabrication; the honest answer is `null` and the UI says so.
+ */
+export function fieldCurrentValue(field: DesignTweakField, manifest: { type: string; system: string; model?: string } | null): string | null {
+  if (!manifest) return null;
+  if (field === 'type') return manifest.type;
+  if (field === 'system') return manifest.system;
+  if (field === 'model') return manifest.model ?? null;
+  return null;
+}
+
+/**
+ * REQ-190 §3 — the tweak sentence a field pick produces. Returns `null` when
+ * the pick cannot be expressed (empty value) or would be a no-op against a
+ * value the manifest already records — a metered rewrite that changes nothing
+ * is worse than no button.
+ */
+export function buildFieldTweakNote(
+  field: DesignTweakField,
+  value: string,
+  current: string | null,
+): string | null {
+  const v = value.trim();
+  if (!v) return null;
+  if (current !== null && current === v) return null;
+  if (field === 'type') return `Re-cut this artifact as a ${v} — keep the same content and product intent.`;
+  if (field === 'system') return `Re-skin this artifact with the ${v} design system — same layout and content, new tokens.`;
+  if (field === 'density') return `Change the layout density to ${v} — same elements, ${v === 'compact' ? 'tighter' : v === 'spacious' ? 'roomier' : 'regular'} spacing rhythm.`;
+  if (field === 'palette') {
+    const pal = DESIGN_PALETTES.find((p) => p.id === v);
+    return `Switch the accent palette to ${pal ? `${pal.label} ${pal.hex}` : v} — recolor buttons, links and focus rings, keep the layout.`;
+  }
+  if (field === 'model') return `Regenerate this artifact with the model ${v} — keep the same brief and system.`;
+  return `Rewrite the copy of this artifact using this text:\n${v}`;
+}
+
+/** Full control descriptor (label + kind + options) for one field. */
+export function fieldControl(
+  field: DesignTweakField,
+  systems: readonly { id: string; name: string }[],
+): DesignFieldControl {
+  if (field === 'type') return { field, label: 'Type', kind: 'select', options: fieldOptions(field, systems) };
+  if (field === 'system') return { field, label: 'System', kind: 'select', options: fieldOptions(field, systems) };
+  if (field === 'palette') return { field, label: 'Palette', kind: 'select', options: fieldOptions(field, systems) };
+  if (field === 'density') return { field, label: 'Density', kind: 'select', options: fieldOptions(field, systems) };
+  if (field === 'model') return { field, label: 'Model', kind: 'select', options: fieldOptions(field, systems) };
+  return { field, label: 'Content', kind: 'text', options: [] };
+}
+
 /**
  * REQ-172 — one session activity chip in the Design chat thread
  * ("Generated …", "HTML saved", "Critique 8/10", errors). Ephemeral by

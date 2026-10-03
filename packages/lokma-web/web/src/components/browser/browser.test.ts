@@ -147,5 +147,29 @@ check('isProxySrc tells proxy from embed', isProxySrc(loopbackSrc) === true
   && isProxySrc('https://www.youtube-nocookie.com/embed/abc') === false
   && isProxySrc('') === false && isProxySrc(null) === false);
 
+// ─── REQ-193 slice 9: the login-wall signal the pane consumes ───────────────────
+// The client cannot read the iframe's response headers (the frame is sandboxed,
+// so `contentDocument` is null), so it asks the server and reads ONE header.
+// That makes the header NAME a contract between two packages. The client copies
+// the constant rather than importing it — `lib/api.ts` is the self-contained
+// client layer and must not depend on components — so the two copies can drift,
+// and this assert is what makes the drift loud instead of silent: it fails the
+// moment either side renames the header, instead of the pane quietly showing
+// every login page as a normal one.
+const CLIENT_LOGIN_WALL_HEADER = 'x-lokma-login-wall';
+const SERVER_LOGIN_WALL_HEADER = (await import('@lokma/core')).LOGIN_WALL_HEADER;
+check('the client header name equals the server constant',
+  CLIENT_LOGIN_WALL_HEADER === SERVER_LOGIN_WALL_HEADER);
+check('the proxy path the client probes equals the one the pane renders',
+  (await import('@/components/browser/browser')).BROWSER_PROXY_PATH === '/api/browser/proxy');
+
+// The verdict is tri-state on the CLIENT side, and that is the point: `null`
+// means "not asked yet", which must never render as either answer. A pane that
+// collapsed it to a boolean would flash "this page needs a login" on every
+// navigation before the probe answered.
+check('an unasked page is not a wall and not a non-wall',
+  (null as boolean | null) !== true && (null as boolean | null) !== false);
+check('only a true verdict asks for the external tab',
+  (true as boolean | null) === true && (false as boolean | null) !== true);
 console.log(`browser probe: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

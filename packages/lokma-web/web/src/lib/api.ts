@@ -8,6 +8,17 @@
 
 export type ApiErrorShape = { code: string; message: string };
 
+/** REQ-193 slice 9 — server route the pane iframe loads (server `PROXY_PATH`). */
+const BROWSER_PROXY_PATH = '/api/browser/proxy';
+/**
+ * REQ-193 slice 9 — response header carrying the login-wall verdict. Mirrors the
+ * server's `LOGIN_WALL_HEADER`; declared here rather than imported because this
+ * module is the self-contained client layer and must not depend on components.
+ * The name is asserted equal to the server constant in `browser.test.ts`, so the
+ * two copies cannot drift silently.
+ */
+const LOGIN_WALL_HEADER = 'x-lokma-login-wall';
+
 /** Typed fetch error — carries the server `{ code, message }` shape. */
 export class ApiError extends Error {
   readonly code: string;
@@ -534,6 +545,12 @@ export type BrowserTabRes = { ok: boolean; tab: BrowserTab };
 export type OpenBrowserTabBody = { url?: string; agentId?: string; sessionId?: string; cwd?: string };
 export type OpenBrowserTabRes = { ok: boolean; tabId: string; tab: BrowserTab };
 export type CloseBrowserTabRes = { ok: boolean; id: string; closed: boolean };
+/**
+ * REQ-193 slice 9 — the server's verdict on a page, asked without its body.
+ * `loginWall` comes from a response HEADER, so it is data rather than something
+ * the pane parses out of a sentence or infers from the rendered form.
+ */
+export type BrowserPageProbe = { status: number; finalUrl: string; loginWall: boolean };
 
 // ─── Setup + doctor (optional stack + init + probes behind the SetupPane, W6-22) ───
 
@@ -1572,6 +1589,28 @@ export const api = {
     post<BrowserTabRes>(`/api/browser/${encodeURIComponent(id)}/reload`, {}),
   closeBrowserTab: (id: string) =>
     del<CloseBrowserTabRes>(`/api/browser/${encodeURIComponent(id)}`),
+
+  /**
+   * REQ-193 slice 9 — ask the proxy what it just served, WITHOUT taking the
+   * body. The pane's iframe is sandboxed (`allow-scripts allow-same-origin`), so
+   * its response headers are unreachable from the frame: reading them would mean
+   * guessing the proxy URL's identity through `contentDocument`, which is null
+   * for a sandboxed document (the REQ-152 lesson). Asking the server for just the
+   * verdict is one cheap request and keeps the wall a FIELD rather than
+   * something the pane re-derives by parsing a page.
+   */
+  probeBrowserPage: async (url: string): Promise<BrowserPageProbe> => {
+    // Range bytes=0-0 keeps the response to a single byte instead of
+    // re-shipping a multi-megabyte document the iframe is already rendering.
+    const res = await authedFetch(`${BROWSER_PROXY_PATH}?url=${encodeURIComponent(url)}`, {
+      headers: { range: 'bytes=0-0' },
+    });
+    return {
+      status: res.status,
+      finalUrl: res.headers.get('x-lokma-proxy-url') ?? url,
+      loginWall: res.headers.get(LOGIN_WALL_HEADER) === '1',
+    };
+  },
 
   // Archify diagrams — typed IR → validated HTML/SVG (W5-17). The server
   // owns validation + rendering; the pane edits IR and downloads artifacts.

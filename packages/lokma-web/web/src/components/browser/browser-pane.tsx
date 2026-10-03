@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  LogIn,
   RefreshCw,
   X,
 } from 'lucide-react';
@@ -54,6 +55,10 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
   const [loading, setLoading] = React.useState(true);
   const [frameReady, setFrameReady] = React.useState(false);
   const [frameHint, setFrameHint] = React.useState(false);
+  // REQ-193 slice 9 — the server's verdict on the page just fetched. Starts
+  // `null` ("not asked yet") so an un-asked page is never confused with a page
+  // the server says is fine.
+  const [loginWall, setLoginWall] = React.useState<boolean | null>(null);
   const ensuredBlank = React.useRef(false);
 
   const refresh = React.useCallback(async () => {
@@ -146,6 +151,39 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
     const t = window.setTimeout(() => setFrameHint(true), 2500);
     return () => window.clearTimeout(t);
   }, [frameSrc, frameNonce]);
+
+  // REQ-193 slice 9 (Kapsam 7) — ask the server whether this page is a login
+  // gate. The proxy forwards no cookies, so a login form rendered here can never
+  // succeed; showing it silently is the "boş form" the REQ forbids. The answer
+  // arrives as a header FIELD on a bodyless probe, and the verdict is cleared on
+  // every navigation so a previous page's wall can never sit over a good one.
+  // Only a proxied page is asked: an embed (YouTube/Piped) frames natively and
+  // was never fetched through the proxy, so there is nothing for it to report.
+  React.useEffect(() => {
+    if (!selected || !viaProxy || !selected.url || selected.url === BROWSER_BLANK_URL) {
+      setLoginWall(null);
+      return;
+    }
+    let cancelled = false;
+    const target = selected.url;
+    setLoginWall(null);
+    void api
+      .probeBrowserPage(target)
+      .then((res) => {
+        // A slower answer for a page the user already navigated away from must
+        // not paint over the new one.
+        if (cancelled) return;
+        setLoginWall(res.loginWall === true);
+      })
+      .catch(() => {
+        // A failed probe is not evidence of a wall — say nothing rather than
+        // accuse a readable page of needing a login.
+        if (!cancelled) setLoginWall(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selected?.url, viaProxy, frameNonce]);
 
   // REQ-146 — the agent opened/reused a tab for THIS session (`ui_action` →
   // pane store). Pull the fresh list and follow that tab, so the visible
@@ -329,7 +367,37 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
           </div>
         ) : (
           <>
-            {frameHint && !frameReady ? (
+            {loginWall === true ? (
+              // REQ-193 slice 9 — Kapsam 7's "harici sekme yönlendirmesi". The
+              // proxy has its own origin and forwards no cookies, so this login
+              // form can never authenticate: it is covered rather than shown as a
+              // dead end, and the real page is one click away in the user's own
+              // browser. `frameReady` cannot suppress this — the frame DOES load
+              // here, it is simply the wrong document.
+              <div
+                data-lokma-login-wall="1"
+                className="absolute inset-x-2 top-2 z-10 flex items-start gap-2 rounded border border-blue-300 bg-blue-50/95 px-2.5 py-2 text-[11px] text-blue-900 shadow-sm"
+              >
+                <LogIn className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium">Bu sayfa giriş istiyor.</div>
+                  <div className="mt-0.5">
+                    Panel sayfayı sunucu ağından çekiyor ve oturum çerezini
+                    iletmiyor, yani buradaki giriş formu çalışmaz. Siteye{' '}
+                    <span className="font-mono">kendi tarayıcın</span> üzerinden gir.
+                  </div>
+                </div>
+                <a
+                  href={selected.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 rounded border border-blue-300 bg-white px-2 py-0.5 font-medium hover:bg-blue-100"
+                >
+                  Harici sekmede aç
+                </a>
+              </div>
+            ) : null}
+            {frameHint && !frameReady && loginWall !== true ? (
               <div className="absolute inset-x-2 top-2 z-10 flex items-start gap-2 rounded border border-amber-300 bg-amber-50/95 px-2.5 py-2 text-[11px] text-amber-900 shadow-sm">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <div className="min-w-0 flex-1">

@@ -61,8 +61,19 @@ export type ParsedAsk = {
  */
 export const BLOCK_FILTER_BUFFER_CAP = 262_144;
 
-const COMPLETE_BLOCK =
-  /<(tool|ask)\b([^>]*?)(\/>|>([\s\S]*?)<\/(?:\1|tool_result)\s*>)/g;
+const ZERO_WIDTH_CLASS = '[\\u200b\\u200c\\u200d\\ufeff]';
+
+/**
+ * REQ-196: the closing tag can carry a zero-width char (`</tool_call>`)
+ * and can name the legacy `tool_call` block instead of `tool`. Neither
+ * shape used to match, so a 20 KB write_file markup matched NOTHING and
+ * streamed into the chat verbatim. `tool_call` is a documented fallback
+ * tag (`TOOL_CALL_BLOCK` below), so accepting it here is consistent.
+ */
+const COMPLETE_BLOCK = new RegExp(
+  `<(tool|ask)\\b([^>]*?)(\\/>|>([\\s\\S]*?)<\\/(?:${ZERO_WIDTH_CLASS})*(?:\\1|tool_result|tool_call)\\s*>)`,
+  'g',
+);
 
 /** Legacy `<tool_call>{"name","arguments"}</tool_call>` shape (also model-slop). */
 const TOOL_CALL_BLOCK = /<tool_call\s*>([\s\S]*?)<\/tool_call\s*>/g;

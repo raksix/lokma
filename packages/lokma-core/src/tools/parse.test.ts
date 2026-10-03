@@ -423,4 +423,37 @@ function assert(cond: boolean, label: string): void {
   assert(((odd[0]?.input ?? {}) as { path?: string }).path === 'a[1].txt', 'a real bracketed filename is not eaten');
 }
 
+// ─── REQ-196b: the real failing shape — junk args AND a junk closer ───
+// Captured from the live transcript: the model opened `<tool name="write_file">`
+// and closed it with `</tool_call>` (a zero-width char inside the tag).
+// COMPLETE_BLOCK required `</tool>` or `</tool_result>`, so a 20 KB write
+// markup matched NOTHING, streamed through as chat text, and no file landed.
+{
+  const HTML_BIG = `<!DOCTYPE html>\n<html lang="tr">\n<head><meta charset="utf-8"><title>T</title></head>\n<body>${'<div class="r">satır</div>\n'.repeat(40)}</body>\n</html>\n`;
+  const ZW = String.fromCharCode(0x200b);
+  const J = `]${ZW}minimax[>[`;
+  const real =
+    '<tool name="write_file">\n<path>live-junk-test.html' + J + '</path>' + J + '<content>' +
+    HTML_BIG +
+    J + '</content>' + J + J + `</${ZW}tool_call>`;
+  const calls = parseToolBlocks(real);
+  assert(calls.length === 1, 'the zero-width tool_call closer still closes the block');
+  assert(calls[0]?.tool === 'write_file', 'tool name survives the junk closer');
+  assert(calls[0]?.parseError === undefined, 'no parseError on the real shape');
+  const input = (calls[0]?.input ?? {}) as { path?: string; content?: string };
+  assert(input.path === 'live-junk-test.html', `path is clean (got ${JSON.stringify(input.path)})`);
+  assert(input.content === HTML_BIG, `the whole ${HTML_BIG.length}-byte payload survives (got ${input.content?.length ?? 0})`);
+  // The stream filter must consume the block too, not just the regex parser.
+  const f = createBlockFilter();
+  const shown = f.push(real);
+  const end = f.finish();
+  assert(end.toolCalls.length === 1, 'the stream filter salvages the real shape as a call');
+  assert((shown + end.tail).trim() === '', 'the markup never reaches the chat');
+  // A plain `</tool>` closer and a `</tool_result>` closer keep working.
+  for (const closer of ['</tool>', '</tool_result>']) {
+    const ok = parseToolBlocks(`<tool name="list_files"><dir>Docs</dir>${closer}`);
+    assert(ok.length === 1 && ((ok[0]?.input ?? {}) as { path?: string }).path === 'Docs', `${closer} still parses`);
+  }
+}
+
 console.log(`\nparse probe: ${passed} passed`);

@@ -1,5 +1,4 @@
-import { readFile, stat } from 'node:fs/promises';
-import { relative, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import {
   SessionStore,
@@ -20,7 +19,6 @@ import {
   onAgentEvent,
   recordApprovalDecision,
   resolveBotChatContext,
-  resolveInRoot,
   saveGlobal,
   terminalManager,
   userFromToken,
@@ -28,6 +26,7 @@ import {
 } from '@lokma/core';
 import { decodeClientMessage, encodeServerMessage } from '@lokma/shared';
 import { LoopAborted, LOOP_DEFAULT_MAX_TURNS, buildLoopHistory, fileAttachmentBlocks, runAgentLoop, splitPromptRow, type ApprovalDecision } from '../agent-loop.js';
+import { readContextBlocks } from '../utils/context-blocks.js';
 import {
   CLAUDE_CLEAR_MARKER,
   CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD,
@@ -108,8 +107,6 @@ async function configuredDefaultModel(cwd: string): Promise<string> {
   if (cfg?.models?.[candidate]?.enabled === false) return DEFAULT_MODEL;
   return candidate;
 }
-const MAX_CONTEXT_FILES = 5;
-const MAX_CONTEXT_BYTES = 20 * 1024;
 /** A gate left unanswered this long auto-denies (the loop must not hang). */
 const APPROVAL_TIMEOUT_MS = 10 * 60_000;
 /**
@@ -698,33 +695,6 @@ function rejectSessionGates(state: SessionRunState): void {
     state.gates.delete(id);
     gate.reject(new LoopAborted());
   }
-}
-
-/** Read workspace-relative paths into `<context>` blocks (real file content). */
-async function readContextBlocks(cwd: string, paths: string[] | undefined): Promise<string> {
-  if (!paths || paths.length === 0) return '';
-  const root = resolve(cwd);
-  const blocks: string[] = [];
-  for (const raw of paths.slice(0, MAX_CONTEXT_FILES)) {
-    if (typeof raw !== 'string' || !raw.trim()) continue;
-    // Jailed by the shared core guard (outside escapes throw, skipped here).
-    let abs: string;
-    try {
-      abs = resolveInRoot(root, raw.trim().replace(/^@/, ''));
-    } catch {
-      continue;
-    }
-    try {
-      const info = await stat(abs);
-      if (!info.isFile() || info.size > MAX_CONTEXT_BYTES) continue;
-      const content = await readFile(abs, 'utf-8');
-      const rel = relative(root, abs) || raw.trim();
-      blocks.push(`<context path="${rel}">\n${content}\n</context>`);
-    } catch {
-      // Missing/unreadable mention — skip it, the prompt still streams.
-    }
-  }
-  return blocks.length ? blocks.join('\n') + '\n' : '';
 }
 
 export async function wsRoutes(app: FastifyInstance): Promise<void> {

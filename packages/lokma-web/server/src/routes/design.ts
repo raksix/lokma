@@ -13,6 +13,7 @@ import {
   readDesignGuard,
   updateArtifactHtml,
 } from '@lokma/core';
+import { expandPromptMentions } from '../utils/context-blocks.js';
 
 /**
  * Design Studio — 6 artifact types over bundled systems (W5-18, Docs/34).
@@ -44,7 +45,14 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/design/generate', async (req, reply) => {
     const body = (req.body ?? {}) as { type?: unknown; brief?: unknown; system?: unknown; model?: unknown; cwd?: unknown };
     try {
-      const { id, manifest, critique } = await generateArtifact(body.type, body.brief, body.system, body.model, body.cwd);
+      // REQ-188 — the brief rides the shared ComposerInput, so `@path` mentions
+      // are real context now: read them into `<context>` blocks against the
+      // SAME project cwd the artifact is stored in, instead of handing the
+      // model a bare filename. Unreadable paths are skipped, never fatal.
+      const cwd = typeof body.cwd === 'string' ? body.cwd : process.cwd();
+      const brief =
+        typeof body.brief === 'string' ? await expandPromptMentions(cwd, body.brief) : body.brief;
+      const { id, manifest, critique } = await generateArtifact(body.type, brief, body.system, body.model, body.cwd);
       return { ok: true, id, manifest, critique };
     } catch (e) {
       if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });

@@ -1,4 +1,5 @@
 import type { ReasoningEffort } from '@lokma/shared/protocol/ws';
+import type { SessionFile } from '@lokma/core';
 import type { ApprovalDecision } from './agent-loop.js';
 
 /**
@@ -25,6 +26,8 @@ export type QueuedPrompt = {
   contextPaths?: string[];
   /** REQ-133: composer thinking budget, forwarded to the provider adapter. */
   reasoningEffort?: ReasoningEffort;
+  /** REQ-187: user-attached files for THIS prompt (content already capped). */
+  files?: SessionFile[];
   /** Resolved at enqueue time (the socket may be gone when the turn runs). */
   userId?: string;
   enqueuedAt: string;

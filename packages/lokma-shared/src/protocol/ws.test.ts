@@ -6,7 +6,10 @@
 import { strict as assert } from 'node:assert';
 import {
   ClientMessageSchema,
+  PROMPT_FILE_CHAR_CAP,
+  PROMPT_FILE_CHAR_SLACK,
   PROMPT_IMAGE_BASE64_CHARS,
+  PROMPT_MAX_FILES,
   PROMPT_MAX_IMAGES,
   ServerMessageSchema,
   decodeClientMessage,
@@ -101,4 +104,35 @@ assert.equal(
   'an oversized payload is rejected',
 );
 
-console.log('REQ-149 ws protocol frames: 20/20 checks passed');
+// ── REQ-187: attached files on the prompt frame ────────────────────────────
+const file = { name: 'notes.md', mime: 'text/markdown', size: 1234, content: '# notes' };
+const withFiles = decodeClientMessage(JSON.stringify({ type: 'prompt', prompt: 'read', files: [file] }));
+assert.equal(withFiles?.type, 'prompt', 'prompt with files parses');
+assert.equal(withFiles?.type === 'prompt' ? (withFiles.files ?? []).length : -1, 1, 'file payload survives');
+assert.equal(
+  withFiles?.type === 'prompt' ? withFiles.files?.[0]?.content : null,
+  '# notes',
+  'file content survives',
+);
+assert.equal(
+  decodeClientMessage(
+    JSON.stringify({ type: 'prompt', prompt: 'x', files: Array.from({ length: PROMPT_MAX_FILES + 1 }, () => file) }),
+  ),
+  null,
+  'more files than the cap are rejected',
+);
+assert.equal(
+  decodeClientMessage(
+    JSON.stringify({ type: 'prompt', prompt: 'x', files: [{ ...file, content: 'z'.repeat(PROMPT_FILE_CHAR_CAP + PROMPT_FILE_CHAR_SLACK + 1) }] }),
+  ),
+  null,
+  'oversized file content is rejected',
+);
+// A file-only prompt (no text) is a legitimate frame (REQ-187).
+assert.equal(
+  decodeClientMessage(JSON.stringify({ type: 'prompt', prompt: '', files: [file] }))?.type,
+  'prompt',
+  'a file-only prompt parses',
+);
+
+console.log('REQ-149 ws protocol frames: 26/26 checks passed');

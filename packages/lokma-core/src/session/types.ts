@@ -27,6 +27,16 @@ export type SessionMessage = {
    * `lokma-shared` `TranscriptRowSchema` — keep both in sync.
    */
   images?: SessionImage[];
+  /**
+   * REQ-187: files the USER attached to this prompt (text content read and
+   * capped in the browser — never raw bytes). The web renders a card
+   * (name/mime/size + preview) under the user bubble, and both the pump and
+   * `buildLoopHistory` replay the content to the model as a labeled
+   * `<file>` block — on the turn it was sent and on follow-up turns (with a
+   * newest-first replay budget). Mirrored in `lokma-shared`
+   * `PromptFileSchema`/`TranscriptRowSchema` — keep both in sync.
+   */
+  files?: SessionFile[];
 };
 
 /** One chat attachment (path relative to the session cwd). */
@@ -45,6 +55,22 @@ export type SessionImage = {
   mime: string;
   /** Raw base64 payload (no `data:` prefix) — the provider wire shape. */
   dataBase64: string;
+};
+
+/**
+ * One user-attached text file (REQ-187) — shape of the protocol's
+ * `PromptFile`. `content` is the capped extraction (the composer truncates
+ * with a `[truncated]` marker); the original bytes never leave the browser.
+ */
+export type SessionFile = {
+  /** Original file name (card label + the model's block label). */
+  name: string;
+  /** Best-effort MIME type (browser `file.type`, or a text/* fallback). */
+  mime: string;
+  /** Original size in bytes (display only — `content` is what rides). */
+  size: number;
+  /** Capped text content. */
+  content: string;
 };
 
 export type SessionMeta = {

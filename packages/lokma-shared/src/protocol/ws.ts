@@ -70,6 +70,29 @@ export const PromptImageSchema = z.object({
 });
 export type PromptImage = z.infer<typeof PromptImageSchema>;
 
+/**
+ * REQ-187 — one user-attached TEXT file riding a `prompt` frame.
+ *
+ * The composer reads the file in the browser (text files directly; PDFs via
+ * the server's extract endpoint) and ships the capped content, so the server
+ * can hand the model a labeled `<file>` block without touching the user's
+ * disk again. Caps are hard: `MAX` entries per prompt and a per-file content
+ * budget (the composer appends a `[truncated …]` marker, hence the slack).
+ */
+export const PROMPT_MAX_FILES = 10;
+/** Per-file inline content budget (chars) — the composer truncates beyond it. */
+export const PROMPT_FILE_CHAR_CAP = 100_000;
+/** Slack above the cap for the truncation marker the composer appends. */
+export const PROMPT_FILE_CHAR_SLACK = 2_000;
+
+export const PromptFileSchema = z.object({
+  name: z.string().min(1).max(200),
+  mime: z.string().min(1).max(120),
+  size: z.number().int().min(0),
+  content: z.string().max(PROMPT_FILE_CHAR_CAP + PROMPT_FILE_CHAR_SLACK),
+});
+export type PromptFile = z.infer<typeof PromptFileSchema>;
+
 /** One persisted transcript line (mirrors `SessionMessage` in lokma-core). */
 export const TranscriptRowSchema = z.object({
   role: z.enum(SESSION_ROLES),
@@ -85,6 +108,12 @@ export const TranscriptRowSchema = z.object({
    * every sent image vanish on refresh (same trap as `attachments`).
    */
   images: z.array(PromptImageSchema).optional(),
+  /**
+   * REQ-187: files the user attached to this prompt — text content only
+   * (images ride `images`, REQ-186). The server stores them on the user row
+   * and assembles labeled `<file>` blocks for the model.
+   */
+  files: z.array(PromptFileSchema).optional(),
 });
 export type TranscriptRow = z.infer<typeof TranscriptRowSchema>;
 
@@ -123,6 +152,10 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
     // REQ-186: attached images as real bytes — the server stores them on the
     // user row and the adapters emit them as content parts next to the text.
     images: z.array(PromptImageSchema).max(PROMPT_MAX_IMAGES).optional(),
+    // REQ-187: attached text files (content read + capped in the browser) —
+    // the server stores them on the user row and assembles `<file>` blocks
+    // for the model.
+    files: z.array(PromptFileSchema).max(PROMPT_MAX_FILES).optional(),
   }),
   z.object({ type: z.literal('abort'), sessionId: z.string() }),
   z.object({ type: z.literal('permission_response'), requestId: z.string(), decision: z.enum(['allow', 'deny', 'always']) }),

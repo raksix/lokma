@@ -61,6 +61,10 @@ export function toTranscriptRow(message: SessionMessage): TranscriptRow {
   // REQ-186: same contract for user-attached images — without this the sent
   // image renders live and disappears on the next transcript reload.
   if (message.images?.length) row.images = message.images;
+  // REQ-187: user-attached files — same contract again (REQ-160 trap): the
+  // WS mapper must carry every row field or the card vanishes on reload and
+  // nothing replays to the model.
+  if (message.files?.length) row.files = message.files;
   return row;
 }
 

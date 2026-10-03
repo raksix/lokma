@@ -161,5 +161,16 @@ const withImage = toTranscriptRow({
 assert.equal(withImage.images?.length, 1, 'user image kept on the row');
 assert.equal(withImage.images?.[0]?.mime, 'image/png', 'user image mime kept');
 
+// 11. REQ-187: user-attached files ride the wire row too (REQ-160 trap) —
+// metadata + capped content, or the card dies on reload.
+const withFile = toTranscriptRow({
+  role: 'user',
+  content: 'read',
+  timestamp: 'now',
+  files: [{ name: 'notes.md', mime: 'text/markdown', size: 9, content: '# notes' }],
+});
+assert.equal(withFile.files?.length, 1, 'user file kept on the row');
+assert.equal(withFile.files?.[0]?.content, '# notes', 'user file content kept');
+
 unsubscribeSocket(listWatcher);
-console.log('REQ-149 session feed: 10 groups, all checks passed');
+console.log('REQ-149 session feed: 11 groups, all checks passed');

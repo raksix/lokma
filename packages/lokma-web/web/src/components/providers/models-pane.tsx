@@ -6,7 +6,20 @@ import { cn } from '@/lib/utils';
 import { useProviderStore } from '@/stores';
 import { emitToast } from '@/components/shell';
 import type { ModelInfo } from '@/lib/api';
-import { buildBulkMap, countEnabled, filterModels, groupByProvider } from './models';
+import {
+  buildBulkMap,
+  countEnabled,
+  filterModels,
+  groupByProvider,
+  MODELS_SPLIT_CLASS,
+  modelPreviewRows,
+  modelRowKey,
+  modelsListClass,
+  modelsListScrollClass,
+  providerIndex,
+  scopeGroupsToProvider,
+  shouldFocusModelSearch,
+} from './models';
 import { DefaultModelPicker } from './default-model-picker';
 
 /**
@@ -29,8 +42,15 @@ import { DefaultModelPicker } from './default-model-picker';
  *   catalog, and the label always carries the count.
  * - Rows are grouped by provider under sticky headers (same grouping the
  *   Composer dropdown already had), each with its own All/None shortcut.
+ *
+ * REQ-194 Kapsam 4 — `wide` (settings modal in full screen) swaps the
+ * single column for provider index | rows | detail, drops the fixed 320px
+ * well so the surrounding body owns the scroll, and adds the `/` search
+ * shortcut. Every geometry and decision behind it is a pure helper in
+ * `models.ts` (probe-covered); the prop defaults to false, so the
+ * Inspector tab and Inspector panel callers keep the shipped layout.
  */
-export function ModelsPane() {
+export function ModelsPane({ wide = false }: { wide?: boolean }) {
   const models = useProviderStore((s) => s.models);
   const loading = useProviderStore((s) => s.loading);
   const refresh = useProviderStore((s) => s.refresh);
@@ -40,6 +60,12 @@ export function ModelsPane() {
   const [query, setQuery] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
+  // REQ-194 Kapsam 4 — provider index selection + the row shown in the
+  // detail panel. Both are split-layout state only; in the single column
+  // they are never written and never read.
+  const [provider, setProvider] = React.useState<string | null>(null);
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const searchRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     void refresh();
@@ -47,10 +73,49 @@ export function ModelsPane() {
 
   const filtered = React.useMemo(() => filterModels(models, query), [models, query]);
   const groups = React.useMemo(() => groupByProvider(filtered), [filtered]);
+  // REQ-194 Kapsam 4 — in the split layout the provider index scopes the
+  // list; in the single column the selection is never written, so scoping
+  // is a no-op there (same helper, no second copy of the expression).
+  const scopedGroups = React.useMemo(
+    () => (provider === null ? groups : scopeGroupsToProvider(groups, provider)),
+    [groups, provider],
+  );
+  const index = React.useMemo(() => providerIndex(scopedGroups), [scopedGroups]);
   const enabledCount = countEnabled(filtered);
   const filtering = query.trim().length > 0;
   // A filtered list means the user is looking at a subset — scope bulk to it.
   const bulkTargets = filtering ? filtered : models;
+  const listShell = modelsListClass(wide);
+  const listScroll = modelsListScrollClass(wide);
+  // The detail panel shows a row of the SCOPED list; an unknown/stale
+  // selection resolves to null (an honest empty panel, never a wrong row).
+  const preview = React.useMemo(
+    () =>
+      wide
+        ? (scopedGroups.flatMap((g) => g.models).find((m) => modelRowKey(m) === selectedId) ?? null)
+        : null,
+    [wide, scopedGroups, selectedId],
+  );
+
+  // REQ-194 Kapsam 4 — `/` focuses the search field. Editable targets keep
+  // their literal slash (typing a path into the filter must still work).
+  React.useEffect(() => {
+    if (!wide) return;
+    function onKey(e: KeyboardEvent): void {
+      const target = e.target as HTMLElement | null;
+      const editable =
+        target !== null &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable === true);
+      if (!shouldFocusModelSearch(e.key, editable)) return;
+      e.preventDefault();
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [wide]);
 
   async function handleToggle(id: string, next: boolean): Promise<void> {
     try {
@@ -102,18 +167,27 @@ export function ModelsPane() {
   }
 
   return (
-    <div className="space-y-2 p-2">
-      <div className="rounded-lg border border-line bg-white p-2.5 text-xs dark:bg-[#1E1E21]">
+    // REQ-194 Kapsam 4 — in full screen the pane is a flex column that
+    // fills the modal body so the split grid (and the un-capped scroll well
+    // inside it) get a real height; the default shell keeps `space-y-2 p-2`
+    // byte-identical, so the Inspector callers are untouched.
+    <div
+      className={cn(wide ? 'flex h-full min-h-0 flex-col gap-2 p-2' : 'space-y-2 p-2')}
+      data-models-pane={wide ? 'wide' : undefined}
+    >
+      <div className="shrink-0 rounded-lg border border-line bg-white p-2.5 text-xs dark:bg-[#1E1E21]">
         <DefaultModelPicker />
       </div>
-      <div className="flex flex-wrap items-center gap-1">
+      <div className="flex shrink-0 flex-wrap items-center gap-1">
         <div className="relative min-w-[160px] flex-1">
           <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-zinc-400" />
           <Input
+            ref={searchRef}
             placeholder="Search models — id / provider..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="h-7 pl-7 text-xs"
+            data-model-search
           />
         </div>
         <Button
@@ -143,9 +217,57 @@ export function ModelsPane() {
           {enabledCount}/{filtered.length} enabled
         </span>
       </div>
-      <div className="overflow-hidden rounded-lg border border-line">
-        <div className="max-h-[320px] overflow-auto">
-          {groups.map((group) => {
+      {/* REQ-194 Kapsam 4 — in full screen the catalog gets the width its
+          shape deserves: a provider index on the left, the rows in the
+          middle, the selected row's detail on the right. Below `lg` the
+          grid stacks and the two side columns are hidden, so a 390px
+          phone keeps exactly the single column it had. In the default
+          (non-wide) shell this wrapper has no class at all — one plain
+          block, the shipped layout untouched. */}
+      <div className={cn(wide && MODELS_SPLIT_CLASS)} data-models-split={wide ? '1' : undefined}>
+        {wide && (
+          <nav aria-label="Model providers" className="hidden min-h-0 flex-col gap-0.5 overflow-y-auto lg:flex">
+            <button
+              type="button"
+              onClick={() => setProvider(null)}
+              aria-pressed={provider === null}
+              data-model-provider=""
+              className={cn(
+                'flex items-center gap-1.5 rounded-md px-2 py-1 text-left text-[11px]',
+                provider === null
+                  ? 'bg-terracotta/10 font-medium text-terracotta'
+                  : 'text-zinc-600 hover:bg-muted dark:text-zinc-300',
+              )}
+            >
+              <span className="min-w-0 flex-1 truncate">All providers</span>
+              <span className="shrink-0 text-[10px] text-zinc-400">{filtered.length}</span>
+            </button>
+            {index.map((row) => (
+              <button
+                key={row.provider}
+                type="button"
+                onClick={() => setProvider(row.provider)}
+                aria-pressed={provider === row.provider}
+                data-model-provider={row.provider}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-md px-2 py-1 text-left text-[11px]',
+                  provider === row.provider
+                    ? 'bg-terracotta/10 font-medium text-terracotta'
+                    : 'text-zinc-600 hover:bg-muted dark:text-zinc-300',
+                )}
+              >
+                <span className="min-w-0 flex-1 truncate font-mono">{row.provider}</span>
+                <span className="shrink-0 text-[10px] text-zinc-400">
+                  {row.enabled}/{row.total}
+                </span>
+              </button>
+            ))}
+          </nav>
+        )}
+        <div className={cn(wide && 'flex min-h-0 flex-col')} data-models-center>
+      <div className={cn(wide && 'flex min-h-0 flex-1 flex-col', listShell)} data-models-list>
+        <div className={listScroll} data-models-scroll>
+          {scopedGroups.map((group) => {
             const on = countEnabled(group.models);
             const isCollapsed = collapsed[group.provider] === true;
             return (
@@ -190,8 +312,17 @@ export function ModelsPane() {
                 {!isCollapsed &&
                   group.models.map((m) => (
                     <label
-                      key={`${m.provider}::${m.id}`}
-                      className="grid cursor-pointer grid-cols-[28px_1fr_60px] items-center gap-1 border-b border-line/40 px-2 py-1.5 text-xs last:border-b-0 hover:bg-muted/30"
+                      key={modelRowKey(m)}
+                      className={cn(
+                        'grid cursor-pointer grid-cols-[28px_1fr_60px] items-center gap-1 border-b border-line/40 px-2 py-1.5 text-xs last:border-b-0 hover:bg-muted/30',
+                        // REQ-194 Kapsam 4 — the selected row is what the
+                        // detail panel describes. Full literal classes (no
+                        // `bg-${}` interpolation — Tailwind v4 never compiles
+                        // a dynamic name, the style would silently vanish).
+                        selectedId === modelRowKey(m) && wide && 'bg-terracotta/10',
+                      )}
+                      data-model-row={modelRowKey(m)}
+                      onClick={wide ? () => setSelectedId(modelRowKey(m)) : undefined}
                     >
                       <input
                         type="checkbox"
@@ -219,12 +350,43 @@ export function ModelsPane() {
               </div>
             );
           })}
-          {filtered.length === 0 && (
+          {scopedGroups.length === 0 && (
             <div className="p-4 text-center text-xs text-zinc-400">
               {loading ? 'Loading models…' : 'No matches'}
             </div>
           )}
         </div>
+      </div>
+        </div>
+        {/* The detail panel — the selected row's REAL fields only. Kapsam 4
+            asked for capacity/context/price; the server catalog carries none
+            of them (see `modelPreviewRows`), so it states what it knows and
+            never invents a number. */}
+        {wide && (
+          <aside className="hidden min-h-0 overflow-y-auto lg:block" data-models-detail>
+            {preview ? (
+              <div className="space-y-2 rounded-lg border border-line p-2.5">
+                <div className="truncate text-xs font-semibold" title={preview.label || preview.id}>
+                  {preview.label || preview.id}
+                </div>
+                <dl className="space-y-1">
+                  {modelPreviewRows(preview).map((row) => (
+                    <div key={row.label} className="text-[11px]">
+                      <dt className="text-zinc-500">{row.label}</dt>
+                      <dd className={cn('break-all text-zinc-700 dark:text-zinc-200', row.mono && 'font-mono')}>
+                        {row.value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-line p-3 text-center text-[11px] text-zinc-400">
+                Select a model to see its details
+              </div>
+            )}
+          </aside>
+        )}
       </div>
       <div className="flex gap-1">
         <Button size="sm" className="h-7 flex-1 gap-1 text-xs" disabled={loading || busy} onClick={() => void handleRefresh()}>

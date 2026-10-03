@@ -2,7 +2,7 @@
  * models.test.ts — probe for the pure Models-tab helpers.
  * Run: `bun src/components/providers/models.test.ts` (no DOM, no server).
  */
-import { buildBulkMap, countEnabled, enabledModels, filterModels, groupByProvider, modelIdMatches, normalizeModelId, resolveDefaultModel } from './models';
+import { buildBulkMap, countEnabled, enabledModels, filterModels, groupByProvider, MODELS_SPLIT_CLASS, modelPreviewRows, modelRowKey, modelsListClass, modelsListScrollClass, modelIdMatches, normalizeModelId, providerIndex, resolveDefaultModel, scopeGroupsToProvider, shouldFocusModelSearch } from './models';
 import type { ModelInfo } from '@/lib/api';
 
 const catalog: ModelInfo[] = [
@@ -133,6 +133,53 @@ check(
   'custom fallback wins when catalog empty',
   resolveDefaultModel({ models: [], configured: '', usageTop: null, fallback: 'x/y' }).model === 'x/y',
 );
+
+// --- REQ-194 Kapsam 4 — the full-screen split layout helpers ----------
+
+// Geometries: the DEFAULT must stay byte-identical to what shipped
+// (the Inspector tab/panel callers pass no prop), so this is a
+// backward-compatibility guard, not a restyle.
+check('default list shell unchanged', modelsListClass(false) === 'overflow-hidden rounded-lg border border-line');
+check('default scroll well keeps its 320px cap', modelsListScrollClass(false) === 'max-h-[320px] overflow-auto');
+check('wide shell drops nothing visible but the well cap', modelsListClass(true).includes('border-line') && modelsListClass(true).includes('min-h-0'));
+check('wide scroll well has no fixed height', modelsListScrollClass(true) === 'h-full min-h-0 overflow-auto' && !modelsListScrollClass(true).includes('max-h-['));
+check('wide geometry differs from the default', modelsListClass(true) !== modelsListClass(false) && modelsListScrollClass(true) !== modelsListScrollClass(false));
+check('split grid has index, rows and detail columns', MODELS_SPLIT_CLASS.includes('lg:grid-cols-[') && MODELS_SPLIT_CLASS.includes('minmax(0,1fr)'));
+
+// Row identity — provider-scoped, because the same id can exist under
+// two providers (the merged catalog is `provider::id`).
+check('row key is provider-scoped', modelRowKey({ id: 'a/b', provider: 'openai' }) === 'openai::a/b');
+check('row keys differ across providers', modelRowKey({ id: 'x', provider: 'a' }) !== modelRowKey({ id: 'x', provider: 'b' }));
+
+// Provider index — counts come from the SAME groups the list renders.
+const g = groupByProvider(catalog);
+check('index lists every provider', providerIndex(g).length === g.length);
+check('index carries total + enabled', providerIndex(g).every((r, i) => r.total === g[i].models.length && r.enabled === countEnabled(g[i].models)));
+check('index enabled counts are real', providerIndex(g).find((r) => r.provider === 'anthropic')?.enabled === 1);
+
+// Scoping — an unknown provider must yield NOTHING, never everything.
+check('null scope keeps every group', scopeGroupsToProvider(g, null).length === g.length);
+check('provider scope narrows to one', scopeGroupsToProvider(g, 'openai').length === 1);
+check('unknown provider scope is empty, not all', scopeGroupsToProvider(g, 'nope').length === 0);
+check('empty groups scope is empty', scopeGroupsToProvider([], 'openai').length === 0);
+
+// `/` search shortcut — a literal slash must survive inside a field.
+check('slash focuses search when not typing', shouldFocusModelSearch('/', false));
+check('slash stays literal while typing', !shouldFocusModelSearch('/', true));
+check('other keys never focus', !shouldFocusModelSearch('a', false) && !shouldFocusModelSearch('Enter', false) && !shouldFocusModelSearch('/', true));
+
+// Preview rows — REAL fields only. Kapsam 4 asked for context/price and
+// the catalog has none, so the probe pins that nothing fabricated appears.
+const rows = modelPreviewRows({ id: 'anthropic/claude-opus', label: 'Claude Opus', provider: 'anthropic', enabled: false });
+check('preview names the label', rows.some((r) => r.label === 'Label' && r.value === 'Claude Opus'));
+check('preview carries the full id', rows.some((r) => r.label === 'Model id' && r.value === 'anthropic/claude-opus' && r.mono === true));
+check('preview carries the provider', rows.some((r) => r.label === 'Provider' && r.value === 'anthropic'));
+check('preview reports disabled honestly', rows.some((r) => r.label === 'Status' && r.value === 'Disabled'));
+check('preview says available when supported', rows.some((r) => r.label === 'Server support' && r.value === 'Available'));
+check('preview flags an unsupported id', modelPreviewRows({ id: 'x/y', label: 'y', provider: 'x', enabled: true, unsupported: true }).some((r) => r.value === 'Not on server'));
+check('preview falls back to the id when the label is empty', modelPreviewRows({ id: 'p/m', label: '', provider: 'p', enabled: true }).some((r) => r.label === 'Label' && r.value === 'p/m'));
+check('preview invents no context/pricing field', !rows.some((r) => /context|ctx|price|cost|token/i.test(r.label)));
+check('every preview row has a non-empty value', rows.every((r) => r.value.length > 0));
 
 console.log(`models.test.ts: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

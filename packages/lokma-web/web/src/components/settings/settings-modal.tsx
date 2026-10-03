@@ -306,7 +306,15 @@ export function SettingsModal({
             })}
           </nav>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          // REQ-194 Kapsam 4 — only the Models section in full screen hands its
+          // height to the pane; every other section (and the default shell)
+          // keeps the body owning the scroll exactly as shipped.
+          <div
+            className={cn(
+              'min-h-0 flex-1 p-4',
+              fullscreen && section === 'models' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
+            )}
+          >
             <React.Suspense fallback={<PaneFallback pane={section} />}>
               {section === 'shortcuts' ? (
                 <ShortcutsSection explorerSide={explorerSide} />
@@ -325,7 +333,14 @@ export function SettingsModal({
               ) : section === 'providers' ? (
                 <LazyProvidersPane />
               ) : section === 'models' ? (
-                <LazyModelsPane />
+                // REQ-194 Kapsam 4 — full screen hands the pane the whole
+                // body height (its `h-full` + the body as a flex column),
+                // which is what lets the split grid and the UN-capped
+                // scroll well have a real box; the default 768x640 shell
+                // keeps `wide={false}` and its shipped 320px well.
+                <div className={cn(fullscreen && 'flex h-full min-h-0 flex-col')}>
+                  <LazyModelsPane wide={fullscreen} />
+                </div>
               ) : section === 'agents' ? (
                 // REQ-163 — Agent Hub is a Settings section now: the same
                 // live pane renders inside the modal body (its h-full root

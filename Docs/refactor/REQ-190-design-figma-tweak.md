@@ -49,3 +49,22 @@
 
 - **Write-only:** kod yazılmadı.
 - Kapsam disiplini: "Figma gibi" **kanvas editörü** anlamına gelmez — OpenDesign'ın kendi konumu pixel'lerin kod olduğu yönünde. Bu REQ onu korur; sürükle-bırak resim editörü kapsam **dışıdır**.
+
+## Uygulama ilerlemesi (worker)
+
+### Tur 1/5 — sürüm defteri (`2288a19`)
+
+Çekirdek katman hazır; UI ve route sonraki turlarda.
+
+- `DesignVersion` + `manifest.versions[]` (en eski önce). Emekli gövde `versions/<sha8>.html`'e arşivlenir, **güncel** gövde `artifact.html`'de kalır — mevcut okuma yolları **hiç değişmez** (`store.ts:persist`).
+- **Yazmadan ÖNCE arşivle**, üstelik kayıtlı sha'ya karşı doğrulanarak: bir ledger girdisi asla yazılmamış bir dosyayı gösteremez, elle bozulmuş bir manifest yanlış isimle arşivleyemez.
+- `appendArtifactVersion()` tek append yolu: tweak **aynı** artifact id'sine yeni sürüm olarak düşer → liste sayısı büyümez.
+- `expectedSha` kilidi (tweak + Code sekmesi yazmaları) `sha256Hex`'i (files modülü) yeniden kullanır; eski değer `stale_version` **409**, sessiz üzerine yazma yok.
+- `revertArtifact()` eski gövdeyi **yeni `revert` girdisi olarak ekler** (yok etmez) → ileri dön = bir revert daha. Gövdesi silinmiş girdi `version_body_missing` 409 verir, artifact **bozulmaz**.
+- `listArtifacts()` satırları zayıf (`versionCount` + `currentVersion`, ledger dizisi yok); `getArtifact()` `sha` + `currentVersion` ekler.
+- REQ-190 öncesi artifact (ledgersız) okunur ve **dürüstçe** v0 / boş geçmişmi bildirir (uydurma v1 yok); ilk düzenlemesi v1 ile başlar.
+
+Birim: `versions.test.ts` **53/53** (ledger, yazmadan-önce-arşivle, 409 kilidi, revert, cap budama, legacy bozulma). Mevcut `store.test.ts` 27/27 + `generate.test.ts` 24/24 yeşil kaldı. `lokma-core` dist yeniden derlendi (sunucu `dist`'ten çözüyor); server typecheck 0.
+
+**Kalan:** `POST /api/design/:id/tweak` ucu (ajan yama üretimi + `expectedSha` koruması) → versiyon seçici/geri alma UI'ı → düzenlenebilir alan yüzeyleri (type/system/model/token/density/content) → `packages/lokma-shared` transcript/artifact alanları → `scripts/probe-design-tweak-versions.cjs`.
+

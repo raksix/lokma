@@ -603,6 +603,19 @@ export type ArchifyExportFormat = 'svg' | 'html' | 'json' | 'card' | 'png' | 'we
 
 // ─── Design Studio (6 artifact types over bundled systems + DESIGN.md guard, W5-18) ───
 
+/**
+ * REQ-192 — one design skill as the generation actually recorded it. `sentChars`
+ * is the honesty signal: a body the prompt budget truncated still counts as
+ * sent, and a skill the resolver refused never appears here at all.
+ */
+export type DesignSkillApplied = {
+  id: string;
+  name: string;
+  /** Characters of SKILL.md handed to the model (the per-skill cap may cut it). */
+  sentChars: number;
+  /** SKILL.md bytes on disk, when known. */
+  bytes?: number;
+};
 export type DesignManifest = {
   id: string;
   type: string;
@@ -612,6 +625,14 @@ export type DesignManifest = {
   updatedAt: string;
   /** REQ-178 — resolved project cwd the artifact lives under (absent = global root). */
   project?: string;
+  /**
+   * REQ-192 — the design skills this artifact was generated with, as the SERVER
+   * recorded them (id + name + how many characters of SKILL.md reached the
+   * model). This is the honesty channel: the UI reads the names from here, so
+   * it never claims a skill was applied when the resolver refused it. Absent
+   * on pre-REQ-192 artifacts.
+   */
+  skills?: DesignSkillApplied[];
 };
 export type DesignSummary = DesignManifest & { bytes: number; overall: number | null };
 export type DesignsRes = { items: DesignSummary[]; count: number; project?: string | null; root?: string };
@@ -628,7 +649,19 @@ export type DesignDetailRes = {
   /** REQ-190 — highest version index in the ledger (0 = no history yet). */
   currentVersion?: number;
 };
-export type GenerateDesignBody = { type: string; brief: string; system?: string; model?: string; cwd?: string };
+/**
+ * REQ-192 — `skills` is the design-SKILL axis (ids only; the server resolves
+ * each to its SKILL.md body before the prompt is built). Omitted when empty so
+ * a no-skill generation keeps the exact wire shape it had before.
+ */
+export type GenerateDesignBody = {
+  type: string;
+  brief: string;
+  system?: string;
+  model?: string;
+  cwd?: string;
+  skills?: string[];
+};
 export type GenerateDesignRes = { ok: boolean; id: string; manifest: DesignManifest; critique: CritiqueResult };
 export type SaveDesignRes = {
   ok: boolean;
@@ -716,6 +749,35 @@ export type DesignSystemsRes = {
   source: 'catalog' | 'bundled';
   root: string;
   categories: string[];
+};
+/**
+ * REQ-192 — one design-SKILL catalog row (the SECOND axis beside systems: a
+ * system is a palette, a skill is a `SKILL.md` instruction set). `hasBody` is
+ * the honesty channel: a row can be selected but still carry a `problem`, and
+ * the server will refuse it with 409 rather than pretend it applied.
+ */
+export type DesignSkillRow = {
+  id: string;
+  name: string;
+  description: string;
+  group: string;
+  category: string;
+  bytes: number;
+  linkedFiles: string[];
+  hasBody: boolean;
+  problem?: string;
+};
+export type DesignSkillsRes = {
+  ok: boolean;
+  skills: DesignSkillRow[];
+  count: number;
+  /** Always `design` today — the scope a SKILL.md must declare to be listed. */
+  scope: string;
+  groups: string[];
+  /** Scanned skills excluded for lacking `scope: design` (the honest "why"). */
+  unscoped: number;
+  /** Scoped rows whose SKILL.md is missing/unreadable/oversized. */
+  invalid: number;
 };
 export type DesignSystemInstallRes = {
   ok: boolean;
@@ -1545,6 +1607,12 @@ export const api = {
     }),
   /** 4 bundled system cards (name/preset/tokens for the picker). */
   getDesignSystems: () => get<DesignSystemsRes>('/api/design/systems'),
+  /**
+   * REQ-192 — the design-SKILL catalog: installed `scope: design` skills,
+   * grouped and searchable. Separate from `/systems` on purpose (a system is a
+   * palette, a skill is a `SKILL.md` instruction set) and never merged into it.
+   */
+  getDesignSkills: () => get<DesignSkillsRes>('/api/design/skills'),
   /** REQ-191 — install one package into the catalog (local path or https URL). */
   installDesignSystem: (source: string) => post<DesignSystemInstallRes>('/api/design/systems', { source }),
   /** REQ-191 — activate an installed system in the project `.lokma/`. */

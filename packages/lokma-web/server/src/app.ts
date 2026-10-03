@@ -17,6 +17,7 @@ import { fsRoutes } from './routes/fs.js';
 import { gitRoutes } from './routes/git.js';
 import { terminalRoutes } from './routes/terminal.js';
 import { browserRoutes } from './routes/browser.js';
+import { browserProxyRoutes } from './browser-proxy/proxy-routes.js';
 import { archifyRoutes } from './routes/archify.js';
 import { designRoutes } from './routes/design.js';
 import { testsRoutes } from './routes/tests.js';
@@ -62,6 +63,7 @@ export async function createApp(): Promise<ReturnType<typeof Fastify>> {
   await gitRoutes(app);
   await terminalRoutes(app);
   await browserRoutes(app);
+  await browserProxyRoutes(app);
   await archifyRoutes(app);
   await designRoutes(app);
   await testsRoutes(app);

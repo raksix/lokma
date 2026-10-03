@@ -14,10 +14,11 @@
  * (REQ-177 §3) — no automatic template fallback.
  */
 
-import { ProviderError, providerOfId, stream as aiStream, type ProviderMessage } from '@lokma/ai';
+import type { ProviderMessage } from '@lokma/ai';
 import type { GlobalConfig } from '@lokma/shared';
 import { loadConfig } from '../config/index.js';
-import { resolveProviderUpstream } from '../providers/providers.js';
+import { callDesignModel, designErrorFromUpstream } from './model-call.js';
+export { DESIGN_GENERATION_TIMEOUT_MS, designErrorFromUpstream } from './model-call.js';
 import {
   DESIGN_HTML_CAP,
   DESIGN_SYSTEM_META,
@@ -35,15 +36,6 @@ export const DEFAULT_DESIGN_MODEL = 'anthropic/claude-sonnet-4-5';
  * silent fallback after a model error (REQ-177 §3).
  */
 export const OFFLINE_TEMPLATE_MODEL = 'offline-template';
-
-/**
- * One generation call is bounded — a hung upstream must not wedge the pane.
- * The default model answers a full HTML artifact in ~2 minutes (measured:
- * 114s on the first live run, then >120s on the next), so the budget sits
- * well above that; the production nginx /api/ read timeout (300s) is the
- * outer bound.
- */
-export const DESIGN_GENERATION_TIMEOUT_MS = 240_000;
 
 /**
  * Quality contract every generated artifact must satisfy (REQ-177 §4):
@@ -161,89 +153,19 @@ export async function resolveDesignModel(modelRaw?: unknown, cwd?: string): Prom
   return pickDesignModel(modelRaw, cfg);
 }
 
-/** Map an upstream failure onto the honest route-level error (never a template). */
-export function designErrorFromUpstream(e: unknown, model: string): DesignError {
-  if (e instanceof DesignError) return e;
-  if (e instanceof ProviderError) {
-    if (e.code === 'missing_api_key') {
-      return new DesignError(
-        'design_no_api_key',
-        `${e.message} Design generation was NOT replaced by a template — fix the credential and retry.`,
-        400,
-      );
-    }
-    return new DesignError('design_upstream_error', `Model "${model}" call failed (${e.code}): ${e.message}`, 502);
-  }
-  if (e instanceof Error && (e.name === 'AbortError' || e.name === 'TimeoutError')) {
-    return new DesignError(
-      'design_timeout',
-      `Model "${model}" did not answer within ${Math.round(DESIGN_GENERATION_TIMEOUT_MS / 1000)}s — retry or pick another model.`,
-      504,
-    );
-  }
-  return new DesignError(
-    'design_upstream_error',
-    `Model "${model}" call failed: ${e instanceof Error ? e.message : String(e)}`,
-    502,
-  );
-}
-
 /**
  * One-shot generation: resolve the provider upstream, stream the answer,
  * return the extracted HTML document. Persistence (manifest, critique,
  * disk) stays in `store.ts` — this module only talks to the model.
  */
 export async function generateDesignHtml(req: DesignModelRequest & { model: string }): Promise<string> {
-  const providerId = providerOfId(req.model, 'anthropic');
-  let upstream: { provider: 'anthropic' | 'openai'; baseUrl: string; apiKey: string | null };
-  try {
-    upstream = await resolveProviderUpstream(providerId);
-  } catch (e) {
-    throw new DesignError(
-      'design_provider_unavailable',
-      e instanceof Error ? e.message : `Provider "${providerId}" is not available.`,
-      400,
-    );
-  }
+  // REQ-190 — the streaming transport now lives in `model-call.ts` so the
+  // tweak patcher shares the SAME provider resolution, timeout and error
+  // mapping. Nothing about generation's behaviour changes.
   const messages: ProviderMessage[] = [
     { role: 'system', content: DESIGN_MODEL_SYSTEM_PROMPT },
     { role: 'user', content: buildDesignPrompt(req) },
   ];
-  let text = '';
-  // The abort surfaces in adapter-specific shapes (DOMException TimeoutError,
-  // a wrapped ProviderError, ...) — track it on the signal itself so a
-  // timeout maps to the honest design_timeout regardless of the wrapper.
-  const deadline = AbortSignal.timeout(DESIGN_GENERATION_TIMEOUT_MS);
-  let timedOut = false;
-  deadline.addEventListener(
-    'abort',
-    () => {
-      timedOut = true;
-    },
-    { once: true },
-  );
-  try {
-    for await (const chunk of aiStream({
-      provider: upstream.provider,
-      model: req.model,
-      messages,
-      apiKey: upstream.apiKey,
-      baseUrl: upstream.baseUrl,
-      signal: deadline,
-      // Go-style upstreams want a client session id (harmless elsewhere).
-      extraHeaders: { 'x-opencode-session': `lokma-design-${Date.now().toString(36)}` },
-    })) {
-      if (chunk.type === 'text_delta' && chunk.delta) text += chunk.delta;
-    }
-  } catch (e) {
-    if (timedOut) {
-      throw new DesignError(
-        'design_timeout',
-        'Model "' + req.model + '" did not answer within ' + Math.round(DESIGN_GENERATION_TIMEOUT_MS / 1000) + 's — retry or pick another model.',
-        504,
-      );
-    }
-    throw designErrorFromUpstream(e, req.model);
-  }
+  const text = await callDesignModel(req.model, messages);
   return extractHtmlDocument(text);
 }

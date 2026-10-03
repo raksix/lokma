@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import {
   DESIGN_SYSTEM_META,
   DesignError,
+  appendArtifactVersion,
   critiqueArtifact,
   deleteArtifact,
   exportArtifact,
@@ -9,8 +10,11 @@ import {
   exportArtifactWebm,
   generateArtifact,
   getArtifact,
+  listArtifactVersions,
   listArtifacts,
   readDesignGuard,
+  revertArtifact,
+  runTweak,
   updateArtifactHtml,
 } from '@lokma/core';
 import { expandPromptMentions } from '../utils/context-blocks.js';
@@ -114,6 +118,56 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
     const query = req.query as { cwd?: unknown };
     try {
       return { ok: true, ...(await critiqueArtifact(id, query.cwd)) };
+    } catch (e) {
+      if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      throw e;
+    }
+  });
+
+  // ── REQ-190: tweak in place, read the history, undo a version ──────────────
+  // The tweak lands as the NEXT version of THIS artifact — a new artifact id
+  // is never created, so the list does not grow and the old design is not
+  // "lost". `expectedSha` is the optimistic lock (409 `stale_version`).
+  app.post('/api/design/:id/tweak', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = (req.body ?? {}) as { note?: unknown; model?: unknown; cwd?: unknown; expectedSha?: unknown };
+    try {
+      const result = await runTweak(
+        {
+          read: async () => {
+            const detail = await getArtifact(id, body.cwd);
+            return { type: detail.manifest.type, system: detail.manifest.system, html: detail.html, sha: detail.sha };
+          },
+          append: async (html, note, model) =>
+            appendArtifactVersion(id, html, { origin: 'tweak', note, model }, body.cwd, body.expectedSha),
+        },
+        { noteRaw: body.note, modelRaw: body.model, expectedShaRaw: body.expectedSha },
+      );
+      return { ok: true, ...result };
+    } catch (e) {
+      if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      throw e;
+    }
+  });
+
+  // History for the version picker. A pre-REQ-190 artifact answers
+  // `versions: []` + `currentVersion: 0` — honest, never a faked v1.
+  app.get('/api/design/:id/versions', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const query = req.query as { cwd?: unknown };
+    try {
+      return { ok: true, ...(await listArtifactVersions(id, query.cwd)) };
+    } catch (e) {
+      if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      throw e;
+    }
+  });
+
+  app.post('/api/design/:id/revert', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = (req.body ?? {}) as { version?: unknown; cwd?: unknown };
+    try {
+      return { ok: true, ...(await revertArtifact(id, body.version, body.cwd)) };
     } catch (e) {
       if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
       throw e;

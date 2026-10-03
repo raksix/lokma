@@ -259,7 +259,11 @@ export function SelectMenu({
                   placeholder={searchPlaceholder}
                   onChange={(event) => setQuery(event.target.value)}
                   onKeyDown={(event) => {
-                    // The box owns typing: Space/Enter must NOT commit a row.
+                    // The box owns typing. Every key stops here: WITHOUT this a
+                    // Space/Enter bubbles to the listbox handler below, which
+                    // COMMITs the highlighted row and closes the menu — the
+                    // measured symptom was "typing a space picks a system".
+                    event.stopPropagation();
                     if (event.key === 'Escape') {
                       event.preventDefault();
                       closeMenu(true);

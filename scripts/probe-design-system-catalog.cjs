@@ -161,7 +161,10 @@ await writeFile(join(pkgDir, 'DESIGN.md'), '# Probe Brand\n\n## one\n## two\n', 
     method: 'POST',
     body: JSON.stringify({ source: pkgDir }),
   });
-  check('POST install from a local package is 200', res.status === 200, 'status ' + res.status + ' ' + JSON.stringify(res.body).slice(0, 160));
+  // 201 Created: this route CREATES a catalog package (slice 2 changed it from
+  // the 200 a plain read would use — the probe asserted the old contract and
+  // failed against correct behaviour, so the expectation moves with the code).
+  check('POST install from a local package is 201', res.status === 201, 'status ' + res.status + ' ' + JSON.stringify(res.body).slice(0, 160));
   check('install echoes the package id', res.body?.id === PKG_ID, String(res.body?.id));
 
   const again = await api('/api/design/systems', { method: 'POST', body: JSON.stringify({ source: pkgDir }) });

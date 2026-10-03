@@ -77,3 +77,32 @@ Kapsam 1, 2, 3, 5 ve 6 **bitti**; kapsam 4 (Models iki kolon + önizleme) ve can
 - **Kapsam 4:** Models tam ekranda iki kolon (kategori/panel solda, satırlar sağda) + `/` arama kısayolu + sağda önizleme paneli (kapasite/context/fiyat/sağlayıcı/id). Not: mevcut `models-pane.tsx:147` satır listeyi `max-h-[320px] overflow-auto` ile **kendi içinde** kaydırıyor — tam ekranda bu sabit yükseklik kullanılmayacak, gövde kaydıracak.
 - **Prob:** `scripts/probe-settings-fullscreen.cjs` (ölçüm + reload kalıcılık + Models iki kolon) + 1500px/390px taşma kontrolü.
 - Kapsam 4 ölçülebilir bir düzen gerektirdiği için ayrı slice: önce iki kolonun düzeni, sonra ona `/` ve önizleme.
+
+## Slice 2 — Models iki kolon + `/` + önizleme (902385f)
+
+Düzen bitti; **prob ve ekran görüntüsü** sırada.
+
+1. **Tek çözümleyici, geriye-dönük guard:** `models.ts` `modelsListClass(wide)` / `modelsListScrollClass(wide)` iki liste geometrisinin tek sahibi. `wide=false` **birebir** eski değerleri verir (`max-h-[320px] overflow-auto` dahil) — Inspector sekmesi/paneli `<ModelsPane />`'i prop'suz çağırıyor, yani o yüzeyler **hiç değişmedi**; prob bunu ayrı bir assert ile sabitler.
+2. **Yükseklik zinciri:** tam ekranda `h-full` + gövde `flex flex-col overflow-hidden` → bölme grid'i gerçek bir kutu alıyor ve **kapaksız** kaydırma kuyusu (`h-full min-h-0 overflow-auto`) tüm yüksekliği kullanıyor. 600+ satırda liste artık 320px'lik bir kuyuda sıkışmıyor; kısa listede de altta boşluk kalmıyor. Diğer bölümler gövde kaydırmasını **olduğu gibi** bırakıyor (yalnız Models + yalnız tam ekran).
+3. **Bölme:** `MODELS_SPLIT_CLASS` = `lg:grid-cols-[180px_minmax(0,1fr)_240px]` → solda sağlayıcı dizini, ortada satırlar, sağda önizleme. `lg` altında iki yan kolon `hidden`, yani 390px telefonda tam olarak eski tek kolon.
+4. **Sağlayıcı dizini** `providerIndex(groups)` ile **aynı** gruplardan türüyor (sıralamayı ikinci kez yapmıyor; ikinci bir kopya kaydrı). Kapsama `null` = hepsi; **bilinmeyen** sağlayıcı **boş** liste veriyor, "her şey" değil — bayat bir seçim listeyi sessizce genişletemiyor.
+5. **`/` kısayolu** `shouldFocusModelSearch(key, inEditable)` saf yardımcısı üzerinden: alan dışında `/` aramaya odaklanıyor, **içindeyse `/` literal kalıyor** (yola filtre yazmak bozulmaz). Prob iki yarıyı da doğruluyor.
+6. **Önizleme paneli — dürüstlük kararı:** Kapsam 4 kapasite/context/fiyat istiyordu, **sunucu kataloğunda bu alanların hiçbiri yok** (`CatalogModel` = id/label/provider/enabled + REQ-183 `unsupported` bayrağı; bu pane portlandığından beri konseptin sahte "Ctx" sütununu bilerek taşımıyor). Uydurma sayı katalogun yalan söylemesi olurdu, o yüzden panel yalnız **gerçek** alanları gösteriyor: label, tam id, sağlayıcı, durum, sunucu desteği. Alanlar sağlayıcı feed'i onları getirdiğinde tek bir listeye (`modelPreviewRows`) eklenecek — prob `context|ctx|price|cost|token` etiketli **hiçbir** satır üretilmediğini sabitliyor.
+7. **Seçili satır stili tam literal Tailwind sınıfı** (`bg-terracotta/10`) — `bg-${}` interpolasyonu v4'te hiç derlenmez, stil sessizce kaybolurdu (prob/skill tuzağı).
+8. `modelRowKey` sağlayıcı-kapsamlı (`provider::id`): aynı id iki sağlayıcı altında var, DOM/store anahtarı çakışmasın.
+
+### Ölçüm (slice 2)
+
+- `bun src/components/providers/models.test.ts` → **66 passed, 0 failed** (+30; varsayılan geometri geriye-dönük guard'ı, kapsam boş-liste, `/` iki yarı, önizleme alanları dahil).
+- `bun src/components/settings/settings-modal.test.ts` → **70 passed, 0 failed** (değişmedi).
+- `bun x tsc --noEmit` (kök) → **0 hata**.
+- `env -u NODE_CHANNEL_FD -u NODE_ENV bun run build` → **built in 4.03s**, `index-DpD-8Pw2.js` (684.66 kB).
+- Canlı: `pm2 restart lokma-web` → servis edilen `assets/index-*.js` **disk ile aynı** (`index-DpD-8Pw2.js`), `web=200`, `api /health=200`, login gate **ON** (tokenless `/api/auth/me` → 401).
+- Yeni sembol demesi: çözümleyiciler `index-DpD-8Pw2.js` içinde (`180px_minmax(0,1fr)_240px` → 1, `h-full min-h-0 overflow-auto` → 1, `min-h-0 overflow-hidden rounded-lg border border-line` → 1); lazy pane chunk'ında `models-pane-DG5Oj6Sp.js` beş `data-model*` hook'u → 1'er, **o chunk'ta `320px` = 0** (sabit kuyuk gerçekten gitti).
+- `data-models-*` hook'ları index chunk'unda **değil** lazy `models-pane` chunk'ında — probe hook ararken önce doğru chunk'u `dist/index.html`'den türetmeli (eskiden `ls -t | head -1` ile yanan hata).
+- Disk 97%'ydi: `emptyOutDir` kapalı olduğu için biriken **80 eski chunk (9.5 MiB)** silindi (24 saat penceresi, güncel chunk'lar `dist/index.html`'den doğrulandıktan sonra). `emptyOutDir` **kapalı kaldı**.
+
+### Kalan
+
+- **`scripts/probe-settings-fullscreen.cjs`** (canlı, login gate AÇIK kalmalı): shell ölçümü (768×640 varsayılan / tam ekran), reload kalıcılığı, Models üç kolon + `/` + önizleme paneli, 1500px ve 390px taşma kontrolü, ilk/son satır yükseklik farkı (600+ satırda akıcılık göstergesi). Mint'lenmiş superadmin token ile (prob `requireLogin`'ı **asla** açmıyor).
+- Sonra: `Status: done` + `git mv` → `finished/` + README + `Docs/00` kapanışı.

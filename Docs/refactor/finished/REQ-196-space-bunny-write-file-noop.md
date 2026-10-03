@@ -1,6 +1,6 @@
 # REQ-196 — write_file does nothing on stealth/space-bunny-alpha
 
-**Status:** done — `1394d1c`
+**Status:** done — `1394d1c`, `126f4e0` (second defect below)
 **Reported:** 2026-10-03, live session `sess_musa0o6l_s89m`
 **Model:** `commandcode/stealth/space-bunny-alpha` (also seen on any upstream
 that answers with tool markup instead of native calls)
@@ -35,7 +35,29 @@ calls functions natively. The failure is in the TEXT-TOOL fallback path that
 runs when a model answers with markup — and the fallback silently produced a
 call with no usable input.
 
-## Root cause
+## Root cause (TWO defects — both were needed for the bug)
+
+### Defect 2 — the block never matched at all (the decisive one)
+
+Found by replaying the live transcript's own 20 290-byte assistant row through
+the parser. The model's output was:
+
+```
+<tool name="write_file">
+<path>live-junk-test.html]<]​minimax[>[</path>…<content>…20 KB of html…</content>…</​tool_call>
+```
+
+The opener is `<tool …>` but the closer is `</​tool_call>` — a **zero-width
+char inside the tag** and a **different tag name**. `COMPLETE_BLOCK` accepted
+only `</tool>` and `</tool_result>`, so the regex never fired at all: the whole
+block streamed into the chat as raw text and nothing executed.
+
+| | calls | payload |
+|---|---|---|
+| before | **0** | — |
+| after | 1 | 20 127 bytes, byte-identical |
+
+### Defect 1 — the salvage could not carry a markup payload
 
 `salvageXmlArgs` matched an argument value with `([^<>]*)` — "any run of
 non-tag characters". A generated landing page is full of tags, so its own
@@ -53,11 +75,16 @@ after fix       -> {path: "duman-tarifi.html", content: "<!DOCTYPE html>…"}  (
 
 ## Fix
 
-1. **Drop the junk keyword** before matching. The model's wrapper is
+1. **Tolerate the junk closer.** `COMPLETE_BLOCK` now accepts zero-width
+   characters (U+200B..U+FEFF) inside the closing tag and the legacy
+   `tool_call` name — already a documented fallback tag via `TOOL_CALL_BLOCK`,
+   so the two paths now agree on what the protocol is. `</tool>` and
+   `</tool_result>` keep working.
+2. **Drop the junk keyword** before matching. The model's wrapper is
    `minimax` glued between brackets with a zero-width char (U+200B) inside.
-2. **Match the registry's real argument tags** with `[\s\S]*?` so a payload
+3. **Match the registry's real argument tags** with `[\s\S]*?` so a payload
    that CONTAINS markup is captured whole.
-3. **Strip the residue** the keyword leaves behind (`]<]\u200b>[`). The run
+4. **Strip the residue** the keyword leaves behind (`]<]\u200b>[`). The run
    must start **and** end with a bracket and contain only `[ ] < >` between
    them. That shape is what makes the strip safe:
 
@@ -75,16 +102,36 @@ or `<div>` can never be mistaken for an argument name.
 ## Verification
 
 ```
-bun src/tools/parse.test.ts                        119 checks (was 105)
+bun src/tools/parse.test.ts                        128 checks (was 105)
 bun src/tools/tools.test.ts                         93 checks
 bun scripts/probe-write-junk-salvage.ts              8 checks — file on disk, byte-identical
 bun scripts/probe-live-write.ts                      5 checks — real upstream, 22 KB native write
 bun x tsc -p tsconfig.json --noEmit                  clean
 ```
 
-**Proven-to-fail:** restoring the old leaf-only `salvageXmlArgs` makes the
-suite fail at `path is a clean filename (got undefined)` and exit 1; putting
-the fix back returns 119. An assertion that never went red is a comment.
+**Proven-to-fail — both fixes:**
+
+| mutation | result |
+|---|---|
+| restore the old leaf-only `salvageXmlArgs` | `FAIL: path is a clean filename (got undefined)` — exit 1 |
+| revert the closer tolerance | `FAIL: the zero-width tool_call closer still closes the block` — exit 1 |
+
+Restoring either returns 128. An assertion that never went red is a comment.
+
+### Live proof — real server, real model, real WebSocket session
+
+Deployed to `lokma.fermag.com.tr`, then the same prompt that produced the
+raw-markup transcript row was replayed over a real `ws://` session as the
+logged-in superadmin (login gate left ON, `requireLogin: true`):
+
+```
+tools: write_file, result:ok
+markup leaked: false
+file exists: true 20300 bytes
+```
+
+The written file: valid `<!DOCTYPE html>`, one `<style>` block, four sections,
+closed `</html>`, and zero `minimax` / `]<]>` / U+200B bytes remaining.
 
 **Note on lint:** `bun run lint` cannot run in this checkout —
 `@typescript-eslint/parser` is not installed, so eslint reports

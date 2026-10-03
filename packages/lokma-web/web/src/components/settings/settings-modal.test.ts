@@ -21,7 +21,7 @@ function check(name: string, cond: boolean): void {
 }
 
 // Registry shape — OpenCode-style categories in display order.
-check('seventeen sections', SETTINGS_SECTIONS.length === 17);
+check('eighteen sections', SETTINGS_SECTIONS.length === 18);
 check('general first', SETTINGS_SECTIONS[0].id === 'general');
 check('account second (own profile only)', SETTINGS_SECTIONS[1].id === 'account');
 check('admin third (users/roles/projects/policy)', SETTINGS_SECTIONS[2].id === 'admin');
@@ -42,6 +42,11 @@ check('vault sits beside memory (vault/memory surfaces together)', SETTINGS_SECT
 check('skills section present', SETTINGS_SECTIONS.some((s) => s.id === 'skills'));
 check('skills label', SETTINGS_SECTIONS.find((s) => s.id === 'skills')?.label === 'Skills');
 check('skills sits beside plugins (capability catalogs together)', SETTINGS_SECTIONS.findIndex((s) => s.id === 'skills') === SETTINGS_SECTIONS.findIndex((s) => s.id === 'plugins') + 1);
+// REQ-193 Kapsam 4 — Share: the tunnel panel is its own section, placed
+// beside the catalogs' tail and before About.
+check('share section present', SETTINGS_SECTIONS.some((s) => s.id === 'share'));
+check('share label', SETTINGS_SECTIONS.find((s) => s.id === 'share')?.label === 'Share');
+check('share sits between skills and about', (() => { const ids = SETTINGS_SECTIONS.map((s) => s.id); return ids.indexOf('share') === ids.indexOf('skills') + 1 && ids.indexOf('about') === ids.indexOf('share') + 1; })());
 check('about last', SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1].id === 'about');
 check('ids unique', new Set(SETTINGS_SECTIONS.map((s) => s.id)).size === SETTINGS_SECTIONS.length);
 check('labels non-empty', SETTINGS_SECTIONS.every((s) => s.label.length > 0));
@@ -68,6 +73,7 @@ check('guard accepts orchestration (REQ-164)', isSettingsSection('orchestration'
 check('guard accepts vault (REQ-165)', isSettingsSection('vault'));
 check('guard accepts memory (REQ-165)', isSettingsSection('memory'));
 check('guard accepts skills (REQ-166)', isSettingsSection('skills'));
+check('guard accepts share (REQ-193)', isSettingsSection('share'));
 check('guard rejects unknown', !isSettingsSection('neon'));
 check('guard rejects empty', !isSettingsSection(''));
 check('guard rejects non-string', !isSettingsSection(42));

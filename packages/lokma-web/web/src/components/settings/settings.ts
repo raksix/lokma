@@ -472,6 +472,9 @@ export const SETTINGS_SECTIONS = [
   // REQ-166 — Skills left the panes too: the live registry + curator patch
   // surface is a section now (beside the other capability catalogs).
   { id: 'skills', label: 'Skills' },
+  // REQ-193 Kapsam 4 — Share: the tunnel surface. Sits beside the other
+  // deployment surfaces (this box on the internet), not beside the catalogs.
+  { id: 'share', label: 'Share' },
   { id: 'about', label: 'About' },
 ] as const;
 

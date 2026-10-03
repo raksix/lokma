@@ -565,6 +565,26 @@ export type CloudImportRes = {
   count: number;
 };
 
+// ─── Public tunnel (portable remote access, REQ-193 Kapsam 4) ──────────────
+// Mirrors `TunnelStatus` in `packages/lokma-core/src/cloud/tunnel.ts`. Kept as
+// a structural copy (not a cross-package import) so the web bundle never pulls
+// a server module in; the route probe is what proves the two agree.
+export type TunnelState = 'stopped' | 'starting' | 'running' | 'error';
+export type TunnelProvider = 'cloudflared' | 'ngrok' | 'relay';
+export type TunnelStatusRes = {
+  state: TunnelState;
+  /** Only ever read from provider stdout server-side; null when stopped. */
+  url: string | null;
+  provider: TunnelProvider | null;
+  startedAt: string | null;
+  expiresAt: string | null;
+  /** Human sentence for the panel — honest on every branch. */
+  message: string;
+  /** Install/configure command when nothing could be started, else null. */
+  installHint: string | null;
+};
+export type TunnelStartBody = { port?: number };
+
 // ─── Archify diagrams (typed IR → validated HTML/SVG behind the ArchifyPane, W5-17) ───
 
 export type ArchifyNode = { id: string; label: string; kind?: string };
@@ -1854,6 +1874,15 @@ export const api = {
   },
   /** Restore a state bundle (existing files are kept unless overwrite is true). */
   importCloudState: (body: CloudImportBody) => post<CloudImportRes>('/api/cloud/import', body),
+
+  // ─── Public tunnel (REQ-193 Kapsam 4) ─────────────────────────────────────
+  // Three thin consumers of the routes in `routes/cloud.ts`. The honesty
+  // contract is the server's: these types exist so the panel cannot invent a
+  // field, and `url` is nullable because the server only ever fills it from
+  // provider stdout — never a fabricated host.
+  getTunnelStatus: () => get<TunnelStatusRes>('/api/cloud/tunnel'),
+  startTunnel: (body: TunnelStartBody = {}) => post<TunnelStatusRes>('/api/cloud/tunnel/start', body),
+  stopTunnel: () => post<TunnelStatusRes>('/api/cloud/tunnel/stop'),
 
   // Plugins — kernel registry + hot toggle + add-from-URL (W6-23, Docs/23).
   // Toggle suspends the plugin's routes server-side (503), no restart.

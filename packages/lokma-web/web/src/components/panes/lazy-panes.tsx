@@ -81,6 +81,11 @@ export const LazyMemoryPane = React.lazy(() =>
 export const LazyUsagePane = React.lazy(() =>
   import('@/components/usage/usage-pane').then((m) => ({ default: m.UsagePane })),
 );
+// REQ-193 slice 8 — Share/tunnel surface (a Settings section, Kapsam 4). Its
+// own chunk because only one settings section needs it and it pulls nothing else.
+export const LazyTunnelPane = React.lazy(() =>
+  import('@/components/tunnel/tunnel-pane').then((m) => ({ default: m.TunnelPane })),
+);
 
 export const LazyTodosPane = React.lazy(() =>
   import('@/components/todos/todo-pane').then((m) => ({ default: m.TodoPane })),

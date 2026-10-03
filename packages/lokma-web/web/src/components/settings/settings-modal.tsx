@@ -6,6 +6,7 @@ import {
   Clock3,
   Cpu,
   Folder,
+  Globe,
   Info,
   Keyboard,
   Layers,
@@ -40,6 +41,7 @@ import {
   LazyPluginsPane,
   LazyProvidersPane,
   LazySkillsPane,
+  LazyTunnelPane,
   LazyVaultPane,
   PaneFallback,
 } from '@/components/panes/lazy-panes';
@@ -90,6 +92,8 @@ const SECTION_ICONS: Record<SettingsSectionId, typeof Settings> = {
   'plugins': Package,
   // REQ-166 — Skills section (moved out of the panes).
   'skills': Puzzle,
+  // REQ-193 — Share: the tunnel surface (this box on the internet).
+  'share': Globe,
   'about': Info,
 };
 
@@ -281,6 +285,11 @@ export function SettingsModal({
                 <div className="@container h-full min-h-0">
                   <LazySkillsPane />
                 </div>
+              ) : section === 'share' ? (
+                // REQ-193 slice 8 — Share/tunnel is a Settings section now. No
+                // `@container` host is needed: the pane is a single scrolling
+                // column, so it takes the modal body's height directly.
+                <LazyTunnelPane />
               ) : needsConfig ? (
                 error !== null && config === null ? (
                   <div className="p-4 text-center text-xs text-zinc-400">

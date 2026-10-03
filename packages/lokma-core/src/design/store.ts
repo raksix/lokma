@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { isAbsolute, join, normalize, resolve } from 'node:path';
-import { ensureDir, expandHome, writeAtomic } from '../utils/fs.js';
+import { sha256Hex } from '../files/files.js';
+import { ensureDir, expandHome, fileExists, writeAtomic } from '../utils/fs.js';
 import { buildStoredZip } from '../utils/zip.js';
 import { OFFLINE_TEMPLATE_MODEL, generateDesignHtml, resolveDesignModel } from './generate.js';
 import { buildArtifactHtml } from './render.js';
@@ -10,6 +11,8 @@ import {
   DESIGN_LIST_CAP,
   DESIGN_SYSTEMS,
   DESIGN_TYPES,
+  DESIGN_VERSION_CAP,
+  DESIGN_VERSION_ORIGINS,
   DesignError,
   type CritiqueDim,
   type CritiqueResult,
@@ -20,6 +23,8 @@ import {
   type DesignSummary,
   type DesignSystem,
   type DesignType,
+  type DesignVersion,
+  type DesignVersionOrigin,
 } from './types.js';
 
 /**
@@ -283,15 +288,122 @@ export async function readDesignGuard(cwdRaw: unknown): Promise<DesignGuard> {
   };
 }
 
-async function persist(root: string, id: string, manifest: DesignManifest, html: string, systemNote: string): Promise<CritiqueResult> {
+/**
+ * REQ-190 — a retired version's body lives at `versions/<sha8>.html`; the
+ * CURRENT body stays in `artifact.html`, so every existing read path keeps
+ * working untouched. Content-addressed: the same body archived twice is one
+ * file, and a revert is a plain copy back.
+ */
+export function versionFileOf(root: string, id: string, sha: string): string {
+  return join(dirOf(root, id), 'versions', `${sha.slice(0, 8)}.html`);
+}
+
+/** Read one version's body — `null` when its file is gone (honest, not empty). */
+export async function readVersionHtml(
+  root: string,
+  id: string,
+  sha: string,
+): Promise<string | null> {
+  try {
+    return await readFile(versionFileOf(root, id, sha), 'utf-8');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * REQ-190 — the history of an artifact, oldest first. Defensive by shape:
+ * a corrupt/absent ledger yields `[]` rather than throwing, because every
+ * reader (detail, list, picker) must still work on a pre-REQ-190 artifact.
+ */
+export function normalizeVersions(raw: unknown): DesignVersion[] {
+  if (!Array.isArray(raw)) return [];
+  const out: DesignVersion[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const e = entry as Partial<DesignVersion>;
+    if (typeof e.sha !== 'string' || !/^[0-9a-f]{64}$/.test(e.sha)) continue;
+    out.push({
+      n: typeof e.n === 'number' ? e.n : out.length + 1,
+      sha: e.sha,
+      bytes: typeof e.bytes === 'number' ? e.bytes : 0,
+      createdAt: typeof e.createdAt === 'string' ? e.createdAt : '',
+      origin: (DESIGN_VERSION_ORIGINS as readonly string[]).includes(e.origin ?? '')
+        ? (e.origin as DesignVersionOrigin)
+        : 'edit',
+      note: typeof e.note === 'string' ? e.note : undefined,
+      model: typeof e.model === 'string' ? e.model : undefined,
+      overall: typeof e.overall === 'number' ? e.overall : null,
+    });
+  }
+  return out;
+}
+
+export type PersistVersionInput = {
+  /** What produced the new body — generation, tweak, manual edit, revert. */
+  origin: DesignVersionOrigin;
+  /** The tweak sentence / manual note (absent for plain generation). */
+  note?: string;
+  /** Model that produced the body when known. */
+  model?: string;
+};
+
+async function persist(
+  root: string,
+  id: string,
+  manifest: DesignManifest,
+  html: string,
+  systemNote: string,
+  versionInput: PersistVersionInput,
+): Promise<{ manifest: DesignManifest; critique: CritiqueResult }> {
   const critique = critiqueHtml(html, manifest.system);
   const dir = dirOf(root, id);
+  const htmlPath = join(dir, 'artifact.html');
+  const sha = sha256Hex(html);
+  const versions = normalizeVersions(manifest.versions);
+  const current = versions[versions.length - 1] ?? null;
+
+  // Archive the body we are about to replace BEFORE writing the new one, so a
+  // ledger entry never points at a file that was never written. Verified
+  // against its recorded sha — a hand-edited manifest must not archive a
+  // mismatched body under the wrong name.
+  if (current && current.sha !== sha && (await fileExists(htmlPath))) {
+    const retiring = await readFile(htmlPath, 'utf-8');
+    if (sha256Hex(retiring) === current.sha) {
+      await writeAtomic(versionFileOf(root, id, current.sha), retiring);
+    }
+  }
+
+  const entry: DesignVersion = {
+    n: current ? current.n + 1 : 1,
+    sha,
+    bytes: html.length,
+    createdAt: new Date().toISOString(),
+    origin: versionInput.origin,
+    note: versionInput.note,
+    model: versionInput.model,
+    overall: critique.overall,
+  };
+  const all = [...versions, entry];
+  const kept = all.slice(Math.max(0, all.length - DESIGN_VERSION_CAP));
+  const liveShas = new Set(kept.map((v) => v.sha));
+  const now = new Date().toISOString();
+  const next: DesignManifest = { ...manifest, updatedAt: now, versions: kept };
+
   await mkdir(dir, { recursive: true });
-  await writeAtomic(join(dir, 'artifact.json'), JSON.stringify(manifest, null, 2));
-  await writeAtomic(join(dir, 'artifact.html'), html);
+  await writeAtomic(join(dir, 'artifact.json'), JSON.stringify(next, null, 2));
+  await writeAtomic(htmlPath, html);
   await writeAtomic(join(dir, 'design.md'), `# DESIGN.md snapshot — ${id}\n\nSystem: ${manifest.system} (${systemNote})\nType: ${manifest.type}\nBrief: ${manifest.brief}\n`);
   await writeAtomic(join(dir, 'critique.json'), JSON.stringify(critique, null, 2));
-  return critique;
+
+  // Prune bodies no ledger entry references any more. A sha still referenced
+  // (or equal to the current body) keeps its file — content-addressed names
+  // make a duplicate-version prune harmless.
+  for (const dropped of all.slice(0, all.length - kept.length)) {
+    if (liveShas.has(dropped.sha)) continue;
+    await rm(versionFileOf(root, id, dropped.sha), { force: true });
+  }
+  return { manifest: next, critique };
 }
 
 /**
@@ -325,33 +437,172 @@ export async function generateArtifact(
     model === OFFLINE_TEMPLATE_MODEL
       ? buildArtifactHtml(type, brief, system)
       : await generateDesignHtml({ type, brief, system, model });
-  const critique = await persist(
+  const { manifest: stored, critique } = await persist(
     root,
     id,
     manifest,
     html,
     model === OFFLINE_TEMPLATE_MODEL ? 'offline template — no model called' : `generated by ${model}`,
+    { origin: 'generate', model },
   );
-  return { id, manifest, critique };
+  return { id, manifest: stored, critique };
 }
 
-/** Replace an artifact's HTML (the pane's Code tab) — validates, re-critiques. */
+/**
+ * REQ-190 — optimistic lock shared by every mutating write (`tweak`, manual
+ * Code-tab edit, revert). `expectedSha` must equal the sha of the CURRENT
+ * body; a mismatch is `stale_version` 409, never a silent overwrite (the same
+ * contract the workspace file routes use, so one mental model).
+ */
+async function assertExpectedSha(root: string, id: string, manifest: DesignManifest, expectedSha: unknown): Promise<string> {
+  let current = '';
+  try {
+    current = await readHtmlFile(root, id);
+  } catch {
+    throw new DesignError('design_not_found', `no design: ${id}`, 404);
+  }
+  const sha = sha256Hex(current);
+  if (typeof expectedSha === 'string' && expectedSha && expectedSha !== sha) {
+    void manifest;
+    throw new DesignError(
+      'stale_version',
+      'This artifact changed since you loaded it — reload and re-apply the change.',
+      409,
+    );
+  }
+  return sha;
+}
+
+/**
+ * Replace an artifact's HTML (the pane's Code tab) — validates, re-critiques.
+ * REQ-190: appends a `edit` version (and `expectedSha` guards the write).
+ */
 export async function updateArtifactHtml(
   idRaw: unknown,
   htmlRaw: unknown,
   cwdRaw?: unknown,
-): Promise<{ id: string; manifest: DesignManifest; critique: CritiqueResult }> {
+  expectedShaRaw?: unknown,
+): Promise<{ id: string; manifest: DesignManifest; critique: CritiqueResult; currentVersion: number }> {
   const cwd = await resolveDesignCwd(cwdRaw);
   const root = designRootOf(cwd);
   const id = assertArtifactId(idRaw);
   const manifest = await readManifest(root, id); // 404 on unknown before touching disk.
+  await assertExpectedSha(root, id, manifest, expectedShaRaw);
   const html = assertHtml(htmlRaw);
-  const next: DesignManifest = { ...manifest, updatedAt: new Date().toISOString() };
-  const critique = await persist(root, id, next, html, 'manual edit');
-  return { id, manifest: next, critique };
+  const { manifest: next, critique } = await persist(root, id, manifest, html, 'manual edit', {
+    origin: 'edit',
+    note: 'manual code edit',
+  });
+  return { id, manifest: next, critique, currentVersion: normalizeVersions(next.versions).length };
 }
 
-/** Full detail: manifest + HTML + last critique. */
+/**
+ * REQ-190 — append a produced body to an artifact's history WITHOUT changing
+ * its id (the tweak flow's persistence step). Validation happens in the
+ * caller; here the body is asserted and the ledger append + archive is the
+ * single write path shared with the manual edit and the revert.
+ */
+export async function appendArtifactVersion(
+  idRaw: unknown,
+  htmlRaw: unknown,
+  versionInput: PersistVersionInput,
+  cwdRaw?: unknown,
+  expectedShaRaw?: unknown,
+): Promise<{ id: string; manifest: DesignManifest; critique: CritiqueResult; sha: string; currentVersion: number }> {
+  const cwd = await resolveDesignCwd(cwdRaw);
+  const root = designRootOf(cwd);
+  const id = assertArtifactId(idRaw);
+  const manifest = await readManifest(root, id);
+  await assertExpectedSha(root, id, manifest, expectedShaRaw);
+  const html = assertHtml(htmlRaw);
+  const { manifest: next, critique } = await persist(root, id, manifest, html, versionInput.note ?? versionInput.origin, versionInput);
+  const versions = normalizeVersions(next.versions);
+  const last = versions[versions.length - 1];
+  return {
+    id,
+    manifest: next,
+    critique,
+    sha: last ? last.sha : sha256Hex(html),
+    currentVersion: versions.length,
+  };
+}
+
+/**
+ * REQ-190 — the artifact's history (oldest first) plus which entry is current.
+ * A pre-REQ-190 artifact reports `[]` with `currentVersion: 0` — honest, so the
+ * picker renders an honest "no history yet" state instead of faking v1.
+ */
+export async function listArtifactVersions(
+  idRaw: unknown,
+  cwdRaw?: unknown,
+): Promise<{ id: string; versions: DesignVersion[]; currentVersion: number; sha: string }> {
+  const cwd = await resolveDesignCwd(cwdRaw);
+  const root = designRootOf(cwd);
+  const id = assertArtifactId(idRaw);
+  const manifest = await readManifest(root, id);
+  const versions = normalizeVersions(manifest.versions);
+  const last = versions[versions.length - 1];
+  let sha = '';
+  try {
+    sha = sha256Hex(await readHtmlFile(root, id));
+  } catch {
+    sha = last ? last.sha : '';
+  }
+  return { id, versions, currentVersion: last ? last.n : 0, sha };
+}
+
+/**
+ * REQ-190 — revert to an earlier version. The archived body is restored as a
+ * NEW current body (appended as a `revert` entry) so nothing is destroyed and
+ * a redo is just another revert forward. A missing body file is
+ * `version_body_missing` 409 — the ledger survives, the current version does
+ * not change, so a failed revert never corrupts the artifact.
+ */
+export async function revertArtifact(
+  idRaw: unknown,
+  versionRaw: unknown,
+  cwdRaw?: unknown,
+): Promise<{ id: string; manifest: DesignManifest; critique: CritiqueResult; currentVersion: number; restoredFrom: number }> {
+  const cwd = await resolveDesignCwd(cwdRaw);
+  const root = designRootOf(cwd);
+  const id = assertArtifactId(idRaw);
+  const manifest = await readManifest(root, id);
+  const versions = normalizeVersions(manifest.versions);
+  if (typeof versionRaw !== 'number' || !Number.isInteger(versionRaw)) {
+    throw new DesignError('bad_version', 'version must be an integer index', 400);
+  }
+  const target = versions.find((v) => v.n === versionRaw);
+  if (!target) {
+    throw new DesignError('version_not_found', `no version ${versionRaw} for design ${id}`, 404);
+  }
+  const html = await readVersionHtml(root, id, target.sha);
+  if (html === null) {
+    throw new DesignError(
+      'version_body_missing',
+      `version ${versionRaw} of ${id} has no stored body — the artifact is unchanged`,
+      409,
+    );
+  }
+  const label = versions.find((v) => v.n === target.n);
+  const { manifest: next, critique } = await persist(
+    root,
+    id,
+    manifest,
+    html,
+    `revert to v${versionRaw}`,
+    { origin: 'revert', note: `reverted to v${versionRaw}`, model: label?.model },
+  );
+  const after = normalizeVersions(next.versions);
+  return {
+    id,
+    manifest: next,
+    critique,
+    currentVersion: after.length ? after[after.length - 1].n : 0,
+    restoredFrom: target.n,
+  };
+}
+
+/** Full detail: manifest + HTML + last critique + REQ-190 sha/currentVersion. */
 export async function getArtifact(idRaw: unknown, cwdRaw?: unknown): Promise<DesignDetail> {
   const cwd = await resolveDesignCwd(cwdRaw);
   const root = designRootOf(cwd);
@@ -359,7 +610,16 @@ export async function getArtifact(idRaw: unknown, cwdRaw?: unknown): Promise<Des
   const manifest = await readManifest(root, id);
   const html = await readHtmlFile(root, id);
   const critique = await readCritiqueFile(root, id);
-  return { id, manifest, html, critique };
+  const versions = normalizeVersions(manifest.versions);
+  const last = versions[versions.length - 1];
+  return {
+    id,
+    manifest,
+    html,
+    critique,
+    sha: sha256Hex(html),
+    currentVersion: last ? last.n : 0,
+  };
 }
 
 /**
@@ -414,7 +674,17 @@ export async function listArtifacts(
       const manifest = await readManifest(root, name);
       const html = await readHtmlFile(root, name);
       const critique = await readCritiqueFile(root, name);
-      items.push({ ...manifest, bytes: html.length, overall: critique ? critique.overall : null });
+      // REQ-190 — the ledger array stays off the list (lean rows); the pane
+      // fetches the history for the SELECTED artifact only.
+      const { versions, ...lean } = manifest;
+      const last = versions ? versions[versions.length - 1] : undefined;
+      items.push({
+        ...lean,
+        bytes: html.length,
+        overall: critique ? critique.overall : null,
+        versionCount: normalizeVersions(versions).length,
+        currentVersion: last ? last.n : 0,
+      });
     } catch {
       continue;
     }

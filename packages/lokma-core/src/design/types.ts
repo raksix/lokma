@@ -118,6 +118,37 @@ export type CritiqueResult = {
   scores: CritiqueScore[];
 };
 
+/**
+ * REQ-190 — one entry of an artifact's version history. Every mutation of an
+ * artifact (generation, tweak, manual Code-tab edit, revert) appends one
+ * entry, so an edit is REVERSIBLE and a tweak never grows the artifact list.
+ * The HTML body is NOT stored per version: version N's bytes live in
+ * `versions/<sha8>.html` and the CURRENT body stays in `artifact.html`, so
+ * the existing read paths keep working unchanged.
+ */
+export type DesignVersion = {
+  /** Monotonic index into `manifest.versions` (v1 = the first body). */
+  n: number;
+  /** sha256 of that version's HTML, full hex — the optimistic-lock token. */
+  sha: string;
+  bytes: number;
+  createdAt: string;
+  /** What produced it: `generate` | `tweak` | `edit` | `revert`. */
+  origin: DesignVersionOrigin;
+  /** The tweak sentence / manual note (absent for plain generation). */
+  note?: string;
+  /** Model that produced the body when known (generation + tweaks). */
+  model?: string;
+  /** 5D heuristic score of THIS body, so the picker can show history. */
+  overall: number | null;
+};
+
+export const DESIGN_VERSION_ORIGINS = ['generate', 'tweak', 'edit', 'revert'] as const;
+export type DesignVersionOrigin = (typeof DESIGN_VERSION_ORIGINS)[number];
+
+/** Max versions kept per artifact (oldest are pruned, newest always wins). */
+export const DESIGN_VERSION_CAP = 20;
+
 export type DesignManifest = {
   id: string;
   type: DesignType;
@@ -129,11 +160,19 @@ export type DesignManifest = {
   project?: string;
   createdAt: string;
   updatedAt: string;
+  /** REQ-190 — version history, oldest first. Absent on pre-REQ-190 artifacts. */
+  versions?: DesignVersion[];
 };
 
-export type DesignSummary = DesignManifest & {
+export type DesignSummary = Omit<DesignManifest, 'versions'> & {
   bytes: number;
   overall: number | null;
+  /**
+   * REQ-190 — history size + which entry is current (v1 = the first body).
+   * The array itself rides on `DesignDetail` only; the list stays lean.
+   */
+  versionCount: number;
+  currentVersion: number;
 };
 
 export type DesignDetail = {
@@ -141,6 +180,10 @@ export type DesignDetail = {
   manifest: DesignManifest;
   html: string;
   critique: CritiqueResult | null;
+  /** REQ-190 — sha256 of the CURRENT html: the `expectedSha` lock token. */
+  sha: string;
+  /** REQ-190 — `versions[].n` of the current body (1 when history is absent). */
+  currentVersion: number;
 };
 
 export type DesignGuard = {

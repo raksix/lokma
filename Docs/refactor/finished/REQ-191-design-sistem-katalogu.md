@@ -1,7 +1,7 @@
 # REQ-191 — Tasarım sistemi (branding) seçilebilsin: 151 paket gerçek listeye insin
 
-**Status:** in-progress
-**Tarih:** 2026-10-02
+**Status:** done
+**Tarih:** 2026-10-02 (kapatıldı: 2026-10-03)
 **Kaynak:** Kullanıcı mesajı (2 Ekim 2026):
 > "+ tasarım skilleri falan ya da design branding falan seçeiblsin opendesgin de var onalrı yap"
 
@@ -98,3 +98,40 @@ Dilim 1 katalogu **yazdı**; bu dilim ona **ulaşılabilirlik** ve asıl kabul k
 **Ölü ölçüm notu:** `probe-design-page.cjs`'de 4 hata var (chrome toggles / tabs / generate) — **REQ-191'den önce de aynı 4 hata** (6da95e4 worktree'sinde doğrulandı), sebebi bayattaki `lokma:sessionId` → 404; bu dilimin regresyonu **değil**, dokunulmadı.
 
 **Kalan:** sistem rozeti (canvas'ta "System: X" + tek tıkla değiştir/iptal) + CLI `lokma design system list|add|use` + üretimde token'ın CSS'e girdiğinin gerçek model çağrısıyla kanıtı (capture stub).
+
+### Dilim 3 — CLI + canvas rozeti + **token el sözleşmesinin canlı kanıtı** (`6afa06d`)
+
+Dilim 1/2 kataloğu yazdı ve erişilebilir kıldı; kalan tek ve en önemli kabul kriteriydi:
+*"Üretimde **o** sistemin token'ları HTML'e giriyor."* `resolveSystemTokens()` birim testi yeşildi,
+`store.ts`'teki `await` okundu — ama **"prompt builder çözülmüş nesneyi kabul ediyor" ile
+"deployed süreç o token'ları upstream'e gönderiyor" aynı şey değil**. Yeşil birim probu,
+bağlanmış bir çağrıyı yok sayılan bir argümandan ayırt edemez.
+
+**Bu yüzden ölçüm tel üstünde yapıldı:** geçici bir capture provider + yerel stub, sunucunun
+**gerçekten gönderdiğini** kaydeder; iddia gönderilen baytlar üstünde verilir, model maliyeti **sıfır**.
+
+- **CLI (Docs/34 §5.1):** yeni `cli/design-system.ts` — `lokma design system list|add|use`.
+  İnce sarmalayıcı: aynı dizin tarama, aynı SSRF/kurulum guard'ı, aynı aktivasyon yazıcısı
+  (ikinci uygulama ikinci delik kümesi olurdu). Boş katalogda gömülü satırlar `(preset)` ile
+  basılır; kurulu ama bozuk paket `[invalid: …]` ile **listelenir, kaybolmaz**.
+- **Canvas rozeti:** seçili artifact'ın sistemi katalog **etiketiyle** görünür (taksonomi + origin
+  tooltip'te); katalogda olmayan id ham id'ye düşer — sessizce kaybolmaz.
+- **Canlı prob** `scripts/probe-design-system-tokens.cjs` **28/28**: paketin `#0af00f` token'ı
+  upstream'e giden istekte **gerçekten** var, paketin **adı** (id değil) prompt'ta, `stripe-linear`
+  ise **kendi** paletini gönderir (idda okuma yolunu okuduğunu kanıtlayan negatif kontrol),
+  bilinmeyen id **hiç** token tablosu alıntılamaz; CLI list/add/use + SSRF reddi de kaplandı.
+
+**Ölçülen tuzaklar (prob/CLI hatası ≠ ürün hatası ayrımı yapıldı):**
+1. `lokma design system list` **İKİ** kelime arkadan geliyor (`design`, `system`) — sabit offset
+   kesme "Unknown subcommand: design system system" döndürdü, yani belgelenen çağrı doğuştan ölüydü.
+2. Gövdesiz DELETE + JSON content-type = Fastify 400 (`FST_ERR_CTP_EMPTY_JSON_BODY`), silme değil:
+   prob provider'ı kendi temizliğinden sağ kurtuldu; `{}` gövdesi gönderilince düzeldi.
+3. Adapter upstream'e provider önekini **çıkarıp** çıplak model id'sini yolluyor; önekli biçimi
+   doğrulamak adapter'ı ölçerdü, REQ-191'i değil.
+4. `listDesignSystems()` gömülü satırları **yalnız dizin boşken** gösterir → "bundled'e düşer"
+   iddiası temizlikten **sonra** doğrulanmalı, çalışırken değil (ilk koşuda kendi kurduğu durumu
+   ölçtü: 3 yanlış kırmızı).
+
+**Kapılar:** tsc **0** · core systems **111/111** · slice-1/2 katalog probu **25/25** (regresyon yok) ·
+token probu **28/28** canlı · web + server build yeşil · servis edilen bundle == disk
+(`index-BQb9yK2f.js`) · kapı **ON** (anon 401) · prob paket/provider/artifact'ları silindi (stays-gone).

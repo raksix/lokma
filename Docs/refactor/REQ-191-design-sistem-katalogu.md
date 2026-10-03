@@ -69,3 +69,32 @@
 **Kapılar:** birim probu **100/100** · `tsc --noEmit` **0** · sterilize concept build yeşil · mevcut `store.test.ts` **27/27** etkilenmedi.
 
 **Kalan (sonraki dilimler):** sunucu uçları (`GET` dizinden + `POST` kurulum + `POST :id/use`) → `design-chat.tsx` gruplu/arama'lı seçici + sistem rozeti → CLI `lokma design system list|add|use` → `scripts/probe-design-system-catalog.cjs` canlı probu (kapı `prob` maddesi).
+
+### Dilim 2 — sunucu uçları + seçici + token çözümleyici (`931c3eb`, `5262371`)
+
+Dilim 1 katalogu **yazdı**; bu dilim ona **ulaşılabilirlik** ve asıl kabul kriterini verdi: *"Üretimde o sistemin token'ları HTML'e giriyor."*
+
+**Sunucu:**
+- `GET /api/design/systems` artık `listDesignSystems()` sonucunu yayıyor (`count`/`source`/`root`/`categories`) — istemci katalog mu fallback mı gördüğünü **tahmin etmiyor, okuyor**.
+- `POST /api/design/systems { source }` → **201 Created** (prob eski 200'ü bekliyordu; dilim değiştirdi, prob da güncellendi).
+- `POST /api/design/systems/:id/use { cwd }` → paketi projenin `.lokma/` klasörüne yazar; `GET /api/design/guard` **zaten aynı dosyaları okuyor**, ikinci okuyucu yazılmadı.
+- İki yeni uç plugin kataloğuna da işlendi (REQ-130'ın `documented!` benimseme kapısı bildirilmiş uçları sayıyor).
+
+**Üretim — asıl neden:** `DesignSystem` kapalı bir union'dı; paket id'leri için **açmak** zorundaydı ve 4 girdili bir tabloya parantezsiz indekslemek `undefined` verir — yani prompt **arka plan rengi olarak `undefined` basar**. Üç ayrı `DESIGN_SYSTEM_META[req.system]` okuması tek yerinde toplandı:
+- `resolveSystemTokens()` (async, diski okur) + `buildBundledResolved()` (sync, saf prompt builder'ları için) — `generate.ts`/`tweak.ts`'in mevcut sync birim probları bozulmadan korundu.
+- `store.ts` seçilen sistemi **bir kez** çözüp gerçek model çağrısına veriyor → paketin kendi `tokens.css`'i üretilen stil katmanına giriyor.
+- Bilinmeyen id `hasTokens:false` döner ve prompt paleti **uydurmaz**, bunun yerine "token tablosu yok" der.
+- `SYSTEM_ID_PATTERN` artık `store.ts` ile **paylaşılıyor** (kopyalanmadı — kayan bir jail yol-kaçış deliğidir).
+
+**İstemci:**
+- System seçici canlı katalogdan **taksonomiye göre gruplu** + **aranabilir**; fallback satırları `(preset)` etiketiyle görünür, paket gibi sunulmaz.
+- `SelectMenu`'ya **opt-in** `searchable` modu eklendi (varsayılan kapalı, mevcut çağıranların hiçbiri etkilenmez): filtre hem düz options hem grup gövdelerini daraltır, boşalan grup başlığını düşürür, "No matches" yazar, kapanışta sıfırlanır.
+- `validateGenerateForm` + sayfa snapshot'ı artık üyelik değil **id şeklini** denetliyor — yoksa seçici, gönderilemeyecek bir sistem teklif ederdi.
+
+**Ölçülen tuzak (prob buldu, unit bulamadı):** arama kutusunda **Space** basmak listbox handler'ına bubble oluyor, vurgulu satırı commit edip menüyü kapatıyordu ("boşluk yazınca sistem seçiliyor"). Tek `stopPropagation` ile kapandı.
+
+**Kapılar:** `tsc` **0** · core systems **111/111** (13 yeni çözümleyici iddiası) · generate 24 · tweak 44 · store 27 · web design **117/117** · design-slash yeşil · sunucu + web build yeşil · `probe-design-system-catalog.cjs` **25/25** canlı · `probe-design-system-picker.cjs` **10/10** canlı tarayıcı · servis edilen bundle == disk (`index-BPUMVPL8.js`) · kapı **ON** kaldı (anon `/api/auth/me` → 401) · prob paketleri silindi, katalog dürüstçe `bundled`'a döndü.
+
+**Ölü ölçüm notu:** `probe-design-page.cjs`'de 4 hata var (chrome toggles / tabs / generate) — **REQ-191'den önce de aynı 4 hata** (6da95e4 worktree'sinde doğrulandı), sebebi bayattaki `lokma:sessionId` → 404; bu dilimin regresyonu **değil**, dokunulmadı.
+
+**Kalan:** sistem rozeti (canvas'ta "System: X" + tek tıkla değiştir/iptal) + CLI `lokma design system list|add|use` + üretimde token'ın CSS'e girdiğinin gerçek model çağrısıyla kanıtı (capture stub).

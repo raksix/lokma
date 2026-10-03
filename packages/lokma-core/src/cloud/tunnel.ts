@@ -68,13 +68,26 @@ export const TUNNEL_PROVIDER_ENV = 'LOKMA_TUNNEL_PROVIDER';
 export const TUNNEL_RELAY_URL_ENV = 'LOKMA_RELAY_URL';
 /** Env var carrying the relay token — read at call time, never persisted. */
 export const TUNNEL_RELAY_TOKEN_ENV = 'LOKMA_RELAY_TOKEN';
+/** Env var overriding the status-file path (tests only; never set in prod). */
+export const TUNNEL_STATE_ENV = 'LOKMA_TUNNEL_STATE';
 /** Port the harness listens on when the caller does not name one. */
 export const TUNNEL_DEFAULT_PORT = 3456;
 /** Hard cap on a provider URL, matching the URL cap used by the proxy policy. */
 export const TUNNEL_URL_CAP = 2048;
 
-/** State file lives beside the rest of `~/.lokma`. */
-const STATE_FILE = '~/.lokma/tunnel.json';
+/**
+ * Where the status file lives. `LOKMA_TUNNEL_STATE` overrides it, resolved at
+ * CALL TIME (not module load) so a test process can point it at a temp dir.
+ *
+ * This override exists because of a measured accident: the first unit probe
+ * wrote the real `/root/.lokma/tunnel.json` and left a live install reporting
+ * `state: error` from a fake provider. A test must never be able to mutate the
+ * install it runs on, so the path is injectable rather than hardcoded.
+ */
+function stateFile(): string {
+  const override = (process.env[TUNNEL_STATE_ENV] ?? '').trim();
+  return override.length > 0 ? override : '~/.lokma/tunnel.json';
+}
 
 /** Stopped answer used by every read path that finds nothing. */
 export function stoppedStatus(message = 'Tunnel is off — nothing is listening from outside.'): TunnelStatus {
@@ -257,7 +270,7 @@ export async function readTunnelState(): Promise<TunnelStateFile> {
     pid: null,
   };
   const raw = await readJson<Record<string, unknown>>(
-    STATE_FILE,
+    stateFile(),
     (v) => (v !== null && typeof v === 'object' ? (v as Record<string, unknown>) : {}),
     {},
   );
@@ -278,7 +291,7 @@ export async function readTunnelState(): Promise<TunnelStateFile> {
 }
 
 async function persistState(state: TunnelStateFile): Promise<void> {
-  await writeAtomic(STATE_FILE, JSON.stringify(state, null, 2), 0o600);
+  await writeAtomic(stateFile(), JSON.stringify(state, null, 2), 0o600);
 }
 
 /** Live child processes, keyed by provider, for `stopTunnel()`. */

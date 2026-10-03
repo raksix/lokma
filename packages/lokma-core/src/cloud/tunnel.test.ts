@@ -4,16 +4,28 @@
  * No framework (plain asserts) so the package stays dependency-free.
  *
  * Zero-network by construction: provider availability is an INJECTED probe and
- * the spawn is a fake, so nothing here can reach the internet, spawn a real
- * cloudflared, or write to the real `~/.lokma` (every state path is HOME-free
- * except the two functions that use `readJson`/`writeAtomic`, which are only
- * reached through `stopTunnel({ silent: true })`'s no-write branch and the
- * pure parsers).
+ * the spawn is a fake, so nothing here can reach the internet or spawn a real
+ * cloudflared.
+ *
+ * STATE ISOLATION IS NOT OPTIONAL HERE. The first version of this probe wrote
+ * the REAL `/root/.lokma/tunnel.json` — the failed-start path calls
+ * `persistState`, which took the hardcoded home path — and left the live
+ * install reporting `state: error` from a fake provider. `LOKMA_TUNNEL_STATE`
+ * is pointed at a temp dir for the whole run, and a leftover-file assertion
+ * below keeps that isolation honest (without it, an env that silently stopped
+ * being honoured would pass every other check while writing home again).
  *
  * The load-bearing assertions are the NEGATIVE ones: an unavailable provider
  * must NOT produce a url, and a dead pid must NOT read as running — a status
  * that invents a URL passes every positive test in the file.
  */
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const STATE_DIR = mkdtempSync(join(tmpdir(), 'lokma-tunnel-probe-'));
+process.env.LOKMA_TUNNEL_STATE = join(STATE_DIR, 'tunnel.json');
+
 import {
   parseNgrokJsonUrl,
   parseProviderUrl,
@@ -25,6 +37,7 @@ import {
   TUNNEL_PROVIDER_ENV,
   TUNNEL_RELAY_URL_ENV,
   TUNNEL_URL_CAP,
+  tunnelStatus,
 } from './tunnel';
 
 let passed = 0;
@@ -184,6 +197,22 @@ await expectTunnelError(
 const stopped = await stopTunnel({ silent: true });
 assert(stopped.state === 'stopped', 'stop answers stopped');
 assert(stopped.url === null, 'a stopped tunnel has NO url — never a stale one');
+
+// --- the failed start above persisted an ERROR state into the temp dir ---------
+const afterFailure = await tunnelStatus();
+assert(afterFailure.state === 'error', 'a failed start is recorded as error, not running');
+assert(afterFailure.url === null, 'the error state still carries no url');
+assert(
+  typeof afterFailure.message === 'string' && afterFailure.message.includes('without printing a public url'),
+  'the error state explains itself instead of inventing a url',
+);
+
+// ISOLATION CONTROL: the whole probe must have written into the temp dir. If the
+// env override were ignored, every assertion above would still pass while the
+// live install's tunnel.json got overwritten again.
+const { existsSync } = await import('node:fs');
+assert(existsSync(join(STATE_DIR, 'tunnel.json')), 'the probe wrote into ITS temp state file');
+rmSync(STATE_DIR, { recursive: true, force: true });
 
 assert(TUNNEL_DEFAULT_PORT === 3456, 'the default port is the harness web port');
 

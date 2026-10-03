@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   DESIGN_BRIEF_CAP,
+  DESIGN_SKILL_SELECT_CAP,
   DESIGN_SYSTEMS,
   DESIGN_TYPES,
   DesignError,
@@ -33,6 +34,12 @@ const DesignGenerateInput = z.object({
   system: z.enum(DESIGN_SYSTEMS).optional(),
   /** Model override; omitted = the configured default model. */
   model: z.string().min(1).max(200).optional(),
+  /**
+   * REQ-192 — design skill ids (the `scope: design` ones). Each is resolved to
+   * its real SKILL.md body before generation; an unknown or scopeless id is an
+   * honest error, never a silently dropped selection.
+   */
+  skills: z.array(z.string().min(1).max(200)).max(DESIGN_SKILL_SELECT_CAP).optional(),
 });
 
 const DesignCritiqueInput = z.object({
@@ -49,19 +56,22 @@ export function buildDesignTools(cwd: string): ToolDefinition[] {
     {
       name: 'design_generate',
       description:
-        'Generate a design artifact (a self-contained HTML page) from a brief through a real model and store it in the Design Studio; returns the artifact id and its critique score.',
+        'Generate a design artifact (a self-contained HTML page) from a brief through a real model and store it in the Design Studio; returns the artifact id, the design skills it really received and its critique score. Pass `skills` (ids of installed `scope: design` SKILL.md files) to have their instructions applied to the artifact.',
       inputSchema: DesignGenerateInput,
       readOnly: false,
       maxResultSizeChars: 12_000,
       handler: async (input) => {
-        const { type, brief, system, model } = input as z.infer<typeof DesignGenerateInput>;
+        const { type, brief, system, model, skills } = input as z.infer<typeof DesignGenerateInput>;
         try {
-          const { id, manifest, critique } = await generateArtifact(type, brief, system, model, cwd);
+          const { id, manifest, critique } = await generateArtifact(type, brief, system, model, cwd, skills);
           return {
             ok: true,
             id,
             type: manifest.type,
             model: manifest.model ?? null,
+            // REQ-192 — report the skills the model REALLY received (id +
+            // sent chars), so "applied" is never a claim the prompt cannot back.
+            skills: manifest.skills ?? [],
             critique: critiqueSummary(critique),
             note: 'Artifact stored in the Design Studio — open the Design mode to view it.',
           };

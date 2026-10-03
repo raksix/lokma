@@ -12,6 +12,7 @@ import {
   installDesignSystem,
   listArtifactVersions,
   listArtifacts,
+  listDesignSkills,
   listDesignSystems,
   readDesignGuard,
   revertArtifact,
@@ -52,7 +53,7 @@ import { expandPromptMentions } from '../utils/context-blocks.js';
 
 export async function designRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/design/generate', async (req, reply) => {
-    const body = (req.body ?? {}) as { type?: unknown; brief?: unknown; system?: unknown; model?: unknown; cwd?: unknown };
+    const body = (req.body ?? {}) as { type?: unknown; brief?: unknown; system?: unknown; model?: unknown; cwd?: unknown; skills?: unknown };
     try {
       // REQ-188 — the brief rides the shared ComposerInput, so `@path` mentions
       // are real context now: read them into `<context>` blocks against the
@@ -61,12 +62,23 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
       const cwd = typeof body.cwd === 'string' ? body.cwd : process.cwd();
       const brief =
         typeof body.brief === 'string' ? await expandPromptMentions(cwd, body.brief) : body.brief;
-      const { id, manifest, critique } = await generateArtifact(body.type, brief, body.system, body.model, body.cwd);
+      // REQ-192 — `skills` is the design-skill axis: ids that core resolves to
+      // their SKILL.md bodies before the prompt is built.
+      const { id, manifest, critique } = await generateArtifact(body.type, brief, body.system, body.model, body.cwd, body.skills);
       return { ok: true, id, manifest, critique };
     } catch (e) {
       if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
       throw e;
     }
+  });
+
+  // ── REQ-192: the design SKILL catalog ───────────────────────────────────────
+  // The SECOND, separate axis beside `/systems`: a system is a palette, a skill
+  // is a `SKILL.md` instruction set. Rows come from the real skill registry,
+  // filtered to `scope: design` — a scopeless skill is never listed, and
+  // `unscoped` reports how many were excluded so the UI can say why.
+  app.get('/api/design/skills', async () => {
+    return { ok: true, ...(await listDesignSkills()) };
   });
 
   app.get('/api/design/list', async (req, reply) => {

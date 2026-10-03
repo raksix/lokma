@@ -1,6 +1,6 @@
 # REQ-187 — Eklediğim dosyanın içeriği sohbette **gerçekten** görünsün (dosya içeriği bağlamı)
 
-**Status:** pending
+**Status:** in-progress (tur 1: `ffec99f` + `ae051b5` + `a48c3e3` — kanal + kart canlı; kalan: kabul probu + bütçe/PDF uçları)
 **Tarih:** 2026-10-01
 **Kaynak:** Kullanıcı mesajı (1 Ekim 2026):
 > "attığım remsi de mesaj içeriğinde görebielyim aq sik işler resim dosya falan attığımda alıp görebilsin"
@@ -46,7 +46,17 @@
 2. İngilizce commit + push.
 3. Dosya: `Status: done` + hash'ler.
 
+## İş günlüğü
+
+- Tur 1 (2026-10-02): **Taşıma kanalı + sohbet kartı + prompt dedupe** — üç atomik commit:
+  - `ffec99f` fix(server): her prompt tel üzerinde TEK kez gidiyor. WS handler prompt satırını append edip kuyruğa alıyor, loop sözleşmesi ise `history`=ÖNCEKİ turlar + `prompt`=bu tur — satır replay edilince prompt İKİ KEZ gidiyordu (capture stub ile ölçüldü: messages [2] ve [3] aynı metin). Yeni `splitPromptRow()` (saf, birim testli) son satırı ayıklıyor; satırın görselleri `promptImages` ile prompt mesajına biniyor (REQ-186 görsel yolu aynen çalışıyor).
+  - `ae051b5` feat(shared,core): `PromptFileSchema` (name/mime/size/content; dosya başına 100k karakter tavanı + işaret payı, prompt başına `PROMPT_MAX_FILES=10`) prompt frame'ine ve transcript satırına eklendi; lokma-core `SessionFile`; kuyruk öğesi + `toTranscriptRow` (REQ-160 tuzağı — soket feed'i alanı taşımazsa kart reload'da ölür).
+  - `a48c3e3` feat(web,server): composer metin dosyalarını (PDF'ler extract ucundan) kırpılmış içerikle `files` olarak yolluyor; mesaj metnine artık `<attachment>` dökümü YAZILMIYOR. Pump bu turun dosyalarını prompt'a `<file name…>` blokları olarak katıyor; `buildLoopHistory` eski satırların dosyalarını ayrı (yeni-önce, 200k karakter) bütçeyle replay ediyor — takip turları eki görmeye devam ediyor, sohbet tahliye olmuyor. Sohbette kullanıcı balonunun altında kart (ad/mime/boyut/ilk satır + kırpılma notu); dosya-only gönderim birinci sınıf (send guard, iyimser satır, WS handler).
+- **Canlı kanıt (deployed sunucu, gerçek WS + capture stub): 11/11 PASS** — (a) metin prompt'u telde TEK kez; (b) `<file name="notes.md">` bloğu bir kez, içerik jetonu bir kez, eski `<attachment>` dökümü yok, blok user mesajında; (c) REST transcript satırı `files[]` taşıyor, metin temiz. Prob: `/tmp/lokma-wire-probe.cjs` (11/11; oturum+provider+geçici dizin silindi, gate ON tokenless 401).
+- Birim kapılar: shared ws 26/26 · agent-loop 48 (37 görsel + 5 dedupe + 6 dosya) · session-feed 11 grup · composer helper'ları 8. Kök `tsc --noEmit` 0; server + web build yeşil; canlı bundle `index-Cb9oE5PW.js` == disk.
+- Kalan (sonraki turlar): resmi prob `scripts/probe-file-attachment-context.cjs` (kırpma / çoklu-ek / PDF / temizlik uçları) + toplam ek bütçesi drop işaretleme + yol/sürükle-bırak yolları notu.
+
 ## Notlar
 
-- **Write-only:** kod yazılmadı.
+- Tur 1'de uygulandı (refactor worker loop — pending REQ kuyruğu). Tur 1 öncesi write-only idi.
 - REQ-186 + 187 tek cümle isteğin iki yarısıdır: "görseli gerçekten gör" + "dosya içeriğini mesajda gör". İkisi de **sessiz çalışma** değil, dürüst davranış ölçütüyle kapanır.

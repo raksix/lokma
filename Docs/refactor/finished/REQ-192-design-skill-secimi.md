@@ -1,7 +1,7 @@
 # REQ-192 — Tasarım skill'leri seçilebilsin (Design Studio'ya skill yüzeyi)
 
-**Status:** in-progress
-**Tarih:** 2026-10-02
+**Status:** done
+**Tarih:** 2026-10-02 · kapatıldı 2026-10-03 (6 dilim)
 **Kaynak:** Kullanıcı mesajı (2 Ekim 2026):
 > "+ tasarım skilleri falan ya da design branding falan seçeiblsin opendesgin de var onalrı yap"
 
@@ -150,11 +150,96 @@ yolları `too_many_templates` 400 / `bad_template` 400 (traversal dahil) /
 `template_not_found` 404 · canlı üretimde `manifest.template` + `sentChars`
 yazıldı · prob artefaktı silindi ve **silindiği doğrulandı** (tekrar 404).
 
-**Kalan dilimler:** (4) `lokma design template list|add` kurulum ucu;
-(5) Web composer'da şablon seçici (skil seçiciden **ayrı**, tekli) +
-önizleme; (6) canlı tarayıcı probu
-`scripts/probe-design-skills-picker.cjs` (iki skill + bir şablon seç →
-**giden istek gövdesi** ikisini de taşıyor).
+**Dilim 4 — KURULUM UCU (bitti, `0795928`)**
+
+1. `installDesignTemplate()` — `~/.lokma/design/templates/<id>/`e yerel paket
+   kopyalar veya https URL'i sığ klonlar. `template.json` okunamaz ya da
+   `SKILL.md` yoksa/okunamazsa kurulum **geri alınır**: öyle bir dizin
+   katalogda sonsuza dek "modele asla ulaşamayacak" bir satır olarak durur ve
+   seçici, hiçbir şey şekillendirmediği halde "şablon şekillendirdi" der.
+   Var olan id 409 (kurulu olan paketlenmişini gölgeler, bilinçli).
+2. **Kaynak guard'ı ve id kafesi** `systems.ts`'ten **yeniden kullanıldı**
+   (`assertInstallSource` + `systemIdFromSource`) — ikinci kopya yok; kaymış bir
+   SSRF predicate'i ya da gevşemiş bir id regex'i aynı özelliğin yeni
+   deliği olurdu.
+3. `lokma design template list|add` — `design system`'ın **kardeş** ekseni, tek
+   `lokma design` girişinin arkasında. **`use` fiili yok**: proje aktivasyonu
+   `.lokma/DESIGN.md` okuyor ve şablonlar için proje düzeyinde bir okuyucu
+   yok — etkisini iddia eden bir fiil uydurmak dürüst olmazdı.
+4. `POST /api/design/templates { source }` — `POST /api/design/systems` ile
+   aynı sözleşme; ikinci guard/jail/rollback yok.
+5. **CLI dağıtım tuzağı (ölçüldü):** `design-system.ts` içindeki `template`
+   dalı `['template', …]` bekliyor, bu yüzden `index.ts` yalnız `system`
+   kelimesini düşürüyor — ikisini de düşürmek "design template template" cevabı
+   verirdi (hemen altındaki satırın aynı sınıf hatası).
+
+**Ölçülen:** birim 74/74 (`templates.test.ts`: kurulum, geri alma iz bırakmıyor,
+409, yedi ret yolu) · **derlenmiş binary'ye karşı CLI** 11 kontrol (boş HOME,
+kurulum, listeleme, 409, SSRF, 404, exit 2'ler, `design system` regresyonu) ·
+**canlı prob 10/10** (201 kurulum → katalog satırı → 409 tekrar → 400
+loopback/boş → token'siz 401, gate AÇIK kaldı; prob paketi silindi ve **silindiği
+doğrulandı**).
+
+**Dilim 5 — ŞABLON SEÇİCİ YÜZEYİ (bitti, `51c0983`)**
+
+1. `GET /api/design/templates/:id` — önizleme okuyucusu; **üretimin kullandığı**
+   `resolveDesignTemplate` çözücüsünü çağırır, yani önizlenen iskelet
+   modelin alacağından farklı olamaz (skill ekseni de kendi paylaşılan
+   `/api/skills/:id` okuyucusunu kullanır). İkinci gövde okuyucu yok.
+2. `GenerateForm.template` sayfa snapshot'ında **tekli** seçim olarak duruyor
+   (sadece ŞEKİL ile geri yükleniyor — katalog üyeliği değil: kurulu katalog
+   makineye özel, taşınmayan bir id sunucunun dürüst `template_not_found`
+   cevabının işi). Dilim-5 öncesi snapshot boş template olarak geri geliyor.
+3. **Tekli seçim bilinçli:** bir artifact'ın TEK iskeleti var, sunucu iki
+   şablonu `too_many_templates` ile reddediyor — çoklu bir seçici, üretim
+   yolunun onurla yerine getiremeyeceği bir seçenek sunardı. `pickTemplate`
+   ayrıca **aynı satıra tekrar tıklamak seçimi kaldırıyor** (görünür bir
+   "kapalı" durumu olmayan tekli kontrolde seçim yanlışlıkla kalıcılaşır) ve
+   `''` sentinel satırı (`None (freeform structure)`) `SelectMenu`'nin çıplak
+   `—`ini dürüst bir etikete çeviriyor.
+4. Gövdesi okunamayan şablon **gizlenmiyor**, `(no body)` ile listeleniyor ve
+   panel o satırları **sayıyor** — tıklamadan sonra sunucunun 409 vermesini
+   beklemektense kullanıcıya önce söyleniyor.
+5. Dürüstlük: üretim sonrası sohbet **sunucunun kaydettiği** şablonu adlandırıyor
+   (`manifest.template`); seçim hayatta kalmadıysa "did not reach the model
+   (unusable)" diyor. Seçim `/new` ve başarılı üretim sonrası **korunuyor**.
+6. Önizleme kendi **sequence guard'ına** sahip: paylaşılan bir guard yavaş bir
+   skill okumasının daha yeni bir şablon okumasını görünmez biçimde iptal
+   etmesine (ya da tersi) yol açardı.
+
+**Ölçülen:** web birim 176/176 (`design.test.ts`, 148'den) + slash probu yeşil
+(`/new` şablonu korur) · çekirdek probları regresyonsuz · kök `tsc --noEmit` 0 ·
+web `tsc -p` 0 · core + server + web build yeşil · iki proc geri dönüşüm ·
+**canlı bundle == disk** `index-GVKKcCnv.js` ve beş yeni
+`data-design-template*` kancası servis edilen chunk'ta **gerçekten** var.
+
+**Dilim 6 — CANLI TARAYICI PROBU (bitti, `1b13d3f`)**
+
+1. `scripts/probe-design-template-picker.cjs` — REQ'nin kabul kapısı
+   (`probe-design-skills-picker.cjs` adıyla yazılmıştı; dilim 5 prob olmadan
+   geldiği için REQ birim testleriyle kapanamazdı). **Gerçek UI'da iki skill +
+   bir şablon seçer** ve **ÇIKAN** `POST /api/design/generate` gövdesinin ikisini
+   de taşıdığını telden okur: istek `request` dinleyicisiyle okunur, DOM'dan
+   tahmin edilmez — "seçici doğru görünüyor" kanıtının yerine geçemez.
+2. Kapı ayrıca: `''` sentinel menünün başında (dürüst tetikleyici + tek tıkla
+   çıkış), her satır geçerli bir katalog id'si, önizleme ortak çözücüden
+   **gerçek** gövde, sağlıklı katalogda uyarı yok, sunucu seçilen id'yi
+   çözüyor, probun ürettiği her artifact **siliniyor ve silindiği yoklanarak**
+   doğrulanıyor (generate yazmaya devam eder), token'siz okuma hâlâ 401.
+3. **Ölçülen 19/19 canlı.** İki selector düzeltmesi kayda değer: satırlar
+   `data-select-option` taşır, `data-select-picked` **yalnız seçili** satırlarda
+   vardır (saymak sıfır bulur); Design sayfasına nav etiketine tıklayarak değil
+   `lokma-app-mode:v1` tohumlanarak gidiliyor (etiket CSS ile büyük harf
+   render ediliyor).
+4. Ekran kanıtı OCR ile doğrulandı (vision kredisi bitti): `DESIGN SKILLS
+   (2/8) · 2 skills - brutalist-web +1`, `TEMPLATE (OUTPUT SKELETON) · Launch
+   Page` ve açık iskelet önizleme paneli.
+
+## Bitirme (done)
+
+1. Kontroller PASS + prob + ekran görüntüsü. ✔
+2. Atomik İngilizce commit(ler) + push. ✔ (`0795928`, `51c0983`, `1b13d3f`)
+3. Dosya: `Status: done` + hash'ler; `git mv` → `finished/`; README index + `Docs/00`. ✔
 
 ## Notlar
 

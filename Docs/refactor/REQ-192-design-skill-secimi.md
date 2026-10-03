@@ -76,11 +76,45 @@ build yeşil · canlı `/api/design/skills` 6 skill gruplu, 7 scope'suz elendi �
 canlı hata yolları `skill_not_found` 404 / `skill_not_design` 400 / `bad_skills` 400 ·
 token'siz `/api/design/skills` **401** (login gate AÇIK kaldı).
 
-**Sıradaki dilimler:** (2) yüzey — composer'da gruplu/aramalı/çoklu seçim `SelectMenu` +
-Reset + önizleme paneli + `skills[]` gönderimi; (3) ayrı **şablon** ekseni
-(`GET /api/design/templates`); (4) `lokma design skill add` kurulum ucu; (5) metadata'da
-"uygulandı/uygulanmadı" satırı; (6) canlı tarayıcı probu
-`scripts/probe-design-skills-picker.cjs`.
+**Dilim 2 — YÜZEY (bitti, `72b8014` · `f915d4d` · `5d94a15` · `ab86557` ·
+`2217bc9` · `22501e1` · `0f9da09`)**
+
+1. `SelectMenu` **opt-in `multi`** modu: opt-in olduğu için mevcut tekli
+   seçim çağıranları hiç etkilemiyor (commit yolu menüyü kapatmaya devam
+   ediyor). Seçim `value`'dan değil, çağıranın verdiği `multiValues`
+   kümesinden okunuyor — tek değerli bir trigger üçlü seçimi anlatamaz.
+   Satır tıklaması **toggle** edip menüyü **açık** bırakıyor; işaretli satır
+   `data-select-picked` ile DOM'dan okunuyor.
+2. Saf yardımcılar (`design.ts`): `toggleSkill` (tek yazar — sıra korumalı,
+   server cap'i aynalanmış, geçersiz id sessizce reddedilir), `clearSkills`,
+   `normalizeSkillIds`, `skillSelectionLabel`, `groupSkillRows`.
+3. `GenerateForm.skills` + **snapshot geri yükleme**: seçim reload'da
+   korunuyor, ama **sadece şekil** üzerinden (geçerli/dedup/cap) — katalog
+   üyeliğine göre değil; katalog makineye özel, sunucu zaten dürüst 404
+   veriyor.
+4. Hook: ikinci katalog kendi state'inde (sistem listesi **yerine geçmez**),
+   tek SKILL.md okuyucu (`GET /api/skills/:id` — ikinci okuyucu yok) tek
+   sequence guard'la; toggle önizlemeyi de açıyor.
+5. Composer: gruplu + aramalı çoklu seçici, **Reset** düğmesi, skill chip'leri
+   (oku/çıkar), SKILL.md önizleme paneli, boş katalog **dürüst** mesajı
+   ("N skill `scope: design` beyan etmediği için atlandı").
+6. Dürüstlük: üretim sonrası sohbet **sunucunun kaydettiği** skill'leri
+   adlandırıyor; giden'den az döndüyse "N/M modele ulaştı" diyor.
+   Seçim üretimden **sonra korunuyor** (Type/System/Model gibi kalıcı eksen).
+
+**Ölçülen:** web birim 148/148 (`design.test.ts`) · core skill 44/44 ·
+slash probu yeşil · kök `tsc --noEmit` 0 (aynı dalgada bulunan ve bu dalgaya
+ait olmayan `skills.test.ts` tip hatası da giderildi) · web `tsc -p` 0 ·
+sterilize build yeşil (`index-D5NquoI8.js`) · `pm2 restart lokma-web` sonrası
+**canlı bundle == disk** · yeni hook'lar (`data-design-composer-skills`,
+`data-design-skill-chip`, `data-design-skills-reset`,
+`data-design-skill-preview*`) servis edilen bundle'da **gerçekten** var.
+
+**Kalan dilimler:** (3) ayrı **şablon** ekseni (`GET /api/design/templates`);
+(4) `lokma design skill add` kurulum ucu; (5) marketplace'den kurulum +
+scope'suz skill dürüst uyarısı; (6) canlı tarayıcı probu
+`scripts/probe-design-skills-picker.cjs` (iki skill seç → **giden istek
+gövdesi** her iki SKILL.md içeriğini taşıyor).
 
 ## Notlar
 

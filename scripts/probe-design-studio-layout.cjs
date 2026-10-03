@@ -117,8 +117,9 @@ const layoutState = () => {
     events: [].slice
       .call(root.querySelectorAll('[data-design-event]'))
       .map((e) => (e.textContent || '').replace(/\s+/g, ' ').trim()),
+    panelOpen: Boolean(root.querySelector('[data-design-artifacts-panel]')),
     artboards: [].slice
-      .call(root.querySelectorAll('[data-design-artboard]'))
+      .call((root.querySelector('[data-design-artifacts-panel]') || root).querySelectorAll('[data-design-artboard]'))
       .map((a) => a.getAttribute('data-design-artboard')),
     overflowX: root.scrollWidth - root.clientWidth,
   };
@@ -292,6 +293,14 @@ const closePanel = (sel) => {
     Boolean(L && L.guardChip && (L.guardChip.indexOf('DESIGN.md') === 0 || L.guardChip.indexOf('No .lokma/DESIGN.md') === 0)),
     L ? 'chip=' + L.guardChip : 'n/a',
   );
+  // REQ-189 — the artboard strip is now the Artifacts PANEL and starts
+  // closed; the strip assertions below read its search/filter and thumbnails,
+  // so open it before generating.
+  ok('the Artifacts panel toggle exists', await page.evaluate(clickSel, '[data-design-artifacts-toggle]'));
+  await sleep(900);
+  L = await page.evaluate(layoutState);
+  ok('the Artifacts panel opens on demand', Boolean(L && L.panelOpen));
+
   ok(
     'search + type filter moved into the artboard strip',
     Boolean(L && L.stripSearch && L.stripFilter),

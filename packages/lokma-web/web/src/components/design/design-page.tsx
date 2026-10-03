@@ -48,6 +48,26 @@ const EXPORT_MENU: { format: DesignExportFormat; label: string; scale?: 1 | 2 }[
   { format: 'webm', label: 'WebM · 2s clip' },
 ];
 
+/**
+ * REQ-189 — Esc closes the Artifacts panel, but ONLY while it is open: with the
+ * panel closed the key must stay free for the composer and the rest of the
+ * studio, so the listener is registered by this hook only for as long as the
+ * panel is mounted — a closed panel holds no keydown handler at all.
+ */
+function useArtifactsPanelEscape(open: boolean, onClose: () => void) {
+  React.useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+}
+
 function CodeDrawer({ studio }: { studio: DesignStudio }) {
   const s = studio;
   return (
@@ -154,6 +174,14 @@ export function DesignPage() {
   const [menu, setMenu] = React.useState<{ x: number; y: number; items: ContextMenuEntry[]; label: string } | null>(
     null,
   );
+  const panelRef = React.useRef<HTMLDivElement | null>(null);
+
+  // REQ-189 — Esc is the keyboard exit, and opening the panel moves focus into
+  // it so a keyboard user lands on the list instead of the canvas.
+  useArtifactsPanelEscape(s.artifactsPanel, s.toggleArtifactsPanel);
+  React.useEffect(() => {
+    if (s.artifactsPanel) panelRef.current?.focus();
+  }, [s.artifactsPanel]);
 
   const openAnchoredMenu = React.useCallback(
     (e: React.MouseEvent<HTMLElement>, label: string, items: ContextMenuEntry[]) => {
@@ -263,7 +291,12 @@ export function DesignPage() {
       </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
         <DesignChat studio={s} />
-        <section data-design-canvas className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {/* REQ-189 — the canvas and the Artifacts panel are siblings now: the
+            panel is a closable right column, so closing it hands its width back
+            to the canvas instead of leaving a gap. `min-w-0` on the canvas is
+            what keeps the row from overflowing at 1500px (REQ-157 trap). */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:flex-row">
+          <section data-design-canvas className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <div
             data-design-toolbar
             className="flex h-9 shrink-0 items-center gap-1.5 border-b border-line bg-[#FDFCFB] px-2 text-[11px] dark:bg-[#1E1E21]"
@@ -273,6 +306,25 @@ export function DesignPage() {
               {s.sel ? `${s.sel.type} · ${s.sel.system} · ${formatUpdated(s.sel.updatedAt)}` : 'No artifact selected'}
             </span>
             <span className="ml-auto flex shrink-0 items-center gap-1">
+              <Button
+                data-design-artifacts-toggle
+                variant={s.artifactsPanel ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-6 gap-1 px-2 text-[11px]"
+                aria-expanded={s.artifactsPanel}
+                aria-controls="lokma-design-artifacts-panel"
+                aria-label="Toggle artifacts panel"
+                onClick={() => s.toggleArtifactsPanel()}
+              >
+                <LayoutTemplate className="h-3 w-3" />
+                Artifacts
+                <span
+                  data-design-artifacts-badge
+                  className="rounded-full border border-line px-1 text-[10px] text-zinc-500 dark:text-zinc-400"
+                >
+                  {s.items.length}
+                </span>
+              </Button>
               <Button
                 data-design-code-toggle
                 variant={s.drawer === 'code' ? 'secondary' : 'ghost'}
@@ -365,8 +417,9 @@ export function DesignPage() {
             {s.drawer === 'code' ? <CodeDrawer studio={s} /> : null}
             {s.drawer === 'critique' ? <CritiqueDrawer studio={s} /> : null}
           </div>
-          <DesignArtboards studio={s} />
-        </section>
+          </section>
+          {s.artifactsPanel ? <DesignArtboards studio={s} panelRef={panelRef} /> : null}
+        </div>
       </div>
       {menu ? (
         <ContextMenu x={menu.x} y={menu.y} label={menu.label} items={menu.items} onClose={() => setMenu(null)} />

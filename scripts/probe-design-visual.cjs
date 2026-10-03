@@ -406,6 +406,15 @@ const closeMenu = () => {
   const threadReady = await waitThreadReady();
   ok('the artifact thread settled (list load finished)', threadReady);
 
+  // REQ-189 — the artboard list moved into the Artifacts PANEL, which starts
+  // CLOSED. The type filter asserted below lives in that panel, so open it
+  // once here and leave it open for the rest of the run.
+  await page.evaluate(() => {
+    const b = document.querySelector('[data-design-artifacts-toggle]');
+    if (b) b.click();
+  });
+  await sleep(900);
+
   // ---- A + D: structure of the design surface (before touching themes) ----
   const audit = await page.evaluate(pageAudit);
   ok('the Design page renders', Boolean(audit));

@@ -16,9 +16,12 @@ import {
   filterArtifacts,
   formatUpdated,
   groupSkillRows,
+  groupTemplateRows,
   normalizeSkillIds,
+  normalizeTemplateId,
   overallLabel,
   parseHtmlEdit,
+  pickTemplate,
   projectLabel,
   scoreTone,
   skillSelectionLabel,
@@ -180,6 +183,74 @@ const rows: NormalizedArtifact[] = [
   check('a blank group falls back to Other', groupSkillRows([{ group: '  ', name: 'x' }], ['Style'])[0]?.label === 'Other');
 }
 
+// REQ-192 slice 5 — the TEMPLATE axis (the output skeleton, single-select).
+{
+  check('picking sets the id', pickTemplate('', 'pitch-deck') === 'pitch-deck');
+  check('picking trims', pickTemplate('', '  launch-page ') === 'launch-page');
+  // Re-picking the CURRENT row clears: a single-select control with no visible
+  // "off" state otherwise makes a selection permanent by accident.
+  check('re-picking the current row clears', pickTemplate('pitch-deck', 'pitch-deck') === '');
+  // Picking a DIFFERENT row replaces — a single-select picker must not refuse a
+  // second click the way the capped multi-skill picker does.
+  check('picking another row replaces', pickTemplate('pitch-deck', 'app-shell') === 'app-shell');
+  check('the empty sentinel clears', pickTemplate('pitch-deck', '') === '');
+  check('junk is ignored, not stored', pickTemplate('pitch-deck', '../escape') === 'pitch-deck');
+  check('an uppercase id is refused (server jail is lowercase)', pickTemplate('', 'PitchDeck') === '');
+
+  check('normalize keeps a valid id', normalizeTemplateId('pitch-deck') === 'pitch-deck');
+  check('normalize trims', normalizeTemplateId('  app-shell  ') === 'app-shell');
+  check('normalize drops a non-string', normalizeTemplateId(7) === '');
+  check('normalize drops null', normalizeTemplateId(null) === '');
+  check('normalize drops a traversal', normalizeTemplateId('../escape') === '');
+  check('normalize drops an over-long id', normalizeTemplateId('a'.repeat(65)) === '');
+  // A snapshot written by a future/foreign writer may hold an array; one
+  // artifact still ships one skeleton, so it coerces to the first entry.
+  check('normalize takes the first of an array', normalizeTemplateId(['app-shell', 'pitch-deck']) === 'app-shell');
+  check('normalize of an empty array is empty', normalizeTemplateId([]) === '');
+
+  const grouped = groupTemplateRows(
+    [
+      { mode: 'deck', label: 'Pitch Deck' },
+      { mode: 'prototype', label: 'Launch Page' },
+      { mode: 'deck', label: 'Quarterly Deck' },
+      { mode: 'mystery', label: 'Odd' },
+    ],
+    DESIGN_TYPES,
+  );
+  // `DESIGN_TYPES` order first (its first entry is `prototype`), off-taxonomy
+  // last. Asserted against the REAL taxonomy constant, not a guessed order.
+  check(
+    'template groups follow the artifact-type order',
+    grouped.map((g) => g.label).join(',') ===
+      [...DESIGN_TYPES.filter((t) => grouped.some((g) => g.label === t)), 'mystery'].join(','),
+  );
+  const deckGroup = grouped.find((g) => g.label === 'deck');
+  check(
+    'template rows sort by label inside a group',
+    deckGroup?.rows.map((r) => r.label).join(',') === 'Pitch Deck,Quarterly Deck',
+  );
+  check('a blank mode falls back to Other', groupTemplateRows([{ mode: '  ', label: 'x' }], DESIGN_TYPES)[0]?.label === 'Other');
+  check('an empty catalog groups to nothing', groupTemplateRows([], DESIGN_TYPES).length === 0);
+
+  // The form default carries the axis as EMPTY, so a no-template generation
+  // stays the byte-identical request it was before slice 5.
+  check('the empty form has no template', emptyGenerateForm.template === '');
+  // Validation: the id SHAPE only — membership is the server's call, because
+  // the installed catalog is per-machine (same rule as skills).
+  const good = { ...emptyGenerateForm, brief: 'a deck', template: 'pitch-deck' };
+  check('a valid template passes validation', validateGenerateForm(good) === null);
+  check(
+    'an invalid template id is refused locally',
+    (validateGenerateForm({ ...good, template: '../escape' }) ?? '').includes('template'),
+  );
+  // An id the catalog does not carry is NOT a client error — the server answers
+  // `template_not_found` honestly, and pre-empting it here would hide the reason.
+  check(
+    'an unknown-but-well-formed id is left to the server',
+    validateGenerateForm({ ...good, template: 'not-installed' }) === null,
+  );
+}
+
 // filterArtifacts — type filter + search.
 {
   check('all returns 3', filterArtifacts(rows, 'all', '').length === 3);
@@ -266,6 +337,28 @@ const rows: NormalizedArtifact[] = [
     'snapshot: an over-cap skills list is trimmed',
     parseDesignPageSnapshot(JSON.stringify({ form: { skills: Array.from({ length: 30 }, (_, i) => 'skill-' + i) } }))
       .form.skills.length === DESIGN_SKILL_SELECT_CAP,
+  );
+  // REQ-192 slice 5 — the template rides the snapshot on the SAME rule: shape
+  // only, never catalog membership (an id the machine no longer carries is the
+  // server's `template_not_found` to report, not a silent local drop).
+  const withTemplate = parseDesignPageSnapshot(
+    JSON.stringify({ form: { brief: 'seed', template: 'pitch-deck' } }),
+  );
+  check('snapshot: restores the picked template', withTemplate.form.template === 'pitch-deck');
+  check(
+    'snapshot: drops a malformed template id',
+    parseDesignPageSnapshot(JSON.stringify({ form: { template: '../escape' } })).form.template === '',
+  );
+  check('snapshot: a missing template field restores empty', parseDesignPageSnapshot('{}').form.template === '');
+  check(
+    'snapshot: an over-long template id is dropped',
+    parseDesignPageSnapshot(JSON.stringify({ form: { template: 'a'.repeat(65) } })).form.template === '',
+  );
+  // A snapshot that never knew about the axis (pre-slice-5 localStorage) must
+  // restore as the default form, not crash or carry `undefined` into the wire.
+  check(
+    'snapshot: a pre-slice-5 payload restores an empty template',
+    parseDesignPageSnapshot(JSON.stringify({ form: { brief: 'seed', skills: ['a'] } })).form.template === '',
   );
 }
 

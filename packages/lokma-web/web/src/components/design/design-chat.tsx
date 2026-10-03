@@ -168,6 +168,40 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
         .filter((row): row is NonNullable<typeof row> => Boolean(row)),
     [s.form.skills, s.skills],
   );
+  // REQ-192 slice 5 — the TEMPLATE picker. A THIRD axis, grouped by artifact
+  // kind (deck / prototype / mobile / document) because that IS what a template
+  // chooses — the document shape — unlike skills, which are grouped by what
+  // they teach. SINGLE-select: one artifact ships one skeleton.
+  const templateGroups = React.useMemo<SelectMenuGroup[]>(
+    () => [
+      {
+        // REQ-192 slice 5 — the `''` sentinel row, same trick the Model picker
+        // uses. `SelectMenu`'s single-select trigger renders `value || '—'`
+        // when nothing matches, so an explicit "None (freeform structure)" row
+        // is what turns "—" into an honest label AND gives the user a
+        // one-click way to back out of a template. Grouped by artifact kind
+        // because that IS what a template chooses — the document shape.
+        label: 'Skeleton',
+        options: [{ value: '', label: 'None (freeform structure)' }],
+      },
+      ...s.templateGroups.map((group) => ({
+        label: group.label,
+        options: group.rows.map((row) => ({
+          value: row.id,
+          // The honest suffix a body-less row carries, same rule as the system
+          // picker's `(preset)`: the user must not pick a row the server will
+          // refuse with 409 after the click.
+          label: row.hasBody ? row.label : `${row.label} (no body)`,
+        })),
+      })),
+    ],
+    [s.templateGroups],
+  );
+  const templateLabels = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of s.templates) map.set(row.id, row.label);
+    return map;
+  }, [s.templates]);
   const modelOptions = React.useMemo<SelectMenuOption[]>(() => {
     const rows: SelectMenuOption[] = [{ value: '', label: 'Default (auto)' }];
     if (s.form.model && !modelInCatalog) {
@@ -389,6 +423,106 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
                   className="mt-1 max-h-40 overflow-y-auto rounded-md border border-line bg-white p-1.5 font-mono text-[10px] leading-4 whitespace-pre-wrap text-zinc-600 dark:bg-[#0F0F11] dark:text-zinc-400"
                 >
                   {s.skillPreview.content}
+                </pre>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+        {/* REQ-192 slice 5 — the TEMPLATE axis (the output skeleton). It sits
+            BELOW skills on purpose and says so in the empty text: a template
+            picks which document shape ships, skills decide how it looks. Merging
+            them would make "pick a deck" and "make it brutalist" one question
+            with one answer, which is exactly the confusion the REQ forbids. */}
+        <div className="mt-2 border-t border-line pt-2" data-design-templates>
+          <div className="flex items-end gap-1.5">
+            <div className="min-w-0 flex-1">
+              <SelectMenu
+                label="Template (output skeleton)"
+                value={s.form.template}
+                onChange={s.selectTemplate}
+                groups={templateGroups}
+                searchable
+                searchPlaceholder="Search design templates"
+                menuClassName="max-h-[320px] min-w-[15rem]"
+                triggerAttrs={{ 'data-design-composer-template': '' }}
+              />
+            </div>
+            <button
+              type="button"
+              data-design-template-reset
+              onClick={s.resetTemplate}
+              disabled={s.form.template === ''}
+              title="Clear the selected template"
+              className="mb-px flex h-7 shrink-0 items-center gap-1 rounded-md border border-line bg-white px-1.5 text-[10px] text-zinc-500 hover:bg-[#F7F5F1] disabled:cursor-not-allowed disabled:opacity-40 dark:bg-[#0F0F11] dark:text-zinc-400 dark:hover:bg-[#242427]"
+            >
+              <RotateCcw className="h-3 w-3" /> Reset
+            </button>
+          </div>
+          {s.templates.length === 0 ? (
+            <p data-design-templates-empty className={cn('mt-1 text-[10px]', META_CLASS)}>
+              No design templates installed — install one with `lokma design template add &lt;url|path&gt;`.
+            </p>
+          ) : null}
+          {s.templates.length > 0 && s.templatesInvalid > 0 ? (
+            <p data-design-templates-invalid className={cn('mt-1 text-[10px]', META_CLASS)}>
+              {s.templatesInvalid} template(s) have no readable SKILL.md and cannot shape an artifact.
+            </p>
+          ) : null}
+          {s.form.template ? (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1">
+              <span
+                data-design-template-chip={s.form.template}
+                className="inline-flex items-center gap-1 rounded-full border border-line bg-white px-1.5 py-0.5 text-[10px] text-ink dark:bg-[#0F0F11] dark:text-white"
+              >
+                <button
+                  type="button"
+                  title={'Read the ' + (templateLabels.get(s.form.template) ?? s.form.template) + ' skeleton'}
+                  data-design-template-read={s.form.template}
+                  onClick={() => s.previewTemplate(s.form.template)}
+                >
+                  {templateLabels.get(s.form.template) ?? s.form.template}
+                </button>
+                <button
+                  type="button"
+                  title="Remove template"
+                  aria-label="Remove template"
+                  data-design-template-remove={s.form.template}
+                  onClick={s.resetTemplate}
+                  className="text-zinc-400 hover:text-rose-600 dark:hover:text-rose-300"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </span>
+            </div>
+          ) : null}
+          {s.templatePreview || s.templatePreviewLoading || s.templatePreviewError ? (
+            <div data-design-template-preview className="mt-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className={cn('truncate text-[10px] font-medium', META_CLASS)}>
+                  {s.templatePreviewLoading
+                    ? 'Reading skeleton…'
+                    : (s.templatePreview?.label ?? 'SKILL.md')}
+                </p>
+                <button
+                  type="button"
+                  data-design-template-preview-close
+                  title="Close preview"
+                  aria-label="Close template preview"
+                  onClick={() => s.previewTemplate(null)}
+                  className="text-zinc-400 hover:text-rose-600 dark:hover:text-rose-300"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+              {s.templatePreviewError ? (
+                <p className="mt-1 text-[10px] text-rose-600 dark:text-rose-300">{s.templatePreviewError}</p>
+              ) : null}
+              {s.templatePreview ? (
+                <pre
+                  data-design-template-preview-body
+                  className="mt-1 max-h-40 overflow-y-auto rounded-md border border-line bg-white p-1.5 font-mono text-[10px] leading-4 whitespace-pre-wrap text-zinc-600 dark:bg-[#0F0F11] dark:text-zinc-400"
+                >
+                  {s.templatePreview.content}
                 </pre>
               ) : null}
             </div>

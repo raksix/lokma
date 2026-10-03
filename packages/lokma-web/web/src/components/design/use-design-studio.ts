@@ -9,6 +9,7 @@ import {
   type DesignSkillsRes,
   type DesignSystemCatalogRow,
   type DesignSystemsRes,
+  type DesignTemplateRow,
   type DesignVersion,
 } from '@/lib/api';
 import { useProviderStore, useSessionStore } from '@/stores';
@@ -18,7 +19,9 @@ import {
   clearSkills,
   emptyGenerateForm,
   filterArtifacts,
+  groupTemplateRows,
   parseHtmlEdit,
+  pickTemplate,
   projectLabel,
   toRow,
   toggleSkill,
@@ -135,6 +138,30 @@ export type DesignStudio = {
   skillPreviewError: string | null;
   /** REQ-192 — open the preview for one selected id (null closes it). */
   previewSkill: (id: string | null) => void;
+  /**
+   * REQ-192 slice 5 — the design-TEMPLATE catalog (`GET /api/design/templates`):
+   * the THIRD axis. A system is a palette, a skill is a style, a template is
+   * the output skeleton. Kept in its own state, never merged into either.
+   */
+  templates: DesignTemplateRow[];
+  /** REQ-192 slice 5 — picker rows grouped by artifact kind, display order. */
+  templateGroups: { label: string; rows: DesignTemplateRow[] }[];
+  /** REQ-192 slice 5 — how many catalog rows have no readable body. */
+  templatesInvalid: number;
+  /** REQ-192 slice 5 — pick/clear the template (the ONLY writer of form.template). */
+  selectTemplate: (id: string) => void;
+  /** REQ-192 slice 5 — drop the template selection (the picker's Reset). */
+  resetTemplate: () => void;
+  /**
+   * REQ-192 slice 5 — the selected template's SKILL.md on screen. Its OWN
+   * request sequence guard, separate from the skill preview: two panels share
+   * one hook and must not cancel each other's reads.
+   */
+  templatePreview: { id: string; label: string; content: string } | null;
+  templatePreviewLoading: boolean;
+  templatePreviewError: string | null;
+  /** REQ-192 slice 5 — open the template preview for one id (null closes it). */
+  previewTemplate: (id: string | null) => void;
   guard: DesignGuard | null;
   systemMeta: DesignSystemCatalogRow | undefined;
   /** REQ-172 — session activity chips for the chat thread (newest last). */
@@ -225,6 +252,18 @@ export function useDesignStudio(): DesignStudio {
   } | null>(null);
   const [skillPreviewLoading, setSkillPreviewLoading] = React.useState(false);
   const [skillPreviewError, setSkillPreviewError] = React.useState<string | null>(null);
+  // REQ-192 slice 5 — the TEMPLATE catalog in its own state (a third list, not
+  // a merge) plus the picked template's SKILL.md preview with its own sequence
+  // guard, so a template read can never cancel a skill read.
+  const [templates, setTemplates] = React.useState<DesignTemplateRow[]>([]);
+  const [templatesInvalid, setTemplatesInvalid] = React.useState(0);
+  const [templatePreview, setTemplatePreview] = React.useState<{
+    id: string;
+    label: string;
+    content: string;
+  } | null>(null);
+  const [templatePreviewLoading, setTemplatePreviewLoading] = React.useState(false);
+  const [templatePreviewError, setTemplatePreviewError] = React.useState<string | null>(null);
   const [guard, setGuard] = React.useState<DesignGuard | null>(null);
   const [events, setEvents] = React.useState<DesignEvent[]>([]);
   const [drawer, setDrawer] = React.useState<DesignDrawer | null>(null);
@@ -312,6 +351,17 @@ export function useDesignStudio(): DesignStudio {
       setSkills([]);
       setSkillGroups([]);
       setSkillsUnscoped(0);
+    }
+    // REQ-192 slice 5 — the TEMPLATE catalog loads beside the other two and
+    // fails to an empty picker, never to the skill or system list standing in
+    // for it (a wrong-but-full picker is worse than an honest empty one).
+    try {
+      const res = await api.getDesignTemplates();
+      setTemplates(res.templates);
+      setTemplatesInvalid(res.invalid);
+    } catch {
+      setTemplates([]);
+      setTemplatesInvalid(0);
     }
     try {
       const res = await api.getDesignGuard(cwd || undefined);
@@ -459,6 +509,74 @@ export function useDesignStudio(): DesignStudio {
     [loadSkillPreview],
   );
 
+  // REQ-192 slice 5 — the ONE template-body reader, with its OWN sequence
+  // guard (`templatePreviewRunRef`, separate from the skill one): two panels
+  // share this hook, and a shared guard would let a slow skill read cancel a
+  // newer template read (or the reverse) with no visible error.
+  const templatePreviewRunRef = React.useRef(0);
+  const loadTemplatePreview = React.useCallback((id: string) => {
+    setTemplatePreviewLoading(true);
+    setTemplatePreviewError(null);
+    const run = (templatePreviewRunRef.current += 1);
+    void api
+      .getDesignTemplate(id)
+      .then((res) => {
+        if (templatePreviewRunRef.current !== run) return;
+        setTemplatePreview({ id, label: res.template.label, content: res.template.content });
+      })
+      .catch((e: unknown) => {
+        if (templatePreviewRunRef.current !== run) return;
+        // Honest failure, same rule as the skill preview: say the body could
+        // not be read instead of showing an empty panel that reads as an empty
+        // template.
+        setTemplatePreview(null);
+        setTemplatePreviewError(e instanceof Error ? e.message : 'template preview failed');
+      })
+      .finally(() => {
+        if (templatePreviewRunRef.current === run) setTemplatePreviewLoading(false);
+      });
+  }, []);
+
+  // The template picker's ONLY writer of `form.template`. Re-picking the
+  // current row clears it (`pickTemplate`), and picking a row OPENS its body —
+  // same reasoning as skills: choosing a skeleton you cannot read is how
+  // "the template did nothing" starts.
+  const selectTemplate = React.useCallback(
+    (id: string) => {
+      setFormError(null);
+      setForm((f) => ({ ...f, template: pickTemplate(f.template, id) }));
+      const next = id.trim();
+      // Clearing (re-picking the current row) closes the panel instead of
+      // re-reading the row the user just deselected.
+      if (next === '' || next === form.template) {
+        setTemplatePreview(null);
+        setTemplatePreviewError(null);
+        return;
+      }
+      loadTemplatePreview(next);
+    },
+    [form.template, loadTemplatePreview],
+  );
+
+  const resetTemplate = React.useCallback(() => {
+    setFormError(null);
+    setForm((f) => ({ ...f, template: '' }));
+    setTemplatePreview(null);
+    setTemplatePreviewError(null);
+  }, []);
+
+  const previewTemplate = React.useCallback(
+    (id: string | null) => {
+      if (!id) {
+        setTemplatePreview(null);
+        setTemplatePreviewError(null);
+        return;
+      }
+      loadTemplatePreview(id);
+    },
+    [loadTemplatePreview],
+  );
+
   const runGenerate = React.useCallback(async () => {
     if (generatingRef.current) return;
     const local = validateGenerateForm(form);
@@ -480,6 +598,11 @@ export function useDesignStudio(): DesignStudio {
         // SKILL.md body. Omitted when empty so a no-skill generation is the
         // exact same request it was before this axis existed.
         ...(form.skills.length > 0 ? { skills: form.skills } : {}),
+        // REQ-192 slice 5 — the template axis rides the SAME request beside
+        // skills (never merged): one id, resolved server-side to its SKILL.md
+        // body. Omitted when empty so a no-template generation stays the exact
+        // request it was before this axis existed.
+        ...(form.template ? { template: form.template } : {}),
       });
       // REQ-178 scope 6 — the narration names the project the artifact
       // actually landed in.
@@ -493,20 +616,30 @@ export function useDesignStudio(): DesignStudio {
           : applied.length === form.skills.length
             ? ` · skills: ${applied.map((sk) => sk.name).join(', ')}`
             : ` · ${applied.length}/${form.skills.length} skills reached the model (rest unusable)`;
+      // REQ-192 slice 5 — the SAME honesty channel for the template: the chat
+      // names what the SERVER recorded (with `sentChars`), never what the
+      // selection claimed. `manifest.template` is absent when nothing was sent.
+      const usedTemplate = res.manifest.template;
+      const templateText = form.template
+        ? usedTemplate
+          ? ` · template: ${usedTemplate.label}`
+          : ' · template did not reach the model (unusable)'
+        : '';
       pushEvent(
         'ok',
-        `Generated ${res.id} — overall ${res.critique.overall}/10 → proje: ${projectLabel(projectCwd)}${appliedText}`,
+        `Generated ${res.id} — overall ${res.critique.overall}/10 → proje: ${projectLabel(projectCwd)}${appliedText}${templateText}`,
       );
       toast(`Generated ${res.id} — overall ${res.critique.overall}/10`);
-      // The brief clears after the server accepted it; the SKILL selection is
-      // deliberately KEPT (it is a standing style choice for this project, not
-      // part of the one-off prompt), like Type/System/Model.
+      // The brief clears after the server accepted it; the SKILL + TEMPLATE
+      // selections are deliberately KEPT (a standing choice for this project,
+      // not part of the one-off prompt), like Type/System/Model.
       setForm((f) => ({
         ...emptyGenerateForm,
         type: f.type,
         system: f.system,
         model: f.model,
         skills: f.skills,
+        template: f.template,
       }));
       await loadList(projectCwd, res.id);
     } catch (e) {
@@ -813,6 +946,22 @@ export function useDesignStudio(): DesignStudio {
     skillPreviewLoading,
     skillPreviewError,
     previewSkill,
+    // REQ-192 slice 5 — the template axis: its own catalog, its own grouped
+    // rows (memoized so the SelectMenu does not get a fresh array identity on
+    // every render, which would re-open/re-measure the menu), and its own
+    // selection writers.
+    templates,
+    templateGroups: React.useMemo(
+      () => groupTemplateRows(templates, DESIGN_TYPES),
+      [templates],
+    ),
+    templatesInvalid,
+    selectTemplate,
+    resetTemplate,
+    templatePreview,
+    templatePreviewLoading,
+    templatePreviewError,
+    previewTemplate,
     guard,
     systemMeta,
     events,

@@ -17,6 +17,7 @@ import {
   listDesignSystems,
   listDesignTemplates,
   readDesignGuard,
+  resolveDesignTemplate,
   revertArtifact,
   runTweak,
   updateArtifactHtml,
@@ -92,6 +93,22 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
   // grows by dropping a directory in — there is no frozen table behind it.
   app.get('/api/design/templates', async () => {
     return { ok: true, ...(await listDesignTemplates()) };
+  });
+
+  // REQ-192 slice 5 — read ONE template's body for the composer preview. This
+  // is the template reader the picker needs and it reuses `resolveDesignTemplate`
+  // — the SAME resolver generation uses — so a preview can never show a body
+  // the model would not have received (the skills axis does the same through
+  // `/api/skills/:id`). An unknown id is 404, an unreadable body 409.
+  app.get('/api/design/templates/:id', async (req, reply) => {
+    const params = req.params as { id?: unknown };
+    try {
+      const payload = await resolveDesignTemplate(params.id as string);
+      return { ok: true, template: payload };
+    } catch (e) {
+      if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      throw e;
+    }
   });
 
   // REQ-192 slice 4 — install a template. `POST /api/design/templates { source }`

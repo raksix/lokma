@@ -616,6 +616,18 @@ export type DesignSkillApplied = {
   /** SKILL.md bytes on disk, when known. */
   bytes?: number;
 };
+/**
+ * REQ-192 slice 5 — one design template as the generation recorded it. Same
+ * contract as `DesignSkillApplied`: `sentChars` proves what reached the model
+ * (the prompt cap may truncate a fat skeleton), and a template the resolver
+ * refused never appears at all.
+ */
+export type DesignTemplateApplied = {
+  id: string;
+  label: string;
+  /** Characters of skeleton handed to the model. */
+  sentChars: number;
+};
 export type DesignManifest = {
   id: string;
   type: string;
@@ -633,6 +645,13 @@ export type DesignManifest = {
    * on pre-REQ-192 artifacts.
    */
   skills?: DesignSkillApplied[];
+  /**
+   * REQ-192 slice 5 — the TEMPLATE this artifact was generated with, as the
+   * SERVER recorded it (id + label + the characters of skeleton that reached
+   * the model). The same honesty channel as `skills`: absent means nothing was
+   * sent (a pre-slice-5 artifact, or a refused template).
+   */
+  template?: DesignTemplateApplied;
 };
 export type DesignSummary = DesignManifest & { bytes: number; overall: number | null };
 export type DesignsRes = { items: DesignSummary[]; count: number; project?: string | null; root?: string };
@@ -777,6 +796,33 @@ export type DesignSkillsRes = {
   /** Scanned skills excluded for lacking `scope: design` (the honest "why"). */
   unscoped: number;
   /** Scoped rows whose SKILL.md is missing/unreadable/oversized. */
+  invalid: number;
+};
+/**
+ * REQ-192 slice 5 — one design-TEMPLATE catalog row (the THIRD axis: a
+ * template is the OUTPUT SKELETON, not a palette and not a style). `hasBody`
+ * is the honesty channel, same as skills: a row can be picked but the server
+ * answers 409 rather than claim the template shaped anything.
+ */
+export type DesignTemplateRow = {
+  id: string;
+  label: string;
+  description: string;
+  mode: string;
+  category: string;
+  examplePrompt: string;
+  bytes: number;
+  hasBody: boolean;
+  origin: 'bundled' | 'installed';
+  problem?: string;
+};
+export type DesignTemplatesRes = {
+  ok: boolean;
+  templates: DesignTemplateRow[];
+  count: number;
+  root: string;
+  origins: string[];
+  /** Rows whose SKILL.md is missing/unreadable/oversized. */
   invalid: number;
 };
 export type DesignSystemInstallRes = {
@@ -1613,6 +1659,21 @@ export const api = {
    * palette, a skill is a `SKILL.md` instruction set) and never merged into it.
    */
   getDesignSkills: () => get<DesignSkillsRes>('/api/design/skills'),
+  /**
+   * REQ-192 slice 5 — the design-TEMPLATE catalog (the third axis): the
+   * output skeleton each artifact ships as. Read-only here; slice 4 added
+   * `POST /api/design/templates` for installs, driven from the CLI.
+   */
+  getDesignTemplates: () => get<DesignTemplatesRes>('/api/design/templates'),
+  /**
+   * REQ-192 slice 5 — ONE template's body for the composer preview. Same
+   * resolver the generation path uses, so a previewed body is byte-identical
+   * to the body that would reach the model.
+   */
+  getDesignTemplate: (id: string) =>
+    get<{ ok: boolean; template: { id: string; label: string; mode: string; content: string } }>(
+      `/api/design/templates/${encodeURIComponent(id)}`,
+    ),
   /** REQ-191 — install one package into the catalog (local path or https URL). */
   installDesignSystem: (source: string) => post<DesignSystemInstallRes>('/api/design/systems', { source }),
   /** REQ-191 — activate an installed system in the project `.lokma/`. */

@@ -45,6 +45,14 @@ export type GenerateForm = {
    * keeps the generation wire shape byte-identical to pre-REQ-192.
    */
   skills: string[];
+  /**
+   * REQ-192 slice 5 — the picked design-TEMPLATE id (the THIRD axis: system =
+   * palette, skill = style, template = output skeleton). SINGLE by design —
+   * one artifact ships one skeleton, and the server refuses two with
+   * `too_many_templates`. `''` = no template, which keeps the generation wire
+   * shape byte-identical to a pre-slice-5 request.
+   */
+  template: string;
 };
 
 export const emptyGenerateForm: GenerateForm = {
@@ -53,6 +61,7 @@ export const emptyGenerateForm: GenerateForm = {
   system: 'stripe-linear',
   model: '',
   skills: [],
+  template: '',
 };
 
 // ── REQ-192 — the design-SKILL selection (second axis beside `system`) ────────
@@ -137,6 +146,74 @@ export function groupSkillRows<T extends { group: string; name: string }>(
   }));
 }
 
+// ── REQ-192 slice 5 — the design-TEMPLATE selection (third axis) ─────────────
+
+/** Mirror of the server id jail (`SYSTEM_ID_PATTERN` in core/design/systems). */
+const TEMPLATE_ID_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+
+/**
+ * Pick one template, or clear the selection with `''`. Selecting the row that
+ * is ALREADY current clears it, so the user can back out with the same click
+ * they picked it with — a single-select control with no visible "off" state is
+ * the classic way to make a selection permanent by accident.
+ *
+ * Re-selecting a DIFFERENT row REPLACES the selection rather than refusing it:
+ * the picker is single-select, so a second click simply moves the choice. An
+ * implausible id is ignored instead of stored, which keeps a stale snapshot
+ * value out of the request body.
+ */
+export function pickTemplate(current: string, id: string): string {
+  const value = typeof id === 'string' ? id.trim() : '';
+  if (value === '') return '';
+  if (!TEMPLATE_ID_RE.test(value)) return current;
+  return value === current ? '' : value;
+}
+
+/**
+ * Tolerant coerce of a persisted template id. Only the SHAPE is checked here,
+ * never catalog membership: the installed catalog is per-machine and may have
+ * changed since this page rendered, so the server stays the authority (it
+ * answers `template_not_found` honestly). An array coerces to its first entry
+ * because a snapshot from a future/foreign writer may hold one.
+ */
+export function normalizeTemplateId(raw: unknown): string {
+  if (Array.isArray(raw)) return normalizeTemplateId(raw[0]);
+  if (typeof raw !== 'string') return '';
+  const id = raw.trim();
+  return TEMPLATE_ID_RE.test(id) ? id : '';
+}
+
+/**
+ * Group template rows by the artifact kind their skeleton targets. Unlike the
+ * skill taxonomy the server sends no heading list here, so the order comes from
+ * this constant — the `DESIGN_TYPES` display order, which is the order the
+ * type picker itself uses, not an alphabetical reshuffle.
+ *
+ * There is deliberately NO `templateSelectionLabel` counterpart to
+ * `skillSelectionLabel`: the template trigger is SINGLE-select, so
+ * `SelectMenu` renders the picked row's own label from `value`, and a second
+ * label path would be a second place where the displayed name could drift from
+ * the menu row the click actually committed.
+ */
+export function groupTemplateRows<T extends { mode: string; label: string }>(
+  rows: readonly T[],
+  taxonomy: readonly string[],
+): { label: string; rows: T[] }[] {
+  const byMode = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = row.mode.trim() || 'Other';
+    const bucket = byMode.get(key) ?? [];
+    bucket.push(row);
+    byMode.set(key, bucket);
+  }
+  const ordered = taxonomy.filter((m) => byMode.has(m));
+  for (const key of byMode.keys()) if (!taxonomy.includes(key)) ordered.push(key);
+  return ordered.map((label) => ({
+    label,
+    rows: (byMode.get(label) ?? []).sort((a, b) => a.label.localeCompare(b.label)),
+  }));
+}
+
 /**
  * REQ-179 — example brief chips for the canvas empty state: one click parks
  * the text (and its natural type) in the composer, so a first artifact never
@@ -202,6 +279,13 @@ export function validateGenerateForm(form: GenerateForm): string | null {
   }
   for (const id of form.skills) {
     if (!isPlausibleSkillId(id)) return 'That skill id is not a valid skill';
+  }
+  // REQ-192 slice 5 — a template is OPTIONAL, so only the id SHAPE is checked
+  // here (same rule as skills: the installed catalog is per-machine, the server
+  // answers `template_not_found` honestly). A non-empty unplausible id would go
+  // out on the wire and come back as a 400 the user cannot connect to a click.
+  if (form.template && !TEMPLATE_ID_RE.test(form.template)) {
+    return 'That template id is not a valid template';
   }
   return null;
 }

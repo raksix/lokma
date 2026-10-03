@@ -47,6 +47,8 @@ assert(new Set(DESIGN_SLASH_COMMANDS.map((c) => c.id)).size === DESIGN_SLASH_COM
     system: 'omp-dark',
     model: 'm/x',
     skills: ['brutalist-web'],
+    // REQ-192 slice 5 — the template is the third axis `/new` must keep.
+    template: 'pitch-deck',
   };
   const { form } = run('new', '', start);
   assert(form.brief === '', '/new clears the brief');
@@ -54,6 +56,9 @@ assert(new Set(DESIGN_SLASH_COMMANDS.map((c) => c.id)).size === DESIGN_SLASH_COM
   // REQ-192 — the skill selection is a style axis too: `/new` is a draft reset,
   // not a "forget what I picked" action.
   assert(form.skills.join(',') === 'brutalist-web', '/new keeps the picked skills');
+  // REQ-192 slice 5 — same for the template axis: the skeleton is a standing
+  // choice, not part of the one-off draft.
+  assert(form.template === 'pitch-deck', '/new keeps the picked template');
 }
 
 // 3. `/type` accepts a name AND a 1-based index; both write the real enum value.

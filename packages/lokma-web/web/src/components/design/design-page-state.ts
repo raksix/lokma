@@ -4,6 +4,7 @@ import {
   DESIGN_TYPES,
   emptyGenerateForm,
   normalizeSkillIds,
+  normalizeTemplateId,
   type GenerateForm,
 } from './design';
 
@@ -74,6 +75,7 @@ export function parseDesignPageSnapshot(raw: string | null | undefined): DesignP
       system?: unknown;
       model?: unknown;
       skills?: unknown;
+      template?: unknown;
     };
     if (typeof form.type === 'string' && (DESIGN_TYPES as readonly string[]).includes(form.type)) {
       out.form.type = form.type;
@@ -95,6 +97,9 @@ export function parseDesignPageSnapshot(raw: string | null | undefined): DesignP
     // installed catalog is per-machine and may no longer carry one of them, and
     // the server already answers an honest 404 for an id it cannot resolve.
     out.form.skills = normalizeSkillIds(form.skills);
+    // REQ-192 slice 5 — same rule for the template: shape only, never catalog
+    // membership. One id, coerced from anything a stale snapshot may hold.
+    out.form.template = normalizeTemplateId(form.template);
   }
   return out;
 }

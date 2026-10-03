@@ -251,6 +251,58 @@ const waitStudio = async (page) => {
     'badge=' + (L ? L.badge : 'n/a'),
   );
 
+  // ── 3b ── search and the type filter actually NARROW the list ──────────
+  // Presence is not function: an input that renders but never filters would
+  // pass every check above, so type a real fragment and read the counter.
+  if (listCount > 1) {
+    const probe = await page.evaluate(layoutState);
+    const all = probe.artboards.slice();
+    await page.fill('input[aria-label="Search artifacts"]', 'zzz-no-such-artifact');
+    await sleep(700);
+    const empty = await page.evaluate(layoutState);
+    ok(
+      'a search with no match empties the list (search really filters)',
+      empty.artboards.length === 0 && empty.counter === '0/' + all.length,
+      'artboards=' + empty.artboards.length + ' counter=' + empty.counter,
+    );
+    ok(
+      'the honest no-match line renders',
+      Boolean((await page.evaluate(layoutState)) && true) &&
+        (await page.evaluate(() => {
+          const p = document.querySelector('[data-design-artifacts-panel]');
+          return Boolean(p && (p.textContent || '').indexOf('No artifacts match') >= 0);
+        })),
+    );
+    // Put it back and prove the list returns, then narrow by the real brief of
+    // the first artifact.
+    await page.fill('input[aria-label="Search artifacts"]', '');
+    await sleep(700);
+    const restored = await page.evaluate(layoutState);
+    ok(
+      'clearing the search restores every artifact',
+      restored.artboards.length === all.length,
+      'restored=' + restored.artboards.length + ' of ' + all.length,
+    );
+    const brief = await page.evaluate((id) => {
+      const b = document.querySelector('[data-design-artboard="' + id + '"]');
+      const span = b ? b.querySelector('span span') : null;
+      return span ? (span.textContent || '').trim() : '';
+    }, all[0]);
+    const frag = brief.split(' ')[0] || 'a';
+    await page.fill('input[aria-label="Search artifacts"]', frag);
+    await sleep(700);
+    const narrowed = await page.evaluate(layoutState);
+    ok(
+      'a real brief fragment narrows the list to fewer rows',
+      narrowed.artboards.length > 0 && narrowed.artboards.length < all.length,
+      'frag=' + frag + ' rows=' + narrowed.artboards.length + '/' + all.length,
+    );
+    await page.fill('input[aria-label="Search artifacts"]', '');
+    await sleep(600);
+  } else {
+    console.log('SKIP  search-narrowing checks (fewer than 2 artifacts on this account)');
+  }
+
   // ── 4 ── selection keeps the panel open and swaps the canvas ───────────
   if (listCount > 0) {
     const first = L.artboards[0];

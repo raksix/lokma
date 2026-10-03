@@ -375,4 +375,52 @@ function assert(cond: boolean, label: string): void {
   assert(end.marks.length === 2 && end.marks[1]?.at === visible.length, 'salvage mark sits at end of visible text');
 }
 
+// ─── REQ-196: space-bunny-alpha's junk-wrapped XML args never execute ───
+// Observed live: the model emitted
+// `<tool name="write_file">]<]minimax[>[<path>x.html]<]minimax[>[</path>…`
+// so the salvage matched only the payload's own leaf tags, returned `{}`,
+// and write_file ran with NO input — nothing written, markup dumped in chat.
+{
+  const HTML = '<!DOCTYPE html>\n<html lang="tr">\n<head><meta charset="utf-8"><title>T</title></head>\n<body><h1>Merhaba</h1></body>\n</html>';
+  const broken =
+    '<tool name="write_file">]<]minimax[>[<path>duman-tarifi.html]<]minimax[>[</path>]<]minimax[>[<content>' +
+    HTML +
+    ']<]minimax[>[</content>]<]minimax[>[</tool>';
+  const calls = parseToolBlocks(broken);
+  assert(calls.length === 1, 'junk-wrapped block still parses as ONE call');
+  assert(calls[0]?.tool === 'write_file', 'tool name survives the junk wrapper');
+  assert(calls[0]?.parseError === undefined, 'the salvaged call has no parseError');
+  const input = (calls[0]?.input ?? {}) as { path?: string; content?: string };
+  assert(input.path === 'duman-tarifi.html', `path is a clean filename (got ${JSON.stringify(input.path)})`);
+  assert(typeof input.content === 'string' && input.content.startsWith('<!DOCTYPE'), 'content keeps its real first bytes');
+  assert(/<h1>Merhaba<\/h1>/.test(input.content ?? ''), 'the html payload survives intact');
+  assert(!/minimax|]\[<]/.test(input.path ?? ''), 'no wrapper residue is left in path');
+  assert(input.content === HTML, 'content is byte-identical to the html the model sent');
+  // Payloads whose own bytes look like the residue must survive it.
+  const keep: [string, string][] = [
+    ['read_file', 'a[1].txt'],
+    ['write_file', '[1,2,3]'],
+    ['write_file', '{"a":1}'],
+    ['write_file', 'a{color:red}'],
+  ];
+  for (const [tool, payload] of keep) {
+    const r = parseToolBlocks(
+      `<tool name="${tool}">]<]minimax[>[<path>p.txt</path>]<]minimax[>[<content>${payload}</content>]<]minimax[>[</tool>`,
+    );
+    assert(
+      ((r[0]?.input ?? {}) as { content?: string }).content === payload,
+      `a payload of ${payload} survives the residue strip`,
+    );
+  }
+  // The html must NOT be edge-trimmed: a clean file starts with `<` and ends with `>`.
+  const cleanPayload = '<tool name="write_file"><path>a.html</path><content>' + HTML + '</content></tool>';
+  const clean = parseToolBlocks(cleanPayload);
+  const cleanInput = (clean[0]?.input ?? {}) as { path?: string; content?: string };
+  assert(cleanInput.content === HTML, 'a payload with no junk is never edge-trimmed');
+  assert(cleanInput.path === 'a.html', 'a clean path is untouched');
+  // And a path that legitimately ends in a bracket-ish char survives.
+  const odd = parseToolBlocks('<tool name="read_file">]<]minimax[>[<path>a[1].txt]<]minimax[>[</path>]<]minimax[>[</tool>');
+  assert(((odd[0]?.input ?? {}) as { path?: string }).path === 'a[1].txt', 'a real bracketed filename is not eaten');
+}
+
 console.log(`\nparse probe: ${passed} passed`);

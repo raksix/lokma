@@ -114,16 +114,100 @@ const ARG_ALIASES: Record<string, string> = {
   cmd: 'command',
 };
 
+/**
+ * REQ-196: junk tokens a model interleaves BETWEEN XML-style args
+ * (`]<]minimax[>[<path>x.html]<]minimax[>[</path>`), observed on
+ * stealth/space-bunny-alpha. Stripped before salvage so the real tags
+ * become matchable. Without this the salvage matches only leaf tags inside
+ * the payload and returns `{}` — the call then runs with NO input.
+ *
+ * The wrapper is bracket/pipe/punctuation ONLY — angle brackets must survive
+ * the keyword removal, or `<path>`/`</path>` are destroyed before the keyed
+ * pass ever sees them. The residue left around the removed keyword is then
+ * removed by the caller via `cleanArgValue` on each salvaged VALUE, so
+ * `path` is a real filename and never `page.html]<>[`.
+ */
+const ARG_JUNK_KEYWORD = /[\][|{}]*minimax[\][|{}]*/gi;
+
+function stripArgJunk(body: string): string {
+  return body.replace(ARG_JUNK_KEYWORD, '');
+}
+
+/**
+ * REQ-196: after the junk keyword is gone the wrapper leaves a residue
+ * `]<]\u200b>[` at both ends of a SHORT value
+ * (`duman-tarifi.html]<]minimax[>[`). Trim that wrapper — and only that
+ * wrapper, including its zero-width space — there.
+ *
+ * Deliberately NOT applied to a payload arg (`content`): an html file
+ * legitimately starts with `<!DOCTYPE html>` and ends with `>`, so edge
+ * trimming would eat real bytes. `content` gets the keyword removed and
+ * nothing else.
+ */
+const ZERO_WIDTH = String.fromCharCode(0x200d, 0x200b);
+const ZW_RE = new RegExp(`[${ZERO_WIDTH}]`, 'g');
+
+/**
+ * REQ-196: junk tokens the model interleaves between XML-style args, observed
+ * live on stealth/space-bunny-alpha: `<path>x.html]<]\u200bminimax[>[</path>`.
+ * Two steps: drop the junk keyword, then drop the bracket run it leaves behind.
+ *
+ * The residue run is recognised by starting AND ending with a bracket and
+ * containing only `[ ] < >` in between. Both edges matter: no real value has
+ * that shape, so `<!DOCTYPE html>`, `</html>`, `a[1].txt`, `[1,2,3]` and
+ * `{"a":1}` are all untouched.
+ */
+const RESIDUE_LEAD = /^[\[\]][<>[\]]*[\[\]]/;
+const RESIDUE_TAIL = /[\[\]][<>[\]]*[\[\]]$/;
+
+function cleanArgValue(v: string): string {
+  return v.replace(ZW_RE, '').replace(RESIDUE_LEAD, '').replace(RESIDUE_TAIL, '');
+}
+
+/**
+ * The argument names the registry actually defines, so the keyed pass cannot
+ * mistake the PAYLOAD's own tags (`<h1>`, `<title>`, `<div>`) for arguments.
+ */
+const ARG_KEY_LIST = [
+  'path', 'content', 'expectedSha', 'query', 'pattern', 'command', 'args',
+  'dir', 'file', 'filepath', 'filename', 'cmd', 'text', 'value', 'name',
+  'description', 'url', 'limit', 'depth', 'maxResults', 'fullPage',
+];
+
 /** Salvage `<key>value</key>` children (sloppy-model XML args) into an object. */
-function salvageXmlArgs(body: string): Record<string, string> | null {
+function salvageXmlArgs(raw: string): Record<string, string> | null {
+  // REQ-196: `([^<>]*)` cannot span a payload that CONTAINS tags — a
+  // generated html file's own `<h1>…</h1>` ends the body match long before
+  // the closing `<content>` is reached, so `<path>`/`<content>` never match
+  // and the salvage yields nothing. Match the real argument tags explicitly
+  // and take everything up to the matching close, nested markup included.
+  const body = stripArgJunk(raw);
+  // Only clean a value's edges when the wrapper residue is really there —
+  // a clean html payload can legitimately START with `<!DOCTYPE` or end
+  // with `>`-bearing markup, and must survive byte-for-byte.
+  const hadJunk = ARG_JUNK_KEYWORD.test(raw);
+  ARG_JUNK_KEYWORD.lastIndex = 0;
   const out: Record<string, string> = {};
-  const re = /<([A-Za-z_][\w.-]*)\s*>([^<>]*)<\/\1\s*>/g;
+  const KEYED = ARG_KEY_LIST.join('|');
+  const re = new RegExp(`<(${KEYED})\\s*>([\\s\\S]*?)<\\/\\1\\s*>`, 'gi');
   let m: RegExpExecArray | null;
   for (;;) {
     m = re.exec(body);
     if (!m) break;
-    const raw = (m[1] ?? '').toLowerCase();
-    const key = ARG_ALIASES[raw] ?? raw;
+    const raw2 = (m[1] ?? '').toLowerCase();
+    const key = ARG_ALIASES[raw2] ?? raw2;
+    const value = m[2] ?? '';
+    if (key in out) continue;
+    out[key] = hadJunk ? cleanArgValue(value) : value.trim();
+  }
+  if (Object.keys(out).length) return out;
+  // Fallback for the simple shapes: keep the old leaf-only pass.
+  const re2 = /<([A-Za-z_][\w.-]*)\s*>([^<>]*)<\/\1\s*>/g;
+  for (;;) {
+    m = re2.exec(body);
+    if (!m) break;
+    const raw2 = (m[1] ?? '').toLowerCase();
+    const key = ARG_ALIASES[raw2] ?? raw2;
     if (!(key in out)) out[key] = (m[2] ?? '').trim();
   }
   return Object.keys(out).length ? out : null;

@@ -1,7 +1,7 @@
 # REQ-190 — Figma gibi düzenleme: seçili öğeyi içerikten düzenle (canvas tweak)
 
-**Status:** pending
-**Tarih:** 2026-10-02
+**Status:** done
+**Tarih:** 2026-10-02 (closed 2026-10-03)
 **Kaynak:** Kullanıcı mesajı (2 Ekim 2026):
 > "figma gibi düzneleme falan da yapabilen opendesign araştır ekle request olarak bunları"
 
@@ -214,3 +214,67 @@ edilen bundle == disk, chunk'ta `data-design-field-strip` **1** kez,
 **Kalan:** canlı tarayıcı probu (`scripts/probe-design-fields.cjs` — alan
 seçiminin tek tweak çağrısına indirdiğini, kapı kapatıldığında uygulama
 kalkmadığını ve **kapı AÇIK kalmadığını** ölçen) → yakma + kapanış.
+
+### Tur 7/15 — canlı tarayıcı probu (`1c05c23`) → KAPANIŞ
+
+Altı dilim birim testleriyle geldi; **dağıtılmış sayfayı** ölçen tek bir şey
+yoktu (tur 5'te ölçülen `expectedSha` boşluğu iki tur hayatta kaldı).
+`scripts/probe-design-fields.cjs` gerçek SPA'yı sürüyor (minted Bearer, gate
+ON) ve §3'ün iddialarını hem DOM'da hem **telde** ölçüyor.
+
+- **Tek yazma yolu, ölçülmüş:** bir alan seçimi tam **1** `POST
+  /api/design/:id/tweak` üretiyor, `POST /api/design/generate` **0**; gövde
+  üretilen cümleyi + sayfanın **kendi** sha kilidini + kapsamlı cwd'yi
+  taşıyor, ve **aynı cümle** serbest metin kutusunda görünüyor (DRY iddiası
+  ölçülüyor, iddia edilmiyor).
+- **Dürüstlük DOM'da:** Type/System/Model çipi manifest'in gerçekten kaydettiği
+  değeri basıyor; Palette/Density yalnız HTML'in içinde yaşadığı için `—`
+  basıyor (ilk seçeneği "mevcut" göstermek uydurma olurdu).
+- **No-op koruması yüzeyde:** mevcut değere eşit satır **hiç sunulmuyor**
+  (`["deck","mobile","image","document","hyperframe"]` — `prototype` yok), yani
+  hiçbir şeyi değiştirmeyen metered tur yazılamıyor.
+- **Boş içerik ateşlenmiyor:** boş Apply `disabled`; dolu içerik **aynı** tek
+  tweak çağrısına iniyor ("Rewrite the copy … Fresh replacement copy").
+- **Kapalı katalog:** `/api/models` tek okuma stub'lanıp boşaltılınca Model
+  kontrolü `disabled` + `title="No model options loaded"`; diğer alanlar
+  etkilenmiyor (stub TEK uca bağlı).
+- **Maliyet sıfır — yapısal olarak, şansla değil.** Alan seçimi `model`
+  taşımadığı için kendi halinde **canlı default sağlayıcıyı** çözer ve bir
+  dakika gerçek token yakardı (ilk koşuda olan da bu: probe uçuş ortasında
+  ölçtü, iki yanlış kırmızı üretti). Prob sayfanın tuttuğu sha kilidini
+  **bayatlatıyor** → aynı tıklama model çağrısından ÖNCE gelen 409
+  `stale_version` ile düşüyor; reddediş panelde görünüyor, **sürüm
+  oluşmuyor**, `v1 · 1 version(s)` korunuyor. Yani gerçek sayfa yolu
+  (cümle kuruldu, POST atıldı, hata çizildi) hiçbir maliyetle sürüldü.
+- **Probun kendi hatası (ölçüldü):** ilk koşunun iki kırmızısı ürün değil
+  probdu — sabit `sleep(2500)` uçuş ortasını ölçüyordu (hata henüz çizilmemiş,
+  düğmeler hâlâ `busy`). Düzeltme: `waitSettled()` durumu bekler. İkinci
+  gerçek hata shim'de: `push(body)` **canlı referans** saklıyor, sonraki
+  `expectedSha` ataması yakalanan "sayfa gövdesi"ni de eziyordu → snapshot
+  önce alınıyor; "sayfa kendi sha'sını gönderdi" kontrolü ancak bundan sonra
+  anlamlı.
+- **proven-to-fail:** `design-page.tsx`'ten mevcut-değer filtresi kaldırıldı →
+  build (`index-DN4weiFv.js`) + restart + koşu → **yalnız E kontrolü**
+  kırmızı ("the current value is NOT offered"), diğer 43 yeşil. Dosya
+  **md5 birebir** geri alındı (`5f0fabba…`), bundle hash bilinen iyi değere
+  döndü (`index-oVvhZEDr.js`) ve koşu yeniden **44/44**.
+
+Kanıt: canlı **44/44** (`/tmp/lokma-req190/fields-summary.json`; `wire:
+tweak POSTs=2 generate POSTs=0`) · birim `design.test.ts` **115/115** · kök
+`bun x tsc --noEmit` **0** · steril web build `index-oVvhZEDr.js`, servis edilen
+== disk · 0 JS hatası · ekran `/tmp/probe-design-fields.png` · prob artifact'ı
+silindi + stays-gone · tokenless `/api/auth/me` **401** (kapı AÇIK kalmadı).
+
+Commitler: `2288a19` (sürüm defteri) · `edd453f` (tweak ucu) · `d021f73`
+(tweak + seçici arayüzü) · `52ddc44`+`e396328` (expectedSha ölçümü + prob) ·
+`468eb5e` (düzenlenebilir alan yüzeyleri) · `1c05c23` (canlı tarayıcı probu).
+
+**Kapsam notu (ölçülen düzeltme):** Kapsam §4'teki "`packages/lokma-shared`
+transcript/artifact şeması" maddesi **geçersizdi** — Design trafiği hiçbir
+zod validator'ından geçmiyor (design frame'i `protocol/ws.ts` birliğinde yok,
+`schemas/` altında design şeması yok, tüm trafik REST). Yeni alanlar için
+validator taşımak gerekmedi; ölçüm tur 5'te alındı.
+
+**Sıradaki REQ'ler:** REQ-191 (sistem kataloğu) → REQ-192 (tasarım skill
+seçimi) → REQ-193 (browser proxy/tunnel) → REQ-194 (settings fullscreen) →
+REQ-195 (sessions altındaki server kartı).

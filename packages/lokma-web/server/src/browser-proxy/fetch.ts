@@ -28,7 +28,13 @@
  *   and offers an external tab for login-gated pages.
  */
 
-import { assertProxyTarget, BrowserError, isPrivateHostLiteral, type ProxyTarget } from '@lokma/core';
+import {
+  assertProxyTarget,
+  BrowserError,
+  detectLoginWall,
+  isPrivateHostLiteral,
+  type ProxyTarget,
+} from '@lokma/core';
 import { proxyUrlFor, rewriteHtml, WS_PROXY_PATH } from './rewrite.js';
 
 /** Wall-clock cap for the whole upstream request including redirects. */
@@ -96,6 +102,13 @@ export type ProxyResponse = {
   rewritten: boolean;
   /** Number of redirects followed. */
   redirects: number;
+  /**
+   * REQ-193 slice 9 — whether this document is a login gate rather than the
+   * page the user asked for. Reported as DATA (never inferred from prose) so
+   * the pane can say so and offer an external tab instead of showing a login
+   * form that can never authenticate through the proxy's own origin.
+   */
+  loginWall: boolean;
 };
 
 function isHtml(contentType: string | null | undefined): boolean {
@@ -207,7 +220,11 @@ export async function fetchThroughProxy(
 
     if (!isHtml(res.headers.get('content-type'))) {
       const buf = new Uint8Array(await res.arrayBuffer());
-      return { finalUrl, status, headers, body: buf, rewritten: false, redirects };
+      // No document to inspect, so only the STATUS can speak here — an image
+      // endpoint that answers 401/403 is still a gate the pane should say so
+      // about, and a 200 binary body is never a login wall.
+      const loginWall = detectLoginWall({ status, finalUrl, redirects, html: null }).loginWall;
+      return { finalUrl, status, headers, body: buf, rewritten: false, redirects, loginWall };
     }
 
     const rawText = await res.text();
@@ -217,7 +234,11 @@ export async function fetchThroughProxy(
     // <base href> points at the proxy for THIS document so relative references
     // resolve through the proxy without us rewriting each one.
     const rewritten = rewriteHtml(rawText, finalUrl, { baseHref: proxyUrlFor(finalUrl) });
-    return { finalUrl, status, headers, body: rewritten, rewritten: true, redirects };
+    // Detection runs on the ORIGINAL text, never the rewritten document: the
+    // rewrite adds a <base> and proxy urls to every reference, which would make
+    // every path look non-empty and mask the very signal being looked for.
+    const loginWall = detectLoginWall({ status, finalUrl, redirects, html: rawText }).loginWall;
+    return { finalUrl, status, headers, body: rewritten, rewritten: true, redirects, loginWall };
   }
 }
 

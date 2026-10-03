@@ -22,7 +22,9 @@
  * - No cookie jar. The proxy has its own origin, so an `httponly` session
  *   cookie cannot be replayed upstream — shipping the pane's own `cookie`/
  *   `authorization` headers to an arbitrary target would be a credential leak,
- *   not a convenience. Login-gated pages get the external-tab hint in the pane.
+ *   not a convenience. A login-gated page is therefore REPORTED as one
+ *   (`x-lokma-login-wall`, slice 9) so the pane can say so and hand the user the
+ *   external tab, instead of rendering a login form that can never succeed.
  *
  * Auth: this path is under `/api/`, so the global login gate (REQ-076) already
  * covers it with no per-route code. The pane's iframe is same-origin with the
@@ -31,7 +33,7 @@
  */
 
 import type { FastifyInstance } from 'fastify';
-import { BrowserError } from '@lokma/core';
+import { BrowserError, LOGIN_WALL_HEADER } from '@lokma/core';
 import { fetchThroughProxy, resolveWsTarget } from './fetch.js';
 import { PROXY_PATH, WS_PROXY_PATH } from './rewrite.js';
 
@@ -64,6 +66,11 @@ export async function browserProxyRoutes(app: FastifyInstance): Promise<void> {
       // The final url is how the pane knows where a redirect chain landed.
       reply.header('x-lokma-proxy-url', result.finalUrl);
       if (result.redirects > 0) reply.header('x-lokma-proxy-redirects', String(result.redirects));
+      // REQ-193 slice 9 — the login-wall signal is a FIELD, and it is only set
+      // when it is true. A pane cannot tell "not a wall" from "header missing"
+      // if a false value is also written, and the absent key is what lets the
+      // client prove it never invents a gate for a page that rendered fine.
+      if (result.loginWall) reply.header(LOGIN_WALL_HEADER, '1');
 
       reply.status(result.status);
       if (typeof result.body === 'string') {

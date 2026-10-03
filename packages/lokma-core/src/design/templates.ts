@@ -28,12 +28,16 @@
  * - Ids come from the directory name (the jail), never from the request.
  */
 
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { cp, mkdir, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { dirname, join, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { expandHome } from '../utils/fs.js';
 import { DesignError, type DesignType } from './types.js';
-import { SYSTEM_ID_PATTERN } from './systems.js';
+import { assertInstallSource, systemIdFromSource, SYSTEM_ID_PATTERN } from './systems.js';
+
+const execFileAsync = promisify(execFile);
 
 /** Installed, machine-local template root (mirrors `~/.lokma/design/systems`). */
 export const DESIGN_TEMPLATES_DIR = '~/.lokma/design/templates';
@@ -141,6 +145,12 @@ export const TEMPLATE_MANIFEST_CAP = 64 * 1024;
 export const TEMPLATE_BODY_CAP = 256 * 1024;
 /** Accepted template id length — the directory pattern already bounds it. */
 const TEMPLATE_ID_CAP = 64;
+/**
+ * git clone timeout. Deliberately the same 60s budget as the system catalog's
+ * install: an install that hangs is worse than one that fails, and a template
+ * is the same size of repo as a system package.
+ */
+const CLONE_TIMEOUT_MS = 60_000;
 
 const TYPE_SET: readonly DesignType[] = [
   'prototype',
@@ -391,4 +401,85 @@ export async function resolveDesignTemplate(
     return { id: row.id, label: row.label, mode: row.mode, content };
   }
   throw new DesignError('template_not_found', `No design template '${id}' is installed`, 404);
+}
+
+/**
+ * REQ-192 slice 4 — install a template into `~/.lokma/design/templates/<id>/`.
+ *
+ * A local path is copied, an https URL is cloned shallowly. The package must
+ * carry a parseable `template.json` AND a readable `SKILL.md`, or the install
+ * ROLLS BACK: an unusable directory would list forever as a row whose body
+ * cannot reach the model, and the picker would then claim a template shaped an
+ * artifact that nothing was shaped by. An existing id is a 409, exactly like
+ * the system catalog — installed shadows bundled on purpose.
+ *
+ * The source guard and the id jail are REUSED (`assertInstallSource` +
+ * `systemIdFromSource`), never a second copy: a drifted SSRF predicate or a
+ * looser id regex here would be a new hole in the same feature.
+ */
+export async function installDesignTemplate(
+  rawSource: unknown,
+  rootOverride?: string,
+): Promise<{ id: string; mode: DesignType; label: string; files: string[]; source: string }> {
+  const src = assertInstallSource(rawSource);
+  const id = systemIdFromSource(
+    src.kind === 'url' ? new URL(src.url).pathname.replace(/\/+$/, '') : src.path,
+  );
+  const root = rootOf(rootOverride);
+  const target = join(root, id);
+  try {
+    const st = await stat(target);
+    if (st) throw new DesignError('template_exists', `Design template '${id}' is already installed`, 409);
+  } catch (e) {
+    if (e instanceof DesignError) throw e;
+    // Missing path — the install proceeds.
+  }
+  await mkdir(root, { recursive: true });
+  if (src.kind === 'path') {
+    let st;
+    try {
+      st = await stat(src.path);
+    } catch {
+      throw new DesignError('source_not_found', `No such template directory: ${src.path}`, 404);
+    }
+    if (!st.isDirectory()) {
+      throw new DesignError('bad_source', `Source is not a directory: ${src.path}`, 400);
+    }
+    try {
+      await cp(src.path, target, { recursive: true, force: false });
+    } catch (e) {
+      await rm(target, { recursive: true, force: true });
+      throw new DesignError('copy_failed', `Could not copy the template: ${(e as Error).message}`, 400);
+    }
+  } else {
+    try {
+      await execFileAsync('git', ['clone', '--depth', '1', src.url, target], {
+        timeout: CLONE_TIMEOUT_MS,
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+      });
+    } catch (e) {
+      await rm(target, { recursive: true, force: true });
+      const code = (e as NodeJS.ErrnoException)?.code;
+      if (code === 'ENOENT') {
+        throw new DesignError('git_missing', 'git is not installed on the server', 500);
+      }
+      throw new DesignError('clone_failed', `git clone failed (${typeof code === 'string' ? code : 'exit'}) — is the source a public repo?`, 400);
+    }
+  }
+  const row = await readTemplateDir(target, id, 'installed');
+  if (!row) {
+    await rm(target, { recursive: true, force: true });
+    throw new DesignError('no_manifest', 'The package has no template.json (not found)', 400);
+  }
+  if (!row.hasBody) {
+    await rm(target, { recursive: true, force: true });
+    throw new DesignError('no_manifest', `The package has no usable SKILL.md (${row.problem ?? 'unreadable'})`, 400);
+  }
+  return {
+    id: row.id,
+    mode: row.mode,
+    label: row.label,
+    files: ['template.json', 'SKILL.md'],
+    source: typeof rawSource === 'string' ? rawSource : '',
+  };
 }

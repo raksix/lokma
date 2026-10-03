@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   DESIGN_TEMPLATES_BUNDLED_DIR,
+  installDesignTemplate,
   listDesignTemplates,
   normalizeTemplateMode,
   parseTemplateManifest,
@@ -41,6 +42,26 @@ async function expectsDesign(
     await fn();
   } catch (e) {
     if (e instanceof DesignError && e.code === code && e.status === status) {
+      passed += 1;
+      console.log('PASS: ' + label);
+      return;
+    }
+    throw new Error('FAIL: ' + label + ' (got ' + (e instanceof Error ? e.name + ':' + e.message : String(e)) + ')');
+  }
+  throw new Error('FAIL: ' + label + ' (no error thrown)');
+}
+
+/**
+ * Message-level assertion (the same shape systems.test.ts uses): some refusals
+ * are about the WORDING a user reads ("no usable SKILL.md"), not about a code
+ * pair, and pinning the message keeps the honest explanation from being
+ * silently reworded into something vague.
+ */
+async function expectsMessage(label: string, fn: () => Promise<unknown>, re: RegExp): Promise<void> {
+  try {
+    await fn();
+  } catch (e) {
+    if (e instanceof DesignError && re.test(e.message)) {
       passed += 1;
       console.log('PASS: ' + label);
       return;
@@ -202,6 +223,75 @@ check(
   'the repo ships a real bundled pitch-deck template with a readable body',
   !(bundledPitch instanceof DesignError) && bundledPitch.content.includes('Pitch Deck'),
 );
+
+// ── 8. REQ-192 slice 4: the INSTALL surface ─────────────────────────────────
+// The catalog is only a catalog if something can put a package into it. The
+// install root is injected again (a second tmp dir) so the probe never writes
+// the real `~/.lokma/design/templates`.
+const inst = await mkdtemp(join(tmpdir(), 'lokma-tpl-install-'));
+const srcPkg = await mkdtemp(join(tmpdir(), 'lokma-tpl-src-'));
+
+await writeTemplate(srcPkg, 'quarterly-deck', {
+  id: 'quarterly-deck',
+  label: 'Quarterly Deck',
+  mode: 'deck',
+  description: 'A review-shaped deck.',
+}, '# Quarterly Deck\n\nHeadline, three proofs, one ask.\n');
+
+const installed = await installDesignTemplate(join(srcPkg, 'quarterly-deck'), inst);
+check('a local package installs', installed.id === 'quarterly-deck');
+check('the install reports the manifest mode', installed.mode === 'deck');
+check('the install reports the label it read', installed.label === 'Quarterly Deck');
+const listed = await listDesignTemplates(inst);
+check('the installed package appears in the catalog', listed.templates.some((t) => t.id === 'quarterly-deck'));
+check('an installed row says installed, not bundled', listed.templates.find((t) => t.id === 'quarterly-deck')?.origin === 'installed');
+const resolvedInstalled = await resolveDesignTemplate('quarterly-deck', inst);
+check('an installed body is resolvable by id', resolvedInstalled.content.includes('three proofs'));
+
+// Rollback: a package whose SKILL.md is missing would list as a row that can
+// never shape anything, so the install must refuse AND clean up after itself.
+await writeTemplate(srcPkg, 'bodyless', { id: 'bodyless', label: 'Bodyless', mode: 'deck' }, null);
+await expectsMessage(
+  'a package without a body is refused',
+  () => installDesignTemplate(join(srcPkg, 'bodyless'), inst),
+  /SKILL\.md/,
+);
+const afterBodyless = await listDesignTemplates(inst);
+check('a refused install leaves NO row behind', !afterBodyless.templates.some((t) => t.id === 'bodyless'));
+
+// Same for a manifest that does not read at all.
+await mkdir(join(srcPkg, 'garbage'), { recursive: true });
+await writeFile(join(srcPkg, 'garbage', 'template.json'), '{ "id": ', 'utf-8');
+await writeFile(join(srcPkg, 'garbage', 'SKILL.md'), '# body\n', 'utf-8');
+await expectsMessage(
+  'a broken manifest is refused',
+  () => installDesignTemplate(join(srcPkg, 'garbage'), inst),
+  /template\.json/,
+);
+check(
+  'a refused broken manifest leaves NO row behind',
+  !(await listDesignTemplates(inst)).templates.some((t) => t.id === 'garbage'),
+);
+
+// Idempotence / conflict: installed shadows bundled on purpose, so re-installing
+// the same id must refuse rather than silently overwrite.
+await expectsDesign('installing the same id twice is 409', () => installDesignTemplate(join(srcPkg, 'quarterly-deck'), inst), 'template_exists', 409);
+
+// Source guard: REUSED from the system catalog, never a second copy.
+await expectsDesign('a loopback URL never reaches git', () => installDesignTemplate('https://127.0.0.1/pkg', inst), 'bad_source', 400);
+await expectsDesign('a link-local URL never reaches git', () => installDesignTemplate('https://169.254.169.254/latest', inst), 'bad_source', 400);
+await expectsDesign('a plain http URL is refused', () => installDesignTemplate('http://example.com/pkg', inst), 'bad_source', 400);
+await expectsDesign('a credentialed URL is refused', () => installDesignTemplate('https://user:pw@example.com/pkg', inst), 'bad_source', 400);
+await expectsDesign('a traversal source is refused', () => installDesignTemplate('../escape', inst), 'bad_source', 400);
+await expectsDesign('an empty source is refused', () => installDesignTemplate('', inst), 'bad_source', 400);
+await expectsDesign('a missing source dir is 404', () => installDesignTemplate(join(srcPkg, 'nope'), inst), 'source_not_found', 404);
+
+// A file (not a dir) is not a package.
+await writeFile(join(srcPkg, 'a-file.json'), '{}', 'utf-8');
+await expectsMessage('a file source is refused', () => installDesignTemplate(join(srcPkg, 'a-file.json'), inst), /not a directory/);
+
+await rm(inst, { recursive: true, force: true });
+await rm(srcPkg, { recursive: true, force: true });
 
 await rm(base, { recursive: true, force: true });
 console.log('\nALL ' + passed + ' TEMPLATE-CATALOG PROBES PASSED');

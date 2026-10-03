@@ -22,6 +22,8 @@ Usage:
   lokma design system list         List installed design system packages
   lokma design system add <url|path>      Install a design system package
   lokma design system use <id> [--cwd <dir>]  Activate it in a project
+  lokma design template list       List installed design templates (output skeletons)
+  lokma design template add <url|path>     Install a design template
   lokma doctor                     Check config/creds/perms
   lokma agent list                 List agents (live registry)
   lokma --help | --version
@@ -191,7 +193,10 @@ for slash commands. Non-interactive shells require -p.
     // `lokma design system list` — the sub-verb lives behind BOTH `design` and
     // `system`, so drop `system` when it is there and hand the rest over.
     // Slicing a fixed offset instead would answer "Unknown subcommand: design
-    // system system" for the documented invocation.
+    // system system" for the documented invocation. `template` (REQ-192) is a
+    // SIBLING axis and is deliberately NOT dropped here: the CLI module
+    // dispatches on it, and stripping it would answer "design template
+    // template" — the same class of bug one line below.
     const rest = positionals.slice(1);
     await runDesignSystemCli(rest[0] === 'system' ? rest.slice(1) : rest, { cwd: values.cwd });
     return;

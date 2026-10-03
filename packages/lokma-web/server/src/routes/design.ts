@@ -10,6 +10,7 @@ import {
   generateArtifact,
   getArtifact,
   installDesignSystem,
+  installDesignTemplate,
   listArtifactVersions,
   listArtifacts,
   listDesignSkills,
@@ -91,6 +92,21 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
   // grows by dropping a directory in — there is no frozen table behind it.
   app.get('/api/design/templates', async () => {
     return { ok: true, ...(await listDesignTemplates()) };
+  });
+
+  // REQ-192 slice 4 — install a template. `POST /api/design/templates { source }`
+  // is the same contract as `POST /api/design/systems`: the SSRF guard, the id
+  // jail and the rollback live in core ONCE (`installDesignTemplate`), so this
+  // route adds no second copy of any of them.
+  app.post('/api/design/templates', async (req, reply) => {
+    const body = (req.body ?? {}) as { source?: unknown };
+    try {
+      const installed = await installDesignTemplate(body.source);
+      return reply.status(201).send({ ok: true, ...installed });
+    } catch (e) {
+      if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      throw e;
+    }
   });
 
   app.get('/api/design/list', async (req, reply) => {

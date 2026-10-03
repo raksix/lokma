@@ -5,18 +5,29 @@ import {
   Download,
   FolderKanban,
   Gauge,
+  History,
   LayoutTemplate,
   MoreHorizontal,
   Paintbrush,
   Palette,
   RefreshCw,
+  RotateCcw,
   Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
-import { DESIGN_SAMPLES, formatUpdated, projectLabel, scoreTone, type DesignExportFormat } from './design';
+import { SelectMenu, type SelectMenuOption } from '@/components/ui/select-menu';
+import {
+  DESIGN_SAMPLES,
+  DESIGN_TWEAK_NOTE_CAP,
+  formatUpdated,
+  projectLabel,
+  scoreTone,
+  versionLabel,
+  type DesignExportFormat,
+} from './design';
 import { DesignArtboards } from './design-artboards';
 import { DesignChat } from './design-chat';
 import { useDesignStudio, type DesignStudio } from './use-design-studio';
@@ -164,6 +175,141 @@ function CritiqueDrawer({ studio }: { studio: DesignStudio }) {
             </p>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * REQ-190 — the TWEAK + HISTORY drawer: the Figma-ish "edit what is on screen"
+ * surface. A short change sentence becomes the NEXT version of THIS artifact
+ * (same id, so the list never grows), and the ledger below it is the only way
+ * back: every entry is selectable and every non-current entry is revertible.
+ *
+ * The pre-REQ-190 state is honest — "No history yet" instead of a fabricated
+ * v1 — and a revert is refused client-side for the version currently shown, so
+ * the button can never spend a write on a no-op.
+ */
+function VersionsDrawer({ studio }: { studio: DesignStudio }) {
+  const s = studio;
+  const options: SelectMenuOption[] = s.versions.map((v) => ({
+    value: String(v.n),
+    label: versionLabel(v, s.currentVersion),
+  }));
+  const pick = options.find((o) => o.value === String(s.currentVersion)) ?? options[options.length - 1];
+  const picked = pick ? Number(pick.value) : 0;
+  const isCurrent = picked === s.currentVersion;
+  return (
+    <div
+      data-design-versions-panel
+      className="absolute inset-x-0 bottom-0 z-10 max-h-[55%] overflow-y-auto border-t border-line bg-white shadow-[0_-8px_24px_rgba(0,0,0,0.08)] dark:bg-[#1E1E21]"
+    >
+      <div className="flex items-center gap-2 px-3 pt-2">
+        <History className="h-3 w-3 text-terracotta" />
+        <span className="text-[11px] font-medium">Tweak</span>
+        <span className="hidden text-[10px] text-zinc-400 sm:inline">
+          becomes the next version of this design — nothing else changes
+        </span>
+        <button
+          data-design-panel-close
+          className="ml-auto rounded p-0.5 text-zinc-400 hover:bg-muted"
+          aria-label="Close versions panel"
+          onClick={() => s.toggleDrawer('versions')}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="space-y-2 p-3 pt-2">
+        <textarea
+          data-design-tweak-input
+          value={s.tweakNote}
+          onChange={(e) => s.setTweakNote(e.target.value)}
+          rows={2}
+          maxLength={DESIGN_TWEAK_NOTE_CAP}
+          placeholder="Make the primary button terracotta"
+          aria-label="Describe the change"
+          className="w-full rounded-md border border-line bg-white p-2 text-[11px] leading-4 focus:border-terracotta/30 focus:outline-none dark:bg-[#0F0F11]"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            data-design-tweak-run
+            size="sm"
+            className="h-7 gap-1 text-[11px]"
+            onClick={() => void s.runTweak()}
+            disabled={!s.selected || s.tweaking || !s.tweakNote.trim()}
+          >
+            <Sparkles className="h-3 w-3" /> {s.tweaking ? 'Tweaking…' : 'Tweak'}
+          </Button>
+          <span data-design-tweak-counter className="text-[10px] text-zinc-400">
+            {s.tweakNote.length}/{DESIGN_TWEAK_NOTE_CAP}
+          </span>
+        </div>
+        {s.tweakError ? (
+          <p data-design-tweak-error className="text-[11px] text-rose-600">
+            {s.tweakError}
+          </p>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-2 border-t border-line pt-2">
+          <span className="text-[11px] font-medium">History</span>
+          <span data-design-versions-count className="text-[10px] text-zinc-400">
+            {s.versions.length > 0 ? `v${s.currentVersion} · ${s.versions.length} version(s)` : 'No history yet'}
+          </span>
+          <div className="ml-auto flex items-center gap-1.5">
+            {s.versions.length > 0 ? (
+              <>
+                <SelectMenu
+                  ariaLabel="Select a version"
+                  size="xs"
+                  align="end"
+                  value={pick?.value ?? ''}
+                  onChange={(value) => {
+                    const n = Number(value);
+                    if (Number.isInteger(n) && n !== s.currentVersion) void s.runRevert(n);
+                  }}
+                  options={options}
+                  triggerClassName="w-[190px]"
+                  triggerAttrs={{ 'data-design-versions-picker': '' }}
+                />
+                <Button
+                  data-design-revert
+                  size="sm"
+                  variant="secondary"
+                  className="h-6 gap-1 px-2 text-[11px]"
+                  disabled={isCurrent || s.reverting !== null}
+                  onClick={() => void s.runRevert(picked)}
+                >
+                  <RotateCcw className="h-3 w-3" /> {s.reverting !== null ? 'Reverting…' : 'Go to version'}
+                </Button>
+              </>
+            ) : null}
+          </div>
+        </div>
+        {s.versionsError ? (
+          <p data-design-versions-error className="text-[11px] text-rose-600">
+            {s.versionsError}
+          </p>
+        ) : null}
+        {s.versionsLoading ? <p className="text-[10px] text-zinc-400">Loading history…</p> : null}
+        {s.versions.length > 0 ? (
+          <ol data-design-versions-list className="space-y-0.5">
+            {s.versions
+              .slice()
+              .reverse()
+              .map((v) => (
+                <li key={v.n} className="flex items-center gap-2 text-[10px] text-zinc-500 dark:text-zinc-400">
+                  <span className="w-9 shrink-0 font-medium text-zinc-600 dark:text-zinc-300">v{v.n}</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {v.note || v.origin}
+                    {v.model ? ` · ${v.model}` : ''}
+                  </span>
+                  <span className="shrink-0">{formatUpdated(v.createdAt)}</span>
+                  {v.n === s.currentVersion ? (
+                    <span className="shrink-0 rounded-full border border-line px-1 text-[9px]">current</span>
+                  ) : null}
+                </li>
+              ))}
+          </ol>
+        ) : null}
       </div>
     </div>
   );
@@ -326,6 +472,23 @@ export function DesignPage() {
                 </span>
               </Button>
               <Button
+                data-design-versions-toggle
+                variant={s.drawer === 'versions' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-6 gap-1 px-2 text-[11px]"
+                disabled={!s.selected}
+                onClick={() => s.toggleDrawer('versions')}
+              >
+                <History className="h-3 w-3" />
+                Versions
+                <span
+                  data-design-versions-badge
+                  className="rounded-full border border-line px-1 text-[10px] text-zinc-500 dark:text-zinc-400"
+                >
+                  {s.versions.length}
+                </span>
+              </Button>
+              <Button
                 data-design-code-toggle
                 variant={s.drawer === 'code' ? 'secondary' : 'ghost'}
                 size="sm"
@@ -416,6 +579,7 @@ export function DesignPage() {
             </div>
             {s.drawer === 'code' ? <CodeDrawer studio={s} /> : null}
             {s.drawer === 'critique' ? <CritiqueDrawer studio={s} /> : null}
+            {s.drawer === 'versions' ? <VersionsDrawer studio={s} /> : null}
           </div>
           </section>
           {s.artifactsPanel ? <DesignArtboards studio={s} panelRef={panelRef} /> : null}

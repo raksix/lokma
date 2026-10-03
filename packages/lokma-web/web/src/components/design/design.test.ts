@@ -14,10 +14,16 @@ import {
   scoreTone,
   toRow,
   validateGenerateForm,
+  validateTweakNote,
+  versionAfterRevert,
+  versionLabel,
+  canRevertTo,
+  DESIGN_TWEAK_NOTE_CAP,
   type DesignEvent,
   type GenerateForm,
   type NormalizedArtifact,
 } from './design';
+import type { DesignVersion } from '@/lib/api';
 import { parseDesignPageSnapshot } from './design-page-state';
 
 /**
@@ -212,6 +218,63 @@ const rows: NormalizedArtifact[] = [
       (s) => validateGenerateForm({ ...emptyGenerateForm, type: s.type, brief: s.brief }) === null,
     ),
   );
+}
+
+// REQ-190 — the version picker + tweak sentence helpers. The invariants here
+// are what keep the UI honest: no fabricated v1 for a pre-REQ-190 artifact, no
+// revert offered for the version already on screen, and a note length the
+// server will actually accept.
+{
+  const ledger: DesignVersion[] = [
+    { n: 1, sha: 'a'.repeat(64), bytes: 1200, createdAt: '2026-10-01T10:00:00.000Z', origin: 'generate', overall: 7 },
+    {
+      n: 2,
+      sha: 'b'.repeat(64),
+      bytes: 1260,
+      createdAt: '2026-10-02T11:00:00.000Z',
+      origin: 'tweak',
+      note: 'Make the primary button terracotta',
+      model: 'deepseek/deepseek-v4.1-flash',
+      overall: 8,
+    },
+    {
+      n: 3,
+      sha: 'c'.repeat(64),
+      bytes: 1190,
+      createdAt: '2026-10-03T09:00:00.000Z',
+      origin: 'revert',
+      note: 'reverted to v1',
+      overall: 7,
+    },
+  ];
+
+  check('tweak note: empty is refused', validateTweakNote('') !== null);
+  check('tweak note: whitespace-only is refused', validateTweakNote('   \n  ') !== null);
+  check('tweak note: a real sentence passes', validateTweakNote('Make the button terracotta') === null);
+  check('tweak note: at the cap passes', validateTweakNote('x'.repeat(DESIGN_TWEAK_NOTE_CAP)) === null);
+  check(
+    'tweak note: one char over the cap is refused',
+    validateTweakNote('x'.repeat(DESIGN_TWEAK_NOTE_CAP + 1)) !== null,
+  );
+  check('tweak cap is the server cap (400)', DESIGN_TWEAK_NOTE_CAP === 400);
+
+  check('version label names the index and origin', versionLabel(ledger[0], 1).startsWith('v1 \u00b7 generated'));
+  check('version label marks the current entry', versionLabel(ledger[2], 3).includes('current'));
+  check('version label carries the score when known', versionLabel(ledger[1], 3).includes('8/10'));
+  check(
+    'version label omits an absent score rather than printing null',
+    versionLabel({ ...ledger[0], overall: null }, 1) === 'v1 \u00b7 generated \u00b7 current',
+  );
+  check('a non-current entry is not marked current', !versionLabel(ledger[0], 3).includes('current'));
+
+  check('revert: the current version is not a valid target', canRevertTo(ledger, 3, 3) === false);
+  check('revert: an earlier version is a valid target', canRevertTo(ledger, 1, 3) === true);
+  check('revert: a version outside the ledger is refused', canRevertTo(ledger, 9, 3) === false);
+  check('revert: a non-integer is refused', canRevertTo(ledger, 1.5, 3) === false);
+  check('revert: an empty ledger has no targets', canRevertTo([], 1, 0) === false);
+
+  check('revert lands on the version AFTER the current one', versionAfterRevert(3, 1) === 4);
+  check('revert from v0 starts the ledger at v1', versionAfterRevert(0, 0) === 1);
 }
 
 console.log(`\nDESIGN PROBE: ${passed} passed, ${failed} failed`);

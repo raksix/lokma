@@ -617,11 +617,63 @@ export type DesignSummary = DesignManifest & { bytes: number; overall: number | 
 export type DesignsRes = { items: DesignSummary[]; count: number; project?: string | null; root?: string };
 export type CritiqueScore = { dim: string; score: number; fixes: string[] };
 export type CritiqueResult = { overall: number; scores: CritiqueScore[] };
-export type DesignDetailRes = { ok: boolean; id: string; manifest: DesignManifest; html: string; critique: CritiqueResult | null };
+export type DesignDetailRes = {
+  ok: boolean;
+  id: string;
+  manifest: DesignManifest;
+  html: string;
+  critique: CritiqueResult | null;
+  /** REQ-190 — sha256 of the loaded body; the tweak's optimistic lock. */
+  sha?: string;
+  /** REQ-190 — highest version index in the ledger (0 = no history yet). */
+  currentVersion?: number;
+};
 export type GenerateDesignBody = { type: string; brief: string; system?: string; model?: string; cwd?: string };
 export type GenerateDesignRes = { ok: boolean; id: string; manifest: DesignManifest; critique: CritiqueResult };
 export type SaveDesignRes = { ok: boolean; id: string; manifest: DesignManifest; critique: CritiqueResult };
 export type CritiqueDesignRes = { ok: boolean; id: string; critique: CritiqueResult };
+/**
+ * REQ-190 — one ledger entry. `n` is monotonic (v1 = the first body) and
+ * `origin` says what produced it, so the picker can label the history without
+ * guessing. A pre-REQ-190 artifact reports `versions: []` (honest, never a
+ * faked v1) and its first edit simply starts the ledger at v1.
+ */
+export type DesignVersion = {
+  n: number;
+  sha: string;
+  bytes: number;
+  createdAt: string;
+  origin: 'generate' | 'tweak' | 'edit' | 'revert';
+  note?: string;
+  model?: string;
+  overall: number | null;
+};
+export type DesignVersionsRes = {
+  ok: boolean;
+  id: string;
+  versions: DesignVersion[];
+  currentVersion: number;
+  sha: string;
+};
+export type DesignTweakBody = { note: string; model?: string; cwd?: string; expectedSha?: string };
+export type DesignTweakRes = {
+  ok: boolean;
+  id: string;
+  sha: string;
+  currentVersion: number;
+  /** Section numbers the model rewrote (`[]` in whole-document mode). */
+  replaced: number[];
+  note: string;
+  model: string;
+};
+export type DesignRevertRes = {
+  ok: boolean;
+  id: string;
+  manifest: DesignManifest;
+  critique: CritiqueResult;
+  currentVersion: number;
+  restoredFrom: number;
+};
 export type DesignSystemMeta = {
   id: string;
   name: string;
@@ -1419,6 +1471,32 @@ export const api = {
   /** Re-run the 5D heuristic critique over the stored HTML. */
   critiqueDesign: (id: string, cwd?: string) =>
     post<CritiqueDesignRes>(designCwdQuery(`/api/design/${encodeURIComponent(id)}/critique`, cwd), {}),
+  /**
+   * REQ-190 — the artifact's version history (oldest first) + which entry is
+   * current. A pre-REQ-190 artifact answers `versions: []` and
+   * `currentVersion: 0`, so the picker renders an honest empty state instead of
+   * inventing a v1.
+   */
+  getDesignVersions: (id: string, cwd?: string) =>
+    get<DesignVersionsRes>(designCwdQuery(`/api/design/${encodeURIComponent(id)}/versions`, cwd)),
+  /**
+   * REQ-190 — tweak the artifact in place: the result lands as the NEXT
+   * version of THIS id, so the artifact list never grows and the previous body
+   * stays recoverable. `expectedSha` is the optimistic lock (409
+   * `stale_version`) checked before the metered model call.
+   */
+  tweakDesign: (id: string, body: DesignTweakBody) =>
+    post<DesignTweakRes>(`/api/design/${encodeURIComponent(id)}/tweak`, body),
+  /**
+   * REQ-190 — go back to an earlier version. The server restores the archived
+   * body as a NEW current version (a `revert` entry), so nothing is destroyed
+   * and a redo is just another revert forward.
+   */
+  revertDesign: (id: string, version: number, cwd?: string) =>
+    post<DesignRevertRes>(designCwdQuery(`/api/design/${encodeURIComponent(id)}/revert`, cwd), {
+      version,
+      ...(cwd ? { cwd } : {}),
+    }),
   /** 4 bundled system cards (name/preset/tokens for the picker). */
   getDesignSystems: () => get<DesignSystemsRes>('/api/design/systems'),
   /** Real `.lokma/DESIGN.md` guard for the picked project (else the server cwd). */

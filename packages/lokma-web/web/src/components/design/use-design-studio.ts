@@ -1,5 +1,13 @@
 import * as React from 'react';
-import { api, type CritiqueResult, type DesignGuard, type DesignManifest, type DesignSystemMeta } from '@/lib/api';
+import {
+  ApiError,
+  api,
+  type CritiqueResult,
+  type DesignGuard,
+  type DesignManifest,
+  type DesignSystemMeta,
+  type DesignVersion,
+} from '@/lib/api';
 import { useProviderStore, useSessionStore } from '@/stores';
 import {
   DESIGN_TYPES,
@@ -10,6 +18,7 @@ import {
   projectLabel,
   toRow,
   validateGenerateForm,
+  validateTweakNote,
   type DesignEvent,
   type DesignExportFormat,
   type DesignSample,
@@ -53,7 +62,7 @@ function saveBlob(filename: string, blob: Blob): void {
 }
 
 /** Canvas drawer id — one overlay at a time over the viewer. */
-export type DesignDrawer = 'code' | 'critique';
+export type DesignDrawer = 'code' | 'critique' | 'versions';
 
 export type DesignStudio = {
   items: NormalizedArtifact[];
@@ -114,6 +123,27 @@ export type DesignStudio = {
   confirmDelete: string | null;
   deleting: boolean;
   runDelete: () => Promise<void>;
+  /**
+   * REQ-190 — the artifact's version ledger (oldest first) and which entry is
+   * current. `versions: []` is the honest state for a pre-REQ-190 artifact, so
+   * the picker renders "no history yet" instead of faking a v1.
+   */
+  versions: DesignVersion[];
+  currentVersion: number;
+  versionsLoading: boolean;
+  versionsError: string | null;
+  /**
+   * REQ-190 — the tweak sentence that lands as the NEXT version of THIS
+   * artifact (the list never grows; the old body stays recoverable).
+   */
+  tweakNote: string;
+  setTweakNote: (value: string) => void;
+  tweakError: string | null;
+  tweaking: boolean;
+  runTweak: () => Promise<void>;
+  /** Revert to an earlier ledger entry (the server appends it as a new current). */
+  reverting: number | null;
+  runRevert: (version: number) => Promise<void>;
 };
 
 export function useDesignStudio(): DesignStudio {
@@ -151,6 +181,15 @@ export function useDesignStudio(): DesignStudio {
   // Two-click delete arm (archify-pane pattern) + in-flight flag.
   const [confirmDelete, setConfirmDelete] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
+  // REQ-190 — version ledger + tweak sentence for the selected artifact.
+  const [versions, setVersions] = React.useState<DesignVersion[]>([]);
+  const [currentVersion, setCurrentVersion] = React.useState(0);
+  const [versionsLoading, setVersionsLoading] = React.useState(false);
+  const [versionsError, setVersionsError] = React.useState<string | null>(null);
+  const [tweakNote, setTweakNote] = React.useState('');
+  const [tweakError, setTweakError] = React.useState<string | null>(null);
+  const [tweaking, setTweaking] = React.useState(false);
+  const [reverting, setReverting] = React.useState<number | null>(null);
 
   // Narration sequence: ids only need to be unique within one visit.
   const eventSeq = React.useRef(0);
@@ -247,6 +286,38 @@ export function useDesignStudio(): DesignStudio {
   React.useEffect(() => {
     if (selected) void loadDetail(selected, projectCwd);
   }, [selected, projectCwd, loadDetail]);
+
+  // REQ-190 — the ledger rides alongside the detail load. Its own sequence
+  // guard: the detail and the history are separate requests and a slow history
+  // answer must never cancel the body (or vice versa), which is exactly what a
+  // shared counter did to the list/detail pair earlier.
+  const versionsRunRef = React.useRef(0);
+  const loadVersions = React.useCallback(async (id: string, cwd: string) => {
+    const run = (versionsRunRef.current += 1);
+    setVersionsLoading(true);
+    setVersionsError(null);
+    try {
+      const res = await api.getDesignVersions(id, cwd || undefined);
+      if (versionsRunRef.current !== run) return;
+      setVersions(res.versions);
+      setCurrentVersion(res.currentVersion);
+    } catch (e) {
+      if (versionsRunRef.current !== run) return;
+      setVersions([]);
+      setCurrentVersion(0);
+      setVersionsError(e instanceof Error ? e.message : 'version history failed');
+    } finally {
+      if (versionsRunRef.current === run) setVersionsLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (selected) void loadVersions(selected, projectCwd);
+    else {
+      setVersions([]);
+      setCurrentVersion(0);
+    }
+  }, [selected, projectCwd, loadVersions]);
 
   const runGenerate = React.useCallback(async () => {
     if (generatingRef.current) return;
@@ -387,6 +458,11 @@ export function useDesignStudio(): DesignStudio {
       setDetailError(null);
       setHtmlEdit('');
       setDrawer(null);
+      // REQ-190 — a deleted artifact's ledger must not linger in the picker.
+      setVersions([]);
+      setCurrentVersion(0);
+      setTweakNote('');
+      setTweakError(null);
       await loadList(projectCwd);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'delete failed';
@@ -400,6 +476,78 @@ export function useDesignStudio(): DesignStudio {
   const toggleDrawer = React.useCallback((next: DesignDrawer) => {
     setDrawer((current) => (current === next ? null : next));
   }, []);
+
+  // REQ-190 — tweak the artifact in place. The re-entry guard is a ref (the
+  // same reason generate has one): a double click behind a disabled button can
+  // still fire twice, and every call here costs a metered model run.
+  const tweakingRef = React.useRef(false);
+  const runTweak = React.useCallback(async () => {
+    if (!selected || tweakingRef.current) return;
+    const local = validateTweakNote(tweakNote);
+    if (local) {
+      setTweakError(local);
+      return;
+    }
+    tweakingRef.current = true;
+    setTweaking(true);
+    setTweakError(null);
+    try {
+      const res = await api.tweakDesign(selected, {
+        note: tweakNote.trim(),
+        ...(projectCwd ? { cwd: projectCwd } : {}),
+      });
+      pushEvent(
+        'ok',
+        `Tweaked ${selected} — v${res.currentVersion}${res.replaced.length > 0 ? ` · ${res.replaced.length} section(s)` : ''}`,
+      );
+      toast(`Tweaked — v${res.currentVersion}`);
+      // The composer empties only after the server accepted it, so a failed
+      // tweak leaves the user's sentence in place to retry.
+      setTweakNote('');
+      // Reload the body AND the ledger: the viewer iframe is keyed on the
+      // manifest's updatedAt, and the picker on the newest entry.
+      await loadDetail(selected, projectCwd);
+      await loadVersions(selected, projectCwd);
+      void loadList(projectCwd, selected);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'tweak failed';
+      setTweakError(message);
+      pushEvent('error', `Tweak failed — ${message}`);
+      toast(message);
+      // A 409 `stale_version` means the ledger moved under us — re-read it so
+      // the picker stops offering the version the user can no longer target.
+      if (e instanceof ApiError && e.status === 409) {
+        await loadVersions(selected, projectCwd);
+        await loadDetail(selected, projectCwd);
+      }
+    } finally {
+      tweakingRef.current = false;
+      setTweaking(false);
+    }
+  }, [selected, tweakNote, projectCwd, loadDetail, loadVersions, loadList, pushEvent]);
+
+  const runRevert = React.useCallback(
+    async (version: number) => {
+      if (!selected || reverting !== null) return;
+      setReverting(version);
+      try {
+        const res = await api.revertDesign(selected, version, projectCwd || undefined);
+        pushEvent('ok', `Reverted ${selected} to v${version} — now v${res.currentVersion}`);
+        toast(`Reverted to v${version} — now v${res.currentVersion}`);
+        setDetail({ manifest: res.manifest, critique: res.critique });
+        await loadDetail(selected, projectCwd);
+        await loadVersions(selected, projectCwd);
+        void loadList(projectCwd, selected);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'revert failed';
+        pushEvent('error', `Revert failed — ${message}`);
+        toast(message);
+      } finally {
+        setReverting(null);
+      }
+    },
+    [selected, reverting, projectCwd, loadDetail, loadVersions, loadList, pushEvent],
+  );
 
   // REQ-189 — the toggle is a functional update so the panel never depends on a
   // stale closure, and it is the ONLY writer: `selectArtifact` deliberately
@@ -420,6 +568,12 @@ export function useDesignStudio(): DesignStudio {
     setHtmlEdit('');
     setDrawer(null);
     setConfirmDelete(null);
+    // REQ-190 — the ledger belongs to the OLD root's artifact; carrying it over
+    // would label another project's design with this one's history.
+    setVersions([]);
+    setCurrentVersion(0);
+    setTweakNote('');
+    setTweakError(null);
   }, []);
 
   const reload = React.useCallback(() => {
@@ -479,5 +633,16 @@ export function useDesignStudio(): DesignStudio {
     confirmDelete,
     deleting,
     runDelete,
+    versions,
+    currentVersion,
+    versionsLoading,
+    versionsError,
+    tweakNote,
+    setTweakNote,
+    tweakError,
+    tweaking,
+    runTweak,
+    reverting,
+    runRevert,
   };
 }

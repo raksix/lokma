@@ -1,4 +1,4 @@
-import type { DesignManifest } from '@/lib/api';
+import type { DesignManifest, DesignVersion } from '@/lib/api';
 
 /**
  * Pure helpers behind the DesignPane (W5-18) — no React, no fetch, so the
@@ -179,6 +179,63 @@ export function projectLabel(cwd: string): string {
 /** Overall score label for the row badge (`8/10` or `—` when uncritiqued). */
 export function overallLabel(overall: number | null): string {
   return overall === null ? '—' : `${overall}/10`;
+}
+
+// ─── REQ-190 — version history (tweak in place, picker, revert) ───────────────
+
+/**
+ * REQ-190 — cap + sentence length for the tweak box, shared by the composer's
+ * counter and the server's own `assertTweakNote` so the UI cannot promise a
+ * note the server will reject. Kept in sync by `design.test.ts`.
+ */
+export const DESIGN_TWEAK_NOTE_CAP = 400;
+
+/** Validate a tweak sentence before spending a metered model call. */
+export function validateTweakNote(note: string): string | null {
+  if (!note.trim()) return 'Describe the change you want';
+  if (note.length > DESIGN_TWEAK_NOTE_CAP) return `Tweak too long (${DESIGN_TWEAK_NOTE_CAP} chars max)`;
+  return null;
+}
+
+/**
+ * REQ-190 — the option row for a version. The label names the origin and the
+ * score so the history is readable without opening anything, and the current
+ * entry is marked rather than silently selected.
+ */
+export function versionLabel(version: DesignVersion, currentVersion: number): string {
+  const origin = ORIGIN_LABEL[version.origin] ?? version.origin;
+  const head = `v${version.n} · ${origin}`;
+  const score = version.overall === null || version.overall === undefined ? '' : ` · ${version.overall}/10`;
+  return version.n === currentVersion ? `${head} · current${score}` : `${head}${score}`;
+}
+
+/** Human origin names for the picker (a new origin falls back to its raw name). */
+const ORIGIN_LABEL: Record<DesignVersion['origin'], string> = {
+  generate: 'generated',
+  tweak: 'tweak',
+  edit: 'edit',
+  revert: 'revert',
+};
+
+/**
+ * REQ-190 — is `n` the entry a revert should target? The current version is
+ * excluded (reverting to what you already see is a no-op that would still burn
+ * a write) and so is anything the ledger does not contain, so the UI can never
+ * send a version the server will 404.
+ */
+export function canRevertTo(versions: DesignVersion[], n: number, currentVersion: number): boolean {
+  if (!Number.isInteger(n) || n === currentVersion) return false;
+  return versions.some((v) => v.n === n);
+}
+
+/**
+ * REQ-190 — the version a revert lands on. The server appends the restored
+ * body as a NEW current entry, so the selector must advance to the version
+ * after the one being restored; a server that answered a smaller index is
+ * reported as-is rather than invented forward.
+ */
+export function versionAfterRevert(currentVersion: number, restoredFrom: number): number {
+  return Math.max(currentVersion + 1, 1);
 }
 
 /**

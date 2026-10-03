@@ -59,6 +59,15 @@ interface TunnelStateFile {
   startedAt: string | null;
   expiresAt: string | null;
   message: string;
+  /**
+   * The install/configure command for the attempt that produced this state.
+   *
+   * Measured in slice 8: without this field the panel asked for the command and
+   * `tunnelStatus()` answered with the status SENTENCE ("Tunnel is off — nothing
+   * is listening from outside.") — a diagnosis where a copyable command
+   * belongs, which is exactly what slice 7 removed from the error path.
+   */
+  installHint: string | null;
   pid: number | null;
 }
 
@@ -294,6 +303,7 @@ export async function readTunnelState(): Promise<TunnelStateFile> {
     startedAt: null,
     expiresAt: null,
     message: stoppedStatus().message,
+    installHint: null,
     pid: null,
   };
   const raw = await readJson<Record<string, unknown>>(
@@ -313,6 +323,9 @@ export async function readTunnelState(): Promise<TunnelStateFile> {
     startedAt: typeof raw['startedAt'] === 'string' ? raw['startedAt'] : null,
     expiresAt: typeof raw['expiresAt'] === 'string' ? raw['expiresAt'] : null,
     message: typeof raw['message'] === 'string' ? raw['message'] : empty.message,
+    // A state file written before slice 8 has no hint; null is the honest
+    // answer there (the next Start reports its own), not the message prose.
+    installHint: typeof raw['installHint'] === 'string' ? raw['installHint'] : null,
     pid: typeof raw['pid'] === 'number' ? raw['pid'] : null,
   };
 }
@@ -356,7 +369,10 @@ export async function tunnelStatus(): Promise<TunnelStatus> {
     startedAt: state.startedAt,
     expiresAt: state.expiresAt,
     message: state.message,
-    installHint: state.state === 'running' ? null : (state.message || stoppedStatus().message),
+    // The RECORDED hint for the last attempt, never the message: a field whose
+    // value is prose is a field a consumer has to parse, which is the bug slice
+    // 7's `TunnelError.installHint` was introduced to remove.
+    installHint: state.state === 'running' ? null : state.installHint,
   };
 }
 
@@ -404,6 +420,7 @@ export async function startTunnel(opts: StartOptions = {}): Promise<TunnelStatus
       startedAt: null,
       expiresAt: null,
       message: refusal,
+      installHint: plan.installHint,
       pid: null,
     });
     throw new TunnelError('provider_unavailable', refusal, 501, plan.installHint);
@@ -449,6 +466,9 @@ export async function startTunnel(opts: StartOptions = {}): Promise<TunnelStatus
       startedAt,
       expiresAt: null,
       message: reason,
+      // Spawning worked but no url was printed, so there is nothing to
+      // install — the honest hint is null, not the diagnosis sentence.
+      installHint: null,
       pid: null,
     });
     throw new TunnelError('no_url', reason, 502);
@@ -462,6 +482,7 @@ export async function startTunnel(opts: StartOptions = {}): Promise<TunnelStatus
     startedAt,
     expiresAt: null,
     message,
+    installHint: null,
     pid,
   });
   return {
@@ -506,6 +527,9 @@ export async function stopTunnel(opts: { silent?: boolean } = {}): Promise<Tunne
     startedAt: previous.startedAt,
     expiresAt: null,
     message: 'Tunnel stopped — the public url no longer resolves.',
+    // A stop is not a failed install, so the previous attempt's hint does not
+    // ride along; the next Start reports its own.
+    installHint: null,
     pid: null,
   });
   return tunnelStatus();

@@ -207,6 +207,42 @@ assert(
   'the error state explains itself instead of inventing a url',
 );
 
+// --- the recorded hint survives as DATA (slice 8) ------------------------------
+// Measured: the panel asked for the install command and `tunnelStatus()` handed
+// back the status SENTENCE ("Tunnel is off — nothing is listening from
+// outside.") — a field whose value is prose is a field every consumer has to
+// parse, which is the exact hole `TunnelError.installHint` was added to close.
+{
+  await expectTunnelError(
+    () =>
+      startTunnel({
+        port: 3456,
+        env: {},
+        binaryExists: async () => false,
+        spawnFn: (() => {
+          throw new Error('spawn must never be reached when no provider is available');
+        }) as never,
+      }),
+    'provider_unavailable',
+    'start refuses with provider_unavailable before it spawns anything',
+  );
+  const recorded = await tunnelStatus();
+  assert(recorded.state === 'error', 'the refusal is recorded as an error state');
+  assert(
+    recorded.installHint !== null && recorded.installHint.includes(TUNNEL_RELAY_URL_ENV),
+    'the recorded installHint names the env var to set (a command, not a diagnosis)',
+  );
+  assert(
+    recorded.installHint !== recorded.message,
+    'installHint is NOT the message — the two fields stay distinguishable',
+  );
+}
+
+// A stop is not a failed install, so it must not inherit the refusal's command.
+const afterStop = await stopTunnel();
+assert(afterStop.state === 'stopped', 'the explicit stop lands on stopped');
+assert(afterStop.installHint === null, 'a deliberate stop carries no install command');
+
 // ISOLATION CONTROL: the whole probe must have written into the temp dir. If the
 // env override were ignored, every assertion above would still pass while the
 // live install's tunnel.json got overwritten again.

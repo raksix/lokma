@@ -27,7 +27,7 @@ import {
   type User,
 } from '@lokma/core';
 import { decodeClientMessage, encodeServerMessage } from '@lokma/shared';
-import { LoopAborted, LOOP_DEFAULT_MAX_TURNS, buildLoopHistory, runAgentLoop, type ApprovalDecision } from '../agent-loop.js';
+import { LoopAborted, LOOP_DEFAULT_MAX_TURNS, buildLoopHistory, runAgentLoop, splitPromptRow, type ApprovalDecision } from '../agent-loop.js';
 import {
   CLAUDE_CLEAR_MARKER,
   CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD,
@@ -527,11 +527,18 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
       const ctrl = new AbortController();
       state.abort = ctrl;
       // History for model continuity (capped) + live permissions for the gate.
-      const [historyMessages, config] = await Promise.all([
+      const [readMessages, config] = await Promise.all([
         store.read(sessionId).catch(() => []),
         loadConfig(cwd).catch(() => null),
       ]);
-      const history = buildLoopHistory(historyMessages);
+      // The prompt handler appended THIS prompt as the newest transcript row
+      // (with its images/files) before enqueueing it, but the loop contract is
+      // `history` = PRIOR turns + `prompt` = the current one. Replaying that
+      // row shipped every prompt TWICE (measured on the wire with a capture
+      // stub, 2026-10-02) — drop it, and carry its images onto the prompt
+      // message so vision keeps working (REQ-186).
+      const { prior, promptRow } = splitPromptRow(readMessages, item.prompt);
+      const history = buildLoopHistory(prior);
       // REQ-147: `send_to_session` delivery — append the message to the
       // TARGET session's transcript + queue its run (the WS prompt path's
       // contract minus the socket), so a message aimed at a session whose
@@ -558,6 +565,7 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
           upstream,
           history,
           prompt: effectivePrompt,
+          promptImages: promptRow?.images,
           systemPreamble: botCtx?.systemPreamble || undefined,
           reasoningEffort: item.reasoningEffort,
           // REQ-136: the per-run tool-turn budget (config `loop.maxTurns`).

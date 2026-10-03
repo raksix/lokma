@@ -86,6 +86,13 @@ export type AgentLoopOpts = {
   history: ProviderMessage[];
   /** User prompt with `@file` context already prepended. */
   prompt: string;
+  /**
+   * REQ-186/dedupe: images attached to the CURRENT prompt. The pump drops
+   * the already-appended prompt row from `history` (replaying it would send
+   * every prompt twice — measured on the wire), so its images ride here on
+   * the prompt message instead of through a history row.
+   */
+  promptImages?: SessionImage[];
   permissions: Pick<Permissions, 'allow' | 'deny' | 'defaultMode'> | undefined | null;
   store: SessionStore;
   /**
@@ -249,6 +256,26 @@ const HISTORY_TOOL_TRUNC = 2_000;
  * prompt being answered always rides whole). ~4M chars ≈ 3 MB of images.
  */
 const HISTORY_IMAGE_CHAR_CAP = 4_000_000;
+
+/**
+ * Drop the transcript's trailing row when it IS the prompt about to run.
+ *
+ * The WS prompt handler appends the row (text + images + files) BEFORE
+ * enqueueing the turn, but the loop contract is `history` = PRIOR turns and
+ * `prompt` = the current one — replaying that row shipped every prompt
+ * twice (measured on the wire with a capture stub). The dropped row is
+ * returned so its images can ride the prompt message (REQ-186) and its
+ * files can be folded into the current-turn blocks (REQ-187).
+ * Pure — probe it directly.
+ */
+export function splitPromptRow(
+  messages: SessionMessage[],
+  prompt: string,
+): { prior: SessionMessage[]; promptRow: SessionMessage | null } {
+  const tail = messages[messages.length - 1];
+  const promptRow = tail && tail.role === 'user' && tail.content === prompt ? tail : null;
+  return { prior: promptRow ? messages.slice(0, -1) : messages, promptRow };
+}
 
 /** Cut `text` to `cap` chars, marking the cut so the model knows. */
 export function truncateHistoryText(text: string, cap: number): string {
@@ -535,7 +562,13 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
   const messages: ProviderMessage[] = [
     { role: 'system', content: system },
     ...opts.history,
-    { role: 'user', content: opts.prompt },
+    {
+      role: 'user',
+      content: opts.prompt,
+      // REQ-186/dedupe: the current prompt's images ride its own message
+      // (the pump dropped the duplicated prompt row from history).
+      ...(opts.promptImages?.length ? { images: opts.promptImages } : {}),
+    },
   ];
   let inputChars = system.length + opts.prompt.length + opts.history.reduce((n, m) => n + m.content.length, 0);
   let outputChars = 0;

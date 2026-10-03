@@ -4,7 +4,7 @@
  * No test framework — plain asserts so the package stays dependency-free.
  * Not imported by server code, so `tsc -p` output ignores it.
  */
-import { buildLoopHistory, decideTurnEnd, maxToolConcurrency, retryDelayMs, toolRowParts, truncateHistoryText } from './agent-loop';
+import { buildLoopHistory, decideTurnEnd, maxToolConcurrency, retryDelayMs, splitPromptRow, toolRowParts, truncateHistoryText } from './agent-loop';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -173,3 +173,30 @@ const bothSmall = buildLoopHistory([
 assert(bothSmall.filter((m) => m.images?.length).length === 2, 'both recent turns keep their images');
 
 console.log(`agent-loop-images probe: ${passed} passed`);
+
+/* dedupe — the answered prompt row leaves the replayed history. */
+// 8a. The trailing row that IS the prompt splits off (with its images, so
+// they can ride the prompt message; measured duplicate on the wire before).
+const dedupeImg = { name: 'shot.png', mime: 'image/png', dataBase64: 'QUJD' };
+const split = splitPromptRow(
+  [
+    msg('user', 'earlier'),
+    msg('assistant', 'ok'),
+    { role: 'user', content: 'NOW', timestamp: 't3', images: [dedupeImg] },
+  ],
+  'NOW',
+);
+assert(split.prior.length === 2, 'prior rows keep everything before the prompt');
+assert(split.promptRow?.content === 'NOW', 'the prompt row is handed back');
+assert(split.promptRow?.images?.length === 1, 'its images ride the prompt message (REQ-186)');
+
+// 8b. A tail that is NOT the prompt stays in history (e.g. a queued second
+// prompt appended while this one runs).
+const noSplit = splitPromptRow([msg('user', 'x'), msg('assistant', 'done')], 'x');
+assert(noSplit.promptRow === null && noSplit.prior.length === 2, 'a non-matching tail stays in history');
+
+// 8c. An empty transcript (CLI-style callers) is a no-op.
+const emptySplit = splitPromptRow([], 'hello');
+assert(emptySplit.promptRow === null && emptySplit.prior.length === 0, 'empty transcript is a no-op');
+
+console.log(`agent-loop-dedupe probe: ${passed} passed`);

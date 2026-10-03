@@ -85,3 +85,41 @@ Agent yamaları hazır; UI ve düzenlenebilir alan yüzeyleri sonraki turlarda.
 **Not — ölçüm disiplini:** `pm2 restart lokma-server` sırasında sunucu çöktü (`parse.ts` içinde kardeş oturumun REQ-196 dosyasında çift `ZW_RE` bildirimi). Bu **benim** alanım değildi; dosya o arada kendiliğinden düzeldi, core dist yeniden derlenip sunucu **online + /health 200** ile ayağa kalktı. Kardeşin `tools/parse.*` değişikliklerine **dokunulmadı** ve commitime **swept edilmedi** — işte HEAD'te kendi hunk'larıyla duruyorlar. Kardeşin kendi `parse.test.ts` probunda 1 assertion hâlâ kırmızı (`path is a clean filename`), o da benim REQ'im değil.
 
 **Kalan:** versiyon seçici/geri alma UI'ı (artboard) → düzenlenebilir alan yüzeyleri (type/system/model/token/density/content) → `packages/lokma-shared` transcript/artifact alanları → `scripts/probe-design-tweak-versions.cjs` (tarayıcı UA'sız, sadece REST sözleşmesi ölçen).
+
+### Tur 4/5 — tweak + sürüm seçici arayüzü (`d021f73`)
+
+Çekirdek defter (`2288a19`) ve tweak ucu (`edd453f`) üstüne arayüz yarısı.
+
+- **VersionsDrawer:** kısa değişiklik cümlesi + History seçici; Lucide `History`
+  araç çubuğu düğmesinde sürüm sayısı rozeti. Tweak **aynı** artifact id'sine
+  yeni sürüm olarak düşer → liste büyümez, eski gövde geri alınabilir.
+- `useDesignStudio` defteri kendi istek-sıra numarasıyla tutuyor — yavaş bir
+  history cevabı gövde yüklemesini iptal edemiyor (REQ-168'de liste/detay için
+  yaşanan tuzağın aynısı, tek sayaç burada da işe yaramazdı). `runTweak` gövde +
+  defter + listeyi yeniden okuyor; `runRevert` de öyle ve sunucunun yeni
+  manifest'ini detaya yansıtıyor. 409 `stale_version` ikisini de tazeler.
+- `runTweak` cümleyi ancak sunucu kabul ETTİKTEN SONRA temizliyor → başarısız
+  tweak'te metin yerinde kalıyor, tekrar denenebilir. Tekrar giriş koruması
+  **ref** (her çağrı metered model turu harcıyor).
+- Artifact silinince veya proje değişince defter + not + hata temizleniyor —
+  bayat defter başka projenin tasarımına bu artifact'in geçmişini etiketler.
+- Saf yardımcılar `design.ts`: `validateTweakNote` (metered çağrıdan ÖNCE boş
+  not reddi), `versionLabel` (mevcut girdi işaretli, puan varsa yazılı — `null`
+  yazılmıyor), `canRevertTo` (ledger'da olmayan sürüm + ekranda görünen sürüm
+  reddedilir → sunucunun 404'üne yol açan tıklama imkânsız), `versionAfterRevert`.
+- **Dürüst boş durum:** REQ-190 öncesi artifact `versions: []` + `currentVersion: 0`
+  döner → seçici uydurma v1 değil, "No history yet" çizer.
+
+Kanıt: `design.test.ts` **85/85** (63'ten; yeni blok 22 kontrol) · proven-to-fail:
+`canRevertTo`'ı yalnız indeks kontrolüne mutasyona uğratmak suite'i iki ledger
+assertion'ında kırmızıya düşürüyor, geri alma **md5 birebir** ve yeşil · kök
+`bun x tsc --noEmit` **0** · sterilize web build yeşil (`index-BnfA_NWQ.js`) ·
+`pm2 restart lokma-web` sonrası servis edilen bundle == disk, chunk'ta
+`data-design-versions-toggle` **1** kez, tokenless `/api/auth/me` **401** (kapı
+AÇIK kalmadı).
+
+**Kalan:** düzenlenebilir alan yüzeyleri (type/system/model/token/density/content)
+→ `packages/lokma-shared` transcript/artifact alanları (yeni alan zod validator'ı
+taşımak zorunda) → `scripts/probe-design-tweak-versions.cjs` (tarayıcı UA'sız,
+yalnız REST sözleşmesi ölçen; 409/stale + liste sayısı değişmez + revert
+dürüstlüğü).

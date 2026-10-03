@@ -8,7 +8,6 @@ import { enabledModels, groupByProvider } from '@/components/providers/models';
 import { emitToast } from '@/components/shell';
 import { cn } from '@/lib/utils';
 import {
-  DESIGN_SYSTEMS,
   DESIGN_TYPES,
   formatUpdated,
   overallLabel,
@@ -123,10 +122,25 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
     () => DESIGN_TYPES.map((t) => ({ value: t, label: t })),
     [],
   );
-  const systemOptions = React.useMemo<SelectMenuOption[]>(
-    () => DESIGN_SYSTEMS.map((system) => ({ value: system, label: system })),
-    [],
-  );
+  // REQ-191 — the System picker reads the INSTALLED CATALOG, grouped by the
+  // OpenDesign taxonomy (AI & LLM, Developer Tools, Fintech…) and searchable.
+  // The previous flat list came from the frozen `DESIGN_SYSTEMS` table, i.e.
+  // the user could never reach Stripe/Linear/Claude. Bundled preset rows are
+  // still offered when the catalog dir is empty, but they are LABELLED as
+  // presets rather than presented as a package.
+  const systemGroups = React.useMemo<SelectMenuGroup[]>(() => {
+    const byCategory = new Map<string, SelectMenuOption[]>();
+    for (const row of s.systems) {
+      const bucket = byCategory.get(row.category) ?? [];
+      bucket.push({
+        value: row.id,
+        label: row.origin === 'catalog' ? row.label : `${row.label} (preset)`,
+      });
+      byCategory.set(row.category, bucket);
+    }
+    return [...byCategory.entries()].map(([label, options]) => ({ label, options }));
+  }, [s.systems]);
+  const hasCatalog = s.systemsSource === 'catalog' && s.systems.length > 0;
   const modelOptions = React.useMemo<SelectMenuOption[]>(() => {
     const rows: SelectMenuOption[] = [{ value: '', label: 'Default (auto)' }];
     if (s.form.model && !modelInCatalog) {
@@ -230,7 +244,10 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
             label="System"
             value={s.form.system}
             onChange={(value) => s.setForm((f) => ({ ...f, system: value }))}
-            options={systemOptions}
+            groups={systemGroups}
+            searchable
+            searchPlaceholder="Search design systems"
+            menuClassName="max-h-[320px] min-w-[15rem]"
             triggerAttrs={{ 'data-design-composer-system': '' }}
           />
         </div>

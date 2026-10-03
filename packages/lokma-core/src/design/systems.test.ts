@@ -16,10 +16,12 @@ import { join } from 'node:path';
 import {
   SYSTEM_CATEGORIES,
   assertInstallSource,
+  buildBundledResolved,
   installDesignSystem,
   listDesignSystems,
   normalizeSystemCategory,
   parseSystemManifest,
+  resolveSystemTokens,
   systemIdFromSource,
   useDesignSystem,
 } from './systems.js';
@@ -300,6 +302,38 @@ await writeFile(join(sysRoot, '.git', 'manifest.json'), JSON.stringify({ id: 'gi
   const proj = join(home, 'p5');
   await mkdir(proj, { recursive: true });
   await expectsMessage('an invalid package cannot be activated', () => useDesignSystem('junk-pkg', proj, sysRoot), /not usable/);
+}
+
+// ── REQ-191 slice 2: the GENERATION resolver ─────────────────────────────────
+// This is the layer that makes a catalog row more than decoration: an
+// installed package's OWN tokens.css must reach the prompt, and an id we
+// know nothing about must NOT come back with a fabricated palette.
+{
+  await writePackage(
+    'tok',
+    { id: 'tok', name: 'Tok', category: 'Fintech' },
+    { 'tokens.css': ':root{--brand:#5b2bd9;--ink:#0b0b0f}' },
+  );
+  const bundled = await resolveSystemTokens('stripe-linear', sysRoot);
+  check('a bundled preset resolves from the table', bundled.origin === 'bundled' && bundled.hasTokens);
+  check('bundled tokens carry the real accent', bundled.tokens.includes('#635bff') || bundled.tokens.includes('accent'));
+  check('a bundled preset never touches disk', bundled.name === 'Stripe/Linear');
+
+  const pkg = await resolveSystemTokens('tok', sysRoot);
+  check('an installed package resolves from its own tokens.css', pkg.origin === 'catalog' && pkg.hasTokens);
+  check('the package token VALUE reaches the prompt block', pkg.tokens.includes('#5b2bd9'));
+  check('the package label comes from its manifest', pkg.name === 'Tok');
+
+  const unknown = await resolveSystemTokens('nope-not-here', sysRoot);
+  check('an unknown id resolves WITHOUT tokens', unknown.hasTokens === false && unknown.tokens === '');
+  check('an unknown id is still named, not invented', unknown.name === 'nope-not-here');
+
+  const traversal = await resolveSystemTokens('../../etc', sysRoot);
+  check('a traversal id is refused by the jail', traversal.hasTokens === false);
+
+  const syncOne = buildBundledResolved('omp-dark');
+  check('the sync resolver reaches the bundled table', syncOne.hasTokens && syncOne.origin === 'bundled');
+  check('the sync resolver cannot invent tokens', buildBundledResolved('tok').hasTokens === false);
 }
 
 await rm(base, { recursive: true, force: true });

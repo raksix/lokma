@@ -696,7 +696,40 @@ export type DesignSystemMeta = {
   line: string;
   font: string;
 };
-export type DesignSystemsRes = { ok: boolean; systems: DesignSystemMeta[] };
+/** REQ-191 — a catalog row. `origin` is the honesty channel: `bundled` rows
+ * are the built-in presets, never an installed package. */
+export type DesignSystemCatalogRow = {
+  id: string;
+  label: string;
+  category: string;
+  description: string;
+  origin: 'catalog' | 'bundled';
+  files: string[];
+  status: 'ok' | 'invalid';
+  problem?: string;
+};
+export type DesignSystemsRes = {
+  ok: boolean;
+  systems: DesignSystemCatalogRow[];
+  count: number;
+  /** `catalog` = read from disk, `bundled` = the fallback preset table. */
+  source: 'catalog' | 'bundled';
+  root: string;
+  categories: string[];
+};
+export type DesignSystemInstallRes = {
+  ok: boolean;
+  id: string;
+  files: string[];
+  source: string;
+};
+export type DesignSystemUseRes = {
+  ok: boolean;
+  id: string;
+  cwd: string;
+  copied: string[];
+  tokens: string | null;
+};
 export type DesignGuard = {
   cwd: string;
   present: boolean;
@@ -1512,6 +1545,11 @@ export const api = {
     }),
   /** 4 bundled system cards (name/preset/tokens for the picker). */
   getDesignSystems: () => get<DesignSystemsRes>('/api/design/systems'),
+  /** REQ-191 — install one package into the catalog (local path or https URL). */
+  installDesignSystem: (source: string) => post<DesignSystemInstallRes>('/api/design/systems', { source }),
+  /** REQ-191 — activate an installed system in the project `.lokma/`. */
+  useDesignSystem: (id: string, cwd?: string) =>
+    post<DesignSystemUseRes>(`/api/design/systems/${encodeURIComponent(id)}/use`, { cwd }),
   /** Real `.lokma/DESIGN.md` guard for the picked project (else the server cwd). */
   getDesignGuard: (cwd?: string) => get<DesignGuardRes>(designCwdQuery('/api/design/guard', cwd)),
   /** Stable viewer URL (sandboxed iframe, self-contained HTML, no CDN). */

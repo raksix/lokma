@@ -65,7 +65,10 @@ export function parseDesignPageSnapshot(raw: string | null | undefined): DesignP
     if (typeof form.type === 'string' && (DESIGN_TYPES as readonly string[]).includes(form.type)) {
       out.form.type = form.type;
     }
-    if (typeof form.system === 'string' && (DESIGN_SYSTEMS as readonly string[]).includes(form.system)) {
+    // REQ-191 — a persisted system may be a bundled preset OR an installed
+    // package id (the catalog is per-machine), so restore on shape, not on
+    // membership in the frozen table.
+    if (typeof form.system === 'string' && /^[a-z0-9][a-z0-9._-]{0,63}$/.test(form.system)) {
       out.form.system = form.system;
     }
     if (typeof form.brief === 'string' && form.brief.length <= 2000) {

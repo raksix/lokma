@@ -68,7 +68,19 @@ const rows: NormalizedArtifact[] = [
   check('bad type rejected', validateGenerateForm({ ...emptyGenerateForm, type: 'mermaid', brief: 'x' }) !== null);
   check('empty brief rejected', validateGenerateForm({ ...emptyGenerateForm, brief: '   ' }) !== null);
   check('long brief rejected', validateGenerateForm({ ...emptyGenerateForm, brief: 'x'.repeat(2001) }) !== null);
-  check('bad system rejected', validateGenerateForm({ ...emptyGenerateForm, brief: 'x', system: 'neon' }) !== null);
+  // REQ-191 — the client no longer owns catalog MEMBERSHIP (it cannot: the
+  // catalog is per-machine and loaded from disk), only the id SHAPE. So the
+  // probe asserts both halves of the new contract: a malformed id is still
+  // refused locally, while a well-formed id the client has never seen — a
+  // freshly installed package — is allowed through for the server to judge.
+  check(
+    'malformed system id rejected',
+    validateGenerateForm({ ...emptyGenerateForm, brief: 'x', system: 'Neon Bad/Id' }) !== null,
+  );
+  check(
+    'an unknown but well-formed catalog id passes the client',
+    validateGenerateForm({ ...emptyGenerateForm, brief: 'x', system: 'tok' }) === null,
+  );
   const form: GenerateForm = { ...emptyGenerateForm };
   check('empty form defaults', form.type === 'prototype' && form.system === 'stripe-linear' && form.model === '');
   check(
@@ -133,8 +145,12 @@ const rows: NormalizedArtifact[] = [
   );
   check('snapshot: restores the selected artifact', restored.selected === 'pricing-abc');
   check('snapshot: restores the brief form', restored.form.type === 'deck' && restored.form.system === 'paper-ink' && restored.form.brief === 'seed deck');
-  const foreign = parseDesignPageSnapshot(JSON.stringify({ selected: 'a', form: { type: 'nope', system: 'neon' } }));
-  check('snapshot: foreign type/system fall back to defaults', foreign.form.type === 'prototype' && foreign.form.system === 'stripe-linear');
+  // REQ-191 — the snapshot keeps a well-formed catalog id (the machine's own
+  // installed packages must survive a reload) but drops a MALFORMED one.
+  const foreign = parseDesignPageSnapshot(JSON.stringify({ selected: 'a', form: { type: 'nope', system: '../escape' } }));
+  check('snapshot: foreign type/malformed system fall back to defaults', foreign.form.type === 'prototype' && foreign.form.system === 'stripe-linear');
+  const catalog = parseDesignPageSnapshot(JSON.stringify({ form: { type: 'deck', system: 'tok', brief: 'seed' } }));
+  check('snapshot: an installed catalog id is restored', catalog.form.system === 'tok');
   check('snapshot: overlong brief dropped', parseDesignPageSnapshot(JSON.stringify({ form: { brief: 'x'.repeat(2001) } })).form.brief === '');
   check('snapshot: non-string selection dropped', parseDesignPageSnapshot(JSON.stringify({ selected: 42 })).selected === null);
   const restoredModel = parseDesignPageSnapshot(

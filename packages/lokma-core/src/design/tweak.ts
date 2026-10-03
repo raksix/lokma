@@ -28,11 +28,11 @@ import { extractHtmlDocument, OFFLINE_TEMPLATE_MODEL, resolveDesignModel } from 
 import { callDesignModel } from './model-call.js';
 import {
   DESIGN_HTML_CAP,
-  DESIGN_SYSTEM_META,
   DesignError,
   type DesignSystem,
   type DesignType,
 } from './types.js';
+import { buildBundledResolved, resolveSystemTokens, type ResolvedSystem } from './systems.js';
 
 /**
  * Prompt budget for the CURRENT document. Under this size the whole html
@@ -199,11 +199,13 @@ export function buildTweakPrompt(req: {
   note: string;
   system: DesignSystem;
   type: DesignType;
-}): string {
-  const meta = DESIGN_SYSTEM_META[req.system];
+}, resolved?: ResolvedSystem): string {
+  const sys = resolved ?? buildBundledResolved(req.system);
   const lines: string[] = [
     `Artifact type: ${req.type}`,
-    `Design system — ${meta.name} (${meta.id}). Tokens: bg ${meta.bg}, surface ${meta.surface}, ink ${meta.ink}, muted ${meta.muted}, accent ${meta.accent}, accent-soft ${meta.accentSoft}, line ${meta.line}.`,
+    sys.hasTokens
+      ? `Design system — ${sys.name} (${sys.id}). Tokens: ${sys.tokens.replace(/\n\s*/g, ' ')}`
+      : `Design system — ${sys.name} (${sys.id}). No bundled token table for this id — keep the document's existing colours.`,
     '',
     `Change request: ${req.note}`,
     '',
@@ -356,7 +358,12 @@ export async function runTweak(
   const plan = planTweakTargets(html, req.budget ?? DESIGN_TWEAK_PROMPT_CAP);
   const answer = await callDesignModel(model, [
     { role: 'system', content: DESIGN_TWEAK_SYSTEM_PROMPT },
-    { role: 'user', content: buildTweakPrompt({ plan, html, note, system, type }) },
+    {
+      role: 'user',
+      // REQ-191 — an ACTIVATED package's own tokens reach the patch call, so a
+      // tweak cannot quietly repaint an artifact away from its chosen system.
+      content: buildTweakPrompt({ plan, html, note, system, type }, await resolveSystemTokens(system)),
+    },
   ]);
 
   let nextHtml: string;

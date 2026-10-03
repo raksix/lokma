@@ -38,6 +38,10 @@ export type SelectMenuProps = {
   triggerClassName?: string;
   menuClassName?: string;
   triggerAttrs?: Record<string, string>;
+  /** REQ-191 — opt-in filter box above the rows (long catalogs). Off by default,
+   * so every existing caller's popup and keyboard flow is untouched. */
+  searchable?: boolean;
+  searchPlaceholder?: string;
 };
 
 type Entry =
@@ -58,18 +62,37 @@ export function SelectMenu({
   triggerClassName,
   menuClassName,
   triggerAttrs,
+  searchable = false,
+  searchPlaceholder = 'Search',
 }: SelectMenuProps) {
   const [open, setOpen] = React.useState(false);
   const [active, setActive] = React.useState(0);
+  const [query, setQuery] = React.useState('');
   const uid = React.useId();
   const listId = uid + '-listbox';
   const triggerId = uid + '-trigger';
   const listRef = React.useRef<HTMLDivElement>(null);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
 
+  // REQ-191 — the filter narrows BOTH the flat options and the group bodies,
+  // and an emptied group header disappears instead of printing an empty section.
+  const needle = query.trim().toLowerCase();
+  const matches = (option: SelectMenuOption) =>
+    needle === '' ||
+    option.label.toLowerCase().includes(needle) ||
+    option.value.toLowerCase().includes(needle);
+  const flatOptions = React.useMemo(() => options.filter(matches), [options, needle]);
+  const shownGroups = React.useMemo(
+    () =>
+      groups
+        .map((group) => ({ label: group.label, options: group.options.filter(matches) }))
+        .filter((group) => group.options.length > 0),
+    [groups, needle],
+  );
+
   const all = React.useMemo(
-    () => [...options, ...groups.flatMap((group) => group.options)],
-    [options, groups],
+    () => [...flatOptions, ...shownGroups.flatMap((group) => group.options)],
+    [flatOptions, shownGroups],
   );
   const selectedIndex = all.findIndex((option) => option.value === value);
   const selected = selectedIndex >= 0 ? all[selectedIndex] : undefined;
@@ -78,16 +101,17 @@ export function SelectMenu({
   const entries = React.useMemo(() => {
     const out: Entry[] = [];
     let index = 0;
-    for (const option of options) out.push({ kind: 'option', option, index: index++ });
-    for (const group of groups) {
+    for (const option of flatOptions) out.push({ kind: 'option', option, index: index++ });
+    for (const group of shownGroups) {
       out.push({ kind: 'header', label: group.label });
       for (const option of group.options) out.push({ kind: 'option', option, index: index++ });
     }
     return out;
-  }, [options, groups]);
+  }, [flatOptions, shownGroups]);
 
   const closeMenu = React.useCallback((refocus: boolean) => {
     setOpen(false);
+    setQuery('');
     if (refocus && typeof window !== 'undefined') {
       window.requestAnimationFrame(() => triggerRef.current?.focus());
     }
@@ -110,9 +134,21 @@ export function SelectMenu({
   );
 
   // The popup owns keyboard focus while open (standard listbox pattern).
+  const searchRef = React.useRef<HTMLInputElement>(null);
   React.useEffect(() => {
-    if (open) listRef.current?.focus();
-  }, [open]);
+    if (!open) return;
+    if (searchable) searchRef.current?.focus();
+    else listRef.current?.focus();
+  }, [open, searchable]);
+
+  // REQ-191 — a NEW filter starts at the top row; opening the menu must NOT be
+  // undone by this, so it keys on the needle changing, not on `open`.
+  const lastNeedle = React.useRef('');
+  React.useEffect(() => {
+    if (lastNeedle.current === needle) return;
+    lastNeedle.current = needle;
+    setActive(0);
+  }, [needle]);
 
   // Keep the highlighted row inside the scroll viewport.
   React.useEffect(() => {
@@ -205,6 +241,7 @@ export function SelectMenu({
             aria-label={ariaLabel ?? label ?? 'Options'}
             tabIndex={-1}
             data-select-menu
+            data-select-menu-open=""
             onKeyDown={onListKeyDown}
             className={cn(
               'absolute z-50 mt-1 max-h-[260px] w-full min-w-[11rem] overflow-y-auto rounded-xl border border-line bg-white p-0.5 shadow-2xl focus-visible:outline-none dark:border-[#2A2A2E] dark:bg-[#111113]',
@@ -212,6 +249,34 @@ export function SelectMenu({
               menuClassName,
             )}
           >
+            {searchable ? (
+              <div className="sticky top-0 z-10 bg-white px-1 pb-1 dark:bg-[#111113]">
+                <input
+                  ref={searchRef}
+                  type="text"
+                  data-select-search=""
+                  value={query}
+                  placeholder={searchPlaceholder}
+                  onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    // The box owns typing: Space/Enter must NOT commit a row.
+                    if (event.key === 'Escape') {
+                      event.preventDefault();
+                      closeMenu(true);
+                    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                      event.preventDefault();
+                      listRef.current?.focus();
+                    }
+                  }}
+                  className="h-6 w-full rounded-md border border-line bg-white px-1.5 text-[11px] text-ink placeholder:text-zinc-400 focus-visible:ring-2 focus-visible:ring-terracotta/50 focus-visible:outline-none dark:bg-[#0F0F11] dark:text-white dark:placeholder:text-zinc-500"
+                />
+              </div>
+            ) : null}
+            {entries.length === 0 ? (
+              <div className="px-2 py-3 text-center text-[11px] text-zinc-500 dark:text-zinc-400">
+                No matches
+              </div>
+            ) : null}
             {entries.map((entry) =>
               entry.kind === 'header' ? (
                 <div

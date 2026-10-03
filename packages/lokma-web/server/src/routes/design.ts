@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify';
 import {
-  DESIGN_SYSTEM_META,
   DesignError,
   appendArtifactVersion,
   critiqueArtifact,
@@ -10,12 +9,15 @@ import {
   exportArtifactWebm,
   generateArtifact,
   getArtifact,
+  installDesignSystem,
   listArtifactVersions,
   listArtifacts,
+  listDesignSystems,
   readDesignGuard,
   revertArtifact,
   runTweak,
   updateArtifactHtml,
+  useDesignSystem,
 } from '@lokma/core';
 import { expandPromptMentions } from '../utils/context-blocks.js';
 
@@ -26,7 +28,10 @@ import { expandPromptMentions } from '../utils/context-blocks.js';
  * configured default; critiqued before it touches disk);
  * `GET /api/design/list?cwd=` (newest first; REQ-178: scoped to a project
  * cwd when given, else the global `~/.lokma/design/artifacts` root);
- * `GET /api/design/systems` (4 bundled cards + project guard hint);
+ * `GET /api/design/systems` (the INSTALLED package catalog — reads
+ * `~/.lokma/design/systems/<id>/manifest.json`, labelled bundled when empty —
+ * plus taxonomy + `POST /api/design/systems { source }` to install one and
+ * `POST /api/design/systems/:id/use { cwd }` to activate it in the project);
  * `GET /api/design/guard?cwd=` (real `.lokma/DESIGN.md` parse, always 200);
  * `GET /api/design/:id` (manifest + HTML + last critique);
  * `PUT /api/design/:id { html }` (pane Code tab — validates, re-critiques);
@@ -75,8 +80,38 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
+  // ── REQ-191: the design-system CATALOG ─────────────────────────────────────
+  // `GET` reads the installed packages (`~/.lokma/design/systems/*/manifest.json`),
+  // not a frozen table; `source` says which one the caller is looking at so a
+  // bundled fallback is never presented as a catalog. `POST` installs one
+  // package (SSRF/zip guards live in core, once); `POST :id/use` activates it
+  // by copying DESIGN.md + tokens.css into the project `.lokma/` — the very
+  // files `GET /api/design/guard` already reads, so the choice is visible in
+  // generation without a second reader.
   app.get('/api/design/systems', async () => {
-    return { ok: true, systems: Object.values(DESIGN_SYSTEM_META) };
+    return { ok: true, ...(await listDesignSystems()) };
+  });
+
+  app.post('/api/design/systems', async (req, reply) => {
+    const body = (req.body ?? {}) as { source?: unknown };
+    try {
+      const installed = await installDesignSystem(body.source);
+      return reply.status(201).send({ ok: true, ...installed });
+    } catch (e) {
+      if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      throw e;
+    }
+  });
+
+  app.post('/api/design/systems/:id/use', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = (req.body ?? {}) as { cwd?: unknown };
+    try {
+      return { ok: true, ...(await useDesignSystem(id, body.cwd)) };
+    } catch (e) {
+      if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      throw e;
+    }
   });
 
   app.get('/api/design/guard', async (req, reply) => {

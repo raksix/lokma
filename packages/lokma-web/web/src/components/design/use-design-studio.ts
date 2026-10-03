@@ -5,7 +5,8 @@ import {
   type CritiqueResult,
   type DesignGuard,
   type DesignManifest,
-  type DesignSystemMeta,
+  type DesignSystemCatalogRow,
+  type DesignSystemsRes,
   type DesignVersion,
 } from '@/lib/api';
 import { useProviderStore, useSessionStore } from '@/stores';
@@ -103,9 +104,11 @@ export type DesignStudio = {
   runGenerate: () => Promise<void>;
   /** REQ-179 — a sample brief chip (canvas empty state) fills the composer. */
   applySample: (sample: DesignSample) => void;
-  systems: DesignSystemMeta[];
+  systems: DesignSystemCatalogRow[];
+  /** REQ-191 — `catalog` (read from disk) vs `bundled` (the fallback table). */
+  systemsSource: DesignSystemsRes['source'];
   guard: DesignGuard | null;
-  systemMeta: DesignSystemMeta | undefined;
+  systemMeta: DesignSystemCatalogRow | undefined;
   /** REQ-172 — session activity chips for the chat thread (newest last). */
   events: DesignEvent[];
   /** Which canvas drawer is open, if any. */
@@ -175,7 +178,10 @@ export function useDesignStudio(): DesignStudio {
   const [form, setForm] = React.useState<GenerateForm>(snapshot.form);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [generating, setGenerating] = React.useState(false);
-  const [systems, setSystems] = React.useState<DesignSystemMeta[]>([]);
+  const [systems, setSystems] = React.useState<DesignSystemCatalogRow[]>([]);
+  // REQ-191 — which list the picker is showing; a bundled fallback must not
+  // be rendered as if it were the installed catalog.
+  const [systemsSource, setSystemsSource] = React.useState<DesignSystemsRes['source']>('bundled');
   const [guard, setGuard] = React.useState<DesignGuard | null>(null);
   const [events, setEvents] = React.useState<DesignEvent[]>([]);
   const [drawer, setDrawer] = React.useState<DesignDrawer | null>(null);
@@ -245,8 +251,10 @@ export function useDesignStudio(): DesignStudio {
     try {
       const res = await api.getDesignSystems();
       setSystems(res.systems);
+      setSystemsSource(res.source);
     } catch {
       setSystems([]);
+      setSystemsSource('bundled');
     }
     try {
       const res = await api.getDesignGuard(cwd || undefined);
@@ -654,6 +662,7 @@ export function useDesignStudio(): DesignStudio {
     runGenerate,
     applySample,
     systems,
+    systemsSource,
     guard,
     systemMeta,
     events,

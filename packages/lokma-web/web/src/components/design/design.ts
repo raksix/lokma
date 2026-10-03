@@ -94,8 +94,13 @@ export function validateGenerateForm(form: GenerateForm): string | null {
   }
   if (!form.brief.trim()) return 'Describe the artifact first';
   if (form.brief.length > 2000) return 'Brief too long (2000 max)';
-  if (!(DESIGN_SYSTEMS as readonly string[]).includes(form.system)) {
-    return 'Pick one of the 4 design systems';
+  // REQ-191 — a system id is now EITHER a bundled preset or an installed
+  // package id, so membership in the frozen 4-table is no longer the rule
+  // (it would reject a catalog row the picker just offered). The server
+  // re-validates against the real catalog; here we only refuse a shape that
+  // could never be a system id.
+  if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(form.system)) {
+    return 'Pick a design system';
   }
   if (form.model && form.model.length > 200) return 'Model id too long (200 max)';
   return null;

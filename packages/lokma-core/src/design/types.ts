@@ -21,11 +21,17 @@ export const DESIGN_SYSTEMS = [
   'paper-ink',
   'minimal-geo',
 ] as const;
-export type DesignSystem = (typeof DESIGN_SYSTEMS)[number];
+/**
+ * REQ-191 — a system is a bundled preset id OR an installed package id, so the
+ * type is the plain string: a closed union here would make every catalog row
+ * inexpressible in the manifest. `DESIGN_SYSTEM_META` lookup is therefore always
+ * indexed behind a membership guard (see `designSystemMeta` in systems.ts).
+ */
+export type DesignSystem = string;
 
 /** Bundled system card — mirrors the concept picker's preset codes. */
 export type DesignSystemMeta = {
-  id: DesignSystem;
+  id: typeof DESIGN_SYSTEMS[number];
   name: string;
   preset: string;
   tokens: string;

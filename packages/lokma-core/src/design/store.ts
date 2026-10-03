@@ -5,6 +5,7 @@ import { ensureDir, expandHome, fileExists, writeAtomic } from '../utils/fs.js';
 import { buildStoredZip } from '../utils/zip.js';
 import { OFFLINE_TEMPLATE_MODEL, generateDesignHtml, resolveDesignModel } from './generate.js';
 import { buildArtifactHtml } from './render.js';
+import { SYSTEM_ID_PATTERN, resolveSystemTokens } from './systems.js';
 import {
   DESIGN_BRIEF_CAP,
   DESIGN_HTML_CAP,
@@ -144,9 +145,17 @@ function assertBrief(raw: unknown): string {
   return raw;
 }
 
-/** Unknown systems fall back to the default (pane validates strictly). */
+/**
+ * REQ-191 — a system is a bundled preset OR an installed package id, so this
+ * validates the SHAPE (the package jail's own id pattern) instead of membership
+ * in the 4-entry table. A malformed id still falls back to the default preset
+ * rather than reaching the prompt builder, so nothing downstream has to guard.
+ */
 function coerceSystem(raw: unknown): DesignSystem {
-  return DESIGN_SYSTEMS.includes(raw as DesignSystem) ? (raw as DesignSystem) : 'stripe-linear';
+  const text = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  if ((DESIGN_SYSTEMS as readonly string[]).includes(text)) return text;
+  if (SYSTEM_ID_PATTERN.test(text)) return text;
+  return 'stripe-linear';
 }
 
 function assertHtml(raw: unknown): string {
@@ -433,10 +442,15 @@ export async function generateArtifact(
   const id = `${slugify(brief).slice(0, 32) || 'design'}-${Date.now().toString(36)}`;
   assertArtifactId(id);
   const manifest: DesignManifest = { id, type, brief, system, model, project: cwd ?? undefined, createdAt: now, updatedAt: now };
+  // REQ-191 — the chosen system's tokens are resolved ONCE here and handed to
+  // the real model call, so a catalog package's `tokens.css` is what lands in
+  // the generated stylesheet (the acceptance criterion: the token/colour NAME
+  // shows up in the produced CSS).
+  const resolved = await resolveSystemTokens(system);
   const html =
     model === OFFLINE_TEMPLATE_MODEL
       ? buildArtifactHtml(type, brief, system)
-      : await generateDesignHtml({ type, brief, system, model });
+      : await generateDesignHtml({ type, brief, system, model }, resolved);
   const { manifest: stored, critique } = await persist(
     root,
     id,

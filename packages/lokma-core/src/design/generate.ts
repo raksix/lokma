@@ -21,11 +21,11 @@ import { callDesignModel, designErrorFromUpstream } from './model-call.js';
 export { DESIGN_GENERATION_TIMEOUT_MS, designErrorFromUpstream } from './model-call.js';
 import {
   DESIGN_HTML_CAP,
-  DESIGN_SYSTEM_META,
   DesignError,
   type DesignSystem,
   type DesignType,
 } from './types.js';
+import { buildBundledResolved, type ResolvedSystem } from './systems.js';
 
 /** Built-in fallback when neither the request nor the config names a model. */
 export const DEFAULT_DESIGN_MODEL = 'anthropic/claude-sonnet-4-5';
@@ -78,21 +78,31 @@ export type DesignModelRequest = {
   system: DesignSystem;
 };
 
-/** The user message the model receives — pure, unit-testable (REQ-177). */
-export function buildDesignPrompt(req: DesignModelRequest): string {
-  const meta = DESIGN_SYSTEM_META[req.system];
-  return [
+/**
+ * The user message the model receives — pure, unit-testable (REQ-177).
+ *
+ * REQ-191: `resolved` is optional and defaults to the bundled table, so the
+ * existing synchronous unit probes keep their exact prompt while the live path
+ * passes the ACTIVATED package's own `tokens.css` (that is how a catalog row
+ * reaches the generated HTML). With no tokens the prompt names the system and
+ * says the values come from the project DESIGN.md — it never prints
+ * `undefined` as a colour.
+ */
+export function buildDesignPrompt(req: DesignModelRequest, resolved?: ResolvedSystem): string {
+  const sys = resolved ?? buildBundledResolved(req.system);
+  const head = [
     `Artifact type: ${req.type}`,
     `Brief: ${req.brief}`,
     '',
-    `Design system — ${meta.name} (${meta.id}):`,
-    `- background ${meta.bg}, surface ${meta.surface}, ink ${meta.ink}, muted ${meta.muted}`,
-    `- accent ${meta.accent}, accent-soft ${meta.accentSoft}, line ${meta.line}`,
-    `- font stack: ${meta.font}`,
-    '',
-    'Use these exact token values in the stylesheet.',
-    TYPE_DIRECTIVES[req.type],
-  ].join('\n');
+    `Design system — ${sys.name} (${sys.id}):`,
+  ];
+  const tokenLines = sys.hasTokens
+    ? [sys.tokens, '', 'Use these exact token values in the stylesheet.']
+    : [
+        'No token table is bundled with this system id — read the values from the',
+        'project DESIGN.md if present, otherwise pick a coherent neutral palette yourself.',
+      ];
+  return [...head, ...tokenLines, '', TYPE_DIRECTIVES[req.type]].join('\n');
 }
 
 const HTML_START_RE = /<!doctype html|<html[\s>]/i;
@@ -158,13 +168,16 @@ export async function resolveDesignModel(modelRaw?: unknown, cwd?: string): Prom
  * return the extracted HTML document. Persistence (manifest, critique,
  * disk) stays in `store.ts` — this module only talks to the model.
  */
-export async function generateDesignHtml(req: DesignModelRequest & { model: string }): Promise<string> {
+export async function generateDesignHtml(
+  req: DesignModelRequest & { model: string },
+  resolved?: ResolvedSystem,
+): Promise<string> {
   // REQ-190 — the streaming transport now lives in `model-call.ts` so the
   // tweak patcher shares the SAME provider resolution, timeout and error
   // mapping. Nothing about generation's behaviour changes.
   const messages: ProviderMessage[] = [
     { role: 'system', content: DESIGN_MODEL_SYSTEM_PROMPT },
-    { role: 'user', content: buildDesignPrompt(req) },
+    { role: 'user', content: buildDesignPrompt(req, resolved) },
   ];
   const text = await callDesignModel(req.model, messages);
   return extractHtmlDocument(text);

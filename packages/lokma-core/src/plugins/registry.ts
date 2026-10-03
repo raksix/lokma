@@ -90,6 +90,8 @@ const BUNDLED_PLUGINS: BundledDef[] = [
       'POST /api/design/generate',
       'GET /api/design/list',
       'GET /api/design/systems',
+      'POST /api/design/systems',
+      'POST /api/design/systems/:id/use',
       'GET /api/design/guard',
       'GET /api/design/:id',
       'PUT /api/design/:id',

@@ -139,7 +139,11 @@ function buildHyperframe(brief: string, meta: DesignSystemMeta): string {
  * unknown types never reach here, `store.ts` validates first).
  */
 export function buildArtifactHtml(type: DesignType, brief: string, system: DesignSystem): string {
-  const meta = DESIGN_SYSTEM_META[system];
+  // REQ-191 — the offline template can only paint the BUNDLED presets (it has no
+  // token file to read and no model to ask). An unknown id falls back to the
+  // default preset rather than indexing the table with undefined, which used to
+  // be impossible only because `DesignSystem` was a closed union.
+  const meta = DESIGN_SYSTEM_META[system as keyof typeof DESIGN_SYSTEM_META] ?? DESIGN_SYSTEM_META['stripe-linear'];
   switch (type) {
     case 'prototype':
       return buildPrototype(brief, meta);

@@ -345,7 +345,10 @@ function TweakFieldStrip({ studio }: { studio: DesignStudio }) {
   const s = studio;
   const [open, setOpen] = React.useState<DesignTweakField | null>(null);
   const [content, setContent] = React.useState('');
-  const systemIds = React.useMemo(() => s.systems.map((x) => ({ id: x.id, name: x.name })), [s.systems]);
+  const systemIds = React.useMemo(
+    () => s.systems.map((x) => ({ id: x.id, name: x.label })),
+    [s.systems],
+  );
   // REQ-190 §3 — the model field reads the SAME catalog the composer's model
   // picker reads (enabled models from the provider store), never a second copy
   // of a model list.
@@ -570,7 +573,8 @@ export function DesignPage() {
           </span>
         ) : null}
         <span className="hidden text-[11px] text-zinc-400 sm:inline">
-          {s.items.length} artifacts · {s.systems.length > 0 ? s.systems.length : 4} systems
+          {s.items.length} artifacts · {s.systems.length}{' '}
+          {s.systemsSource === 'catalog' ? 'installed systems' : 'preset systems'}
         </span>
         <span className="ml-auto flex items-center gap-1.5">
           {s.detail?.critique ? (

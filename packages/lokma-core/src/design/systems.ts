@@ -33,6 +33,7 @@ import { promisify } from 'node:util';
 import { expandHome } from '../utils/fs.js';
 import {
   DESIGN_SYSTEM_META,
+  DESIGN_SYSTEMS,
   DesignError,
   type DesignSystem,
   type DesignSystemMeta,
@@ -56,7 +57,12 @@ export const SYSTEM_SOURCE_CAP = 500;
 const CLONE_TIMEOUT_MS = 60_000;
 
 /** Directory id charset — also the filename jail for install and activate. */
-const SYSTEM_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+/**
+ * The package id jail. Exported because `store.ts` needs the SAME rule to
+ * accept a catalog id in a generate request — two copies would drift, and a
+ * drifted jail is a path-escape hole.
+ */
+export const SYSTEM_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 
 /** Taxonomy headings from the OpenDesign catalog README (Docs/34 §5). */
 export const SYSTEM_CATEGORIES = [
@@ -504,4 +510,104 @@ export async function useDesignSystem(
     throw new DesignError('system_incomplete', `Design system '${id}' carries neither DESIGN.md nor tokens.css`, 400);
   }
   return { id, cwd, copied, tokens };
+}
+
+// ── REQ-191: the one place a system id becomes usable tokens ─────────────────────
+
+/** A system resolved for generation: the token block the prompt quotes. */
+export type ResolvedSystem = {
+  id: string;
+  name: string;
+  origin: 'bundled' | 'catalog';
+  /** Verbatim token values for the prompt; empty when nothing is known. */
+  tokens: string;
+  /** True when `tokens` came from a real package file (bundled: the table). */
+  hasTokens: boolean;
+};
+
+/**
+ * REQ-191 — the single reader for a system id at GENERATION time.
+ *
+ * Before this slice `generate.ts` / `tweak.ts` / `render.ts` each did
+ * `DESIGN_SYSTEM_META[req.system]`, which typechecked only because `DesignSystem`
+ * was a closed union. That union had to open for catalog ids, and an
+ * unbracketed index into a 4-entry record silently yields `undefined` — the
+ * prompt would print `undefined` as the background colour. So the lookup lives
+ * here, behind a membership guard, and handles three honest cases:
+ *
+ * 1. a bundled preset → the table (same values as before),
+ * 2. an installed package → its own `tokens.css` (why a catalog row is not
+ *    decoration: THIS is where it lands in the generated HTML),
+ * 3. anything else → `hasTokens: false`, never a fake colour. The caller then
+ *    states the system by name instead of quoting numbers it does not have.
+ */
+
+/**
+ * REQ-191 — the SYNCHRONOUS half of the resolver, for the pure prompt
+ * builders (`buildDesignPrompt` / `buildTweakPrompt` / `buildArtifactHtml`),
+ * which must stay sync for their unit probes. It can only reach the bundled
+ * table — a package's `tokens.css` is disk I/O, so the async
+ * `resolveSystemTokens()` is what the live paths use. An unknown id resolves
+ * with `hasTokens: false` rather than a fabricated palette.
+ */
+export function buildBundledResolved(id: unknown): ResolvedSystem {
+  const text = typeof id === 'string' ? id.trim().toLowerCase() : '';
+  if ((DESIGN_SYSTEMS as readonly string[]).includes(text)) {
+    const meta = DESIGN_SYSTEM_META[text as DesignSystem];
+    return {
+      id: text,
+      name: meta.name,
+      origin: 'bundled',
+      hasTokens: true,
+      tokens: [
+        `- background ${meta.bg}, surface ${meta.surface}, ink ${meta.ink}, muted ${meta.muted}`,
+        `- accent ${meta.accent}, accent-soft ${meta.accentSoft}, line ${meta.line}`,
+        `- font stack: ${meta.font}`,
+      ].join('\n'),
+    };
+  }
+  return { id: text, name: text || 'default', origin: 'bundled', hasTokens: false, tokens: '' };
+}
+
+export async function resolveSystemTokens(
+  id: unknown,
+  rootOverride?: string,
+): Promise<ResolvedSystem> {
+  const text = typeof id === 'string' ? id.trim().toLowerCase() : '';
+  if ((DESIGN_SYSTEMS as readonly string[]).includes(text)) {
+    const meta = DESIGN_SYSTEM_META[text as DesignSystem];
+    return {
+      id: text,
+      name: meta.name,
+      origin: 'bundled',
+      hasTokens: true,
+      tokens: [
+        `- background ${meta.bg}, surface ${meta.surface}, ink ${meta.ink}, muted ${meta.muted}`,
+        `- accent ${meta.accent}, accent-soft ${meta.accentSoft}, line ${meta.line}`,
+        `- font stack: ${meta.font}`,
+      ].join('\n'),
+    };
+  }
+  if (SYSTEM_ID_PATTERN.test(text)) {
+    const pkgDir = resolvePath(join(rootOf(rootOverride), text));
+    try {
+      const st = await stat(join(pkgDir, 'tokens.css'));
+      if (st.isFile() && st.size <= SYSTEM_ASSET_CAP) {
+        const tokens = (await readFile(join(pkgDir, 'tokens.css'), 'utf-8')).trim();
+        if (tokens) {
+          const row = await readPackage(pkgDir, text);
+          return {
+            id: text,
+            name: row?.label ?? text,
+            origin: 'catalog',
+            hasTokens: true,
+            tokens,
+          };
+        }
+      }
+    } catch {
+      // No token file — fall through to the honest "name only" answer.
+    }
+  }
+  return { id: text, name: text || 'default', origin: 'bundled', hasTokens: false, tokens: '' };
 }

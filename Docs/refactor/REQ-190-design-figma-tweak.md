@@ -176,3 +176,41 @@ maddenin doğru karşılığı aşağıda.
 
 **Kalan:** §3 düzenlenebilir alan yüzeyleri (type/system/model/token/density/content)
 → sonra yakma + kapanış.
+
+### Tur 6/10 — §3 düzenlenebilir alan yüzeyleri (`468eb5e`)
+
+Altı alan, **her biri için tek kontrol**: type · system · palette · density ·
+model · content. Serbest metinli tweak kutusu **duruyor**; alan seçimi yeni bir
+yazma yolu açmıyor, aynı cümleyi üretip **aynı metered çağrıyı** tetikliyor.
+
+- **Tek uygulama (DRY):** `runTweakNote(note)` artık TEK metered yazma yolu;
+  `runTweak` ona devrediyor. Alan seçimi ile serbest metin kutusu iki ayrı
+  tweak implementasyonu değil — aynı yeniden-giriş korumasını paylaşıyorlar.
+- **Canlı katalog, ikinci liste yok:** system seçenekleri `GET /api/design/systems`'ten,
+  model seçenekleri kompozitörün kullandığı `enabledModels(useProviderStore(...))`
+  kataloğundan geliyor (aynı `models.ts` yardımcısı). REQ-191 bu listeyi
+  değiştirdiğinde alan yüzeyi kendiliğinden yeni kataloğu gösterir.
+- **Dürüstlük (ölçülen sınır):** manifest yalnız `type`/`system`/`model`
+  kaydediyor. `palette`/`density`/`content` sadece HTML'in içinde yaşıyor, bu
+  yüzden `fieldCurrentValue` onlar için **`null` döner** ve çip `—` basar —
+  ilk seçeneği "mevcut" diye göstermek uydurma olurdu. Manifest yoksa da `null`.
+- **No-op metered çağrı yok:** `buildFieldTweakNote` boş değerde **ve** mevcut
+  değere eşit seçimde `null` döner → düğme pasif kalır, hiçbir model turu yanmaz.
+- **Kapalı katalog dürüstlüğü:** sistem/model listesi boşsa kontrol **pasif**
+  (`title` ile sebebi yazılı) — boş bir açılır menü değil.
+- `content` alanı `text` türünde (serbest metin bloğu), diğer beşi `select`.
+  Alan şeridi `data-design-field-strip` + `data-design-field-toggle/apply`
+  kancalarını taşıyor (canlı prob için).
+
+Kanıt: `design.test.ts` **115/115** (85'ten, 30 yeni kontrol: 6 alan, katalog
+ kaynaklı seçenekler, `null` dürüstlüğü ×6, no-op ×3, tüm üretilen notların
+paylaşılan 400 karakter tavanına sığması). **proven-to-fail:** no-op koruması
+kaldırılınca iki assertion kırmızıya düşüyor (113 passed / 2 failed) ve dosya
+**md5 birebir** geri alınıyor. Kök `bun x tsc --noEmit` **0** · sterilize web
+build yeşil (`index-oVvhZEDr.js`) · `pm2 restart lokma-web` sonrası servis
+edilen bundle == disk, chunk'ta `data-design-field-strip` **1** kez,
+`runTweakNote` **1** kez · tokenless `/api/auth/me` **401** (kapı AÇIK kalmadı).
+
+**Kalan:** canlı tarayıcı probu (`scripts/probe-design-fields.cjs` — alan
+seçiminin tek tweak çağrısına indirdiğini, kapı kapatıldığında uygulama
+kalkmadığını ve **kapı AÇIK kalmadığını** ölçen) → yakma + kapanış.

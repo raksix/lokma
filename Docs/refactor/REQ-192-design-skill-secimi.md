@@ -1,6 +1,6 @@
 # REQ-192 — Tasarım skill'leri seçilebilsin (Design Studio'ya skill yüzeyi)
 
-**Status:** pending
+**Status:** in-progress
 **Tarih:** 2026-10-02
 **Kaynak:** Kullanıcı mesajı (2 Ekim 2026):
 > "+ tasarım skilleri falan ya da design branding falan seçeiblsin opendesgin de var onalrı yap"
@@ -46,6 +46,41 @@
 1. Kontroller PASS + prob + ekran görüntüsü.
 2. Atomik İngilizce commit(ler) + push.
 3. Dosya: `Status: done` + hash'ler; `git mv` → `finished/`; README index + `Docs/00`.
+
+## Dilim durumu (ilgilendirme sırası: yetenek → yüzey → katalog)
+
+**Dilim 1 — YETENEK (bitti, `7ea0c4c` · `f32d125` · `604cf1b` · `f49b8ee` · `1b142b8`)**
+
+1. `SkillSchema`'ya isteğe bağlı `scope` + `group`; `parseFrontmatter` ikisini de
+   okur (`registry.ts` iki push noktası da iletir). Alanlar opsiyonel: scope'suz
+   skill eskisi gibi çalışır.
+2. `packages/lokma-core/src/design/skills.ts` — **ikinci katalog**, `systems.ts`'in
+   yanında: `listDesignSkills()` (gerçek registry taraması, YALNIZ `scope: design`,
+   gruplu + taksonomi sıralı, `unscoped`/`invalid` sayaçlarıyla), `parseSkillSelection()`
+   (tip hataları sessizce düşmez), `resolveDesignSkills()` (id → **SKILL.md gövdesi**;
+   bilinmeyen 404 / scope'suz 400 / okunamayan 409).
+3. `buildDesignSkillsPrompt()` — `<design_skills>` bloğu token tablosu ile
+   tip direktifi arasında, gövdelerle; skill başına + toplam karakter bütçesi ve
+   görünür `[truncated: …]` işareti. Seçim yoksa prompt bayt bayt eskisi gibi.
+4. `generateArtifact(…, skillsRaw)` önce çözer, `manifest.skills` (id + `sentChars`)
+   dürüstlük kanalı olarak yazılır; REST `POST /api/design/generate` `skills` alır,
+   `GET /api/design/skills` katalogu döner, `design_generate` aracı aynı alanı alıp
+   modele **gerçekten giden** skill'leri raporlar.
+5. `skills/design-*/` altında **6 scope'lu skill** (brutalist-web, editorial-serif,
+   product-hierarchy, data-dense-dashboard, accessibility-basics, brand-voice) —
+   katalog aksi halde boş bir katalog olurdu.
+
+**Ölçülen:** birim 44/44 (`skills.test.ts`) · mevcut design probları 24/111/27/53
+regresyonsuz · kök `tsc --noEmit` 0 · `@lokma/shared` → `@lokma/core` → `lokma-server`
+build yeşil · canlı `/api/design/skills` 6 skill gruplu, 7 scope'suz elendi ·
+canlı hata yolları `skill_not_found` 404 / `skill_not_design` 400 / `bad_skills` 400 ·
+token'siz `/api/design/skills` **401** (login gate AÇIK kaldı).
+
+**Sıradaki dilimler:** (2) yüzey — composer'da gruplu/aramalı/çoklu seçim `SelectMenu` +
+Reset + önizleme paneli + `skills[]` gönderimi; (3) ayrı **şablon** ekseni
+(`GET /api/design/templates`); (4) `lokma design skill add` kurulum ucu; (5) metadata'da
+"uygulandı/uygulanmadı" satırı; (6) canlı tarayıcı probu
+`scripts/probe-design-skills-picker.cjs`.
 
 ## Notlar
 

@@ -2,8 +2,10 @@ import * as React from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SelectMenu, type SelectMenuGroup, type SelectMenuOption } from '@/components/ui/select-menu';
+import { COMPOSER_ENTER_HINT, COMPOSER_SHELL_CLASS, ComposerInput } from '@/components/chat/composer-input';
 import { useProviderStore, useSessionStore } from '@/stores';
 import { enabledModels, groupByProvider } from '@/components/providers/models';
+import { emitToast } from '@/components/shell';
 import { cn } from '@/lib/utils';
 import {
   DESIGN_SYSTEMS,
@@ -14,6 +16,7 @@ import {
   type DesignEvent,
   type NormalizedArtifact,
 } from './design';
+import { DESIGN_SLASH_COMMANDS, applyDesignSlash } from './design-slash';
 import type { DesignStudio } from './use-design-studio';
 
 /**
@@ -201,7 +204,7 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
       <div data-design-composer className="shrink-0 border-t border-line bg-[#FDFCFB] p-3 dark:bg-[#1E1E21]">
         <div className="mb-2 flex items-baseline justify-between gap-2">
           <p className="font-serif text-[13px] text-ink dark:text-white">New artifact</p>
-          <span className={cn('text-[10px]', META_CLASS)}>⌘/Ctrl + Enter generates</span>
+          <span className={cn('text-[10px]', META_CLASS)}>@file · / for commands</span>
         </div>
         <SelectMenu
           label="Project"
@@ -244,21 +247,32 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
           <label htmlFor="design-brief" className={LABEL_CLASS}>
             Brief
           </label>
-          <textarea
-            id="design-brief"
-            data-design-brief
-            value={s.form.brief}
-            onChange={(e) => s.setForm((f) => ({ ...f, brief: e.target.value }))}
-            onKeyDown={(e) => {
-              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                e.preventDefault();
-                void s.runGenerate();
-              }
-            }}
-            rows={3}
-            placeholder="e.g. pricing page, 3 tiers, terracotta, Stripe polish…"
-            className="mt-1 w-full resize-none rounded-lg border border-line bg-white p-2.5 text-[12px] leading-5 text-ink placeholder:text-zinc-400 focus:border-terracotta/30 focus:outline-none dark:bg-[#0F0F11] dark:text-white dark:placeholder:text-zinc-500"
-          />
+          <div className={cn('mt-1', COMPOSER_SHELL_CLASS)} data-design-composer-input>
+            <ComposerInput
+              id="design-brief"
+              ariaLabel="Design brief"
+              placeholder="e.g. pricing page, 3 tiers, terracotta, Stripe polish…"
+              value={s.form.brief}
+              onChange={(value) => s.setForm((f) => ({ ...f, brief: value }))}
+              onSubmit={() => void s.runGenerate()}
+              commands={DESIGN_SLASH_COMMANDS}
+              onSlash={(id, args) => {
+                const result = applyDesignSlash(id, args, s.form, s.setForm, s.applySample);
+                emitToast('message' in result ? result.message : result.error);
+              }}
+              hintId="design-brief-hint"
+              attrs={{ 'data-design-brief': '' }}
+              minHeight={56}
+              maxHeight={200}
+              disabled={s.generating}
+            >
+              <div className="mt-1 flex items-center gap-1.5 px-1 pb-0.5">
+                <span id="design-brief-hint" className="min-w-0 truncate text-[10px] text-zinc-400">
+                  {COMPOSER_ENTER_HINT}
+                </span>
+              </div>
+            </ComposerInput>
+          </div>
           {s.formError ? (
             <p className="mt-1 text-[11px] text-rose-600 dark:text-rose-300">{s.formError}</p>
           ) : null}
@@ -267,12 +281,14 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
             size="sm"
             className="mt-2 h-9 w-full gap-1.5 text-[12px]"
             onClick={() => void s.runGenerate()}
-            disabled={s.generating}
+            disabled={s.generating || !s.form.brief.trim()}
           >
             <Sparkles className="h-3.5 w-3.5" /> {s.generating ? 'Generating…' : 'Generate'}
           </Button>
           {s.generating ? (
-            <p className={cn('mt-1.5 text-center text-[10px]', META_CLASS)}>This can take up to ~2 minutes.</p>
+            <p className={cn('mt-1.5 text-center text-[10px]', META_CLASS)}>
+              Generating — the composer is locked until the artifact lands.
+            </p>
           ) : null}
         </div>
       </div>

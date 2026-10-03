@@ -19,7 +19,8 @@ import { cn } from '@/lib/utils';
 import { api, type SlashCommandInfo } from '@/lib/api';
 import { useProviderStore } from '@/stores';
 import { emitToast } from '@/components/shell';
-import { MAX_IMAGE_EDGE, downscaleDims, formatImageMarker, hasOsFiles, isImageAttachment, isSlashPrefix, parseMentions, parseSlashCommand, removeMention } from './composer-utils';
+import { MAX_IMAGE_EDGE, downscaleDims, formatImageMarker, hasOsFiles, isImageAttachment, parseMentions, parseSlashCommand, removeMention } from './composer-utils';
+import { COMPOSER_ENTER_HINT, COMPOSER_SHELL_CLASS, ComposerInput, type ComposerInputHandle } from './composer-input';
 import { appendMention } from '@/components/files';
 import { enabledModels } from '@/components/providers/models';
 
@@ -328,14 +329,14 @@ export function Composer({
   const [thinkOpen, setThinkOpen] = React.useState(false);
   const [modelOpen, setModelOpen] = React.useState(false);
   const [modelQuery, setModelQuery] = React.useState('');
-  const [paletteOpen, setPaletteOpen] = React.useState(false);
   const [commands, setCommands] = React.useState<SlashCommandInfo[]>([]);
   const [queued, setQueued] = React.useState<QueuedPrompt[]>([]);
   const [attachments, setAttachments] = React.useState<Attachment[]>([]);
   const [dragActive, setDragActive] = React.useState(false);
   const [recording, setRecording] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
-  const taRef = React.useRef<HTMLTextAreaElement>(null);
+  /** REQ-188 — the textarea lives inside the shared `ComposerInput`. */
+  const inputRef = React.useRef<ComposerInputHandle>(null);
   const keySeq = React.useRef(0);
   /** Nesting depth for the OS-file drag overlay (dragenter/leave fire per child). */
   const dragDepth = React.useRef(0);
@@ -354,14 +355,6 @@ export function Composer({
       .catch(() => emitToast('Slash commands unavailable — server unreachable'));
   }, [refreshProviders]);
 
-  // `/help` opens the palette from the Chat layer.
-  React.useEffect(() => {
-    if (paletteSignal > 0) {
-      setPaletteOpen(true);
-      taRef.current?.focus();
-    }
-  }, [paletteSignal]);
-
   // File dropped from the explorer — splice `@path` into the draft (the
   // existing mention parser turns it into `contextPaths` on send).
   const dropKey = dropSignal?.key ?? 0;
@@ -369,7 +362,7 @@ export function Composer({
   React.useEffect(() => {
     if (dropKey > 0 && dropPath) {
       setText((prev) => appendMention(prev, dropPath));
-      taRef.current?.focus();
+      inputRef.current?.focus();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dropKey]);
@@ -453,13 +446,10 @@ export function Composer({
       keySeq.current += 1;
       setQueued((prev) => [...prev, { key: keySeq.current, text }]);
       setText('');
-      if (taRef.current) taRef.current.style.height = 'auto';
       return;
     }
     deliver(text);
     setText('');
-    setPaletteOpen(false);
-    if (taRef.current) taRef.current.style.height = 'auto';
   };
 
   // Queue drains one prompt per finished stream (real ordering, client-side).
@@ -550,16 +540,11 @@ export function Composer({
     }
   };
 
-  const paletteItems = React.useMemo(() => {
-    const prefix = text.trim().slice(1).toLowerCase();
-    return commands.filter((c) => !prefix || c.id.startsWith(prefix) || c.hint.toLowerCase().includes(prefix));
-  }, [commands, text]);
-
   const canSend = (text.trim().length > 0 || attachments.length > 0) && (socketOpen || (mode === 'queue' && streaming));
 
   return (
     <div
-      className="relative rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(38,38,36,0.06),0_4px_12px_rgba(38,38,36,0.04)] dark:bg-[#1E1E21]"
+      className={COMPOSER_SHELL_CLASS}
       onDragEnter={(e) => {
         if (!dragHasFiles(e)) return;
         e.preventDefault();
@@ -586,7 +571,7 @@ export function Composer({
         dragDepth.current = 0;
         setDragActive(false);
         attachFiles(e.dataTransfer.files);
-        taRef.current?.focus();
+        inputRef.current?.focus();
       }}
     >
       {dragActive && (
@@ -728,52 +713,23 @@ export function Composer({
         </div>
       </div>
 
-      {/* Text area + slash palette */}
+      {/* Text area + slash palette — REQ-188: the SHARED ComposerInput
+          primitive (same file the Design Studio brief rides), so the Enter
+          contract, auto-grow and `/` palette exist exactly once. */}
       <div className="relative p-1.5">
-        {paletteOpen && paletteItems.length > 0 && (
-          <div className="absolute bottom-[calc(100%+4px)] right-1.5 left-1.5 z-50 overflow-hidden rounded-lg border border-line bg-white shadow-xl dark:bg-[#1E1E21]">
-            {paletteItems.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => {
-                  setText('');
-                  setPaletteOpen(false);
-                  onSlash(c.id, '', c.name);
-                }}
-                className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs hover:bg-[#FDF0E6] dark:hover:bg-[#2A1E15]"
-              >
-                <span className="font-mono font-semibold text-terracotta">{c.name}</span>
-                <span className="text-zinc-500">{c.hint}</span>
-                <span className="ml-auto hidden font-mono text-[11px] text-zinc-400 sm:inline">{c.usage}</span>
-              </button>
-            ))}
-          </div>
-        )}
-        <textarea
-          ref={taRef}
-          rows={1}
-          aria-label="Message Lokma"
+        <ComposerInput
+          ref={inputRef}
+          ariaLabel="Message Lokma"
+          hintId="lokma-composer-hint"
           placeholder={placeholder ?? (socketOpen ? 'Ask Lokma — @file for context, / for commands' : 'Connecting…')}
           value={text}
           disabled={!socketOpen && !(mode === 'queue' && streaming)}
-          onChange={(e) => {
-            setText(e.target.value);
-            e.target.style.height = 'auto';
-            e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
-            setPaletteOpen(isSlashPrefix(e.target.value));
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              handleSend();
-            }
-            if (e.key === 'Escape') setPaletteOpen(false);
-          }}
-          onPaste={(e) => {
-            const files = e.clipboardData?.files;
-            if (files && files.length > 0) attachFiles(files);
-          }}
-          className="min-h-[28px] w-full resize-none bg-transparent px-1 py-1 text-[13px] focus:outline-none disabled:opacity-60"
+          commands={commands}
+          onSlash={(id) => onSlash(id, '', id)}
+          onSubmit={handleSend}
+          onChange={setText}
+          showMentionChips={false}
+          openSignal={paletteSignal}
         />
         {attachments.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
@@ -910,7 +866,7 @@ export function Composer({
             )}
           </div>
           <div className="ml-auto flex items-center gap-1.5">
-            <span className="hidden text-[11px] text-zinc-400 sm:inline">Enter send · Shift+Enter newline · / commands</span>
+            <span id="lokma-composer-hint" className="hidden text-[11px] text-zinc-400 sm:inline">{COMPOSER_ENTER_HINT}</span>
             {streaming ? (
               <Button onClick={onStop} title="Stop the stream (keeps partial output)" className="h-7 gap-1 rounded-full border-0 bg-[#262624] pr-3 pl-3 text-white hover:bg-black">
                 <Square className="h-3 w-3" /> Stop

@@ -19,7 +19,11 @@
  *      canvas viewer and leaves the panel mounted
  *   6. Esc closes it; so does the panel's own close button
  *   7. the open/closed state survives a reload (lokma-design-page:v1)
- *   8. at 390px the page still has no horizontal overflow
+ *   8. the EMPTY state is FORCED (the one list endpoint is stubbed to zero):
+ *      the honest empty card renders, the counter reads 0/0, the panel still
+ *      opens / searches / closes — the one criterion a live account that
+ *      always has artifacts could otherwise never measure
+ *   9. at 390px the page still has no horizontal overflow
  *
  * The probe creates nothing: it drives the existing artifact list, so there is
  * no generated artifact to clean up afterwards (which is also why it never
@@ -365,6 +369,83 @@ const waitStudio = async (page) => {
   // Leave the account as we found it: the panel closed.
   await page.evaluate(clickSel, '[data-design-artifacts-toggle]');
   await sleep(500);
+
+  // ── 6b ── the EMPTY state is forced, never assumed ─────────────────────
+  // Acceptance #7 ("0 artifact → dürüst boş durum") is the one criterion the
+  // live account can never satisfy on its own: it always has artifacts, so
+  // every earlier check either OR-s in the empty card or skips on
+  // `listCount > 0` and proves nothing about it. Stub the ONE list endpoint
+  // (stub the metered read, never the app) so zero is real, then assert the
+  // honest empty card actually renders — and that the panel still opens,
+  // still searches, still closes.
+  const realList = { items: [], count: 0, project: null, root: '~' };
+  let stubbed = 0;
+  await page.route('**/api/design/list*', async (route) => {
+    stubbed += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(realList),
+    });
+  });
+
+  // Force a fresh load so the studio re-reads the list through the stub.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-mode-switch="design"]', { timeout: 20000 });
+  await sleep(1000);
+  await page.evaluate(() => {
+    const b = document.querySelector('[data-mode-switch="design"]');
+    if (b) b.click();
+  });
+  await waitStudio(page);
+  await sleep(700);
+
+  ok('the stubbed list endpoint was actually used', stubbed > 0, 'hits=' + stubbed);
+  L = await page.evaluate(layoutState);
+  ok(
+    'the empty panel lists zero artboards (the stub is in force)',
+    Boolean(L && L.artboards.length === 0),
+    'artboards=' + (L ? L.artboards.length : 'n/a'),
+  );
+
+  // The panel may already be open (the snapshot restored it); open it if not.
+  if (!(await page.evaluate(layoutState)).panelOpen) {
+    await page.evaluate(clickSel, '[data-design-artifacts-toggle]');
+    await sleep(700);
+  }
+  const emptyL = await page.evaluate(layoutState);
+  ok('the panel opens with zero artifacts', Boolean(emptyL && emptyL.panelOpen));
+  ok(
+    'ZERO artifacts render the HONEST empty card, not a blank grid',
+    Boolean(emptyL && emptyL.emptyState),
+    'emptyState=' + (emptyL ? emptyL.emptyState : 'n/a'),
+  );
+  ok(
+    'the empty card points at Generate (a way forward, not dead space)',
+    await page.evaluate(() => {
+      const p = document.querySelector('[data-design-artifacts-panel]');
+      const t = p ? (p.textContent || '') : '';
+      return t.indexOf('No artifacts yet') >= 0 && t.indexOf('Generate') >= 0;
+    }),
+  );
+  ok(
+    'the empty counter reads 0/0',
+    Boolean(emptyL && emptyL.counter === '0/0'),
+    'counter=' + (emptyL ? emptyL.counter : 'n/a'),
+  );
+  ok('the search input still exists with zero artifacts', Boolean(emptyL && emptyL.panelSearch));
+  ok('the empty panel has no horizontal overflow', Boolean(emptyL && emptyL.overflowX <= 1), 'overflowX=' + (emptyL ? emptyL.overflowX : 'n/a'));
+  await page.screenshot({ path: SHOT.replace(/\.png$/, '-empty.png') });
+
+  await page.evaluate(clickSel, '[data-design-artifacts-close]');
+  await sleep(600);
+  ok('the empty panel still closes on its own button', Boolean(await page.evaluate(layoutState) && !(await page.evaluate(layoutState)).panelOpen));
+
+  // Drop the stub and restore the account exactly as we found it.
+  await page.unroute('**/api/design/list*');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-mode-switch="design"]', { timeout: 20000 });
+  await sleep(800);
 
   // ── 7 ── narrow viewport: no overflow ──────────────────────────────────
   await page.setViewportSize({ width: 390, height: 844 });

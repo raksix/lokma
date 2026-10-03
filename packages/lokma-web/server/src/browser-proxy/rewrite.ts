@@ -98,10 +98,15 @@ export function rewriteRef(raw: string, baseUrl: string): ResolvedRef {
     absoluteSource = false;
   }
   const proxied = /^wss?:/i.test(absoluteTarget) ? wsProxyUrlFor(absoluteTarget) : proxyUrlFor(absoluteTarget);
-  // `<base>` already makes relative refs hit the proxy, so a relative source
-  // keeps its original bytes: rewriting it would double-encode the query.
-  if (!absoluteSource && !proxied.startsWith(WS_PROXY_PATH)) {
-    return { value: raw, absolute: false };
+  // Relative sources DO get rewritten, and `<base>` is the reason: per the HTML
+  // spec a root-relative ref like `/app.css` resolves against the BASE'S ORIGIN
+  // and DISCARDS its query string, so a base of `/api/browser/proxy?url=…` alone
+  // would make the page request the Lokma app itself (`/app.css` → 200 SPA
+  // index.html, so stylesheets vanish and links navigate away from the proxy).
+  // Only `ws:` targets keep their original bytes: the ws proxy path carries no
+  // target in its base, and a websocket url is never resolved through `<base>`.
+  if (!absoluteSource && !/^wss?:/i.test(absoluteTarget)) {
+    return { value: proxied, absolute: false };
   }
   return { value: proxied, absolute: true };
 }

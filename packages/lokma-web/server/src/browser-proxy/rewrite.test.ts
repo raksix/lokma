@@ -40,8 +40,14 @@ assert(abs.absolute === true, 'an absolute http(s) src counts as absolute');
 assert(abs.value.startsWith(PROXY_PATH + '?url='), 'an absolute src is routed through the proxy');
 assert(abs.value.includes(encodeURIComponent('https://cdn.example/x.js')), 'the absolute target survives encoding');
 
+// A relative ref IS rewritten, and this is not cosmetic: per the HTML spec a
+// root-relative ref resolves against the <base> tag's ORIGIN and throws its
+// query away, so `<base href="/api/browser/proxy?url=…">` alone would send
+// `/static/app.css` to the Lokma app (a 200 SPA index.html), not the target.
 const rel = rewriteRef('/static/app.css', BASE);
-assert(rel.value === '/static/app.css', 'a relative src keeps its bytes (the <base> tag resolves it through the proxy)');
+assert(rel.value.startsWith(PROXY_PATH + '?url='), 'a relative src is routed through the proxy, not left to the <base> origin');
+assert(rel.value.includes(encodeURIComponent('https://target.example/static/app.css')), 'the relative ref resolves against the document url first');
+assert(rel.absolute === false, 'a relative src stays relative in origin terms');
 
 const protoRel = rewriteRef('//cdn.example/lib.js', BASE);
 assert(protoRel.absolute === true, 'a protocol-relative src is absolute');
@@ -85,14 +91,18 @@ const doc = rewriteHtml(
 
 assert(doc.includes('<base href="' + BASE_HREF + '">'), 'a <base href> pointing at the proxy is injected');
 assert(doc.indexOf('<base') < doc.indexOf('<link'), 'the <base> precedes the first referencing tag');
-assert(doc.includes('href="/css/site.css"'), 'a relative stylesheet keeps its bytes (the <base> covers it)');
-assert(doc.includes(PROXY_PATH + '?url=' + encodeURIComponent('https://cdn.example/app.js')), 'an absolute script src is proxied');
-assert(doc.includes(PROXY_PATH + '?url=' + encodeURIComponent('https://other.example/page')), 'an absolute anchor href is proxied');
-assert(doc.includes('content="0; url=/next"'), 'a RELATIVE meta refresh keeps its bytes (the <base> resolves it)');
-assert(doc.includes(PROXY_PATH + '?url=' + encodeURIComponent('https://redirect.example/target')), 'an ABSOLUTE meta refresh is redirected through the proxy');
+// Relative refs are rewritten rather than left to <base>: a root-relative path
+// resolves against the base's ORIGIN and drops its query, so leaving it alone
+// would request the Lokma app (`/css/site.css` → the SPA index.html, 200 OK).
+const proxiedAbs = (target: string) => PROXY_PATH + '?url=' + encodeURIComponent(target);
+assert(doc.includes('href="' + proxiedAbs('https://target.example/css/site.css') + '"'), 'a relative stylesheet is routed through the proxy');
+assert(doc.includes(proxiedAbs('https://cdn.example/app.js')), 'an absolute script src is proxied');
+assert(doc.includes(proxiedAbs('https://other.example/page')), 'an absolute anchor href is proxied');
+assert(doc.includes('content="0; url=' + proxiedAbs('https://target.example/next') + '"'), 'a RELATIVE meta refresh is routed through the proxy too');
+assert(doc.includes('content="3; URL=' + proxiedAbs('https://redirect.example/target') + '"'), 'an ABSOLUTE meta refresh is redirected through the proxy');
 assert(doc.includes('src="data:image/png;base64,AAAA"'), 'a data: image survives byte-identical');
-assert(doc.includes('action="/submit"') && doc.includes('formaction="/submit2"'), 'form actions keep their bytes');
-assert(doc.includes('poster="/poster.jpg"') && doc.includes('src="/v/movie.mp4"'), 'poster and source src keep their bytes');
+assert(doc.includes('action="' + proxiedAbs('https://target.example/submit') + '"') && doc.includes('formaction="' + proxiedAbs('https://target.example/submit2') + '"'), 'form actions are routed through the proxy');
+assert(doc.includes('poster="' + proxiedAbs('https://target.example/poster.jpg') + '"') && doc.includes('src="' + proxiedAbs('https://target.example/v/movie.mp4') + '"'), 'poster and source src are routed through the proxy');
 assert(doc.includes(encodeURIComponent('https://cdn.example/a2.png') + ' 2x'), 'an absolute srcset candidate is proxied with its descriptor');
 
 // A page that already has a <base> must not get a second one, and its OWN base
@@ -135,7 +145,7 @@ assert(!guarded.includes(encodeURIComponent('https://never.example/')), 'a link 
 assert(!guarded.includes(encodeURIComponent('https://comment.example/c.png')), 'a link inside a comment is NOT rewritten');
 assert(!guarded.includes(encodeURIComponent('https://textarea.example/t.png')), 'a link inside a textarea is NOT rewritten');
 assert(!/<style>body\{background:url\(\/api/.test(guarded), 'CSS url() inside <style> is left to the server (documented limit)');
-assert(guarded.includes('src="/img/real.png"'), 'a real img AFTER the protected block is still processed (the scanner resumes)');
+assert(guarded.includes('src="' + proxiedAbs('https://target.example/img/real.png') + '"'), 'a real img AFTER the protected block is still processed (the scanner resumes)');
 assert(guarded.includes('<style>body{background:url(/img/bg.png)}</style>'), 'the protected style block is byte-identical');
 
 // --- quoting -------------------------------------------------------------------
@@ -148,6 +158,6 @@ const rewrittenHref = /<a href="([^"]*)"/.exec(ampersand.replace(/<base[^>]*>/, 
 assert(rewrittenHref.startsWith(PROXY_PATH), 'the absolute href went through the proxy');
 assert(!/[&"]/.test(rewrittenHref), 'a rewritten href carries no raw ampersand or quote');
 assert(rewrittenHref.includes('%26'), 'the target query separator is encoded inside the proxy url');
-assert(ampersand.includes('href="/rel?x=1&y=2"'), 'an untouched relative href keeps its own bytes untouched');
+assert(ampersand.includes('href="' + proxiedAbs('https://target.example/rel?x=1&y=2') + '"'), 'a relative href is proxied with its query encoded, not passed through raw');
 
 console.log('\nbrowser proxy rewrite: ' + passed + '/' + passed + ' passed');

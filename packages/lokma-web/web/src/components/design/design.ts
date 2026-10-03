@@ -38,6 +38,13 @@ export type GenerateForm = {
   system: string;
   /** Picked model id — '' means the configured default chain (REQ-177). */
   model: string;
+  /**
+   * REQ-192 — the picked design-SKILL ids (the second axis beside `system`:
+   * a system is a palette, a skill is a SKILL.md instruction set). Kept in the
+   * form so the selection rides the page snapshot; `[]` = no skills, which
+   * keeps the generation wire shape byte-identical to pre-REQ-192.
+   */
+  skills: string[];
 };
 
 export const emptyGenerateForm: GenerateForm = {
@@ -45,7 +52,90 @@ export const emptyGenerateForm: GenerateForm = {
   brief: '',
   system: 'stripe-linear',
   model: '',
+  skills: [],
 };
+
+// ── REQ-192 — the design-SKILL selection (second axis beside `system`) ────────
+
+/** Mirror of the server cap (`DESIGN_SKILL_SELECT_CAP` in core/design/skills). */
+export const DESIGN_SKILL_SELECT_CAP = 8;
+/** Mirror of the server id bound (`SKILL_ID_CAP`). */
+const SKILL_ID_MAX_LEN = 200;
+
+/** An id that could never be a skill id — refused locally, before any request. */
+function isPlausibleSkillId(id: string): boolean {
+  return /^[a-z0-9][a-z0-9._/-]{0,199}$/i.test(id);
+}
+
+/**
+ * REQ-192 — add/remove one id from the selection, order-preserving (the pick
+ * order is what the picker lists, so it must not shuffle on re-render) and
+ * capped. `toggleSkill` is the ONLY writer: the multi `SelectMenu` hands back a
+ * bare value per click, so the set semantics live here, not in the component.
+ */
+export function toggleSkill(current: readonly string[], id: string): string[] {
+  const value = id.trim();
+  if (!value || !isPlausibleSkillId(value)) return [...current];
+  if (current.includes(value)) return current.filter((id2) => id2 !== value);
+  if (current.length >= DESIGN_SKILL_SELECT_CAP) return [...current];
+  return [...current, value];
+}
+
+/** Drop every selection — the picker's Reset action. */
+export function clearSkills(): string[] {
+  return [];
+}
+
+/**
+ * Tolerant coerce of a persisted/foreign selection: non-arrays, junk entries
+ * and over-cap lists all collapse to a valid `string[]` instead of throwing
+ * (the snapshot is user-writable localStorage).
+ */
+export function normalizeSkillIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== 'string') continue;
+    const id = item.trim();
+    if (!id || id.length > SKILL_ID_MAX_LEN || !isPlausibleSkillId(id)) continue;
+    if (out.includes(id)) continue;
+    out.push(id);
+    if (out.length >= DESIGN_SKILL_SELECT_CAP) break;
+  }
+  return out;
+}
+
+/**
+ * REQ-192 — the trigger's honest summary. With nothing picked it offers the
+ * picker itself; with one row it names it; past that the count plus the first
+ * name, so the user can never mistake a 3-skill brief for an empty one.
+ */
+export function skillSelectionLabel(ids: readonly string[], names: ReadonlyMap<string, string>): string {
+  if (ids.length === 0) return 'None selected';
+  if (ids.length === 1) return names.get(ids[0]) ?? ids[0];
+  const first = names.get(ids[0]) ?? ids[0];
+  return `${ids.length} skills · ${first} +${ids.length - 1}`;
+}
+
+/** Group catalog rows by their server-provided `group`, keeping taxonomy order. */
+export function groupSkillRows<T extends { group: string; name: string }>(
+  rows: readonly T[],
+  taxonomy: readonly string[],
+): { label: string; rows: T[] }[] {
+  const byGroup = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = row.group.trim() || 'Other';
+    const bucket = byGroup.get(key) ?? [];
+    bucket.push(row);
+    byGroup.set(key, bucket);
+  }
+  const ordered = taxonomy.filter((g) => byGroup.has(g));
+  for (const key of byGroup.keys()) if (!taxonomy.includes(key)) ordered.push(key);
+  return ordered.map((label) => ({
+    label,
+    rows: (byGroup.get(label) ?? []).sort((a, b) => a.name.localeCompare(b.name)),
+  }));
+}
 
 /**
  * REQ-179 — example brief chips for the canvas empty state: one click parks
@@ -103,6 +193,16 @@ export function validateGenerateForm(form: GenerateForm): string | null {
     return 'Pick a design system';
   }
   if (form.model && form.model.length > 200) return 'Model id too long (200 max)';
+  // REQ-192 — skills are OPTIONAL, so the only client-side rule is the cap the
+  // server enforces. Membership in the catalog is NOT checked here: the
+  // installed catalog is per-machine and may have changed since this page was
+  // rendered, so the server stays the authority (it answers 404/400 honestly).
+  if (form.skills.length > DESIGN_SKILL_SELECT_CAP) {
+    return `Pick at most ${DESIGN_SKILL_SELECT_CAP} skills`;
+  }
+  for (const id of form.skills) {
+    if (!isPlausibleSkillId(id)) return 'That skill id is not a valid skill';
+  }
   return null;
 }
 

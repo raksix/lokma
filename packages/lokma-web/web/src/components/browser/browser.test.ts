@@ -12,6 +12,7 @@ import {
   frameSrcFor,
   groupByAgent,
   historyPosition,
+  isAgentOpened,
   isPipedUrl,
   isProxySrc,
   paneUrlFor,
@@ -171,5 +172,49 @@ check('an unasked page is not a wall and not a non-wall',
   (null as boolean | null) !== true && (null as boolean | null) !== false);
 check('only a true verdict asks for the external tab',
   (true as boolean | null) === true && (false as boolean | null) !== true);
+
+// ─── REQ-193 slice 10 (Kapsam 5): the agent-open badge ────────────────────────
+// The pane ORs two sources (record stamp + frame stamp), so the pure rule is
+// what both callers share. The negative direction is the one that matters: a
+// missing/blank stamp must read as "the user chose this page", never as
+// "unknown", or the badge would accuse the user's own navigation.
+check('an ISO stamp counts as an agent open', isAgentOpened('2026-10-03T10:07:01.000Z') === true);
+check('a missing stamp is not an agent open',
+  isAgentOpened(undefined) === false && isAgentOpened(null) === false && isAgentOpened('') === false);
+check('a whitespace-only stamp is not an agent open', isAgentOpened('   ') === false);
+
+// The wire contract: a Zod object STRIPS unknown keys, so if the `ui_action`
+// schema did not declare the field the frame would arrive without it and the
+// first-paint half of the badge would be permanently dead. Parse a frame that
+// carries it and read the value back out — a unit assert on the payload the
+// loop builds cannot catch a schema that drops it.
+const { ServerMessageSchema } = await import('@lokma/shared/protocol/ws');
+const parsedFrame = ServerMessageSchema.safeParse({
+  type: 'ui_action',
+  actionId: 'ui_probe',
+  action: 'open_browser',
+  url: 'https://example.org/',
+  tabId: 'tab_probe',
+  openedByAgentAt: '2026-10-03T10:07:01.000Z',
+  sessionId: 'sess_1',
+});
+check('the ui_action frame parses', parsedFrame.success === true);
+const frameStamp = parsedFrame.success && 'openedByAgentAt' in parsedFrame.data
+  ? (parsedFrame.data as { openedByAgentAt?: string }).openedByAgentAt
+  : undefined;
+check('the ws schema KEEPS the agent-open stamp (no zod strip)',
+  frameStamp === '2026-10-03T10:07:01.000Z');
+const noStampFrame = ServerMessageSchema.safeParse({
+  type: 'ui_action',
+  actionId: 'ui_probe2',
+  action: 'open_browser',
+  url: 'https://example.org/',
+  tabId: 'tab_probe',
+  sessionId: 'sess_1',
+});
+check('a frame without the stamp still parses (absent ≠ invalid)',
+  noStampFrame.success === true
+  && (noStampFrame.success ? (noStampFrame.data as { openedByAgentAt?: string }).openedByAgentAt : 'set') === undefined);
+
 console.log(`browser probe: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

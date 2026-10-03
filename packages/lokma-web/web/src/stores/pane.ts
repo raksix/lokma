@@ -60,6 +60,15 @@ export type PendingBrowserOpen = {
   tabId: string;
   url: string;
   sessionId: string;
+  /**
+   * REQ-193 slice 10 (Kapsam 5): the `ui_action` frame's agent-open stamp.
+   *
+   * The pane needs it on the FIRST paint — the tab list it refreshes from can
+   * arrive a beat later, and a badge that only appears after a refetch is a
+   * badge the user never sees. `null` means "this open came from a REST/direct
+   * navigation, so say nothing"; it is not a guess.
+   */
+  openedByAgentAt?: string | null;
 };
 
 type PaneState = {

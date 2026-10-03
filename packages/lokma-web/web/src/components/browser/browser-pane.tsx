@@ -6,6 +6,7 @@ import {
   ExternalLink,
   LogIn,
   RefreshCw,
+  Sparkles,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import {
   canGoBack,
   canGoForward,
   frameSrcFor,
+  isAgentOpened,
   isPipedUrl,
   isProxySrc,
   tabLabel,
@@ -59,6 +61,12 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
   // `null` ("not asked yet") so an un-asked page is never confused with a page
   // the server says is fine.
   const [loginWall, setLoginWall] = React.useState<boolean | null>(null);
+  // REQ-193 slice 10 (Kapsam 5) — the agent-open stamp carried by the
+  // `ui_action` frame, held for the gap between the signal arriving and the
+  // tab list carrying the same field (the record's own stamp covers every
+  // later paint). Declared with the other state because the frame badge is
+  // derived from it well below the effect that writes it.
+  const [frameAgentOpen, setFrameAgentOpen] = React.useState<string | null>(null);
   const ensuredBlank = React.useRef(false);
 
   const refresh = React.useCallback(async () => {
@@ -140,6 +148,14 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
   const frameSrc = React.useMemo(() => frameSrcFor(selected?.url ?? ''), [selected?.url]);
   const viaPiped = React.useMemo(() => isPipedUrl(frameSrc) && frameSrc !== selected?.url, [frameSrc, selected?.url]);
   const viaProxy = React.useMemo(() => isProxySrc(frameSrc), [frameSrc]);
+  // REQ-193 slice 10 (Kapsam 5) — "this page is one the AGENT opened". The
+  // record's stamp is the durable half (it survives a remount/reload), the
+  // frame signal is the immediate half (it covers the fetch gap); either one
+  // alone leaves a window where the badge is missing or stale.
+  const agentOpened = React.useMemo(
+    () => isAgentOpened(selected?.openedByAgentAt) || isAgentOpened(frameAgentOpen),
+    [selected?.openedByAgentAt, frameAgentOpen],
+  );
 
   // A refused frame never fires `onLoad`, so nothing would ever tell the user
   // why the body is blank. After 2.5 s without a load, show a hint (honest
@@ -201,12 +217,16 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
     if (pendingBrowserOpen.url) {
       setAddress(pendingBrowserOpen.url === BROWSER_BLANK_URL ? '' : pendingBrowserOpen.url);
     }
+    setFrameAgentOpen(pendingBrowserOpen.openedByAgentAt ?? null);
     // Remount the frame: the reused tab keeps its id while its URL changes,
     // so the iframe must reload on the new src.
     setFrameNonce((n) => n + 1);
     void refresh();
   }, [pendingBrowserOpen, sessionId, refresh, consumeBrowserOpen]);
 
+  // A USER navigation clears the frame stamp: the record's own stamp belongs
+  // to whatever tab the agent last opened, so typing an address must never
+  // leave "agent opened this" hanging over a page the user chose.
   const go = React.useCallback(async () => {
     if (!selected) return;
     const problem = validateTabUrl(address);
@@ -215,6 +235,7 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
       return;
     }
     setBusy(true);
+    setFrameAgentOpen(null);
     try {
       const res = await api.navigateBrowserTab(selected.id, address.trim());
       applyTab(res.tab);
@@ -319,6 +340,23 @@ export function BrowserPane({ sessionId }: { sessionId: string }) {
             data-proxy-chip="1"
           >
             Sunucu
+          </span>
+        ) : null}
+        {agentOpened ? (
+          /* REQ-193 slice 10 (Kapsam 5) — the visible page was CHOSEN by the
+             agent, and it reached the user through the server proxy (see the
+             `Sunucu` chip). Without this the two look identical, so nobody
+             could tell that the URL in the address bar is the agent's choice
+             rather than their own; with it the difference is visible, not
+             inferred. The badge is driven by the record's own stamp, so a
+             user-typed address clears it (navigate() nulls the field). */
+          <span
+            title="Bu sayfayı ajan açtı. Panel sayfayı sunucu üzerinden çekiyor, senin tarayıcındaki çerezin taşınmıyor."
+            className="flex shrink-0 items-center gap-1 rounded border border-indigo-200 bg-indigo-50/60 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-300"
+            data-agent-chip="1"
+          >
+            <Sparkles className="h-2.5 w-2.5" aria-hidden="true" />
+            Ajan açtı
           </span>
         ) : null}
         {selected?.lastAgentUseAt ? (

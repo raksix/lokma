@@ -537,6 +537,13 @@ export type BrowserTab = {
    * pane shows an "engine" badge from it (engine view ≠ this iframe view).
    */
   lastAgentUseAt?: string | null;
+  /**
+   * REQ-193 slice 10 (Kapsam 5): when the AGENT opened/navigated this tab.
+   * Drives the pane's "agent" badge, so a page the agent chose is visibly
+   * distinguishable from one the user typed. Optional on the wire for older
+   * records — absent means "not opened by an agent", never "unknown".
+   */
+  openedByAgentAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };

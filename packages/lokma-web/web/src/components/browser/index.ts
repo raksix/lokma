@@ -9,6 +9,7 @@ export {
   canGoForward,
   groupByAgent,
   historyPosition,
+  isAgentOpened,
   shortScope,
   tabLabel,
   validateTabUrl,

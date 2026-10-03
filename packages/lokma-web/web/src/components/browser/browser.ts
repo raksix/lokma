@@ -212,3 +212,22 @@ export function isProxySrc(input: string | null | undefined): boolean {
   if (!input) return false;
   return input.startsWith(BROWSER_PROXY_PATH + '?url=');
 }
+
+/**
+ * REQ-193 slice 10 (Kapsam 5) — did the AGENT open this page?
+ *
+ * Two independent sources answer it, and the pane ORs them because each is
+ * missing a case the other covers:
+ *  - the tab RECORD's `openedByAgentAt` — survives reloads, session switches
+ *    and pane remounts, but arrives with the tab list (one fetch later);
+ *  - the `ui_action` frame's stamp — present on the very first paint, but
+ *    gone once the signal is consumed.
+ *
+ * Neither alone is enough, so the rule lives here instead of being open-coded
+ * in the JSX twice. `false` for a missing/blank stamp rather than a throw:
+ * an absent stamp means "no agent opened this", which is the answer for every
+ * user-typed navigation.
+ */
+export function isAgentOpened(input: string | null | undefined): boolean {
+  return typeof input === 'string' && input.trim().length > 0;
+}

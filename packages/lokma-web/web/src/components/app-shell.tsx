@@ -478,6 +478,9 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           tabId: entry.tabId ?? '',
           url: entry.url ?? '',
           sessionId: entry.sessionId,
+          // REQ-193 slice 10 (Kapsam 5) — forward the agent-open stamp so
+          // the pane can label a page the agent chose on its first paint.
+          openedByAgentAt: entry.openedByAgentAt ?? null,
         });
         openBrowserPane();
         emitToast(`Agent opened browser: ${entry.url ?? ''}`);

@@ -1,6 +1,6 @@
 # REQ-191 — Tasarım sistemi (branding) seçilebilsin: 151 paket gerçek listeye insin
 
-**Status:** pending
+**Status:** in-progress
 **Tarih:** 2026-10-02
 **Kaynak:** Kullanıcı mesajı (2 Ekim 2026):
 > "+ tasarım skilleri falan ya da design branding falan seçeiblsin opendesgin de var onalrı yap"
@@ -51,3 +51,21 @@
 
 - **Write-only:** kod yazılmadı.
 - Sıra: REQ-190 (tweak) önce, REQ-191 sonra — çünkü tweak'in token/renk düzenleme yüzeyleri katalogdan besleniyor.
+
+## Dilim kaydı (slice log)
+
+### Dilim 1 — çekirdek katalog (`dbb3994`)
+
+`packages/lokma-core/src/design/systems.ts` (yeni) + `systems.test.ts` + `index.ts` dışa aktarımı.
+
+- **Katalog tarama:** `listDesignSystems()` `~/.lokma/design/systems/*/manifest.json` dizinini okur; `source: 'catalog' | 'bundled'` **dürüstlük kanalı** — dizin boşken bugünkü 4 kart `origin: 'bundled'` etiketiyle döner, katalog varmış gibi görünmez.
+- **Taksonomi:** `normalizeSystemCategory()` OpenDesign başlıklarını (`Starter`…`Other`) eşler; `e_commerce` / `AI & LLM` gibi varyantlar ve bilinmeyen başlıklar `Other`'a düşer (sıralamasız grup uydurmaz).
+- **Bozuk paket kataloğu bozmaz:** `parseSystemManifest()` ayrım sonucu (discriminated union) döner; okunamayan paket `status: 'invalid'` + `problem` ile **listelenir**, kaybolmaz.
+- **SSRF:** `assertInstallSource()` — `marketplace.ts`'teki `isPrivateHost` kalıbı, **genişletilmiş**: link-local (`169.254.0.0/16` — bulut metadata sıçraması) ve CGNAT (`100.64/10`) de reddedilir; `172.15`/`172.32` özel blok dışı olduğu için **serbest** (bulan üst/alt sınır testleriyle kanıtlandı). İkinci guard uygulaması yok.
+- **Kurulum:** `installDesignSystem()` yerel yol kopyalar / https `git clone --depth 1`. Manifest'ı okunamayan paket **geri alınır** (yarım paket satırı kalmasın diye); var olan id → 409.
+- **Aktifleştirme:** `useDesignSystem()` paketin `DESIGN.md` + `tokens.css` dosyasını projenin `.lokma/` klasörüne kopyalar — `GET /api/design/guard` **zaten tam olarak bu yolu okuyor**, yani ikinci bir okuyucu yazılmadan üretimde görünür. Cezaevi paket **dizini**: id paterni + çözülmüş yolun katalog kökü içinde kalması.
+- **Ölçülen tuzak:** `os.homedir()` runtime'da **önbellekli** — probe içinde `process.env.HOME` değiştirmek onu taşımıyor. Bu yüzden katalog kökü `rootOverride` ile **açıkça enjekte** ediliyor; aksi halde test gerçek `~/.lokma`'ya yazardı (kontrol: probe sonrası `/root/.lokma/design/` altında `systems/` yok).
+
+**Kapılar:** birim probu **100/100** · `tsc --noEmit` **0** · sterilize concept build yeşil · mevcut `store.test.ts` **27/27** etkilenmedi.
+
+**Kalan (sonraki dilimler):** sunucu uçları (`GET` dizinden + `POST` kurulum + `POST :id/use`) → `design-chat.tsx` gruplu/arama'lı seçici + sistem rozeti → CLI `lokma design system list|add|use` → `scripts/probe-design-system-catalog.cjs` canlı probu (kapı `prob` maddesi).

@@ -26,6 +26,7 @@ import {
   type DesignType,
 } from './types.js';
 import { buildBundledResolved, type ResolvedSystem } from './systems.js';
+import type { DesignSkillPayload } from './skills.js';
 
 /** Built-in fallback when neither the request nor the config names a model. */
 export const DEFAULT_DESIGN_MODEL = 'anthropic/claude-sonnet-4-5';
@@ -76,7 +77,59 @@ export type DesignModelRequest = {
   type: DesignType;
   brief: string;
   system: DesignSystem;
+  /**
+   * REQ-192 — the SELECTED design skills, as real SKILL.md bodies. Absent (the
+   * common case) keeps every existing probe's prompt byte-identical.
+   */
+  skills?: DesignSkillPayload[];
 };
+
+/**
+ * REQ-192 — the `<design_skills>` prompt block. This carries the SKILL.md
+ * BODIES, not their names: a model given only "brutalist-web" learns nothing,
+ * and the whole point of the request ("tasarım skill'i seçilebilsin") is that
+ * the instruction actually reaches the generator.
+ *
+ * Bodies are truncated per skill at a share of the stored-HTML budget so a
+ * fat SKILL.md cannot crowd out the brief or the token table, and the marker
+ * says so rather than pretending the file was read in full.
+ */
+const SKILL_BODY_CHAR_CAP = 12_000;
+
+/** Per-skill budget that leaves room for several skills in one prompt. */
+const SKILL_TOTAL_CHAR_CAP = 32_000;
+
+/** Pure: render the skill block (empty string when nothing is selected). */
+export function buildDesignSkillsPrompt(skills?: DesignSkillPayload[]): string {
+  if (!skills || skills.length === 0) return '';
+  const parts: string[] = [];
+  let used = 0;
+  for (const s of skills) {
+    const room = Math.max(0, Math.min(SKILL_BODY_CHAR_CAP, SKILL_TOTAL_CHAR_CAP - used));
+    const body = room > 0 ? s.content.slice(0, room) : '';
+    const truncated = s.content.length > body.length;
+    if (!body) continue;
+    used += body.length;
+    parts.push(
+      [
+        `<skill name="${s.name}" id="${s.id}">`,
+        truncated
+          ? `${body}\n[truncated: ${s.content.length - body.length} of ${s.content.length} chars not shown]`
+          : body,
+        '</skill>',
+      ].join('\n'),
+    );
+  }
+  if (parts.length === 0) return '';
+  return [
+    '<design_skills>',
+    ...parts,
+    '</design_skills>',
+    '',
+    'The user explicitly selected the skills above for this artifact. Apply their',
+    'instructions to the design. They are authoritative for style, layout and copy.',
+  ].join('\n');
+}
 
 /**
  * The user message the model receives — pure, unit-testable (REQ-177).
@@ -102,7 +155,13 @@ export function buildDesignPrompt(req: DesignModelRequest, resolved?: ResolvedSy
         'No token table is bundled with this system id — read the values from the',
         'project DESIGN.md if present, otherwise pick a coherent neutral palette yourself.',
       ];
-  return [...head, ...tokenLines, '', TYPE_DIRECTIVES[req.type]].join('\n');
+  // REQ-192 — the selected skills sit between the token table and the
+  // per-type directive, so the directive stays the LAST word on the shape of
+  // the artifact while the skills own style/layout/copy. Empty (the default)
+  // contributes nothing, keeping every pre-REQ-192 probe byte-identical.
+  const skillsBlock = buildDesignSkillsPrompt(req.skills);
+  const skillsLines = skillsBlock ? ['', skillsBlock, ''] : [];
+  return [...head, ...tokenLines, ...skillsLines, TYPE_DIRECTIVES[req.type]].join('\n');
 }
 
 const HTML_START_RE = /<!doctype html|<html[\s>]/i;

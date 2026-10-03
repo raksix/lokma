@@ -5,5 +5,6 @@ export * from './model-call.js';
 export * from './tweak.js';
 export * from './store.js';
 export * from './systems.js';
+export * from './skills.js';
 export * from './raster.js';
 export * from './webm.js';

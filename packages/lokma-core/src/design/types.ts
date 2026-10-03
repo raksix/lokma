@@ -149,6 +149,21 @@ export type DesignVersion = {
   overall: number | null;
 };
 
+/**
+ * REQ-192 — one design skill recorded on an artifact manifest. `sentChars`
+ * is the honesty channel (§7): it says how much of the SKILL.md actually
+ * reached the model, so a truncated or empty skill is visible instead of
+ * being reported as "applied".
+ */
+export type DesignSkillApplied = {
+  id: string;
+  name: string;
+  /** Characters of SKILL.md handed to the model (the cap may cut it). */
+  sentChars: number;
+  /** SKILL.md bytes on disk, when known. */
+  bytes?: number;
+};
+
 export const DESIGN_VERSION_ORIGINS = ['generate', 'tweak', 'edit', 'revert'] as const;
 export type DesignVersionOrigin = (typeof DESIGN_VERSION_ORIGINS)[number];
 
@@ -162,6 +177,11 @@ export type DesignManifest = {
   system: DesignSystem;
   /** Model that generated the artifact (absent on pre-REQ-177 artifacts). */
   model?: string;
+  /**
+   * REQ-192 — the design skills this artifact was generated with (ids only;
+   * the bodies live in the prompt, not on disk). Absent = none selected.
+   */
+  skills?: DesignSkillApplied[];
   /** REQ-178 — absolute project dir when stored under a project (absent = global). */
   project?: string;
   createdAt: string;

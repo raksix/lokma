@@ -1,6 +1,6 @@
 # REQ-189 — Artifacts paneli açılır-kapanır olsun (sağda gizli panel)
 
-**Status:** pending
+**Status:** in-progress (tick 1/5 — state layer: snapshot + hook toggle)
 **Tarih:** 2026-10-02
 **Kaynak:** Kullanıcı mesajı (2 Ekim 2026):
 > "arttaki articfast açılır kapabilir olsun."

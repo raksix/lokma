@@ -306,9 +306,14 @@ export function SettingsModal({
             })}
           </nav>
 
-          // REQ-194 Kapsam 4 — only the Models section in full screen hands its
-          // height to the pane; every other section (and the default shell)
-          // keeps the body owning the scroll exactly as shipped.
+          {/* REQ-194 Kapsam 4 — only the Models section in full screen hands its
+              height to the pane; every other section (and the default shell)
+              keeps the body owning the scroll exactly as shipped.
+              This comment MUST stay in JSX comment braces: a bare line-comment
+              marker here is not a comment but JSX TEXT, and as an unbreakable
+              text node it became a flex item that pushed the whole body
+              off-screen (the Models split collapsed to a 0px middle column).
+              Gate: scripts/audit-jsx-text-comments.cjs. */}
           <div
             className={cn(
               'min-h-0 flex-1 p-4',

@@ -1,7 +1,7 @@
 # REQ-189 — Artifacts paneli açılır-kapanır olsun (sağda gizli panel)
 
-**Status:** in-progress (tick 2/5 — markup: the panel is a closable right column, cb5f1ed + 5403a3f)
-**Tarih:** 2026-10-02 · tur 2: 2026-10-03
+**Status:** done (3 Ekim 2026 — turlar 1-3: `7a75f83` `cb5f1ed` `5403a3f` `80c571b`; kapanış: bu kapanış docs commit'i)
+**Tarih:** 2026-10-02 · tur 2: 2026-10-03 · tur 3 (kapanış): 2026-10-03
 **Kaynak:** Kullanıcı mesajı (2 Ekim 2026):
 > "arttaki articfast açılır kapabilir olsun."
 
@@ -43,24 +43,26 @@
 
 ## Bitirme (done)
 
-1. Kontroller PASS + prob + ekran görüntüsü.
-2. Atomik İngilizce commit(ler) + push.
-3. Dosya: `Status: done` + hash'ler; `git mv` → `finished/`; README index + `Docs/00`.
+1. Kontroller PASS + prob + ekran görüntüsü. — **80c571b** (48/48, `ss1` boş durum + `ss2` panel açık)
+2. Atomik İngilizce commit(ler) + push. — `7a75f83` `cb5f1ed` `5403a3f` `80c571b` + kapanış
+3. Dosya: `Status: done` + hash'ler; `git mv` → `finished/`; README index + `Docs/00`. — bu commit
 
 ## Notlar
 
 - **Write-only:** kod yazılmadı.
 - Tasarım kararı: liste **gizli panel** olur ama **seçim sonrası kapanmaz** — kapatıp her seferinde açmak zorlamak, canvas'ı kullanan iş akışını bozar.
 
-## Uygulama (tick 1-2)
+## Uygulama (tick 1-3)
 
 - **tick 1 · `7a75f83`** — state katmanı: snapshot `artifactsPanel` (yalnız açık `true` geri yüklenir; `"true"`/`1`/bozuk payload paneli **kapalı** tutar) + `toggleArtifactsPanel()` tek yazar + birim testleri.
 - **tick 2 · `cb5f1ed`** — markup: `design-artboards.tsx` panel gövdesi oldu (arama, `SelectMenu` tip filtresi, canlı sandbox önizlemeler, 380-440px sağ kolon, kendi kaydırması, boş durum); `design-page.tsx` canvas+panel'i tek satıra aldı (panel kapanınca genişlik canvas'a geri döner), araç çubuğuna `aria-expanded`/`aria-controls` + sayı rozetli açma düğmesi, açılışta panele odak; Esc yalnız panel **mount** iken dinleyici kaydediyor.
+- **tick 3 · `5403a3f` + `80c571b`** — **kalan kabul kriteri ölçüldü.** İki tanesi daha önce ölçülmüyordu: (a) *"arama **çalışır**"* — varlığı değil **işlevi**: eşleşmeyen parça listeyi 0/4'e boşaltıyor, temizleme 4/4'ü geri getiriyor, gerçek bir brief parçası 3/4'e daraltıyor (parça DOM'dan okunuyor, uydurulmuyor); (b) *"0 artifact → dürüst boş durum"* — canlı hesap **her zaman** artifact'lı olduğu için bu kriter kendi kendine ASLA ölçülemiyordu (prob `listCount > 0` üzerinde atlayor ya da boş kartı `||` ile geçiyordu = hiçbir şey kanıtlamıyor). Çözüm: **tek sayılan okuma** (`GET /api/design/list`) stub'lanarak sıfır GERÇEK kılındı (uygulamanın kendisi değil metered okuma), sonra dürüst boş kartın çizildiği, sayacın `0/0` okuduğu, arama input'unun durduğu, taşma olmadığı ve panelin **hâlâ** açılıp kapandığı ölçüldü; stub kaldırılıp sayfa yeniden yüklendi (hesap bulunduğu gibi bırakıldı).
 
-### Ölçülen kapılar (tick 2)
+### Ölçülen kapılar (tick 3 — kapanış)
 
-- Birim: design 67/67 · kök `bun x tsc --noEmit` 0 · sterilize build yeşil.
-- Canlı: `pm2 restart lokma-web` → servis edilen bundle `index-DTS946yu.js` == disk; token'siz `/api/auth/me` **401** (login gate açık).
-- Yeni prob `scripts/probe-design-artifacts-panel.cjs` **39/39**: varsayılan kapalı (DOM'da yok), canvas 1115px → açınca 695px, panel 420px sağda, aria bağı çözülüyor, seçim paneli kapatmıyor ve canvas'ı değiştiriyor, Esc ve X kapatıyor, reload sonrası durum korunuyor, 1500px ve 390px'te taşma yok. Ayrıca **aramanın gerçekten filtrelediği** ölçülüyor (`5403a3f`): eşleşmeyen parça listeyi 0/4'e boşaltıyor, temizleme 4/4'ü geri getiriyor, gerçek bir brief parçası ("probe") 3/4'e daraltıyor — parça DOM'dan okunuyor, uydurulmuyor.
-- **Kardeş prob'lar**: `[data-design-strip]` artık sadece panel açıkken var; `probe-design-visual.cjs` ve `probe-design-studio-layout.cjs` paneli önce açıyor (layout probunda **strip kontrolünden önce** — sonra açmak kapalı paneli okuyup alakasız kırmızı veriyor).
-- **Regresyon tabanı (ölçüldü, tahmin değil):** bu değişiklik `git stash` ile geri alınıp yeniden build+koşuldu — `probe-design-studio-layout` değişiklik **öncesi 9**, **sonrası 7** failure. 7'si aynı: Generate sonrası zincir (canlı model kredisi gerektiriyor). Çıkan 2 fark, özelliği olmayan baseline'da **var olamayacak** olan yeni panel kontrolleri. Yani hiçbir yeşil kontrol kaybolmadı.
+- **Canlı prob `scripts/probe-design-artifacts-panel.cjs` 48/48 PASS** (39/39 → 48/48): varsayılan kapalı (DOM'da yok), canvas 1115px → açınca 695px (panel 420px, canvas.right == panel.left == 1075), `aria-expanded` false→true + `aria-controls` panel id'sini çözüyor, açılışta odak panele, 0 native `<select>`, arama gerçekten filtreliyor, seçim paneli kapatmıyor ve canvas `src`'si değişiyor, Esc + X kapatıyor, reload sonrası durum korunuyor, **ZORLA boş durum** dürüst kart + `0/0` + taşma yok, 1500px ve 390px'te taşma yok, 0 JS hatası.
+- Birim: design **67/67** · kök `bun x tsc --noEmit` **0 hata**.
+- Canlı dağıtım: servis edilen bundle `index-DTS946yu.js` == disk `web/dist` (prob **deployed** bundle'a karşı koştu) · token'siz `/api/auth/me` **401** (login gate AÇIK kalmadı).
+- **Bu tick'te ürün kodu değişmedi** — yalnız prob + iki ekran görüntüsü + bu doküman; web paketlemesi değişmediği için rebuild/pm2 restart gerektirmedi (prob zaten canlı dağıtımı sürüyor).
+- **Kesilmiş turdan kurtarma:** bu turun başında ağaç kirliydi — REQ-189'un boş-durum prob uzantısı commit'siz, ayrıca REQ-183 kesintisinden kalan iki yetim prob (`probe-live-write.ts`, `probe-live-write-full.ts`) sahipsiz duruyordu. Talimat gereği silmek yerine ölçüp **adopt** edildi: ikisi de credential taşımıyor (`resolveApiKey` ile çalışma anında çözüyor), `bun build --no-bundle` ile parse temiz, REQ-183'ün gerçek kayıt/registry probu ikilisinin tamamlayıcısı → `e2e908f`.
+- **Tuzak notu:** `.git/index.lock` 34 dakika yaşında ve `pgrep -x git` boştu → **kilit eskiydi**, silindi (`pgrep -f` kendi komut satırınla eşleşir, yanlış "aktif yazar" sinyali verir).

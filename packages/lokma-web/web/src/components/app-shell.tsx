@@ -15,7 +15,6 @@ import { LayoutGrid, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePaneStore } from '@/stores/pane';
 import { DEFAULT_LEFT_WIDTH, DEFAULT_RIGHT_WIDTH } from '@/stores/layout';
-import { HealthBadge } from '@/components/status/health-badge';
 import { useWs } from '@/hooks/use-ws';
 import { api, type MetricsRes } from '@/lib/api';
 import { useInstanceBootstrapped } from '@/lib/bootstrapped';
@@ -634,20 +633,11 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     return () => window.removeEventListener(SHOW_SHORTCUTS_EVENT, open);
   }, []);
 
-  // REQ-043 — the Explorer panel keeps sessions + the server card wherever
-  // the swap puts it; files moved to the Inspector's own Files page.
-  const explorerContent = (
-    <div className="space-y-4">
-      <SessionsSidebar activeId={activeId} onSelect={switchSession} />
-      <div className="rounded border border-dashed p-3 text-xs text-muted-foreground">
-        <div className="font-medium text-foreground">Server</div>
-        <div className="mt-1 flex items-center gap-2">
-          <HealthBadge />
-          <span>Fastify :3456</span>
-        </div>
-      </div>
-    </div>
-  );
+  // REQ-195 — the Explorer panel is the session list ONLY; the server card that
+  // used to sit under it is gone (same call as REQ-175 on the header badge).
+  // Reachability stays visible in the footer (`gateway · Nms` / `gateway down`)
+  // and Settings → General keeps its server line, so nothing is lost.
+  const explorerContent = <SessionsSidebar activeId={activeId} onSelect={switchSession} />;
 
   // REQ-043 — Inspector and Explorer are SEPARATE pages now (supersedes the
   // REQ-034 docking): the FileBrowser lives ONLY behind the rail's Files

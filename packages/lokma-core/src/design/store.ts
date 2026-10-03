@@ -482,7 +482,14 @@ export async function updateArtifactHtml(
   htmlRaw: unknown,
   cwdRaw?: unknown,
   expectedShaRaw?: unknown,
-): Promise<{ id: string; manifest: DesignManifest; critique: CritiqueResult; currentVersion: number }> {
+): Promise<{
+  id: string;
+  manifest: DesignManifest;
+  critique: CritiqueResult;
+  currentVersion: number;
+  /** sha256 of the body just written — the next write's lock token. */
+  sha: string;
+}> {
   const cwd = await resolveDesignCwd(cwdRaw);
   const root = designRootOf(cwd);
   const id = assertArtifactId(idRaw);
@@ -493,7 +500,15 @@ export async function updateArtifactHtml(
     origin: 'edit',
     note: 'manual code edit',
   });
-  return { id, manifest: next, critique, currentVersion: normalizeVersions(next.versions).length };
+  const versions = normalizeVersions(next.versions);
+  const last = versions[versions.length - 1];
+  return {
+    id,
+    manifest: next,
+    critique,
+    currentVersion: versions.length,
+    sha: last ? last.sha : sha256Hex(html),
+  };
 }
 
 /**

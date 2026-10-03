@@ -209,6 +209,8 @@ export function useDesignStudio(): DesignStudio {
   // then never cleared, so the page sat on "Loading artifacts…" forever).
   const listRunRef = React.useRef(0);
   const detailRunRef = React.useRef(0);
+  /** REQ-190 — sha256 of the currently loaded body; the `expectedSha` lock token. */
+  const detailShaRef = React.useRef('');
 
   // Persist the remembered pieces on every change (cheap, serialized JSON).
   React.useEffect(() => {
@@ -269,9 +271,15 @@ export function useDesignStudio(): DesignStudio {
     setDetailLoading(true);
     setDetailError(null);
     setDetail(null);
+    detailShaRef.current = '';
     try {
       const res = await api.getDesign(id, cwd || undefined);
       if (detailRunRef.current !== run) return;
+      // REQ-190 — remember the sha of the body we just loaded. Both mutating
+      // writes (Code-tab save, tweak) send it back as `expectedSha`, so a
+      // write against a body the server has since changed is refused with 409
+      // instead of silently overwriting a version the user never saw.
+      detailShaRef.current = res.sha ?? '';
       setDetail({ manifest: res.manifest, critique: res.critique });
       setHtmlEdit(res.html);
       setHtmlError(null);
@@ -377,7 +385,15 @@ export function useDesignStudio(): DesignStudio {
     setSaving(true);
     setHtmlError(null);
     try {
-      const saved = await api.saveDesignHtml(selected, parsed.html, projectCwd || undefined);
+      const saved = await api.saveDesignHtml(
+        selected,
+        parsed.html,
+        projectCwd || undefined,
+        detailShaRef.current || undefined,
+      );
+      // The write moved the body on: adopt the new sha so a second save in the
+      // same pane is not immediately refused by its own first save.
+      detailShaRef.current = saved.sha ?? detailShaRef.current;
       setDetail({ manifest: saved.manifest, critique: saved.critique });
       pushEvent('ok', `HTML saved — viewer rebuilt, overall ${saved.critique.overall}/10`);
       toast(`Saved ${selected} — viewer rebuilt, overall ${saved.critique.overall}/10`);
@@ -455,6 +471,8 @@ export function useDesignStudio(): DesignStudio {
       toast(`Deleted ${target}`);
       setSelected(null);
       setDetail(null);
+      // The deleted artifact's lock token goes with it.
+      detailShaRef.current = '';
       setDetailError(null);
       setHtmlEdit('');
       setDrawer(null);
@@ -495,6 +513,7 @@ export function useDesignStudio(): DesignStudio {
       const res = await api.tweakDesign(selected, {
         note: tweakNote.trim(),
         ...(projectCwd ? { cwd: projectCwd } : {}),
+        ...(detailShaRef.current ? { expectedSha: detailShaRef.current } : {}),
       });
       pushEvent(
         'ok',
@@ -564,6 +583,9 @@ export function useDesignStudio(): DesignStudio {
     setProjectCwd((current) => (current === value ? current : value));
     setSelected(null);
     setDetail(null);
+    // The lock token dies with the body it described — carrying it into the
+    // next artifact would make the first write there a guaranteed 409.
+    detailShaRef.current = '';
     setDetailError(null);
     setHtmlEdit('');
     setDrawer(null);

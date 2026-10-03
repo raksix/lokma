@@ -102,11 +102,15 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
+  // REQ-190: the manual Code-tab edit is a mutating write like any tweak, so
+  // it takes the SAME optimistic lock (409 `stale_version`) instead of
+  // silently overwriting a body the pane never loaded. A stale edit is refused
+  // rather than applied on top of an unseen change.
   app.put('/api/design/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const body = (req.body ?? {}) as { html?: unknown; cwd?: unknown };
+    const body = (req.body ?? {}) as { html?: unknown; cwd?: unknown; expectedSha?: unknown };
     try {
-      return { ok: true, ...(await updateArtifactHtml(id, body.html, body.cwd)) };
+      return { ok: true, ...(await updateArtifactHtml(id, body.html, body.cwd, body.expectedSha)) };
     } catch (e) {
       if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
       throw e;

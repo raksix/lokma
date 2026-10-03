@@ -630,7 +630,15 @@ export type DesignDetailRes = {
 };
 export type GenerateDesignBody = { type: string; brief: string; system?: string; model?: string; cwd?: string };
 export type GenerateDesignRes = { ok: boolean; id: string; manifest: DesignManifest; critique: CritiqueResult };
-export type SaveDesignRes = { ok: boolean; id: string; manifest: DesignManifest; critique: CritiqueResult };
+export type SaveDesignRes = {
+  ok: boolean;
+  id: string;
+  manifest: DesignManifest;
+  critique: CritiqueResult;
+  /** REQ-190 — sha256 of the body just written; the lock token for the next write. */
+  sha?: string;
+  currentVersion?: number;
+};
 export type CritiqueDesignRes = { ok: boolean; id: string; critique: CritiqueResult };
 /**
  * REQ-190 — one ledger entry. `n` is monotonic (v1 = the first body) and
@@ -1459,11 +1467,16 @@ export const api = {
   generateDesign: (body: GenerateDesignBody) => post<GenerateDesignRes>('/api/design/generate', body),
   getDesign: (id: string, cwd?: string) =>
     get<DesignDetailRes>(designCwdQuery(`/api/design/${encodeURIComponent(id)}`, cwd)),
-  /** Persist an edited HTML document — server validates + re-critiques. */
-  saveDesignHtml: (id: string, html: string, cwd?: string) =>
+  /**
+   * Persist an edited HTML document — server validates + re-critiques.
+   * REQ-190: `expectedSha` is the optimistic lock, exactly like the tweak's —
+   * a pane holding a body the server has since changed is refused with 409
+   * `stale_version` instead of overwriting a version the user never saw.
+   */
+  saveDesignHtml: (id: string, html: string, cwd?: string, expectedSha?: string) =>
     request<SaveDesignRes>(`/api/design/${encodeURIComponent(id)}`, {
       method: 'PUT',
-      body: JSON.stringify(cwd ? { html, cwd } : { html }),
+      body: JSON.stringify({ html, ...(cwd ? { cwd } : {}), ...(expectedSha ? { expectedSha } : {}) }),
     }),
   /** Remove the whole on-disk dir (artifact.json + html + design.md + critique). */
   deleteDesign: (id: string, cwd?: string) =>

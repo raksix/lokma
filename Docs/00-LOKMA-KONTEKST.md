@@ -142,6 +142,14 @@
 - **Ölçüm notu:** `lokma-server` restart'ında kardeş oturumun REQ-196 dosyasındaki çift bildirim yüzünden çöktü; dosya kendiliğinden düzeldi, dist yeniden derlenip sunucu online + `/health 200` oldu. Kardeşin `tools/parse.*` işi **dokunulmadan** commit dışı bırakıldı.
 - **Kalan:** versiyon seçici/geri alma UI · düzenlenebilir alan yüzeyleri · `lokma-shared` alanları · `probe-design-tweak-versions.cjs`.
 
+### 2026-10-03 — REQ-193 tur 5/5: pane iframe'i sunucu proxy'sine bağlandı + göreli-ref hatası (`90c72a5`, `045a5e9`)
+- **Kök neden (kullanıcıdaki hata):** pane hedefi iframe'e **doğrudan** veriyordu, yani `http://127.0.0.1:3014` **kullanıcının** tarayıcısına gidiyordu. Slice 1-4 (politika, rewriter, fetch, route) vardı ama **hiçbiri çağrılmıyordu** — proxy'nin varlığı işe yaramıyordu.
+- **Karar:** tek nokta `frameSrcFor()` — YouTube video native no-cookie embed, diğer YouTube sayfaları Piped, **her şey** sunucudan. Sıra embed → proxy (native yollar kalite kaybettirmiyor).
+- **Bulunan ürün hatası:** `<base href="/api/browser/proxy?url=…">` kök-göreli ref'leri kapsamıyor (spec: `/…` base'in origin'ine çözülür, query düşer) → sayfa asset'ini Lokma uygulamasından istiyordu (SPA 200). Slice 2 testleri geçiyordu çünkü hiçbiri render edilmiş belge ölçmüyordu; "`<base>` kapsar" assert'leri de aynı yanlış inancı kodluyordu — ikisi de düzeltildi.
+- **Kapılar:** url-policy 51/51 · rewrite 51/51 · fetch 43/43 · routes 23/23 · web browser 51/51 · allowlist probu 12/12 (negatif kontrol dahil) · canlı süreç probu 6/6 (route mount + SSRF + gate 401) · tsc 0 · sterilize build yeşil · canlı bundle disk ile eşleşti (`browser-pane-B_E2IgaJ.js`).
+- **Canlı ayrıntı:** `lokma-server` ayrı pm2 süreci — dist değişince **ikisi** restart edilmeli. `LOKMA_BROWSER_LOCAL_HOSTS` kapalıyken loopback 400 döner (tasarlanmış SSRF davranışı; remote kurulumda açılmalı).
+- **Kalan:** kapsam 4 (tunnel), 7 (çerez sınırı davranışı), 5 (`ui_action` proxy tablosu), ekran görüntüsü kanıtı.
+
 ## Bekleyen Sorular (Furkan'a)
 - [x] GitHub repo: `raksix/lokma` PUBLIC — done 2026-08-31
 - [x] İlk provider multi-provider (Anthropic + OpenAI/DeepSeek/Google/Ollama/OpenRouter) — specced

@@ -604,6 +604,27 @@ export function DesignPage() {
             <span className="min-w-0 truncate text-zinc-500">
               {s.sel ? `${s.sel.type} · ${s.sel.system} · ${formatUpdated(s.sel.updatedAt)}` : 'No artifact selected'}
             </span>
+            {/* REQ-191 — the selected artifact's design system, named by the
+                CATALOG row (its real label + taxonomy), not by the raw id.
+                A bundled id with no catalog row stays visible and says
+                "preset": a row that silently disappeared would read as a
+                missing feature. */}
+            {s.sel ? (
+              <span
+                data-design-system-badge
+                title={
+                  s.systemMeta
+                    ? `${s.systemMeta.label} — ${s.systemMeta.category}` +
+                      (s.systemMeta.origin === 'catalog' ? ' (installed package)' : ' (built-in preset)')
+                    : 'Unknown design system — not in the installed catalog'
+                }
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line bg-muted/40 px-1.5 py-0.5 text-[10px] text-zinc-500"
+              >
+                <Palette className="h-2.5 w-2.5" />
+                System: {s.systemMeta ? s.systemMeta.label : s.sel.system}
+                {s.systemMeta && s.systemMeta.origin !== 'catalog' ? ' (preset)' : ''}
+              </span>
+            ) : null}
             <span className="ml-auto flex shrink-0 items-center gap-1">
               <Button
                 data-design-artifacts-toggle

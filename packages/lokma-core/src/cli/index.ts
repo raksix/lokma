@@ -19,6 +19,9 @@ Usage:
   lokma web [--port 3456]          Start web harness (Fastify + Vite SPA)
   lokma config get <key>           Read layered config
   lokma config set <dotted.key> <value>  Write to ~/.lokma/config.json
+  lokma design system list         List installed design system packages
+  lokma design system add <url|path>      Install a design system package
+  lokma design system use <id> [--cwd <dir>]  Activate it in a project
   lokma doctor                     Check config/creds/perms
   lokma agent list                 List agents (live registry)
   lokma --help | --version
@@ -33,6 +36,8 @@ async function main(): Promise<void> {
       model: { type: 'string' },
       session: { type: 'string' },
       prompt: { type: 'string', short: 'p' },
+      // REQ-191 — `lokma design system use <id> --cwd <project>`.
+      cwd: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
     },
@@ -175,6 +180,20 @@ for slash commands. Non-interactive shells require -p.
     const agents = await listAgents();
     console.log(`Agents: ${agents.length} (maxAgents 20, maxConcurrent 5)`);
     for (const a of agents) console.log(` - ${a.id} (${a.persona}) [${a.state}] model=${a.model}`);
+    return;
+  }
+
+  // REQ-191 — `lokma design system …` (Docs/34 §5.1). Dispatched to its own
+  // module so the CLI stays a table of commands; the sub-verbs call the same
+  // design/systems.ts helpers the HTTP routes use.
+  if (cmd === 'design') {
+    const { runDesignSystemCli } = await import('./design-system.js');
+    // `lokma design system list` — the sub-verb lives behind BOTH `design` and
+    // `system`, so drop `system` when it is there and hand the rest over.
+    // Slicing a fixed offset instead would answer "Unknown subcommand: design
+    // system system" for the documented invocation.
+    const rest = positionals.slice(1);
+    await runDesignSystemCli(rest[0] === 'system' ? rest.slice(1) : rest, { cwd: values.cwd });
     return;
   }
 

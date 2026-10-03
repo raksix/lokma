@@ -5,6 +5,8 @@ import {
   type CritiqueResult,
   type DesignGuard,
   type DesignManifest,
+  type DesignSkillRow,
+  type DesignSkillsRes,
   type DesignSystemCatalogRow,
   type DesignSystemsRes,
   type DesignVersion,
@@ -13,11 +15,13 @@ import { useProviderStore, useSessionStore } from '@/stores';
 import {
   DESIGN_TYPES,
   appendDesignEvent,
+  clearSkills,
   emptyGenerateForm,
   filterArtifacts,
   parseHtmlEdit,
   projectLabel,
   toRow,
+  toggleSkill,
   validateGenerateForm,
   validateTweakNote,
   type DesignEvent,
@@ -107,6 +111,30 @@ export type DesignStudio = {
   systems: DesignSystemCatalogRow[];
   /** REQ-191 — `catalog` (read from disk) vs `bundled` (the fallback table). */
   systemsSource: DesignSystemsRes['source'];
+  /**
+   * REQ-192 — the design-SKILL catalog (`GET /api/design/skills`: installed
+   * `scope: design` SKILL.md files, grouped). A SECOND axis beside systems, and
+   * the selection itself lives in `form.skills` so it rides the snapshot.
+   */
+  skills: DesignSkillRow[];
+  /** REQ-192 — the group taxonomy the server answers, in display order. */
+  skillGroups: string[];
+  /** REQ-192 — how many scanned skills were excluded for lacking `scope: design`. */
+  skillsUnscoped: number;
+  /** REQ-192 — toggle one skill id in/out of the selection (the only writer). */
+  toggleSkill: (id: string) => void;
+  /** REQ-192 — drop every selected skill (the picker's Reset). */
+  resetSkills: () => void;
+  /**
+   * REQ-192 — the SKILL.md preview of the LAST toggled selection, read through
+   * the shared `/api/skills/:id` endpoint (no second reader). `null` while
+   * loading or when nothing is being previewed.
+   */
+  skillPreview: { id: string; name: string; content: string } | null;
+  skillPreviewLoading: boolean;
+  skillPreviewError: string | null;
+  /** REQ-192 — open the preview for one selected id (null closes it). */
+  previewSkill: (id: string | null) => void;
   guard: DesignGuard | null;
   systemMeta: DesignSystemCatalogRow | undefined;
   /** REQ-172 — session activity chips for the chat thread (newest last). */
@@ -182,6 +210,21 @@ export function useDesignStudio(): DesignStudio {
   // REQ-191 — which list the picker is showing; a bundled fallback must not
   // be rendered as if it were the installed catalog.
   const [systemsSource, setSystemsSource] = React.useState<DesignSystemsRes['source']>('bundled');
+  // REQ-192 — the design-SKILL catalog + its taxonomy. `skillsUnscoped` is the
+  // honesty counter: it tells the UI WHY a skill the user installed is absent
+  // (it lacked `scope: design`), instead of an empty picker with no reason.
+  const [skills, setSkills] = React.useState<DesignSkillRow[]>([]);
+  const [skillGroups, setSkillGroups] = React.useState<string[]>([]);
+  const [skillsUnscoped, setSkillsUnscoped] = React.useState(0);
+  // REQ-192 — which selected skill's SKILL.md is on screen. Its own request
+  // sequence guard: two quick previews must not let the slower answer win.
+  const [skillPreview, setSkillPreview] = React.useState<{
+    id: string;
+    name: string;
+    content: string;
+  } | null>(null);
+  const [skillPreviewLoading, setSkillPreviewLoading] = React.useState(false);
+  const [skillPreviewError, setSkillPreviewError] = React.useState<string | null>(null);
   const [guard, setGuard] = React.useState<DesignGuard | null>(null);
   const [events, setEvents] = React.useState<DesignEvent[]>([]);
   const [drawer, setDrawer] = React.useState<DesignDrawer | null>(null);
@@ -255,6 +298,20 @@ export function useDesignStudio(): DesignStudio {
     } catch {
       setSystems([]);
       setSystemsSource('bundled');
+    }
+    // REQ-192 — the SKILL catalog is loaded beside the system catalog (both
+    // are picker data), but kept in its own state: merging them would defeat
+    // the whole point of the second axis. A failed load leaves an empty
+    // picker, never the system list standing in for skills.
+    try {
+      const res = await api.getDesignSkills();
+      setSkills(res.skills);
+      setSkillGroups(res.groups);
+      setSkillsUnscoped(res.unscoped);
+    } catch {
+      setSkills([]);
+      setSkillGroups([]);
+      setSkillsUnscoped(0);
     }
     try {
       const res = await api.getDesignGuard(cwd || undefined);
@@ -341,6 +398,67 @@ export function useDesignStudio(): DesignStudio {
     }
   }, [selected, projectCwd, loadVersions]);
 
+  // REQ-192 — the ONE SKILL.md reader. Both entry points (toggling a row in
+  // and pressing "read" on a chip) call it, so there is a single request path
+  // with a single sequence guard: two quick previews must not let the slower
+  // answer overwrite the newer one.
+  const skillPreviewRunRef = React.useRef(0);
+  const loadSkillPreview = React.useCallback((id: string) => {
+    setSkillPreviewLoading(true);
+    setSkillPreviewError(null);
+    const run = (skillPreviewRunRef.current += 1);
+    void api
+      .getSkill(id)
+      .then((res) => {
+        if (skillPreviewRunRef.current !== run) return;
+        setSkillPreview({ id, name: res.skill.name, content: res.content });
+      })
+      .catch((e: unknown) => {
+        if (skillPreviewRunRef.current !== run) return;
+        // Honest failure: the user is told the body could not be read rather
+        // than seeing an empty panel that reads like an empty skill.
+        setSkillPreview(null);
+        setSkillPreviewError(e instanceof Error ? e.message : 'skill preview failed');
+      })
+      .finally(() => {
+        if (skillPreviewRunRef.current === run) setSkillPreviewLoading(false);
+      });
+  }, []);
+
+  // The picker's only selection writer. The set semantics (cap, order, dedupe)
+  // live in the pure `toggleSkill`, so the multi SelectMenu stays a dumb
+  // per-click `onChange(value)`. Toggling a row also OPENS that skill's preview:
+  // picking a skill without being able to read what it says is exactly how
+  // "the skill was ignored" starts.
+  const selectSkill = React.useCallback(
+    (id: string) => {
+      setFormError(null);
+      setForm((f) => ({ ...f, skills: toggleSkill(f.skills, id) }));
+      loadSkillPreview(id);
+    },
+    [loadSkillPreview],
+  );
+
+  const resetSkills = React.useCallback(() => {
+    setFormError(null);
+    setForm((f) => ({ ...f, skills: clearSkills() }));
+    setSkillPreview(null);
+    setSkillPreviewError(null);
+  }, []);
+
+  /** Open the preview for one selected id; `null` closes the panel. */
+  const previewSkill = React.useCallback(
+    (id: string | null) => {
+      if (!id) {
+        setSkillPreview(null);
+        setSkillPreviewError(null);
+        return;
+      }
+      loadSkillPreview(id);
+    },
+    [loadSkillPreview],
+  );
+
   const runGenerate = React.useCallback(async () => {
     if (generatingRef.current) return;
     const local = validateGenerateForm(form);
@@ -358,15 +476,38 @@ export function useDesignStudio(): DesignStudio {
         system: form.system,
         model: form.model || undefined,
         cwd: projectCwd || undefined,
+        // REQ-192 — the ids travel as ids; the server resolves each to its
+        // SKILL.md body. Omitted when empty so a no-skill generation is the
+        // exact same request it was before this axis existed.
+        ...(form.skills.length > 0 ? { skills: form.skills } : {}),
       });
       // REQ-178 scope 6 — the narration names the project the artifact
       // actually landed in.
+      // REQ-192 — the manifest echoes WHICH skills were really sent (with the
+      // characters that reached the model), so the chat names them from the
+      // server's own answer instead of claiming "applied" from the selection.
+      const applied = res.manifest.skills ?? [];
+      const appliedText =
+        form.skills.length === 0
+          ? ''
+          : applied.length === form.skills.length
+            ? ` · skills: ${applied.map((sk) => sk.name).join(', ')}`
+            : ` · ${applied.length}/${form.skills.length} skills reached the model (rest unusable)`;
       pushEvent(
         'ok',
-        `Generated ${res.id} — overall ${res.critique.overall}/10 · → proje: ${projectLabel(projectCwd)}`,
+        `Generated ${res.id} — overall ${res.critique.overall}/10 → proje: ${projectLabel(projectCwd)}${appliedText}`,
       );
       toast(`Generated ${res.id} — overall ${res.critique.overall}/10`);
-      setForm((f) => ({ ...emptyGenerateForm, type: f.type, system: f.system, model: f.model }));
+      // The brief clears after the server accepted it; the SKILL selection is
+      // deliberately KEPT (it is a standing style choice for this project, not
+      // part of the one-off prompt), like Type/System/Model.
+      setForm((f) => ({
+        ...emptyGenerateForm,
+        type: f.type,
+        system: f.system,
+        model: f.model,
+        skills: f.skills,
+      }));
       await loadList(projectCwd, res.id);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'generate failed';
@@ -663,6 +804,15 @@ export function useDesignStudio(): DesignStudio {
     applySample,
     systems,
     systemsSource,
+    skills,
+    skillGroups,
+    skillsUnscoped,
+    toggleSkill: selectSkill,
+    resetSkills,
+    skillPreview,
+    skillPreviewLoading,
+    skillPreviewError,
+    previewSkill,
     guard,
     systemMeta,
     events,

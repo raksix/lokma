@@ -110,13 +110,57 @@ sterilize build yeşil (`index-D5NquoI8.js`) · `pm2 restart lokma-web` sonrası
 `data-design-skill-chip`, `data-design-skills-reset`,
 `data-design-skill-preview*`) servis edilen bundle'da **gerçekten** var.
 
-**Kalan dilimler:** (3) ayrı **şablon** ekseni (`GET /api/design/templates`);
-(4) `lokma design skill add` kurulum ucu; (5) marketplace'den kurulum +
-scope'suz skill dürüst uyarısı; (6) canlı tarayıcı probu
-`scripts/probe-design-skills-picker.cjs` (iki skill seç → **giden istek
-gövdesi** her iki SKILL.md içeriğini taşıyor).
+**Dilim 3 — ŞABLON EKSENİ (bitti, `f6e083a` · `df7581b`)**
+
+1. `packages/lokma-core/src/design/templates.ts` — **üçüncü katalog**:
+   sistem (palet) / skill (stil) / şablon (çıktı iskeleti) birbirinden
+   ayrı. `listDesignTemplates()` **gerçek dizin taraması**: repo
+   `design-templates/` + `~/.lokma/design/templates`; aynı id'de kurulu olan
+   paketlenmiş olanı gölgerler (id ile dedupe → hiçbir satır iki kez).
+   Sabit tablo **yok** — katalog bir dizin bırakmakla büyür.
+2. `parseTemplateSelection` **TEK** id kabul eder; iki şablon 400
+   (`too_many_templates`) — bir belgenin tek iskeleti vardır, iki iskeletin
+   ne anlama geldiği dürüstçe ifade edilemez. Bozuk id `bad_template` 400.
+3. `resolveDesignTemplate` **gerçek SKILL.md gövdesini** döner; bilinmeyen
+   404, gövdesiz/bozuk manifest 409 — sessiz düşme yok.
+4. **Ölçülen gerçek kusur (birim prob yakaladı):** paketlenmiş kök
+   `process.cwd()`'e göre çözülürse canlı sunucuda çalışır ama
+   `lokma design template list` başka bir dizinden **BOŞ katalog** bildirirdi.
+   Kök artık **modül-göreli önce** (5 seviye yukarı), cwd son çare olarak
+   çözülüyor.
+5. Prompt: `<design_template>` bloğu token tablosu ile `<design_skills>`
+   ARASINDA → iskelet → stil → tip direktifi sırası; 12k karakter kesme +
+   görünür `[truncated: …]`. Şablon bloğu stil **sahibi olmadığını** söyler
+   ("not by the template") — üç eksen karışmaz.
+6. `generateArtifact(…, templateRaw)` şablonu skill ile **aynı dürüstlük
+   kuralıyla** çözer (model çağrısından ÖNCE 404/409), `manifest.template`
+   `{ id, label, sentChars }` olarak yazılır; `POST /api/design/generate`
+   `template` alır, `GET /api/design/templates` kataloğu döner.
+7. **4 paketlenmiş şablon** (`design-templates/`): `pitch-deck` (deck),
+   `launch-page` (prototype), `app-shell` (mobile), `status-report`
+   (document) — gerçek iskelet + gerçek bölüm sırası, aksi halde katalog
+   ilk açılışta boş olurdu.
+
+**Ölçülen:** birim 55/55 (`templates.test.ts`) · mevcut design probları
+regresyonsuz (skills 44 · generate 24 · store 27 · systems 111 · tweak 44 ·
+versions 53 · raster 15 · webm 23) · kök `tsc --noEmit` 0 · shared → core →
+server build yeşil · **canlı prob 15/15**: katalog 4 şablon gruplu, token'siz
+`/api/design/templates` ve `/generate` **401** (gate AÇIK kaldı) · canlı hata
+yolları `too_many_templates` 400 / `bad_template` 400 (traversal dahil) /
+`template_not_found` 404 · canlı üretimde `manifest.template` + `sentChars`
+yazıldı · prob artefaktı silindi ve **silindiği doğrulandı** (tekrar 404).
+
+**Kalan dilimler:** (4) `lokma design template list|add` kurulum ucu;
+(5) Web composer'da şablon seçici (skil seçiciden **ayrı**, tekli) +
+önizleme; (6) canlı tarayıcı probu
+`scripts/probe-design-skills-picker.cjs` (iki skill + bir şablon seç →
+**giden istek gövdesi** ikisini de taşıyor).
 
 ## Notlar
 
 - **Write-only:** kod yazılmadı.
 - Bu dalga OpenDesign'ın **iki ayrı** kataloğunu (skill + şablon) bilinçli olarak ayırır; REQ-191 ise üçüncüsü (marka sistemi).
+- **Ölçüm tuzağı (bu dilim):** paketlenmiş katalog kökünü cwd'ye bağlamak
+  canlı sunucuda doğru görünür; yalnız paketin içinden koşan bir birim prob
+  yakalar. Kökün kaynağı sorusu için **bir yerden değil, İKİ yerden** çözülür.
+

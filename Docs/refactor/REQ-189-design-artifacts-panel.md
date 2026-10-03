@@ -1,6 +1,6 @@
 # REQ-189 — Artifacts paneli açılır-kapanır olsun (sağda gizli panel)
 
-**Status:** in-progress (tick 2/5 — markup: the panel is a closable right column, cb5f1ed)
+**Status:** in-progress (tick 2/5 — markup: the panel is a closable right column, cb5f1ed + 5403a3f)
 **Tarih:** 2026-10-02 · tur 2: 2026-10-03
 **Kaynak:** Kullanıcı mesajı (2 Ekim 2026):
 > "arttaki articfast açılır kapabilir olsun."
@@ -61,6 +61,6 @@
 
 - Birim: design 67/67 · kök `bun x tsc --noEmit` 0 · sterilize build yeşil.
 - Canlı: `pm2 restart lokma-web` → servis edilen bundle `index-DTS946yu.js` == disk; token'siz `/api/auth/me` **401** (login gate açık).
-- Yeni prob `scripts/probe-design-artifacts-panel.cjs` **35/35**: varsayılan kapalı (DOM'da yok), canvas 1115px → açınca 695px, panel 420px sağda, aria bağı çözülüyor, seçim paneli kapatmıyor ve canvas'ı değiştiriyor, Esc ve X kapatıyor, reload sonrası durum korunuyor, 1500px ve 390px'te taşma yok.
+- Yeni prob `scripts/probe-design-artifacts-panel.cjs` **39/39**: varsayılan kapalı (DOM'da yok), canvas 1115px → açınca 695px, panel 420px sağda, aria bağı çözülüyor, seçim paneli kapatmıyor ve canvas'ı değiştiriyor, Esc ve X kapatıyor, reload sonrası durum korunuyor, 1500px ve 390px'te taşma yok. Ayrıca **aramanın gerçekten filtrelediği** ölçülüyor (`5403a3f`): eşleşmeyen parça listeyi 0/4'e boşaltıyor, temizleme 4/4'ü geri getiriyor, gerçek bir brief parçası ("probe") 3/4'e daraltıyor — parça DOM'dan okunuyor, uydurulmuyor.
 - **Kardeş prob'lar**: `[data-design-strip]` artık sadece panel açıkken var; `probe-design-visual.cjs` ve `probe-design-studio-layout.cjs` paneli önce açıyor (layout probunda **strip kontrolünden önce** — sonra açmak kapalı paneli okuyup alakasız kırmızı veriyor).
 - **Regresyon tabanı (ölçüldü, tahmin değil):** bu değişiklik `git stash` ile geri alınıp yeniden build+koşuldu — `probe-design-studio-layout` değişiklik **öncesi 9**, **sonrası 7** failure. 7'si aynı: Generate sonrası zincir (canlı model kredisi gerektiriyor). Çıkan 2 fark, özelliği olmayan baseline'da **var olamayacak** olan yeni panel kontrolleri. Yani hiçbir yeşil kontrol kaybolmadı.

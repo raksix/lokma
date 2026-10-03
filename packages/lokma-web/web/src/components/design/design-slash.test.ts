@@ -41,10 +41,19 @@ assert(new Set(DESIGN_SLASH_COMMANDS.map((c) => c.id)).size === DESIGN_SLASH_COM
 
 // 2. `/new` clears the draft but keeps the style axes (the user picked them).
 {
-  const start: GenerateForm = { type: 'deck', brief: 'old brief', system: 'omp-dark', model: 'm/x' };
+  const start: GenerateForm = {
+    type: 'deck',
+    brief: 'old brief',
+    system: 'omp-dark',
+    model: 'm/x',
+    skills: ['brutalist-web'],
+  };
   const { form } = run('new', '', start);
   assert(form.brief === '', '/new clears the brief');
   assert(form.type === 'deck' && form.system === 'omp-dark', '/new keeps type + system');
+  // REQ-192 — the skill selection is a style axis too: `/new` is a draft reset,
+  // not a "forget what I picked" action.
+  assert(form.skills.join(',') === 'brutalist-web', '/new keeps the picked skills');
 }
 
 // 3. `/type` accepts a name AND a 1-based index; both write the real enum value.

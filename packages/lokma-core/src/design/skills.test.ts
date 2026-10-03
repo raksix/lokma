@@ -131,7 +131,7 @@ check('unknown frontmatter group lands on Other', listed.skills.some((s) => s.id
 check('a11y alias maps to the Accessibility group', listed.skills.find((s) => s.id.endsWith('a11y-basics'))?.group === 'Accessibility');
 check('a deleted SKILL.md lists as invalid, not silently healthy', (() => {
   const row = listed.skills.find((s) => s.id.endsWith('empty-design'));
-  return row && row.hasBody === false && typeof row.problem === 'string' && row.problem.length > 0;
+  return row !== undefined && row.hasBody === false && typeof row.problem === 'string' && row.problem.length > 0;
 })());
 check('catalog reports the invalid count', listed.invalid === 1);
 check('catalog echoes the scope it filtered on', listed.scope === 'design');

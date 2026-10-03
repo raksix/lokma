@@ -1,23 +1,29 @@
 import {
   DESIGN_EXPORTS,
   DESIGN_SAMPLES,
+  DESIGN_SKILL_SELECT_CAP,
   DESIGN_SYSTEMS,
   DESIGN_TYPES,
   DESIGN_TWEAK_FIELDS,
   appendDesignEvent,
   artifactBadge,
   buildFieldTweakNote,
+  clearSkills,
   emptyGenerateForm,
   fieldControl,
   fieldCurrentValue,
   fieldOptions,
   filterArtifacts,
   formatUpdated,
+  groupSkillRows,
+  normalizeSkillIds,
   overallLabel,
   parseHtmlEdit,
   projectLabel,
   scoreTone,
+  skillSelectionLabel,
   toRow,
+  toggleSkill,
   validateGenerateForm,
   validateTweakNote,
   versionAfterRevert,
@@ -88,6 +94,90 @@ const rows: NormalizedArtifact[] = [
     validateGenerateForm({ ...emptyGenerateForm, brief: 'x', model: 'commandcode/deepseek/deepseek-v4.1-flash' }) === null,
   );
   check('overlong model id rejected', validateGenerateForm({ ...emptyGenerateForm, brief: 'x', model: 'm'.repeat(201) }) !== null);
+  // REQ-192 — skills are OPTIONAL and the client only owns the shape + the cap
+  // (membership belongs to the per-machine catalog the server reads).
+  check(
+    'no skills is valid (the axis is optional)',
+    validateGenerateForm({ ...emptyGenerateForm, brief: 'x', skills: [] }) === null,
+  );
+  check(
+    'a well-formed skill id the client has never seen passes the client',
+    validateGenerateForm({ ...emptyGenerateForm, brief: 'x', skills: ['brand-voice'] }) === null,
+  );
+  check(
+    'a malformed skill id is refused locally',
+    validateGenerateForm({ ...emptyGenerateForm, brief: 'x', skills: ['../escape'] }) !== null,
+  );
+  check(
+    'over the skill cap is refused client-side too',
+    validateGenerateForm({
+      ...emptyGenerateForm,
+      brief: 'x',
+      skills: Array.from({ length: DESIGN_SKILL_SELECT_CAP + 1 }, (_, i) => 'skill-' + i),
+    }) !== null,
+  );
+  check('the empty form carries no skills', emptyGenerateForm.skills.length === 0);
+}
+
+// REQ-192 — the design-SKILL selection: one pure writer (`toggleSkill`) that
+// the multi SelectMenu's per-click onChange delegates to.
+{
+  check('toggle adds', toggleSkill([], 'brand-voice').join(',') === 'brand-voice');
+  check('toggle removes', toggleSkill(['brand-voice'], 'brand-voice').length === 0);
+  check(
+    'toggle keeps pick order (no shuffle)',
+    toggleSkill(['a-skill', 'b-skill'], 'c-skill').join(',') === 'a-skill,b-skill,c-skill',
+  );
+  check('toggle trims', toggleSkill([], '  brand-voice  ').join(',') === 'brand-voice');
+  check('toggle refuses junk without throwing', toggleSkill(['a-skill'], '../escape').join(',') === 'a-skill');
+  check('toggle refuses an empty id', toggleSkill(['a-skill'], '   ').join(',') === 'a-skill');
+  // The cap is the SERVER cap mirrored here: a 9th pick is dropped, not sent.
+  const eight = Array.from({ length: DESIGN_SKILL_SELECT_CAP }, (_, i) => 'skill-' + i);
+  check('the cap holds', toggleSkill(eight, 'one-too-many').length === DESIGN_SKILL_SELECT_CAP);
+  // Removing below the cap still works — a full list is not a locked list.
+  check('a full list can still shrink', toggleSkill(eight, eight[0]!).length === DESIGN_SKILL_SELECT_CAP - 1);
+  check('clear empties the selection', clearSkills().length === 0);
+
+  check('normalize drops a non-array', normalizeSkillIds('brand-voice').length === 0);
+  check('normalize drops non-strings', normalizeSkillIds(['a', 7, null, {}]).join(',') === 'a');
+  check('normalize dedupes', normalizeSkillIds(['a', 'a', 'b']).join(',') === 'a,b');
+  check('normalize drops a path escape', normalizeSkillIds(['../escape', 'a']).join(',') === 'a');
+  check(
+    'normalize enforces the cap',
+    normalizeSkillIds(Array.from({ length: 40 }, (_, i) => 'skill-' + i)).length === DESIGN_SKILL_SELECT_CAP,
+  );
+
+  const names = new Map([
+    ['brand-voice', 'Brand voice'],
+    ['brutalist-web', 'Brutalist web'],
+  ]);
+  check('empty selection offers the picker', skillSelectionLabel([], names) === 'None selected');
+  check('one skill is named', skillSelectionLabel(['brand-voice'], names) === 'Brand voice');
+  check('an unknown id falls back to itself', skillSelectionLabel(['zzz'], names) === 'zzz');
+  check(
+    'several skills show the count and the first name',
+    skillSelectionLabel(['brand-voice', 'brutalist-web'], names) === '2 skills · Brand voice +1',
+  );
+
+  const grouped = groupSkillRows(
+    [
+      { group: 'Style', name: 'brutalist-web' },
+      { group: 'Style', name: 'Editorial serif' },
+      { group: 'Accessibility', name: 'accessibility-basics' },
+      { group: 'Mystery', name: 'unknown-group' },
+    ],
+    ['Style', 'Layout', 'Accessibility'],
+  );
+  check('groups follow the server taxonomy', grouped.map((g) => g.label).join(',') === 'Style,Accessibility,Mystery');
+  // The sort is the shared `localeCompare` the server catalog uses — assert the
+  // CONTRACT (a stable, localeCompare-ordered list), not a guessed collation.
+  check(
+    'rows sort by name inside a group',
+    grouped[0]?.rows.map((r) => r.name).join(',') ===
+      [...grouped[0]!.rows].sort((a, b) => a.name.localeCompare(b.name)).map((r) => r.name).join(','),
+  );
+  check('an off-taxonomy group still lists last', grouped.at(-1)?.rows[0]?.name === 'unknown-group');
+  check('a blank group falls back to Other', groupSkillRows([{ group: '  ', name: 'x' }], ['Style'])[0]?.label === 'Other');
 }
 
 // filterArtifacts — type filter + search.
@@ -159,6 +249,24 @@ const rows: NormalizedArtifact[] = [
   check('snapshot: restores the picked model (REQ-177)', restoredModel.form.model === 'commandcode/deepseek/deepseek-v4.1-flash');
   check('snapshot: overlong model dropped', parseDesignPageSnapshot(JSON.stringify({ form: { model: 'x'.repeat(201) } })).form.model === '');
   check('snapshot: non-string model dropped', parseDesignPageSnapshot(JSON.stringify({ form: { model: 7 } })).form.model === '');
+  // REQ-192 — the picked skills ride the snapshot (the REQ's "survives a
+  // reload" criterion) and are restored on SHAPE only, never against catalog
+  // membership: the installed catalog is per-machine.
+  const withSkills = parseDesignPageSnapshot(
+    JSON.stringify({ form: { brief: 'seed', skills: ['brand-voice', 'brutalist-web'] } }),
+  );
+  check('snapshot: restores the picked skills', withSkills.form.skills.join(',') === 'brand-voice,brutalist-web');
+  check(
+    'snapshot: drops junk skill entries',
+    parseDesignPageSnapshot(JSON.stringify({ form: { skills: ['ok-skill', '../escape', 9] } })).form.skills.join(',') ===
+      'ok-skill',
+  );
+  check('snapshot: a missing skills field restores empty', parseDesignPageSnapshot('{}').form.skills.length === 0);
+  check(
+    'snapshot: an over-cap skills list is trimmed',
+    parseDesignPageSnapshot(JSON.stringify({ form: { skills: Array.from({ length: 30 }, (_, i) => 'skill-' + i) } }))
+      .form.skills.length === DESIGN_SKILL_SELECT_CAP,
+  );
 }
 
 // REQ-178 — the snapshot also remembers the project cwd, and the label

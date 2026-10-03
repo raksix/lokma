@@ -150,6 +150,16 @@
 - **Canlı ayrıntı:** `lokma-server` ayrı pm2 süreci — dist değişince **ikisi** restart edilmeli. `LOKMA_BROWSER_LOCAL_HOSTS` kapalıyken loopback 400 döner (tasarlanmış SSRF davranışı; remote kurulumda açılmalı).
 - **Kalan:** kapsam 4 (tunnel), 7 (çerez sınırı davranışı), 5 (`ui_action` proxy tablosu), ekran görüntüsü kanıtı.
 
+### 2026-10-03 — REQ-193 slice 9: login duvarı tespiti + panelde dürüst yönlendirme (Kapsam 7'nin eksik yarısı)
+- **Kök neden:** proxy kendi origin'inde döndüğü ve **çerez iletmediği** için (bilinçli, slice 4) login gereken bir sayfa panelde **ölü bir giriş formu** olarak çıkıyordu — kullanıcı formu dolduruyor, hiçbir şey olmuyor; hata gibi okunuyor.
+- **Karar:** sınıflandırma **tek** modülde (`packages/lokma-core/src/browser/login-wall.ts`, `detectLoginWall`); sunucu onu `x-lokma-login-wall` **başlığı** olarak yazar (yalnız doğruysa), panel o başlığı okur — istemci sayfayı yeniden ayrıştırmaz, cümleden bilgi çıkarmaz (slice 7/8'in kapattığı prose-in-a-data-field deliği).
+- **Kapılar:** birim 19/19 (mutasyonla kanıtlandı: uzunluk koruması devre dışı → kırmızı, byte-aynı geri alma) · `browser` 55/55 · url-policy 51/51 · cloud/tunnel 37/37 · rewrite 51/51 · fetch 43/43 · routes 23/23 · settings-modal 38/38 · canlı route probu 14/14 · **canlı panel probu 12/12** · proxy allowlist 12/12 · tunnel route 20/20 · kök tsc 0 · 3 paket build yeşil · canlı bundle == disk (`index-BIh-4yN3.js`).
+- **Ölçülebilir tuzaklar (hepsi bu turun kendi hatasıydı, ürün hatası değil):** (1) **sıfır eşleşen selector** iki denemede "özellik yok" dedi — gerçek giriş `shell/inspector-rail.tsx`'te `aria-label={label}`, ama **rail kabı** (`aria-label="Inspector rail"`) ile birlikte kapsanmalı (aynı etiket Activity bar'da da var); sıfır-isabetli selector **çökmeli**. (2) **cwd-kapsamlı + sayfalanmış listede "yok" = "silinmiş" demek değil** — temizlik kontrolü yanlış yeşildi, oturum yaşıyordu; artık oturum **doğrudan GET** ile yokluğu kanıtlıyor. (3) **Görüntü yolu hatası `existsSync`'i aynı yanlış yolda doğrulayıp** yeşil verdi (`packages/Docs/` stray'i); yol repo kökünden çözülüyor, yakalama pane'in tamamını alıyor (OCR metni okudu: "Bu sayfa giriş istiyor. Harici sekmede aç").
+- **Yanlış teşhis ve düzeltmesi:** banner 199×400 ölçülünce "flex shrink-to-fit" sanıldı ve `w-auto` eklendi — **yanlıştı**: `left:8px` **ve** `right:8px` ölçülmüştü, kutu parent'ı dolduruyordu (215−16=199); dar olan seeded layout'ın **pane'i**ydi. `w-auto` geri alındı, assert'ler genişlik yerine **parent'a göre dolma** + en-boy oranına çevrildi. **Kural: mutlak konumlandırılmış bir kutunun `right`'ı da ölçülmeden "genişlik eksik" denmez.**
+- **Ekran kanıtı:** `Docs/refactor/assets/REQ-193-ss5-login-wall-banner.png` (OCR ile okundu — vision kredisi bitmişti, beklemeden ölçüldü).
+- **Kalan:** kapsam 5 (`ui_action` işaretinin proxy tablosunu göstermesi — ölçülebilir davranış değil, gösterge) + tünelin gerçek sağlayıcısı (bu kutuda `cloudflared`/`ngrok` kurulu değil ve `LOKMA_RELAY_URL` set değil, yani Start dürüstçe 501 + kurulum komutu dönüyor).
+- **Commit:** `d81bf4f` (çekirdek) + `08c5c80` (sunucu) + `798458e` (web).
+
 ## Bekleyen Sorular (Furkan'a)
 - [x] GitHub repo: `raksix/lokma` PUBLIC — done 2026-08-31
 - [x] İlk provider multi-provider (Anthropic + OpenAI/DeepSeek/Google/Ollama/OpenRouter) — specced

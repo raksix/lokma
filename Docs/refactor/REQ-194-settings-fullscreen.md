@@ -1,6 +1,6 @@
 # REQ-194 — Settings bölümleri tam ekran (full-screen) açılabilsin, en azından Models
 
-**Status:** pending
+**Status:** in-progress
 **Tarih:** 2026-10-03
 **Kaynak:** Kullanıcı mesajı (3 Ekim 2026):
 > "settings modeli daha büyük full screen gibi bişi olsun"
@@ -49,3 +49,31 @@
 ## Notlar
 
 - **Write-only:** kod yazılmadı. Ekranlar bu REQ'e **ait değil** (browser hatası gösteriyor), bu yüzden ss eklenmedi — REQ-193'e eklendi.
+
+## Slice 1 — full-screen kabuk (bc6948c)
+
+Kapsam 1, 2, 3, 5 ve 6 **bitti**; kapsam 4 (Models iki kolon + önizleme) ve canlı prob sırada.
+
+1. **Tek çözümleyici:** `settings.ts` `settingsShellClass(fullscreen)` iki kabuk geometrisinin tek sahibi. Varsayılan **hiç değişmedi** (`h-[640px] max-h-3xl` → 768×640; probe bunu geriye-dönük guard olarak ölçüyor), tam ekran `h-screen w-screen max-w-none` + köşesiz.
+2. **Kalıcılık:** `lokma-settings-fullscreen:v1`, `"1"` = tam ekran. `readSettingsFullscreen`/`writeSettingsFullscreen` **enjekte edilebilir storage** alır (probe DOM'suz ölçüyor) ve storage bloklanmışsa varsayılan kabuğa düşüyor, patlamıyor.
+3. **Düğme:** `Maximize2`/`Minimize2` (emoji yok), `aria-expanded`, `sm` altında **gizli** (Kapsam 7 — telefonda tam ekran zaten mevcut düzen).
+4. **Esc sırası:** `useFocusTrap`'in `onEscape` callback'i önce tam ekrandan çıkıyor, ikinci basışta kapatıyor; kullanıcı büyük kutuda hapsolmaz (Kapsam 5'in "önce kapatır sonra moddan çıkar" cümlesi bu sırayla çeliştiği için dosyada ölçülebilir sıra yazılı).
+5. **Yeniden ölçüm:** kabuk bir flex column, gövde kaydırmayı sahipleniyor; `ResizeObserver` panele bakıyor ve **window `resize` eventi** de yayıyor (container-query paneler + xterm ölçümü yeniden tetiklenir — `@container` bölümleri bunu kullanıyor, `ResizeObserver`'ı dinlemez). Toggle remount YAPMIYOR: açık arama alanı odakta kalıyor.
+6. **Backdrop:** tam ekranda `bg-black/40` + `p-4` düşüyor ve backdrop tıklaması **kapatmıyor** (arkada açığa çıkacak bir şey yok, dolguya tıklayan formu bozmaz).
+7. **Deep link (Kapsam 3):** `?settings=models&fullscreen=1` mount'ta bir kez okunuyor, sonra **parametreler URL'den siliniyor** — yeniden yükleme ya da paylaşılan çıplak URL tam ekran kutuyu tekrar açmıyor. `fullscreen=1` kalıcı tercihe yazılıyor, modal açılışta onu okuyan taraf.
+8. **Reset layout:** `RESET_LAYOUT_EVENT` handler'ı (`workspace.tsx:389`) tercihi tiling snapshot'ıyla birlikte temizliyor — Kapsam 2'nin "Reset layout ile geri alınabilir" maddesi, ikinci bir düğme uydurmadan.
+
+### Ölçüm
+
+- `bun src/components/settings/settings-modal.test.ts` → **70 passed, 0 failed** (+37 yeni).
+- `bun x tsc --noEmit` → **0 hata**.
+- `env -u NODE_CHANNEL_FD -u NODE_ENV bun run build` → **built in 3.37s**, `index-CDbfNXGK.js` (683.77 kB).
+- Canlı: `pm2 restart lokma-web` → servis edilen `assets/index-*.js` **disk ile aynı** (`index-CDbfNXGK.js`), `web=200`, `api /health=200`, login gate **ON** (`/api/auth/me` tokenless → 401).
+- Yeni sembol demesi: `grep -c 'lokma-settings-fullscreen:v1' dist/assets/index-CDbfNXGK.js` = **1** (eski hash'lerde 0 — canlıya gerçekten çıkmış).
+- `a11y.test.ts` → 48 passed / 4 failed; **4'ü de clean baseline'da aynı** (`git stash` ile doğrulandı): `single-chat-view.tsx:248` nameless button, dialog registry, `fullscreen-modal.tsx` + `pane.tsx` focus trap. Bu REQ'in regresyonu değil, ayrı iş.
+
+### Kalan
+
+- **Kapsam 4:** Models tam ekranda iki kolon (kategori/panel solda, satırlar sağda) + `/` arama kısayolu + sağda önizleme paneli (kapasite/context/fiyat/sağlayıcı/id). Not: mevcut `models-pane.tsx:147` satır listeyi `max-h-[320px] overflow-auto` ile **kendi içinde** kaydırıyor — tam ekranda bu sabit yükseklik kullanılmayacak, gövde kaydıracak.
+- **Prob:** `scripts/probe-settings-fullscreen.cjs` (ölçüm + reload kalıcılık + Models iki kolon) + 1500px/390px taşma kontrolü.
+- Kapsam 4 ölçülebilir bir düzen gerektirdiği için ayrı slice: önce iki kolonun düzeni, sonra ona `/` ve önizleme.

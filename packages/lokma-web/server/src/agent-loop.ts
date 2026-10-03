@@ -278,6 +278,19 @@ export function fileAttachmentBlocks(files: SessionFile[]): string {
 }
 
 /**
+ * REQ-187: honest marker naming attachments the replay budget left out. An
+ * older turn's file that silently vanishes reads to the model as "nothing
+ * was attached" — name every dropped file so a follow-up answer can say so
+ * instead of denying content that exists. Pure — probe it.
+ */
+export function droppedFilesNote(files: SessionFile[]): string {
+  if (files.length === 0) return '';
+  return `[attachments dropped (over the history attachment budget): ${files
+    .map((f) => f.name)
+    .join(', ')}]`;
+}
+
+/**
  * Drop the transcript's trailing row when it IS the prompt about to run.
  *
  * The WS prompt handler appends the row (text + images + files) BEFORE
@@ -403,9 +416,17 @@ export function buildLoopHistory(messages: SessionMessage[]): ProviderMessage[] 
       }
     }
     const text = isNewest ? m.content : truncateHistoryText(m.content, HISTORY_CHAT_TRUNC);
+    // REQ-187: files the replay budget refused are NAMED, never silent — a
+    // vanished attachment must not read as "nothing was attached". Kept and
+    // dropped files both ride as labeled sections under the same text.
+    const droppedFiles =
+      m.role === 'user' && m.files?.length ? m.files.slice(keptFiles.length) : [];
+    const fileSections: string[] = [];
+    if (m.role === 'user' && keptFiles.length > 0) fileSections.push(fileAttachmentBlocks(keptFiles));
+    if (droppedFiles.length > 0) fileSections.push(droppedFilesNote(droppedFiles));
     const withFiles =
-      keptFiles.length > 0 && m.role === 'user'
-        ? `${text.trim() ? `${text}\n\n` : ''}${fileAttachmentBlocks(keptFiles)}`
+      fileSections.length > 0
+        ? `${text.trim() ? `${text}\n\n` : ''}${fileSections.join('\n\n')}`
         : text;
     const row: Row =
       m.role === 'tool'

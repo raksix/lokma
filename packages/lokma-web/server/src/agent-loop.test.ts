@@ -4,7 +4,7 @@
  * No test framework — plain asserts so the package stays dependency-free.
  * Not imported by server code, so `tsc -p` output ignores it.
  */
-import { buildLoopHistory, decideTurnEnd, fileAttachmentBlocks, maxToolConcurrency, retryDelayMs, splitPromptRow, toolRowParts, truncateHistoryText } from './agent-loop';
+import { buildLoopHistory, decideTurnEnd, droppedFilesNote, fileAttachmentBlocks, maxToolConcurrency, retryDelayMs, splitPromptRow, toolRowParts, truncateHistoryText } from './agent-loop';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -184,6 +184,13 @@ assert(
   'block is the labeled file shape',
 );
 
+// 7a2. The dropped marker is empty for no files and names every dropped file.
+assert(droppedFilesNote([]) === '', 'no dropped files — no marker');
+assert(
+  droppedFilesNote([{ name: 'old.txt', mime: 'text/plain', size: 3, content: 'abc' }]).includes('old.txt'),
+  'dropped marker names the file',
+);
+
 // 7b. A user row carrying files replays its content inside the block.
 const fileHistory = buildLoopHistory([
   { role: 'user', content: 'read this', timestamp: 't1', files: [fileRow('a.txt', 40)] },
@@ -205,7 +212,23 @@ const fileBudget = buildLoopHistory([
 const newFileRow = fileBudget.find((m) => m.content.startsWith('new'));
 const oldFileRow = fileBudget.find((m) => m.content.startsWith('old'));
 assert(newFileRow !== undefined && newFileRow.content.includes('<file name="new.txt"'), 'newest keeps its file under the cap');
-assert(oldFileRow !== undefined && !oldFileRow.content.includes('old.txt'), 'older file blocks drop when spent');
+assert(oldFileRow !== undefined && !oldFileRow.content.includes('<file name="old.txt"'), 'older file blocks drop when spent');
+assert(
+  oldFileRow !== undefined && oldFileRow.content.includes('old.txt') && oldFileRow.content.includes('attachments dropped'),
+  'older file is NAMED in a dropped marker (never silent)',
+);
+
+// 7c2. A file-only turn whose file exceeds the whole budget still rides —
+// the dropped marker is its honest content (before, it vanished silently).
+const overCapFile = buildLoopHistory([
+  { role: 'user', content: '', timestamp: 't1', files: [fileRow('huge.txt', 250_000)] },
+]);
+assert(
+  overCapFile.length === 1 &&
+    overCapFile[0]?.content.includes('huge.txt') &&
+    overCapFile[0]?.content.includes('attachments dropped'),
+  'an over-cap file-only turn rides with the dropped marker',
+);
 
 // 7d. A file-only prompt has no text but must not be dropped.
 const fileOnly = buildLoopHistory([

@@ -24,6 +24,9 @@ Usage:
   lokma design system use <id> [--cwd <dir>]  Activate it in a project
   lokma design template list       List installed design templates (output skeletons)
   lokma design template add <url|path>     Install a design template
+  lokma tunnel status             Report the public-tunnel status (honest)
+  lokma tunnel start [--port N]   Expose this box via cloudflared/ngrok/relay
+  lokma tunnel stop               Stop the tunnel (always reports "off")
   lokma doctor                     Check config/creds/perms
   lokma agent list                 List agents (live registry)
   lokma --help | --version
@@ -199,6 +202,16 @@ for slash commands. Non-interactive shells require -p.
     // template" — the same class of bug one line below.
     const rest = positionals.slice(1);
     await runDesignSystemCli(rest[0] === 'system' ? rest.slice(1) : rest, { cwd: values.cwd });
+    return;
+  }
+
+  // REQ-193 slice 7 — `lokma tunnel status|start|stop`. Its own module for
+  // the same reason `design` has one: the CLI stays a table of commands, and
+  // the sub-verbs call the same `cloud/tunnel.ts` helpers the HTTP routes call
+  // so there is exactly one provider/url/honesty implementation.
+  if (cmd === 'tunnel') {
+    const { runTunnelCli } = await import('./tunnel.js');
+    await runTunnelCli(positionals.slice(1), { port: values.port });
     return;
   }
 

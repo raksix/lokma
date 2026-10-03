@@ -102,16 +102,43 @@ export function stoppedStatus(message = 'Tunnel is off — nothing is listening 
   };
 }
 
+/**
+ * Coerce a caller-supplied port into a valid 16-bit port, or throw.
+ *
+ * REQ-193 slice 7: the HTTP route and the CLI both take a port, and a port is
+ * validated by ONE rule. A second copy in the CLI would be a second rule — and
+ * a typo like `3456x` must never be laundered into a tunnel pointed at some
+ * other local service. Returns the default when the value is absent.
+ */
+export function parseTunnelPort(value: unknown, fallback = TUNNEL_DEFAULT_PORT): number {
+  if (value === undefined || value === null || value === '') return fallback;
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > 65535) {
+    throw new TunnelError('bad_port', 'port must be an integer between 1 and 65535', 400);
+  }
+  return n;
+}
+
 /** Typed failure — routes map it straight to `{ code, message }`. */
 export class TunnelError extends Error {
   readonly code: string;
   readonly status: number;
+  /**
+   * The install/configure sentence as DATA, not prose to re-parse.
+   *
+   * Measured in slice 7: the first refusal only embedded the install command in
+   * its message, so a panel could not render it as a copyable line without
+   * parsing English out of a sentence. Carrying it as a field means the CLI and
+   * the panel print the same command without either re-deriving it.
+   */
+  readonly installHint: string | null;
 
-  constructor(code: string, message: string, status = 400) {
+  constructor(code: string, message: string, status = 400, installHint: string | null = null) {
     super(message);
     this.name = 'TunnelError';
     this.code = code;
     this.status = status;
+    this.installHint = installHint;
   }
 }
 
@@ -362,16 +389,24 @@ export async function startTunnel(opts: StartOptions = {}): Promise<TunnelStatus
     ...(opts.binaryExists ? { binaryExists: opts.binaryExists } : {}),
   });
   if (!plan.available || !plan.command) {
+    // The refusal must carry the INSTALL SENTENCE, not just a diagnosis —
+    // measured in slice 7: `lokma tunnel start` answered "LOKMA_RELAY_URL is
+    // not set, so there is no relay to use", which names a missing env var but
+    // never tells the reader what to do about it. Kapsam 4 asks for the install
+    // command, so the plan's hint rides on the error and both surfaces (CLI +
+    // route) show it without either one re-deriving it.
+    const reason = plan.reason;
+    const refusal = plan.reason + (plan.installHint ? ' — ' + plan.installHint : '');
     await persistState({
       state: 'error',
       url: null,
       provider: plan.provider,
       startedAt: null,
       expiresAt: null,
-      message: plan.reason,
+      message: refusal,
       pid: null,
     });
-    throw new TunnelError('provider_unavailable', plan.reason, 501);
+    throw new TunnelError('provider_unavailable', refusal, 501, plan.installHint);
   }
 
   await stopTunnel({ silent: true });

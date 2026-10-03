@@ -4,11 +4,11 @@ import {
   CloudError,
   exportState,
   importState,
+  parseTunnelPort,
   startTunnel,
   stopTunnel,
   TunnelError,
   tunnelStatus,
-  TUNNEL_DEFAULT_PORT,
 } from '@lokma/core';
 
 /**
@@ -85,19 +85,32 @@ export async function cloudRoutes(app: FastifyInstance): Promise<void> {
 
   app.post('/api/cloud/tunnel/start', async (req, reply) => {
     const body = (req.body ?? {}) as { port?: unknown };
-    let port = TUNNEL_DEFAULT_PORT;
-    if (body.port !== undefined) {
-      const n = typeof body.port === 'number' ? body.port : Number(body.port);
-      // A port is a 16-bit value; anything else is a typo, not a range request.
-      if (!Number.isInteger(n) || n < 1 || n > 65535) {
-        return reply.status(400).send({ code: 'bad_port', message: 'port must be an integer between 1 and 65535' });
-      }
-      port = n;
+    let port: number;
+    try {
+      // REQ-193 slice 7 — the SAME port rule the CLI uses. A port is a 16-bit
+      // value; anything else is a typo, not a range request, and must not be
+      // laundered into a tunnel of some other local service.
+      port = parseTunnelPort(body.port);
+    } catch (e) {
+      if (e instanceof TunnelError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      throw e;
     }
     try {
       return await startTunnel({ port });
     } catch (e) {
-      if (e instanceof TunnelError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      // `installHint` rides along as a field (slice 7): the panel needs the
+      // install command as DATA to render a copyable line, not as a sentence
+      // it would have to parse out of the message. Kept absent (not null) when
+      // there is nothing to install.
+      if (e instanceof TunnelError) {
+        return reply
+          .status(e.status)
+          .send(
+            e.installHint
+              ? { code: e.code, message: e.message, installHint: e.installHint }
+              : { code: e.code, message: e.message },
+          );
+      }
       throw e;
     }
   });

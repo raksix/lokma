@@ -1,4 +1,11 @@
-import { DESIGN_CWD_MAX_LEN, DESIGN_SYSTEMS, DESIGN_TYPES, emptyGenerateForm, type GenerateForm } from './design';
+import {
+  DESIGN_CWD_MAX_LEN,
+  DESIGN_SYSTEMS,
+  DESIGN_TYPES,
+  emptyGenerateForm,
+  normalizeSkillIds,
+  type GenerateForm,
+} from './design';
 
 /**
  * REQ-168 — the Design Studio is its own page, and its state must survive
@@ -61,7 +68,13 @@ export function parseDesignPageSnapshot(raw: string | null | undefined): DesignP
     if (project.length > 0 && project.length <= DESIGN_CWD_MAX_LEN) out.project = project;
   }
   if (typeof record.form === 'object' && record.form !== null) {
-    const form = record.form as { type?: unknown; brief?: unknown; system?: unknown; model?: unknown };
+    const form = record.form as {
+      type?: unknown;
+      brief?: unknown;
+      system?: unknown;
+      model?: unknown;
+      skills?: unknown;
+    };
     if (typeof form.type === 'string' && (DESIGN_TYPES as readonly string[]).includes(form.type)) {
       out.form.type = form.type;
     }
@@ -77,6 +90,11 @@ export function parseDesignPageSnapshot(raw: string | null | undefined): DesignP
     if (typeof form.model === 'string' && form.model.length <= 200) {
       out.form.model = form.model;
     }
+    // REQ-192 — the picked skill ids survive a reload. Restored on SHAPE only
+    // (ids are valid, capped, deduped), never against catalog membership: the
+    // installed catalog is per-machine and may no longer carry one of them, and
+    // the server already answers an honest 404 for an id it cannot resolve.
+    out.form.skills = normalizeSkillIds(form.skills);
   }
   return out;
 }

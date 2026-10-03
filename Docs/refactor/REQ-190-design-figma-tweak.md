@@ -123,3 +123,56 @@ AÇIK kalmadı).
 taşımak zorunda) → `scripts/probe-design-tweak-versions.cjs` (tarayıcı UA'sız,
 yalnız REST sözleşmesi ölçen; 409/stale + liste sayısı değişmez + revert
 dürüstlüğü).
+
+### Tur 5/5 — ölçülmüş kusur: `expectedSha` yalnız **tweak** yolundaydı (`52ddc44`, `e396328`)
+
+Prob yazılırken ölçülen iki bulgu — biri **yanlış beyan**, biri REQ'in kendi
+kabul kapısı.
+
+**1. Doküman yeşil yalan söylüyordu.** Tur 1 "Code sekmesi yazmaları" için de
+`expectedSha` kilidini yazılı sayıyordu; ölçüm bunun **yanlış** olduğunu
+gösterdi: `PUT /api/design/:id` gövdeden yalnız `body.cwd` okuyor, `expectedSha`
+düşüyor (`updateArtifactHtml`'in 4. argümanı hep `undefined`); istemci
+`saveDesignHtml`'e hiç parametre geçmiyor; `runTweak` de `expectedSha` **göndermiyor**.
+Sonuç: UI'dan **hiçbir** yoldan 409 `stale_version` üretilemezdi — kilit yalnız
+elle yazılmış bir istekte çalışırdı. Code sekmesi, tweak/revert ile değişmiş
+bir gövdenin **üstüne sessizce** yazıyor, kullanıcının hiç görmediği bir sürümün
+üzerine `edit` girdisi ekliyordu.
+
+- Uç `body.expectedSha`'yı iletir; `updateArtifactHtml` yazdığı sha'yı + `currentVersion`'ı
+  döndürür (bir sonraki yazmanın taze token'ı).
+- `saveDesignHtml` opsiyonel `expectedSha` alır; `SaveDesignRes` `sha`/`currentVersion` taşır.
+- Stüdyo yüklenen gövdenin sha'sını **`ref`**'te tutar (`detailShaRef`) — state
+  olsaydı bir yazma pane'i yeniden render ederdi — ve **iki** yazma yoluna da
+  gönderir. Token gövde her düştüğünde (yükleme, silme, proje değişimi) temizlenir:
+  başka artifact'a taşınmış bir sha, oradaki ilk yazmayı garanti 409 yapardı.
+
+**2. Prob — REQ'in kendi kabul kapısı.** Üç dilim birim testleriyle geldi, yani
+**dağıtılmış** sunucunun davranışını ölçen hiçbir şey yoktu; yukarıdaki boşluk
+iki tur hayatta kaldı. `scripts/probe-design-tweak-versions.cjs` canlı REST'i
+tarayıcısız ve **model maliyeti olmadan** ölçer (offline-template sentinel'i):
+tek sha üzerinde anlaşma · edit'in id'yi koruması + listeyi büyütmemesi ·
+emekli gövdenin bayt-aynı arşivlenmesi · bayat sha'nın **reddi** + aynı yazmanın
+güncel sha ile **kabulü** · metered yolun dürüst reddi (sürüm üretmeden) ·
+revert'in bayt-aynı geri dönmesi ve **eklenerek** kaydedilmesi · kötü hedeflerin
+dürüst hataları · silinmiş arşiv gövdesinin 409 vermesi · temizlik + kapının
+**401** kalması.
+
+**Kanıt:** canlı **52/52** (`/tmp/lokma-req190/summary.json`) · **proven-to-fail:**
+PUT rotasından `expectedSha` düşürülünce koşu 23. kontrolde kırmızıya düşüyor
+(`D: a stale-sha write is refused 409 stale_version`) → kapı yalnız rotanın
+*varlığını* değil **kilit davranışını** ölçüyor; mutasyon `git diff` boş kalacak
+şekilde **bayt-aynı** geri alındı. Kök `bun x tsc --noEmit` **0** · sterilize
+server + core + web build · `pm2 restart` ikisi · servis edilen bundle == disk
+(`index-CB4KPKko.js`).
+
+**Kapsam düzeltmesi (ölçülen, varsayım değil):** Kapsam §4'teki
+"`packages/lokma-shared` transcript/artifact şeması" maddesi **geçersiz** —
+Design yüzeyi **hiçbir** zod validator'ından geçmiyor: `protocol/ws.ts` frame
+birliğinde design frame'i **yok**, `schemas/` altında tek bir design/artifact
+şeması **yok**; tüm Design trafiği REST (`use-design-studio.ts` yalnız `lib/api.ts`'i
+çağırıyor). Bu yüzden yeni alanlar için validator taşımak **gerekmiyor**; o
+maddenin doğru karşılığı aşağıda.
+
+**Kalan:** §3 düzenlenebilir alan yüzeyleri (type/system/model/token/density/content)
+→ sonra yakma + kapanış.

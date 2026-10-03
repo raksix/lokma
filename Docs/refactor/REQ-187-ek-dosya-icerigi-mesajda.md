@@ -1,6 +1,6 @@
 # REQ-187 — Eklediğim dosyanın içeriği sohbette **gerçekten** görünsün (dosya içeriği bağlamı)
 
-**Status:** in-progress (tur 1: `ffec99f` + `ae051b5` + `a48c3e3` — kanal + kart canlı; kalan: kabul probu + bütçe/PDF uçları)
+**Status:** in-progress (tur 2: `ffec99f`+`ae051b5`+`a48c3e3` kanal+kart + `d7e79b2` bütçe-düşen işareti; kalan: resmi prob + kapanış)
 **Tarih:** 2026-10-01
 **Kaynak:** Kullanıcı mesajı (1 Ekim 2026):
 > "attığım remsi de mesaj içeriğinde görebielyim aq sik işler resim dosya falan attığımda alıp görebilsin"
@@ -54,7 +54,9 @@
   - `a48c3e3` feat(web,server): composer metin dosyalarını (PDF'ler extract ucundan) kırpılmış içerikle `files` olarak yolluyor; mesaj metnine artık `<attachment>` dökümü YAZILMIYOR. Pump bu turun dosyalarını prompt'a `<file name…>` blokları olarak katıyor; `buildLoopHistory` eski satırların dosyalarını ayrı (yeni-önce, 200k karakter) bütçeyle replay ediyor — takip turları eki görmeye devam ediyor, sohbet tahliye olmuyor. Sohbette kullanıcı balonunun altında kart (ad/mime/boyut/ilk satır + kırpılma notu); dosya-only gönderim birinci sınıf (send guard, iyimser satır, WS handler).
 - **Canlı kanıt (deployed sunucu, gerçek WS + capture stub): 11/11 PASS** — (a) metin prompt'u telde TEK kez; (b) `<file name="notes.md">` bloğu bir kez, içerik jetonu bir kez, eski `<attachment>` dökümü yok, blok user mesajında; (c) REST transcript satırı `files[]` taşıyor, metin temiz. Prob: `/tmp/lokma-wire-probe.cjs` (11/11; oturum+provider+geçici dizin silindi, gate ON tokenless 401).
 - Birim kapılar: shared ws 26/26 · agent-loop 48 (37 görsel + 5 dedupe + 6 dosya) · session-feed 11 grup · composer helper'ları 8. Kök `tsc --noEmit` 0; server + web build yeşil; canlı bundle `index-Cb9oE5PW.js` == disk.
-- Kalan (sonraki turlar): resmi prob `scripts/probe-file-attachment-context.cjs` (kırpma / çoklu-ek / PDF / temizlik uçları) + toplam ek bütçesi drop işaretleme + yol/sürükle-bırak yolları notu.
+- Tur 2 (2026-10-03): **Bütçenin düşürdüğü ekler artık ADIYLA işaretli** — `droppedFilesNote()` (saf, birim testli; `agent-loop.ts`) replay bütçesini (200k) aşan ekleri `[attachments dropped (over the history attachment budget): <adlar>]` satırıyla yazar; bütçeyi tek başına aşan dosya-only tur önceden SESSİZCE düşerken artık işaretle birlikte akar (model "ek hiç yoktu" diyemez). Test: 7a2 (boş→işaretsiz, ad verir), 7c (blok düşer + ad İŞARETTE), 7c2 (cap-üstü dosya-only tur akar) — 47+52 PASS; kök tsc 0; server build yeşil; `pm2 restart lokma-server` + dist'te işaret doğrulandı + `/health` 200. Commit `d7e79b2`.
+- Yol / tek-kanal notu: sürükle-bırak (`onDrop` → `attachFiles`, composer.tsx:582-588), Ctrl+V (`onPaste` → `clipboardData.files` → `attachFiles`, composer.tsx:773-776) ve dosya seçici aynı TEK yazma yolunu paylaşır; explorer'dan sürüklenen dosya ise mevcut `@path` mention kanalıdır (proje bağlamı — bilinçli ayrı). Bu kalan iş kod gerektirmedi, doğrulandı.
+- Kalan (sonraki tur): resmi prob `scripts/probe-file-attachment-context.cjs` (pozitif jeton / kırpma / çoklu-ek / PDF / temizlik uçları) + kapanış.
 
 ## Notlar
 

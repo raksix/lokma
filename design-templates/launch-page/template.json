@@ -1,0 +1,8 @@
+{
+  "id": "launch-page",
+  "label": "Launch Page",
+  "mode": "prototype",
+  "category": "marketing",
+  "description": "A single conversion column: nav, promise, proof, objections, price, close.",
+  "example_prompt": "The launch page for a design-system subscription"
+}

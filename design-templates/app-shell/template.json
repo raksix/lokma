@@ -1,0 +1,8 @@
+{
+  "id": "app-shell",
+  "label": "App Shell",
+  "mode": "mobile",
+  "category": "product",
+  "description": "A 390px device frame around a real app screen: chrome, list, empty and loading states.",
+  "example_prompt": "The home screen of a habit-tracking mobile app"
+}

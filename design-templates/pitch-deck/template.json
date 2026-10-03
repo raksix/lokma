@@ -1,0 +1,8 @@
+{
+  "id": "pitch-deck",
+  "label": "Pitch Deck",
+  "mode": "deck",
+  "category": "presentations",
+  "description": "Six slides that carry an argument: hook, problem, product, proof, business, ask.",
+  "example_prompt": "A seed round deck for a developer-tooling startup"
+}

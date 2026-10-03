@@ -1,0 +1,8 @@
+{
+  "id": "status-report",
+  "label": "Status Report",
+  "mode": "document",
+  "category": "operation",
+  "description": "A quarterly report with a headline number, a chart-shaped block and an open-questions section.",
+  "example_prompt": "A Q3 status report for a design team"
+}

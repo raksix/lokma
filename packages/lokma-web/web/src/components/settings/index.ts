@@ -11,7 +11,11 @@ export { McpPane } from './mcp-pane';
 export { DoctorStrip } from './doctor-strip';
 export {
   DEFAULT_SETTINGS_SECTION,
+  SETTINGS_FULLSCREEN_KEY,
   SETTINGS_SECTIONS,
+  SETTINGS_SHELL_CLASS,
+  SETTINGS_SHELL_FULLSCREEN_CLASS,
+  browserStorage,
   buildHooksPatch,
   buildMcpPatch,
   buildPermissionsPatch,
@@ -25,9 +29,13 @@ export {
   normalizeConfig,
   normalizeMcpEntry,
   normalizeMcpServers,
+  readSettingsFullscreen,
   serverThemeToMode,
+  settingsDeepLink,
+  settingsShellClass,
   summarizeDoctor,
   validateMcpForm,
+  writeSettingsFullscreen,
   MCP_TRANSPORTS,
   PERMISSION_MODES,
   SERVER_THEMES,
@@ -40,5 +48,6 @@ export {
   type PermissionMode,
   type ServerTheme,
   type SettingsSectionId,
+  type StorageLike,
   type WebMode,
 } from './settings';

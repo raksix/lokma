@@ -490,3 +490,87 @@ export function isSettingsSection(v: unknown): v is SettingsSectionId {
     (SETTINGS_SECTIONS as readonly { id: string }[]).some((s) => s.id === v)
   );
 }
+
+/* ------------------------------------------------------------------ *
+ * REQ-194 — full-screen settings shell
+ *
+ * The modal shipped at a fixed `h-[640px] max-w-3xl` (768x640) no matter
+ * how large the window is, so the Models section (600+ catalog rows) was
+ * a permanently scrolling well. These helpers carry the full-screen
+ * preference and the two shell geometries; they are pure over an
+ * injectable storage so probes run under bun with no DOM.
+ * ------------------------------------------------------------------ */
+
+/** localStorage key for the settings full-screen preference (persisted). */
+export const SETTINGS_FULLSCREEN_KEY = 'lokma-settings-fullscreen:v1';
+
+/** Minimal storage surface — `localStorage`, or a stub in a bun probe. */
+export type StorageLike = {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+};
+
+/** Resolve the browser storage, or null where it is unavailable (SSR/tests). */
+export function browserStorage(): StorageLike | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    return localStorage;
+  } catch {
+    // Private-mode / blocked storage never breaks the modal.
+    return null;
+  }
+}
+
+/** Read the stored full-screen preference (anything but "1" is off). */
+export function readSettingsFullscreen(store: StorageLike | null): boolean {
+  try {
+    return store?.getItem(SETTINGS_FULLSCREEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Persist (or clear) the full-screen preference. */
+export function writeSettingsFullscreen(on: boolean, store: StorageLike | null): void {
+  try {
+    if (on) store?.setItem(SETTINGS_FULLSCREEN_KEY, '1');
+    else store?.removeItem(SETTINGS_FULLSCREEN_KEY);
+  } catch {
+    // Storage failures must not break the toggle.
+  }
+}
+
+/** Default shell — unchanged by REQ-194 (768x640 on a large window). */
+export const SETTINGS_SHELL_CLASS =
+  'flex h-[640px] max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-line bg-white shadow-2xl dark:bg-[#1E1E21]';
+
+/** Full-screen shell — the viewport, no rounding, no max width/height. */
+export const SETTINGS_SHELL_FULLSCREEN_CLASS =
+  'flex h-screen w-screen max-w-none flex-col overflow-hidden border border-line bg-white dark:bg-[#1E1E21]';
+
+/** The one place that decides the shell geometry (probe-covered). */
+export function settingsShellClass(fullscreen: boolean): string {
+  return fullscreen ? SETTINGS_SHELL_FULLSCREEN_CLASS : SETTINGS_SHELL_CLASS;
+}
+
+/**
+ * REQ-194 Kapsam 3 — deep link: `?settings=models&fullscreen=1` opens the
+ * modal straight on that section in full screen. Returns null when the URL
+ * carries no `settings` param (the normal case: the modal stays closed).
+ * An unknown section falls back to the default rather than opening blind.
+ */
+export function settingsDeepLink(search: string): { section: SettingsSectionId; fullscreen: boolean } | null {
+  let params: URLSearchParams;
+  try {
+    params = new URLSearchParams(search);
+  } catch {
+    return null;
+  }
+  const raw = params.get('settings');
+  if (raw === null) return null;
+  return {
+    section: isSettingsSection(raw) ? raw : DEFAULT_SETTINGS_SECTION,
+    fullscreen: params.get('fullscreen') === '1',
+  };
+}

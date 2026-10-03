@@ -58,6 +58,7 @@ import {
   type SidebarVisibility,
 } from '@/components/shell';
 import { useFocusTrap } from '@/components/shell/use-focus-trap';
+import { browserStorage, settingsDeepLink, writeSettingsFullscreen } from '@/components/settings/settings';
 import type { SettingsSectionId } from '@/components/settings/settings';
 
 /**
@@ -235,6 +236,28 @@ export function AppShell({ sessionId }: { sessionId: string }) {
     },
     [explorerSide, inspectorSide, isMobile, openBrowserPane],
   );
+
+  // REQ-194 Kapsam 3 — deep link: `?settings=models&fullscreen=1` opens the
+  // modal straight on that section (optionally full screen). Read once on
+  // mount, then the params are stripped so a later reload — and any share
+  // of the bare URL — does not re-open a full-height box on top of the
+  // user's own surface. `fullscreen=1` lands in the persisted preference,
+  // which is the single source the modal reads on open.
+  React.useEffect(() => {
+    const link = settingsDeepLink(window.location.search);
+    if (!link) return;
+    setSettingsSection(link.section);
+    setSettingsOpen(true);
+    if (link.fullscreen) writeSettingsFullscreen(true, browserStorage());
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('settings');
+      url.searchParams.delete('fullscreen');
+      window.history.replaceState({}, '', url.toString());
+    } catch {
+      // A locked-down history API only costs the strip, never the open.
+    }
+  }, []);
 
   // REQ-163 — a rail entry that opens a Settings modal section (Agent Hub)
   // instead of a pane/tab. Single callback so every launcher (desktop rail,

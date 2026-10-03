@@ -10,6 +10,8 @@ import {
   Info,
   Keyboard,
   Layers,
+  Maximize2,
+  Minimize2,
   Package,
   Palette,
   Plug2,
@@ -48,8 +50,12 @@ import {
 import {
   DEFAULT_SETTINGS_SECTION,
   SETTINGS_SECTIONS,
+  browserStorage,
   isSettingsSection,
   normalizeConfig,
+  readSettingsFullscreen,
+  settingsShellClass,
+  writeSettingsFullscreen,
   type NormalizedConfig,
   type SettingsSectionId,
 } from './settings';
@@ -113,12 +119,46 @@ export function SettingsModal({
   const [config, setConfig] = React.useState<NormalizedConfig | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [reloadToken, setReloadToken] = React.useState(0);
+  // REQ-194 — full-screen shell. Restored from storage on every open (the
+  // preference outlives a reload); `?fullscreen=1` deep links override it.
+  const [fullscreen, setFullscreen] = React.useState<boolean>(
+    () => readSettingsFullscreen(browserStorage()),
+  );
+  const [fullscreenNudge, setFullscreenNudge] = React.useState(0);
   // REQ-101 — Admin tab visibility + content guard (quiet 401 → no tab).
   const [me, setMe] = React.useState<AuthUser | null>(null);
   const [meLoaded, setMeLoaded] = React.useState(false);
   const canSeeAdmin = canDo(me, 'manageUsers');
   const panelRef = React.useRef<HTMLDivElement>(null);
-  useFocusTrap(open, panelRef, { onEscape: onClose });
+  // REQ-194 Kapsam 5 — Escape leaves full screen FIRST, then closes the
+  // modal on a second press (so the user is never trapped in the big box).
+  const escapeFullscreenRef = React.useRef(false);
+  escapeFullscreenRef.current = fullscreen;
+  useFocusTrap(open, panelRef, {
+    onEscape: () => {
+      if (escapeFullscreenRef.current) setFullscreen(false);
+      else onClose();
+    },
+  });
+
+  // REQ-194 Kapsam 1 — the shell is a flex column whose body owns the
+  // scroll, so anything measuring the box (the container queries the panes
+  // use, xterm fit, the Models preview split) must re-measure the instant
+  // the geometry changes. ResizeObserver fires for both a viewport resize
+  // and the class swap; the counter lands on the body as a probe hook and
+  // the window event re-fits anything that listens (no remount, so the
+  // open search field keeps focus across a toggle).
+  React.useEffect(() => {
+    const panel = panelRef.current;
+    if (!open || !panel || typeof ResizeObserver === 'undefined') return;
+    setFullscreenNudge((n) => n + 1);
+    const ro = new ResizeObserver(() => {
+      setFullscreenNudge((n) => n + 1);
+      window.dispatchEvent(new Event('resize'));
+    });
+    ro.observe(panel);
+    return () => ro.disconnect();
+  }, [open, fullscreen]);
 
   const load = React.useCallback(async () => {
     try {
@@ -170,34 +210,72 @@ export function SettingsModal({
   const needsConfig =
     section === 'general' || section === 'appearance' || section === 'permissions' || section === 'mcp';
 
+  const shellClass = settingsShellClass(fullscreen);
+
+  function toggleFullscreen(next: boolean): void {
+    setFullscreen(next);
+    writeSettingsFullscreen(next, browserStorage());
+  }
+
   return (
     <div
-      className="fixed inset-0 z-[60] grid place-items-center bg-black/40 p-4"
+      // REQ-194 Kapsam 2 — in full screen the panel IS the viewport, so the
+      // dimmed backdrop and its padding would frame an edge-less box; both
+      // are dropped and a backdrop click no longer closes (there is nothing
+      // behind it to reveal, and a stray click must not dismiss a
+      // full-height form).
+      className={
+        fullscreen
+          ? 'fixed inset-0 z-[60] bg-white dark:bg-[#1E1E21]'
+          : 'fixed inset-0 z-[60] grid place-items-center bg-black/40 p-4'
+      }
       role="dialog"
       aria-modal="true"
       aria-label="Settings"
-      onClick={onClose}
+      onClick={fullscreen ? undefined : onClose}
     >
       <div
         ref={panelRef}
-        className="flex h-[640px] max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-line bg-white shadow-2xl dark:bg-[#1E1E21]"
+        data-settings-shell
+        data-fullscreen={fullscreen ? '1' : '0'}
+        className={shellClass}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2.5">
           <Settings className="h-4 w-4 text-terracotta" />
           <span className="text-sm font-semibold">Settings</span>
+          {/* REQ-194 — the maximize toggle. Hidden on narrow viewports
+              (full screen is already the layout there), so the header keeps
+              exactly the controls a phone can act on. */}
+          <button
+            type="button"
+            onClick={() => toggleFullscreen(!fullscreen)}
+            aria-label={fullscreen ? 'Exit full screen' : 'Full screen'}
+            aria-expanded={fullscreen}
+            title={fullscreen ? 'Exit full screen (Esc)' : 'Full screen'}
+            data-settings-fullscreen-toggle
+            className={cn(
+              'ml-auto hidden h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-muted sm:grid',
+              fullscreen ? 'ml-2' : '',
+            )}
+          >
+            {fullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+          </button>
           <button
             type="button"
             onClick={onClose}
             data-autofocus
             aria-label="Close settings"
-            className="ml-auto grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-muted"
+            className={cn('grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-muted', fullscreen ? '' : 'ml-auto')}
           >
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
+        <div
+          className="flex min-h-0 flex-1 flex-col sm:flex-row"
+          data-settings-nudge={fullscreenNudge}
+        >
           <nav
             aria-label="Settings sections"
             className="flex shrink-0 flex-row gap-1 overflow-x-auto border-b border-line p-2 sm:w-52 sm:flex-col sm:overflow-x-hidden sm:overflow-y-auto sm:border-r sm:border-b-0"

@@ -20,6 +20,10 @@ import {
 } from './windowed-canvas';
 import { FullscreenPlaceholder, PaneFullscreenModal } from './fullscreen-modal';
 import { WorkspacePane } from './pane';
+// REQ-194 — the persisted settings full-screen preference is view state
+// owned by the settings module; "Reset layout" clears it alongside the
+// tiling snapshot instead of duplicating the storage key here.
+import { writeSettingsFullscreen } from '@/components/settings/settings';
 import {
   RESET_LAYOUT_EVENT,
   TILING_TABS_KEY,
@@ -380,6 +384,9 @@ export function TilingWorkspace({
   // REQ-045 — the TilingBar Reset button moved to the AppShell mode
   // cluster; the handler stays here where the tab/window state lives.
   // Dispatched as RESET_LAYOUT_EVENT, same pattern as FOCUS_FILES_EVENT.
+  // REQ-194 — the settings full-screen preference resets with it: it is
+  // the same kind of persisted view state, so "Reset layout" must be the
+  // single way back to the default 768x640 shell.
   React.useEffect(() => {
     const onReset = () => {
       resetStoreLayout();
@@ -389,6 +396,7 @@ export function TilingWorkspace({
       try {
         localStorage.removeItem(TILING_TABS_KEY);
         localStorage.removeItem(WINDOWED_POS_KEY);
+        writeSettingsFullscreen(false, localStorage);
       } catch {
         // Private-mode storage never breaks reset.
       }

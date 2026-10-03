@@ -125,3 +125,49 @@ check(stamped.url === urlBefore, 'touchAgentUse never alters the url');
 
 browserTabs.clearForTests();
 console.log(`\nbrowser-tools: ${passed} checks passed.`);
+
+// ─── REQ-193 slice 10 (Kapsam 5): the agent-open stamp ───────────────────────
+// The pane's "Ajan açtı" badge is driven by a FIELD on the record, so these
+// are the asserts that keep it honest. The negative direction carries the
+// weight: a stamp that is never cleared would sit over a page the USER typed,
+// which is the exact ambiguity the badge was added to remove.
+check(browserTabs.open({ sessionId: 'sess_user' }).record.openedByAgentAt === null,
+  'a plain open stamps no agent (user navigation)');
+
+const agentTab = browserTabs.open({ sessionId: 'sess_agent', url: 'https://agent.example', openedByAgent: true }).record;
+check(typeof agentTab.openedByAgentAt === 'string' && agentTab.openedByAgentAt.length > 0,
+  'an agent open stamps openedByAgentAt');
+
+// A reuse that navigates is the agent's page again (REQ-146 reuse keeps the id).
+const reusedTab = browserTabs.openOrReuse({ sessionId: 'sess_agent', url: 'https://agent-2.example', openedByAgent: true });
+check(reusedTab.reused === true && reusedTab.record.id === agentTab.id, 'reuse: the same record is reused');
+check(reusedTab.record.url === 'https://agent-2.example/', 'reuse: the record navigated to the agent url');
+check(typeof reusedTab.record.openedByAgentAt === 'string' && reusedTab.record.openedByAgentAt.length > 0,
+  'reuse: the agent stamp is present on the reused record');
+
+// A plain navigate CLEARS the stamp — this is the negative control that makes
+// "the badge shows" mean anything. Not "the stamp differs from the creation
+// one": two ISO stamps in the same millisecond are byte-equal, so an
+// inequality assert would be flaky while proving nothing about re-stamping.
+const cleared = browserTabs.navigate(reusedTab.record.id, 'https://typed.example').record;
+check(cleared.url === 'https://typed.example/', 'navigate moved the record to the typed url');
+check(cleared.openedByAgentAt === null, 'navigate clears the agent stamp (the user chose this page)');
+
+// Re-stamping is observable through the clear→set cycle above, not through a
+// clock: a second agent open on the SAME record brings the stamp back.
+const restamped = browserTabs.openOrReuse({ sessionId: 'sess_agent', url: 'https://agent-3.example', openedByAgent: true });
+check(typeof restamped.record.openedByAgentAt === 'string', 'a later agent open re-stamps the record');
+
+// A blank reuse touches without navigating, and must still stamp (the agent
+// looked at the live tab) while leaving the url alone. The url is read from
+// the record rather than hardcoded: the restamp above moved it, and a literal
+// here would assert a premise another test already changed.
+const blankBefore = restamped.record.url;
+const blankReuse = browserTabs.openOrReuse({ sessionId: 'sess_agent', openedByAgent: true });
+check(blankReuse.reused === true && blankReuse.record.url === blankBefore, 'blank reuse never navigates away');
+check(typeof blankReuse.record.openedByAgentAt === 'string', 'blank reuse re-stamps the agent touch');
+
+// REST cannot forge the badge: the route builds OpenTabOpts itself and has no
+// field for it, so the closest REST caller (a plain open) leaves it null.
+const restShaped = browserTabs.open({ sessionId: 'sess_rest', url: 'https://rest.example' } as { sessionId: string; url: string });
+check(restShaped.record.openedByAgentAt === null, 'a REST-shaped open carries no agent stamp');

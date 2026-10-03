@@ -68,6 +68,17 @@ export type UiActionPayload = {
   cwd?: string;
   /** REQ-182: display name, so the modal/toast needs no refetch. */
   projectName?: string;
+  /**
+   * REQ-193 slice 10 (Kapsam 5): when the agent opened/navigated this tab,
+   * the record's own stamp. The client shows an "agent" badge from it — the
+   * pane's frame is the server proxy's fetch, so the user can see that the
+   * visible page is one the agent chose rather than one they typed.
+   *
+   * A FIELD, not a sentence, for the same reason `installHint` is one: the
+   * client must be able to render a badge from the truth instead of parsing
+   * English out of a description.
+   */
+  openedByAgentAt?: string;
 };
 
 /**
@@ -157,9 +168,23 @@ export function buildUiControlTools(cwd: string, opts: UiControlOpts): ToolDefin
         const { url } = input as z.infer<typeof OpenBrowserInput>;
         // REQ-146 — reuse the session's open tab (same id) instead of stacking
         // a new record per call; `reused` tells the model the page was swapped.
-        const { record, reused } = browserTabs.openOrReuse({ url, sessionId: opts.sessionId, cwd });
-        opts.emit({ action: 'open_browser', url: record.url, tabId: record.id });
-        return { ok: true, tabId: record.id, url: record.url, reused };
+        // REQ-193 slice 10: `openedByAgent` is what stamps the record, so the
+        // pane can show that the visible page came from the agent and reached
+        // the user through the server proxy (the frame below carries the same
+        // fact, so the badge appears on the very first paint without a refetch).
+        const { record, reused } = browserTabs.openOrReuse({
+          url,
+          sessionId: opts.sessionId,
+          cwd,
+          openedByAgent: true,
+        });
+        opts.emit({
+          action: 'open_browser',
+          url: record.url,
+          tabId: record.id,
+          openedByAgentAt: record.openedByAgentAt ?? undefined,
+        });
+        return { ok: true, tabId: record.id, url: record.url, reused, openedByAgentAt: record.openedByAgentAt };
       },
     },
     {

@@ -40,6 +40,19 @@ export type BrowserTabRecord = {
    * iframe, so the split is made visible instead of silent.
    */
   lastAgentUseAt: string | null;
+  /**
+   * REQ-193 slice 10 (Kapsam 5): last time the AGENT opened/navigated this
+   * tab (`touchAgentOpen`, stamped by the `open_browser` tool only).
+   *
+   * Deliberately a timestamp and not an agent identity: `agentId` has been a
+   * null-on-every-agent-tab field since the record was introduced — no
+   * agent path ever wrote it, so it could not answer "did an agent choose this
+   * page?" and the pane had no honest way to say where the visible page came
+   * from. A stamp needs no identity and cannot be forged over REST (no route
+   * writes it), so the pane's agent badge stays a fact about the record rather
+   * than a client-side guess.
+   */
+  openedByAgentAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -49,6 +62,14 @@ export type OpenTabOpts = {
   agentId?: string;
   sessionId?: string;
   cwd?: string;
+  /**
+   * REQ-193 slice 10 — set by the `open_browser` TOOL only. Stamps
+   * `openedByAgentAt` so the pane can show that the visible page was chosen
+   * by the agent (and reached the user through the server proxy), instead of
+   * the two looking identical. REST callers cannot pass it, so the badge
+   * cannot be faked from a hand-written request.
+   */
+  openedByAgent?: boolean;
 };
 
 /** Typed error — routes map `code`/`status` straight into `{ code, message }`. */
@@ -130,6 +151,7 @@ class BrowserTabs {
       sessionId: typeof opts.sessionId === 'string' && opts.sessionId ? opts.sessionId : '',
       cwd: cleanLabel(opts.cwd),
       lastAgentUseAt: null,
+      openedByAgentAt: opts.openedByAgent === true ? now : null,
       createdAt: now,
       updatedAt: now,
     };
@@ -158,9 +180,15 @@ class BrowserTabs {
     // A blank open (no url) must never navigate the live page away; touch it.
     if (opts.url === undefined) {
       existing.updatedAt = new Date().toISOString();
+      if (opts.openedByAgent === true) existing.openedByAgentAt = existing.updatedAt;
       return { record: existing, reused: true };
     }
-    return { record: this.navigate(existing.id, opts.url).record, reused: true };
+    const { record } = this.navigate(existing.id, opts.url);
+    // REQ-193 slice 10: a reuse that navigates IS the agent's page — the
+    // record keeps its id but its url is now the agent's, so the pane badge
+    // has to follow the navigation, not the creation.
+    if (opts.openedByAgent === true) record.openedByAgentAt = record.updatedAt;
+    return { record, reused: true };
   }
 
   /** List tabs, newest first; filter by owning session when given. */
@@ -186,6 +214,12 @@ class BrowserTabs {
     record.history = [...record.history.slice(0, record.index + 1), next].slice(-BROWSER_HISTORY_CAP);
     record.index = record.history.length - 1;
     record.url = next;
+    // REQ-193 slice 10: a plain navigation is the USER's (the REST route and
+    // the pane's Go button), so the page stops being "one the agent opened".
+    // Clearing here rather than in each caller is what keeps the pane badge
+    // honest — `openOrReuse` re-stamps immediately for the agent path, so
+    // both cases still have exactly one writer.
+    record.openedByAgentAt = null;
     record.updatedAt = new Date().toISOString();
     return { record };
   }

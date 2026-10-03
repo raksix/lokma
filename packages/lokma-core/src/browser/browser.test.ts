@@ -102,7 +102,11 @@ async function main(): Promise<void> {
   assert(openBrowser !== undefined, 'open_browser tool is registered');
   if (openBrowser) {
     const r1 = (await openBrowser.handler({ url: 'https://first.example' }, undefined)) as { tabId: string; reused: boolean };
-    const r2 = (await openBrowser.handler({ url: 'https://second.example' }, undefined)) as { tabId: string; reused: boolean };
+    const r2 = (await openBrowser.handler({ url: 'https://second.example' }, undefined)) as {
+      tabId: string;
+      reused: boolean;
+      openedByAgentAt?: string | null;
+    };
     assert(r1.reused === false && r2.reused === true, 'tool: the second open reuses the tab');
     assert(r1.tabId === r2.tabId, 'tool: both opens report the same tabId');
     assert(browserTabs.list('sess_tool').length === 1, 'tool: one tab record for the session');
@@ -111,6 +115,14 @@ async function main(): Promise<void> {
       emitted[1].action === 'open_browser' && emitted[1].url === normalizeTabUrl('https://second.example'),
       'tool: frames carry the live url',
     );
+    // REQ-193 slice 10 (Kapsam 5): the agent-open stamp travels on BOTH the
+    // record and the frame. Without the frame field the pane's badge can only
+    // appear one fetch late, and without the record field it disappears on the
+    // next reload — each alone leaves a window where the user is not told.
+    assert(typeof r2.openedByAgentAt === 'string' && r2.openedByAgentAt.length > 0, 'tool: the result carries the agent-open stamp');
+    assert(emitted[1].openedByAgentAt === r2.openedByAgentAt, 'tool: the frame carries the SAME stamp as the record');
+    const toolTab = browserTabs.get(r1.tabId).record;
+    assert(typeof toolTab.openedByAgentAt === 'string' && toolTab.openedByAgentAt.length > 0, 'tool: the record itself is stamped');
   }
 
   // --- REQ-147 send_to_session wiring: deliver + one ui_action frame ---

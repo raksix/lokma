@@ -14,6 +14,7 @@ import {
   listArtifacts,
   listDesignSkills,
   listDesignSystems,
+  listDesignTemplates,
   readDesignGuard,
   revertArtifact,
   runTweak,
@@ -53,7 +54,7 @@ import { expandPromptMentions } from '../utils/context-blocks.js';
 
 export async function designRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/design/generate', async (req, reply) => {
-    const body = (req.body ?? {}) as { type?: unknown; brief?: unknown; system?: unknown; model?: unknown; cwd?: unknown; skills?: unknown };
+    const body = (req.body ?? {}) as { type?: unknown; brief?: unknown; system?: unknown; model?: unknown; cwd?: unknown; skills?: unknown; template?: unknown };
     try {
       // REQ-188 — the brief rides the shared ComposerInput, so `@path` mentions
       // are real context now: read them into `<context>` blocks against the
@@ -62,9 +63,11 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
       const cwd = typeof body.cwd === 'string' ? body.cwd : process.cwd();
       const brief =
         typeof body.brief === 'string' ? await expandPromptMentions(cwd, body.brief) : body.brief;
-      // REQ-192 — `skills` is the design-skill axis: ids that core resolves to
-      // their SKILL.md bodies before the prompt is built.
-      const { id, manifest, critique } = await generateArtifact(body.type, brief, body.system, body.model, body.cwd, body.skills);
+      // REQ-192 — `skills` is the design-skill axis (how it looks) and
+      // `template` the template axis (which document shape ships). They are
+      // resolved separately in core: the ids become the real SKILL.md bodies
+      // before the prompt is built.
+      const { id, manifest, critique } = await generateArtifact(body.type, brief, body.system, body.model, body.cwd, body.skills, body.template);
       return { ok: true, id, manifest, critique };
     } catch (e) {
       if (e instanceof DesignError) return reply.status(e.status).send({ code: e.code, message: e.message });
@@ -79,6 +82,15 @@ export async function designRoutes(app: FastifyInstance): Promise<void> {
   // `unscoped` reports how many were excluded so the UI can say why.
   app.get('/api/design/skills', async () => {
     return { ok: true, ...(await listDesignSkills()) };
+  });
+
+  // ── REQ-192 slice 3: the design TEMPLATE catalog ────────────────────────────
+  // The THIRD axis: a template is the OUTPUT SKELETON (which document shape
+  // ships), not a palette and not a style. Rows come from a real directory scan
+  // (repo `design-templates/` + `~/.lokma/design/templates`), so the catalog
+  // grows by dropping a directory in — there is no frozen table behind it.
+  app.get('/api/design/templates', async () => {
+    return { ok: true, ...(await listDesignTemplates()) };
   });
 
   app.get('/api/design/list', async (req, reply) => {

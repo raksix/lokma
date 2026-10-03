@@ -27,6 +27,7 @@ import {
 } from './types.js';
 import { buildBundledResolved, type ResolvedSystem } from './systems.js';
 import type { DesignSkillPayload } from './skills.js';
+import type { DesignTemplatePayload } from './templates.js';
 
 /** Built-in fallback when neither the request nor the config names a model. */
 export const DEFAULT_DESIGN_MODEL = 'anthropic/claude-sonnet-4-5';
@@ -82,6 +83,12 @@ export type DesignModelRequest = {
    * common case) keeps every existing probe's prompt byte-identical.
    */
   skills?: DesignSkillPayload[];
+  /**
+   * REQ-192 — the chosen output SKELETON, as the template's real SKILL.md
+   * body. Absent (the common case) keeps every existing probe's prompt
+   * byte-identical.
+   */
+  template?: DesignTemplatePayload;
 };
 
 /**
@@ -132,6 +139,36 @@ export function buildDesignSkillsPrompt(skills?: DesignSkillPayload[]): string {
 }
 
 /**
+ * REQ-192 — the `<design_template>` prompt block: the output SKELETON, kept
+ * strictly separate from `<design_skills>` (how it looks) and the token table
+ * (what it is made of). The template block goes BEFORE the skills so the
+ * per-type directive stays the last word, and it carries the real body, not
+ * the label — "deck" as a word teaches the model nothing the type directive
+ * does not already say, while the template's skeleton does.
+ */
+const TEMPLATE_BODY_CHAR_CAP = 12_000;
+
+/** Pure: render the template block (empty string when nothing is selected). */
+export function buildDesignTemplatePrompt(template?: DesignTemplatePayload): string {
+  if (!template || !template.content) return '';
+  const body = template.content.slice(0, TEMPLATE_BODY_CHAR_CAP);
+  const truncated = template.content.length > body.length;
+  return [
+    '<design_template>',
+    `<template name="${template.label}" id="${template.id}">`,
+    truncated
+      ? `${body}\n[truncated: ${template.content.length - body.length} of ${template.content.length} chars not shown]`
+      : body,
+    '</template>',
+    '</design_template>',
+    '',
+    'The user picked the template above. Follow its document STRUCTURE and',
+    'section order. Style, palette and copy are governed by the design system',
+    'tokens and the selected skills, not by the template.',
+  ].join('\n');
+}
+
+/**
  * The user message the model receives — pure, unit-testable (REQ-177).
  *
  * REQ-191: `resolved` is optional and defaults to the bundled table, so the
@@ -155,13 +192,15 @@ export function buildDesignPrompt(req: DesignModelRequest, resolved?: ResolvedSy
         'No token table is bundled with this system id — read the values from the',
         'project DESIGN.md if present, otherwise pick a coherent neutral palette yourself.',
       ];
-  // REQ-192 — the selected skills sit between the token table and the
-  // per-type directive, so the directive stays the LAST word on the shape of
-  // the artifact while the skills own style/layout/copy. Empty (the default)
-  // contributes nothing, keeping every pre-REQ-192 probe byte-identical.
+  // REQ-192 — the chosen TEMPLATE sits right after the token table and before
+  // the skills: skeleton (what ships) → skills (how it looks) → per-type
+  // directive (last word). Empty (the default) contributes nothing, keeping
+  // every pre-REQ-192 probe byte-identical.
+  const templateBlock = buildDesignTemplatePrompt(req.template);
+  const templateLines = templateBlock ? ['', templateBlock, ''] : [];
   const skillsBlock = buildDesignSkillsPrompt(req.skills);
   const skillsLines = skillsBlock ? ['', skillsBlock, ''] : [];
-  return [...head, ...tokenLines, ...skillsLines, TYPE_DIRECTIVES[req.type]].join('\n');
+  return [...head, ...tokenLines, ...templateLines, ...skillsLines, TYPE_DIRECTIVES[req.type]].join('\n');
 }
 
 const HTML_START_RE = /<!doctype html|<html[\s>]/i;

@@ -164,6 +164,19 @@ export type DesignSkillApplied = {
   bytes?: number;
 };
 
+/**
+ * REQ-192 — one design TEMPLATE recorded on an artifact manifest. The
+ * skeleton is the skeleton: `sentChars` says how much of the template's
+ * SKILL.md actually reached the model, so an empty or truncated template is
+ * visible instead of being reported as "applied" (§7 honesty channel).
+ */
+export type DesignTemplateApplied = {
+  id: string;
+  label: string;
+  /** Characters of the template SKILL.md handed to the model (the cap may cut it). */
+  sentChars: number;
+};
+
 export const DESIGN_VERSION_ORIGINS = ['generate', 'tweak', 'edit', 'revert'] as const;
 export type DesignVersionOrigin = (typeof DESIGN_VERSION_ORIGINS)[number];
 
@@ -182,6 +195,12 @@ export type DesignManifest = {
    * the bodies live in the prompt, not on disk). Absent = none selected.
    */
   skills?: DesignSkillApplied[];
+  /**
+   * REQ-192 — the design TEMPLATE (output skeleton) this artifact was
+   * generated with. Absent = none selected. Deliberately singular: one
+   * document has one skeleton.
+   */
+  template?: DesignTemplateApplied;
   /** REQ-178 — absolute project dir when stored under a project (absent = global). */
   project?: string;
   createdAt: string;

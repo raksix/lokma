@@ -268,6 +268,11 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
     cwd: z.string().max(500).optional(),
     // REQ-182: display name so the confirmation modal/toast needs no refetch.
     projectName: z.string().max(60).optional(),
+    // REQ-193 slice 10 (Kapsam 5): the record's own agent-open stamp, so the
+    // pane shows the "agent" badge on the FIRST paint. The tab list carries
+    // the same field for later paints; a Zod object drops unknown keys, so
+    // without this line the badge would never arrive over the wire at all.
+    openedByAgentAt: z.string().max(40).optional(),
     sessionId: z.string(),
   }),
   // REQ-149: answers to `sessions_list` / `transcript_get` and the live

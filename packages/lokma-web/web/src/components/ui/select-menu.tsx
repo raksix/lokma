@@ -17,6 +17,9 @@ import { cn } from '@/lib/utils';
  *   `data-select-value` always mirrors the current value for probes.
  * - Keyboard: Enter/Space/Arrow opens, Arrow/Home/End move, Enter/Space
  *   commits, Escape closes back to the trigger, Tab closes and moves on.
+ * - REQ-192 — `multi` flips commit into a TOGGLE that leaves the menu open, so
+ *   several rows can be picked in one visit; the caller owns the set via
+ *   `multiValues` + `multiLabel` and receives the toggled value per click.
  * - Focus stays visible: the trigger ring plus the active-row highlight are
  *   the affordances (the listbox element itself holds focus).
  */
@@ -42,6 +45,19 @@ export type SelectMenuProps = {
    * so every existing caller's popup and keyboard flow is untouched. */
   searchable?: boolean;
   searchPlaceholder?: string;
+  /**
+   * REQ-192 — opt-in MULTI-select. Off by default, so every existing caller
+   * keeps single-select semantics (commit closes the menu). In multi mode a row
+   * TOGGLES: the menu stays open, every chosen row keeps its check, and
+   * `onChange` fires with the row's value each time. Selection is read from
+   * `multiValues`, never from `value` — one brief can carry several skills, so
+   * a single-value trigger cannot describe the state.
+   */
+  multi?: boolean;
+  /** The full selection in multi mode (checked rows + the count). */
+  multiValues?: readonly string[];
+  /** Trigger text in multi mode (e.g. "2 skills · Brand voice"). */
+  multiLabel?: string;
 };
 
 type Entry =
@@ -64,6 +80,9 @@ export function SelectMenu({
   triggerAttrs,
   searchable = false,
   searchPlaceholder = 'Search',
+  multi = false,
+  multiValues = [],
+  multiLabel,
 }: SelectMenuProps) {
   const [open, setOpen] = React.useState(false);
   const [active, setActive] = React.useState(0);
@@ -96,7 +115,13 @@ export function SelectMenu({
   );
   const selectedIndex = all.findIndex((option) => option.value === value);
   const selected = selectedIndex >= 0 ? all[selectedIndex] : undefined;
-  const display = selected ? selected.label : value || '—';
+  const display = multi ? (multiLabel ?? '—') : (selected ? selected.label : value || '—');
+
+  // REQ-192 — in multi mode the CHECKED set is authoritative and comes from the
+  // caller (`multiValues`), never from `value`: a single-value trigger cannot
+  // describe a selection of three. Membership is a Set for O(1) row checks.
+  const multiSet = React.useMemo(() => new Set(multiValues), [multiValues]);
+  const isPicked = (v: string) => (multi ? multiSet.has(v) : v === value);
 
   const entries = React.useMemo(() => {
     const out: Entry[] = [];
@@ -128,9 +153,13 @@ export function SelectMenu({
       const option = all[index];
       if (!option) return;
       onChange(option.value);
+      // REQ-192 — multi mode TOGGLES and stays open; closing here would make
+      // picking three skills three round trips through the trigger, which is
+      // what the user is expected to think is broken.
+      if (multi) return;
       closeMenu(true);
     },
-    [all, onChange, closeMenu],
+    [all, onChange, closeMenu, multi],
   );
 
   // The popup owns keyboard focus while open (standard listbox pattern).
@@ -211,7 +240,7 @@ export function SelectMenu({
         aria-controls={open ? listId : undefined}
         aria-label={ariaLabel ?? (label ? undefined : 'Select')}
         disabled={disabled}
-        title={selected ? selected.label : undefined}
+        title={multi ? multiLabel : selected ? selected.label : undefined}
         onClick={() => (open ? closeMenu(false) : openMenu())}
         onKeyDown={onTriggerKeyDown}
         className={cn(
@@ -297,19 +326,20 @@ export function SelectMenu({
                   id={listId + '-opt-' + entry.index}
                   type="button"
                   role="option"
-                  aria-selected={entry.option.value === value}
+                  aria-selected={isPicked(entry.option.value)}
                   data-select-option={entry.option.value}
+                  data-select-picked={isPicked(entry.option.value) ? '' : undefined}
                   title={entry.option.label}
                   onMouseEnter={() => setActive(entry.index)}
                   onClick={() => commit(entry.index)}
                   className={cn(
                     'flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-[11.5px] leading-5 text-ink hover:bg-muted dark:text-white dark:hover:bg-white/10',
                     active === entry.index && 'bg-muted dark:bg-white/10',
-                    entry.option.value === value && 'font-medium',
+                    isPicked(entry.option.value) && 'font-medium',
                   )}
                 >
                   <span className="flex w-3 shrink-0 justify-center">
-                    {entry.option.value === value ? <Check className="h-3 w-3 text-terracotta" /> : null}
+                    {isPicked(entry.option.value) ? <Check className="h-3 w-3 text-terracotta" /> : null}
                   </span>
                   <span className="min-w-0 flex-1 truncate">{entry.option.label}</span>
                 </button>

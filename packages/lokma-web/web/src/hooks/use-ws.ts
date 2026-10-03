@@ -24,6 +24,7 @@ import {
   wsUrl,
   type CostTotal,
   type PermissionRequest,
+  type PromptFile,
   type PromptImage,
   type QuestionRequest,
   type ReasoningEffort,
@@ -55,6 +56,8 @@ export type SendOpts = {
   reasoningEffort?: ReasoningEffort;
   /** REQ-186: attached images (downscaled base64) riding the prompt frame. */
   images?: PromptImage[];
+  /** REQ-187: attached text files (capped content) riding the prompt frame. */
+  files?: PromptFile[];
 };
 
 export type UseWs = {
@@ -300,7 +303,9 @@ export function useWs(sessionId: string): UseWs {
 
   const sendText = useCallback((prompt: string, opts: SendOpts = {}) => {
     const text = prompt.trim();
-    if (!text) return;
+    // REQ-186/187: an attachment-only prompt (image or file, no text) is a
+    // legitimate send — only a frame carrying nothing at all is dropped.
+    if (!text && !(opts.images?.length || opts.files?.length)) return;
     // A new prompt starts a new run — clear the previous run's trace with it.
     setUi((prev) => ({ ...prev, stream: '', thinking: '', done: false, doneReason: null, lastError: null, lastErrorCode: null, toolCalls: {}, toolMarks: [], retry: null }));
     socketSend(wsRef.current, promptMessage(text, sessionRef.current, opts));

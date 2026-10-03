@@ -39,6 +39,7 @@ import {
   type ExecuteCheck,
   type ParsedToolCall,
   type SessionDeliveryResult,
+  type SessionFile,
   type SessionImage,
   type SessionMessage,
   type ToolEvent,
@@ -256,6 +257,25 @@ const HISTORY_TOOL_TRUNC = 2_000;
  * prompt being answered always rides whole). ~4M chars ≈ 3 MB of images.
  */
 const HISTORY_IMAGE_CHAR_CAP = 4_000_000;
+/**
+ * REQ-187: char budget for REPLAYED attachment text from OLDER turns. The
+ * current turn's files always ride whole (they are the prompt being
+ * answered); older rows budget out oldest-first — a session that attached
+ * several 100KB files must not ship all of them again on every later turn.
+ * ~200k chars ≈ 50k tokens of deliberate attachment context.
+ */
+const HISTORY_FILE_CHAR_CAP = 200_000;
+
+/**
+ * REQ-187: one labeled block per attached file — the exact text the model
+ * reads. Shared by the pump (current turn) and `buildLoopHistory` (follow-up
+ * turns) so both present files identically. Pure — probe it.
+ */
+export function fileAttachmentBlocks(files: SessionFile[]): string {
+  return files
+    .map((f) => `<file name="${f.name}" mime="${f.mime}" size="${f.size}">\n${f.content}\n</file>`)
+    .join('\n\n');
+}
 
 /**
  * Drop the transcript's trailing row when it IS the prompt about to run.
@@ -323,6 +343,10 @@ export function toolRowParts(content: string): { argumentsJson: string; body: st
  * content parts (newest-first, `HISTORY_IMAGE_CHAR_CAP`) — the previous
  * turn's screenshot stays visible to the model, and a history stripped of
  * images is exactly the "görseli görmüyor" bug this closes.
+ *
+ * REQ-187: user rows carrying `files` replay their capped content as labeled
+ * `<file>` blocks (newest-first, `HISTORY_FILE_CHAR_CAP`) so follow-up turns
+ * still see an attached file; the current turn's files ride `opts.prompt`.
  * Pure — probe it directly.
  */
 export function buildLoopHistory(messages: SessionMessage[]): ProviderMessage[] {
@@ -340,6 +364,8 @@ export function buildLoopHistory(messages: SessionMessage[]): ProviderMessage[] 
   // context the truncation markers describe). Newest-first — the row being
   // answered is processed first and keeps its images before older turns.
   let imageChars = 0;
+  // REQ-187: replayed attachment text has its own budget (see cap comment).
+  let fileChars = 0;
   for (let i = recent.length - 1; i >= 0; i--) {
     const m = recent[i];
     if (!m) continue;
@@ -363,6 +389,24 @@ export function buildLoopHistory(messages: SessionMessage[]): ProviderMessage[] 
         keptImages.push(image);
       }
     }
+    // REQ-187: attachment text replays as labeled `<file>` blocks, budgeted
+    // like images (oldest-first). Kept text accounting stays separate:
+    // `chars` counts only the message text, or one replayed 100KB file would
+    // evict the whole conversation past HISTORY_CHAR_CAP.
+    let spentFiles = 0;
+    const keptFiles: SessionFile[] = [];
+    if (m.role === 'user' && m.files?.length) {
+      for (const file of m.files) {
+        if (fileChars + spentFiles + file.content.length > HISTORY_FILE_CHAR_CAP) break;
+        spentFiles += file.content.length;
+        keptFiles.push(file);
+      }
+    }
+    const text = isNewest ? m.content : truncateHistoryText(m.content, HISTORY_CHAT_TRUNC);
+    const withFiles =
+      keptFiles.length > 0 && m.role === 'user'
+        ? `${text.trim() ? `${text}\n\n` : ''}${fileAttachmentBlocks(keptFiles)}`
+        : text;
     const row: Row =
       m.role === 'tool'
         ? {
@@ -373,15 +417,16 @@ export function buildLoopHistory(messages: SessionMessage[]): ProviderMessage[] 
           }
         : {
             role: m.role === 'assistant' ? 'assistant' : 'user',
-            content: isNewest ? m.content : truncateHistoryText(m.content, HISTORY_CHAT_TRUNC),
+            content: withFiles,
             ...(keptImages.length > 0 ? { images: keptImages } : {}),
           };
-    // REQ-186: an image-only prompt has no text but IS a message — only rows
-    // carrying neither text nor images are dropped.
+    // REQ-186/187: an attachment-only prompt has no text but IS a message —
+    // only rows carrying neither text, files nor images are dropped.
     if (!row.content.trim() && !row.images?.length) continue;
-    chars += row.content.length;
+    chars += (m.role === 'user' ? text : row.content).length;
     if (chars > HISTORY_CHAR_CAP && rows.length > 0) break;
     imageChars += spent;
+    fileChars += spentFiles;
     rows.unshift(row);
   }
 

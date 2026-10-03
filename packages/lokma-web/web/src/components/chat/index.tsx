@@ -359,7 +359,10 @@ export function Chat({
       if (isDuplicateSubmit(lastSubmit.current, s.text, now)) return;
       lastSubmit.current = recordSubmit(s.text, now);
       keySeq.current += 1;
-      setPending((prev) => [...prev, { key: keySeq.current, text: s.text }]);
+      // REQ-187: a file-only send has no text — the optimistic row names the
+      // files instead of painting an empty bubble.
+      const pendingText = s.text || s.files.map((f) => f.name).join(', ');
+      setPending((prev) => [...prev, { key: keySeq.current, text: pendingText }]);
       setStreamVisible(true);
       doneSeen.current = false;
       sendText(s.text, {
@@ -367,6 +370,7 @@ export function Chat({
         contextPaths: s.contextPaths.length ? s.contextPaths : undefined,
         reasoningEffort: s.reasoningEffort === 'off' ? undefined : s.reasoningEffort,
         images: s.images.length ? s.images : undefined,
+        files: s.files.length ? s.files : undefined,
       });
     },
     [sendText],
@@ -551,7 +555,7 @@ export function Chat({
     (prompt: string) => {
       if (transcript.length === 0 && pending.length === 0 && !stream) {
         // Starter cards honour the persisted thinking pick (REQ-133).
-        send({ text: prompt, model, contextPaths: [], reasoningEffort: readThinking(), images: [] });
+        send({ text: prompt, model, contextPaths: [], reasoningEffort: readThinking(), images: [], files: [] });
         return;
       }
       api

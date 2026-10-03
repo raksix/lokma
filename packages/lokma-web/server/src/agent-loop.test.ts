@@ -4,7 +4,7 @@
  * No test framework — plain asserts so the package stays dependency-free.
  * Not imported by server code, so `tsc -p` output ignores it.
  */
-import { buildLoopHistory, decideTurnEnd, maxToolConcurrency, retryDelayMs, splitPromptRow, toolRowParts, truncateHistoryText } from './agent-loop';
+import { buildLoopHistory, decideTurnEnd, fileAttachmentBlocks, maxToolConcurrency, retryDelayMs, splitPromptRow, toolRowParts, truncateHistoryText } from './agent-loop';
 
 let passed = 0;
 function assert(cond: boolean, label: string): void {
@@ -173,6 +173,59 @@ const bothSmall = buildLoopHistory([
 assert(bothSmall.filter((m) => m.images?.length).length === 2, 'both recent turns keep their images');
 
 console.log(`agent-loop-images probe: ${passed} passed`);
+
+/* REQ-187 — user-attached files replay as labeled blocks. */
+const fileRow = (name: string, chars: number) => ({ name, mime: 'text/plain', size: chars, content: 'x'.repeat(chars) });
+
+// 7a. The block is the exact shape the model reads (label + content).
+const block = fileAttachmentBlocks([{ name: 'notes.md', mime: 'text/markdown', size: 12, content: 'HELLO-TOKEN' }]);
+assert(
+  block === '<file name="notes.md" mime="text/markdown" size="12">\nHELLO-TOKEN\n</file>',
+  'block is the labeled file shape',
+);
+
+// 7b. A user row carrying files replays its content inside the block.
+const fileHistory = buildLoopHistory([
+  { role: 'user', content: 'read this', timestamp: 't1', files: [fileRow('a.txt', 40)] },
+]);
+assert(
+  fileHistory.length === 1 &&
+    fileHistory[0]?.content.startsWith('read this') &&
+    fileHistory[0]?.content.includes('<file name="a.txt"') &&
+    fileHistory[0]?.content.includes('x'.repeat(40)),
+  'file content replays as a labeled block',
+);
+
+// 7c. Budget: newest keeps its file; older blocks drop once the cap is spent.
+const fileBudget = buildLoopHistory([
+  { role: 'user', content: 'old', timestamp: 't1', files: [fileRow('old.txt', 250_000)] },
+  { role: 'assistant', content: 'ok', timestamp: 't2' },
+  { role: 'user', content: 'new', timestamp: 't3', files: [fileRow('new.txt', 50_000)] },
+]);
+const newFileRow = fileBudget.find((m) => m.content.startsWith('new'));
+const oldFileRow = fileBudget.find((m) => m.content.startsWith('old'));
+assert(newFileRow !== undefined && newFileRow.content.includes('<file name="new.txt"'), 'newest keeps its file under the cap');
+assert(oldFileRow !== undefined && !oldFileRow.content.includes('old.txt'), 'older file blocks drop when spent');
+
+// 7d. A file-only prompt has no text but must not be dropped.
+const fileOnly = buildLoopHistory([
+  { role: 'user', content: '', timestamp: 't1', files: [fileRow('only.txt', 10)] },
+]);
+assert(fileOnly.length === 1 && fileOnly[0]?.content.includes('<file name="only.txt"'), 'file-only prompt rides');
+
+// 7e. Attachment text is budgeted separately: a huge file must not evict the
+// conversation the way an uncounted 300KB block would (text cap alone).
+const giantFile = buildLoopHistory([
+  { role: 'user', content: 'remember BANANA-FILE', timestamp: 't1' },
+  { role: 'assistant', content: 'noted', timestamp: 't2' },
+  { role: 'user', content: 'here', timestamp: 't3', files: [fileRow('big.txt', 300_000)] },
+]);
+assert(
+  giantFile.map((m) => m.content).join('\n').includes('BANANA-FILE'),
+  'conversation survives a 300KB attachment (separate budget)',
+);
+
+console.log(`agent-loop-files probe: ${passed} passed`);
 
 /* dedupe — the answered prompt row leaves the replayed history. */
 // 8a. The trailing row that IS the prompt splits off (with its images, so

@@ -11,12 +11,13 @@ import {
   ClientMessageSchema,
   ServerMessageSchema,
   type ClientMessage,
+  type PromptFile,
   type PromptImage,
   type ReasoningEffort,
   type ServerMessage,
 } from '@lokma/shared/protocol/ws';
 
-export type { ClientMessage, PromptImage, ReasoningEffort, ServerMessage };
+export type { ClientMessage, PromptFile, PromptImage, ReasoningEffort, ServerMessage };
 
 export type WsStatus = 'idle' | 'connecting' | 'open' | 'closed' | 'error';
 
@@ -172,7 +173,7 @@ function checked(msg: ClientMessage): string {
 export function promptMessage(
   prompt: string,
   sessionId?: string,
-  opts: { model?: string; contextPaths?: string[]; reasoningEffort?: ReasoningEffort; images?: PromptImage[] } = {},
+  opts: { model?: string; contextPaths?: string[]; reasoningEffort?: ReasoningEffort; images?: PromptImage[]; files?: PromptFile[] } = {},
 ): string {
   return checked({
     type: 'prompt',
@@ -182,6 +183,7 @@ export function promptMessage(
     contextPaths: opts.contextPaths,
     reasoningEffort: opts.reasoningEffort,
     images: opts.images && opts.images.length > 0 ? opts.images : undefined,
+    files: opts.files && opts.files.length > 0 ? opts.files : undefined,
   });
 }
 

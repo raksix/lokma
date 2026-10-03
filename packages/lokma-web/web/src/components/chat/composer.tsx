@@ -12,7 +12,7 @@ import {
   Square,
   X,
 } from 'lucide-react';
-import { PROMPT_IMAGE_BASE64_CHARS, PROMPT_MAX_IMAGES, type PromptImage, type ReasoningEffort } from '@lokma/shared/protocol/ws';
+import { PROMPT_FILE_CHAR_CAP, PROMPT_IMAGE_BASE64_CHARS, PROMPT_MAX_FILES, PROMPT_MAX_IMAGES, type PromptFile, type PromptImage, type ReasoningEffort } from '@lokma/shared/protocol/ws';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -33,7 +33,7 @@ import { enabledModels } from '@/components/providers/models';
  * images attach as thumbnail + marker), stop fires the WS interrupt.
  */
 
-export type ComposerSend = { text: string; model: string; contextPaths: string[]; reasoningEffort: ReasoningEffort; images: PromptImage[] };
+export type ComposerSend = { text: string; model: string; contextPaths: string[]; reasoningEffort: ReasoningEffort; images: PromptImage[]; files: PromptFile[] };
 
 type QueuedPrompt = { key: number; text: string };
 
@@ -66,9 +66,11 @@ export function readThinking(): ReasoningEffort {
 }
 
 const MAX_ATTACH_BYTES = 50 * 1024 * 1024;
-/** How much of a text file is inlined into the prompt (REQ-113) — the rest
- *  is noted, not sent, so a 50MB attach cannot nuke the context window. */
-const INLINE_BUDGET_CHARS = 100 * 1024;
+/** How much of a text file is inlined into the prompt (REQ-113/REQ-187) —
+ *  the rest is noted, not sent, so a 50MB attach cannot nuke the context
+ *  window. Sourced from the shared protocol cap: the frame validator rejects
+ *  more, and the slack there covers the truncation marker. */
+const INLINE_BUDGET_CHARS = PROMPT_FILE_CHAR_CAP;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_ATTACH_FILES = 20;
 const TEXT_EXTENSIONS = new Set([
@@ -85,7 +87,7 @@ function readMode(): 'steer' | 'queue' {
 }
 
 /** One file queued on the composer — text inlines content, images carry a thumbnail + real wire bytes (REQ-186). */
-type Attachment = { name: string; content: string; kind: 'text' | 'image'; previewUrl?: string; image?: PromptImage };
+export type Attachment = { name: string; mime: string; size: number; content: string; kind: 'text' | 'image'; previewUrl?: string; image?: PromptImage };
 
 /** One wire-ready image (REQ-186) — the encoded payload plus display facts. */
 type EncodedImage = {
@@ -163,6 +165,8 @@ async function readImageAttachment(file: File): Promise<Attachment> {
     const scaledFrom = encoded.scaled ? `${encoded.sourceWidth}x${encoded.sourceHeight}` : undefined;
     return {
       name: file.name,
+      mime: encoded.image.mime,
+      size: file.size,
       content: formatImageMarker(file.name, dims, sizeKb, scaledFrom),
       kind: 'image',
       previewUrl,
@@ -183,8 +187,45 @@ function revokeAttachment(a: Attachment): void {
     // Already revoked or never created — the chip is gone either way.
   }
 }
+
+/**
+ * REQ-187: wire shape for the text-kind attachments (pure — probe it).
+ * Images are NOT files: they ride `ComposerSend.images` as bytes (REQ-186).
+ */
+export function promptFilesFor(attachments: Attachment[]): PromptFile[] {
+  return attachments.flatMap((a) =>
+    a.kind === 'text'
+      ? [{ name: a.name, mime: a.mime, size: a.size, content: a.content }]
+      : [],
+  );
+}
+
+/**
+ * REQ-071/REQ-187: double-Enter guard key — the text plus the attachment
+ * names, so two sends with the same text but different files never collapse
+ * and a fast second Enter on an identical payload still does.
+ */
+export function sendDedupeKey(body: string, attachments: Attachment[]): string {
+  return `${body}\n--${attachments.map((a) => a.name).join('\n')}`;
+}
+/** Best-effort MIME for a file the browser left untyped (common text names). */
+function mimeForFile(file: File): string {
+  if (file.type) return file.type;
+  const ext = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
+  const map: Record<string, string> = {
+    '.md': 'text/markdown',
+    '.json': 'application/json',
+    '.csv': 'text/csv',
+    '.yaml': 'text/yaml',
+    '.yml': 'text/yaml',
+    '.toml': 'text/toml',
+    '.log': 'text/plain',
+  };
+  return map[ext] ?? 'text/plain';
+}
+
 /** Read a user-attached file as text (binary/oversize files are refused). */
-function readAttachment(file: File): Promise<string> {
+function readAttachment(file: File): Promise<Attachment> {
   const ext = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
   if (file.size > MAX_ATTACH_BYTES) {
     return Promise.reject(
@@ -202,12 +243,12 @@ function readAttachment(file: File): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => {
       const full = typeof reader.result === 'string' ? reader.result : '';
-      // REQ-113: cap what rides into the prompt; note the remainder.
-      resolve(
+      // REQ-113/REQ-187: cap what rides into the prompt; note the remainder.
+      const content =
         full.length > INLINE_BUDGET_CHARS
           ? `${full.slice(0, INLINE_BUDGET_CHARS)}\n…[file truncated: ${full.length} chars total, first ${INLINE_BUDGET_CHARS} shown]`
-          : full,
-      );
+          : full;
+      resolve({ name: file.name, mime: mimeForFile(file), size: file.size, content, kind: 'text' as const });
     };
     reader.onerror = () => reject(new Error(`${file.name}: could not be read`));
     reader.readAsText(file);
@@ -218,7 +259,7 @@ function readAttachment(file: File): Promise<string> {
 function readOneAttachment(file: File): Promise<Attachment> {
   if (isImageAttachment(file.name, file.type)) return readImageAttachment(file);
   if (file.name.toLowerCase().endsWith('.pdf')) return extractPdfAttachment(file);
-  return readAttachment(file).then((content) => ({ name: file.name, content, kind: 'text' as const }));
+  return readAttachment(file);
 }
 
 /** PDF attach (REQ-114) — bytes go to the server, extracted text comes back. */
@@ -239,7 +280,9 @@ function extractPdfAttachment(file: File): Promise<Attachment> {
       }
       api
         .extractPdf({ name: file.name, dataBase64: btoa(bin) })
-        .then((r) => resolve({ name: file.name, content: r.text, kind: 'text' as const }))
+        .then((r) =>
+          resolve({ name: file.name, mime: 'application/pdf', size: file.size, content: r.text, kind: 'text' as const }),
+        )
         .catch((e: unknown) => {
           const msg = e instanceof Error ? e.message : String(e);
           reject(new Error(`${file.name}: ${msg}`));
@@ -366,20 +409,26 @@ export function Composer({
   const deliver = React.useCallback(
     (raw: string) => {
       const body = raw.trim();
+      // REQ-187: attachments are first-class inputs — a file-only (or
+      // image-only) message has no text but is still a send.
+      if (!body && attachments.length === 0) return;
+      // REQ-186: image markers stay in the text (they orient the model).
+      // REQ-187: file content NO LONGER dumps into the text — files ride the
+      // frame's `files` array, the server assembles the model's `<file>`
+      // blocks, and the chat renders a card instead of a raw content wall.
+      const images = attachments.flatMap((a) => (a.kind === 'image' && a.image ? [a.image] : []));
       let full = body;
-      if (attachments.length) {
+      if (images.length > 0) {
         full += attachments
-          .map((a) =>
-            a.kind === 'image'
-              ? `\n\n${a.content}`
-              : `\n\n<attachment name="${a.name}">\n${a.content}\n</attachment>`,
-          )
+          .filter((a) => a.kind === 'image')
+          .map((a) => `\n\n${a.content}`)
           .join('');
       }
-      if (!full.trim()) return;
+      const files = promptFilesFor(attachments);
       const now = Date.now();
-      if (full === lastSent.current.text && now - lastSent.current.at < 1500) return;
-      lastSent.current = { text: full, at: now };
+      const sendKey = sendDedupeKey(body, attachments);
+      if (sendKey === lastSent.current.text && now - lastSent.current.at < 1500) return;
+      lastSent.current = { text: sendKey, at: now };
       const slash = parseSlashCommand(body);
       if (slash && commands.some((c) => c.id === slash.id)) {
         onSlash(slash.id, slash.args, body);
@@ -393,8 +442,7 @@ export function Composer({
         for (const a of attachments) revokeAttachment(a);
         setAttachments([]);
       }
-      const images = attachments.flatMap((a) => (a.kind === 'image' && a.image ? [a.image] : []));
-      onSend({ text: full, model, contextPaths: parseMentions(body).map((m) => m.path), reasoningEffort: thinking, images });
+      onSend({ text: full, model, contextPaths: parseMentions(body).map((m) => m.path), reasoningEffort: thinking, images, files });
     },
     [attachments, commands, contextPaths, model, onSend, thinking],
   );
@@ -436,6 +484,13 @@ export function Composer({
     const incomingImages = arr.filter((f) => isImageAttachment(f.name, f.type)).length;
     if (imagesHeld + incomingImages > PROMPT_MAX_IMAGES) {
       emitToast(`At most ${PROMPT_MAX_IMAGES} images per message`);
+      return;
+    }
+    // REQ-187: same for text files — the frame caps how many files ride.
+    const filesHeld = attachments.filter((a) => a.kind === 'text').length;
+    const incomingFiles = arr.filter((f) => !isImageAttachment(f.name, f.type)).length;
+    if (filesHeld + incomingFiles > PROMPT_MAX_FILES) {
+      emitToast(`At most ${PROMPT_MAX_FILES} files per message`);
       return;
     }
     void Promise.all(arr.map(readOneAttachment))

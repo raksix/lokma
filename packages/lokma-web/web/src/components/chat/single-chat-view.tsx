@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { ChevronUp, Copy, GitFork, History, Pencil, User, Wrench } from 'lucide-react';
+import { ChevronUp, Copy, FileText, GitFork, History, Pencil, User, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { AttachmentView, type ChatAttachment } from './attachment';
+import { AttachmentView, formatBytes, type ChatAttachment } from './attachment';
 import { HeroSection } from './hero-section';
 import {
   MESSAGE_WINDOW_INITIAL,
@@ -45,10 +45,14 @@ export type TranscriptMessage = {
   attachments?: ChatAttachment[];
   /** REQ-186: images the USER attached to this prompt (raw base64 bytes). */
   images?: TranscriptImage[];
+  /** REQ-187: files the USER attached to this prompt (capped text content). */
+  files?: TranscriptFile[];
 };
 
 /** One user-attached image row (REQ-186) — mirrors the protocol `PromptImage`. */
 export type TranscriptImage = { name: string; mime: string; dataBase64: string };
+/** One user-attached file row (REQ-187) — mirrors the protocol `PromptFile`. */
+export type TranscriptFile = { name: string; mime: string; size: number; content: string };
 export type PendingMessage = { key: number; text: string };
 /** REQ-111: one stream cut per `tool_start` (arrival order, see `@/lib/ws`). */
 export type ToolMark = { callId: string; at: number };
@@ -252,6 +256,41 @@ function UserImage({ image }: { image: TranscriptImage }) {
   );
 }
 
+/**
+ * REQ-187: one user-attached file under the bubble — name, type, size and a
+ * one-line preview. The model-facing content rides as a `<file>` block; the
+ * chat never dumps the raw text wall into the bubble.
+ */
+function UserFileCard({ file }: { file: TranscriptFile }) {
+  const preview = React.useMemo(() => {
+    const line = file.content
+      .split('\n')
+      .map((l) => l.trim())
+      .find((l) => l.length > 0);
+    if (!line) return '';
+    return line.length > 140 ? `${line.slice(0, 137)}…` : line;
+  }, [file.content]);
+  const truncated = file.content.includes('[file truncated');
+  return (
+    <div
+      className="flex max-w-md items-start gap-2 rounded-lg border border-line bg-muted/40 px-3 py-2"
+      data-chat-user-file="1"
+    >
+      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-xs font-medium">{file.name}</div>
+        <div className="text-[11px] text-zinc-400">
+          {file.mime} · {formatBytes(file.size)}
+          {truncated ? ' · içerik kırpıldı [truncated]' : ''}
+        </div>
+        {preview ? (
+          <div className="mt-1 truncate text-[11px] text-zinc-500 dark:text-zinc-400">{preview}</div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function UserRow({
   index,
   message,
@@ -309,6 +348,13 @@ function UserRow({
             {message.content.trim() ? (
               <div className="mt-1.5 rounded-2xl rounded-tl-sm border border-line bg-white p-3.5 shadow-sm transition group-hover:border-line-strong group-hover:shadow-md dark:bg-[#1E1E21]">
                 <div className="text-[13.5px] leading-[1.6] whitespace-pre-wrap break-words">{message.content}</div>
+              </div>
+            ) : null}
+            {message.files?.length ? (
+              <div className="mt-1.5 space-y-1" data-user-files="1">
+                {message.files.map((file, k) => (
+                  <UserFileCard key={`${k}-${file.name}`} file={file} />
+                ))}
               </div>
             ) : null}
             {message.images?.length ? (

@@ -27,7 +27,7 @@ import {
   type User,
 } from '@lokma/core';
 import { decodeClientMessage, encodeServerMessage } from '@lokma/shared';
-import { LoopAborted, LOOP_DEFAULT_MAX_TURNS, buildLoopHistory, runAgentLoop, splitPromptRow, type ApprovalDecision } from '../agent-loop.js';
+import { LoopAborted, LOOP_DEFAULT_MAX_TURNS, buildLoopHistory, fileAttachmentBlocks, runAgentLoop, splitPromptRow, type ApprovalDecision } from '../agent-loop.js';
 import {
   CLAUDE_CLEAR_MARKER,
   CLAUDE_ENGINE_DEFAULT_MAX_BUDGET_USD,
@@ -492,7 +492,14 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
       }
       const provider = model.split('/')[0] ?? 'anthropic';
       const contextPrefix = await readContextBlocks(cwd, item.contextPaths);
-      const effectivePrompt = contextPrefix ? `${contextPrefix}${item.prompt}` : item.prompt;
+      // REQ-187: attached files ride as labeled `<file>` blocks after the
+      // prompt text — the same blocks older rows replay through
+      // `buildLoopHistory`, so the current turn and follow-up turns present
+      // files identically.
+      const fileBlocks = item.files?.length ? fileAttachmentBlocks(item.files) : '';
+      const effectivePrompt = [contextPrefix + item.prompt, fileBlocks]
+        .filter((part) => part.length > 0)
+        .join('\n\n');
 
       // REQ-116 FAZ B-wiring: `claude-code/...` model ids run the headless
       // engine (the subprocess owns the tool loop natively) instead of the
@@ -854,9 +861,11 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
       if (msg.type === 'prompt') {
         const prompt = msg.prompt.trim();
         // REQ-186: an image-only prompt is legitimate (paste a screenshot and
-        // hit Enter with no text) — only a frame carrying neither is dropped.
+        // hit Enter with no text); REQ-187: a file-only prompt is the same —
+        // only a frame carrying none of the three is dropped.
         const images = msg.images ?? [];
-        if (!prompt && images.length === 0) return;
+        const files = msg.files ?? [];
+        if (!prompt && images.length === 0 && files.length === 0) return;
         const cwd = await effectiveCwd();
         // Claim attribution is resolved now (the socket may be gone by turn time).
         // REQ-112: fall back to the handshake user — headers/cookies miss
@@ -886,12 +895,17 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
           ...(images.length > 0
             ? { images: images.map((i) => ({ name: i.name, mime: i.mime, dataBase64: i.dataBase64 })) }
             : {}),
+          // REQ-187: same contract for attached files — metadata + capped
+          // content ride the row; the chat renders cards and the follow-up
+          // turns replay the content as `<file>` blocks.
+          ...(files.length > 0 ? { files } : {}),
         });
         const depth = enqueuePrompt(sessionId, {
           prompt,
           model: msg.model?.trim() || undefined,
           contextPaths: msg.contextPaths,
           reasoningEffort: msg.reasoningEffort,
+          files: files.length > 0 ? files : undefined,
           userId: turnUser?.id,
           enqueuedAt: new Date().toISOString(),
         });

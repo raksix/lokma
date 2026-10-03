@@ -1,5 +1,15 @@
 import type { FastifyInstance } from 'fastify';
-import { CLOUD_MAX_UPLOAD_BYTES, CloudError, exportState, importState } from '@lokma/core';
+import {
+  CLOUD_MAX_UPLOAD_BYTES,
+  CloudError,
+  exportState,
+  importState,
+  startTunnel,
+  stopTunnel,
+  TunnelError,
+  tunnelStatus,
+  TUNNEL_DEFAULT_PORT,
+} from '@lokma/core';
 
 /**
  * Portable cloud transfer — the server side of the move-to-cloud story
@@ -57,4 +67,40 @@ export async function cloudRoutes(app: FastifyInstance): Promise<void> {
       }
     },
   );
+
+  // --- Public tunnel (REQ-193 Kapsam 4) ---------------------------------------
+  //
+  // The export/import routes above move STATE to another box; these expose the
+  // RUNNING box to the internet so a remote install is reachable. They are
+  // deliberately NOT in the auth-gate public allowlist: starting a tunnel is a
+  // privileged action, so the global gate (REQ-076) keeps covering `/api/*`
+  // and the caller must be a logged-in user.
+  //
+  // Honesty contract (kontrol 5 in the REQ): no route ever synthesizes a url.
+  // `GET` returns whatever the provider actually reported, `stop` always
+  // answers stopped with a null url, and a failure answers `{code,message}`
+  // -- never a made-up public host that would render as a broken frame.
+
+  app.get('/api/cloud/tunnel', async () => tunnelStatus());
+
+  app.post('/api/cloud/tunnel/start', async (req, reply) => {
+    const body = (req.body ?? {}) as { port?: unknown };
+    let port = TUNNEL_DEFAULT_PORT;
+    if (body.port !== undefined) {
+      const n = typeof body.port === 'number' ? body.port : Number(body.port);
+      // A port is a 16-bit value; anything else is a typo, not a range request.
+      if (!Number.isInteger(n) || n < 1 || n > 65535) {
+        return reply.status(400).send({ code: 'bad_port', message: 'port must be an integer between 1 and 65535' });
+      }
+      port = n;
+    }
+    try {
+      return await startTunnel({ port });
+    } catch (e) {
+      if (e instanceof TunnelError) return reply.status(e.status).send({ code: e.code, message: e.message });
+      throw e;
+    }
+  });
+
+  app.post('/api/cloud/tunnel/stop', async () => stopTunnel());
 }

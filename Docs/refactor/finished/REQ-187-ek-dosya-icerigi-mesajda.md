@@ -1,6 +1,6 @@
 # REQ-187 — Eklediğim dosyanın içeriği sohbette **gerçekten** görünsün (dosya içeriği bağlamı)
 
-**Status:** in-progress (tur 2: `ffec99f`+`ae051b5`+`a48c3e3` kanal+kart + `d7e79b2` bütçe-düşen işareti; kalan: resmi prob + kapanış)
+**Status:** done (2026-10-03 — `ffec99f`+`ae051b5`+`a48c3e3` kanal+kart, `d7e79b2` bütçe-düşen işareti, `e79645f`+`64aa475` log+resmi prob 43/43)
 **Tarih:** 2026-10-01
 **Kaynak:** Kullanıcı mesajı (1 Ekim 2026):
 > "attığım remsi de mesaj içeriğinde görebielyim aq sik işler resim dosya falan attığımda alıp görebilsin"
@@ -56,7 +56,8 @@
 - Birim kapılar: shared ws 26/26 · agent-loop 48 (37 görsel + 5 dedupe + 6 dosya) · session-feed 11 grup · composer helper'ları 8. Kök `tsc --noEmit` 0; server + web build yeşil; canlı bundle `index-Cb9oE5PW.js` == disk.
 - Tur 2 (2026-10-03): **Bütçenin düşürdüğü ekler artık ADIYLA işaretli** — `droppedFilesNote()` (saf, birim testli; `agent-loop.ts`) replay bütçesini (200k) aşan ekleri `[attachments dropped (over the history attachment budget): <adlar>]` satırıyla yazar; bütçeyi tek başına aşan dosya-only tur önceden SESSİZCE düşerken artık işaretle birlikte akar (model "ek hiç yoktu" diyemez). Test: 7a2 (boş→işaretsiz, ad verir), 7c (blok düşer + ad İŞARETTE), 7c2 (cap-üstü dosya-only tur akar) — 47+52 PASS; kök tsc 0; server build yeşil; `pm2 restart lokma-server` + dist'te işaret doğrulandı + `/health` 200. Commit `d7e79b2`.
 - Yol / tek-kanal notu: sürükle-bırak (`onDrop` → `attachFiles`, composer.tsx:582-588), Ctrl+V (`onPaste` → `clipboardData.files` → `attachFiles`, composer.tsx:773-776) ve dosya seçici aynı TEK yazma yolunu paylaşır; explorer'dan sürüklenen dosya ise mevcut `@path` mention kanalıdır (proje bağlamı — bilinçli ayrı). Bu kalan iş kod gerektirmedi, doğrulandı.
-- Kalan (sonraki tur): resmi prob `scripts/probe-file-attachment-context.cjs` (pozitif jeton / kırpma / çoklu-ek / PDF / temizlik uçları) + kapanış.
+- Tur 3 (2026-10-03): **Resmi prob — 43/43 PASS, REQ KAPANDI** `scripts/probe-file-attachment-context.cjs` (`64aa475`). İki katman: **(A) tel** (deployed sunucu `127.0.0.1:3456` + geçici provider + capture stub, SIFIR model maliyeti): T1 tek `.md` — içerik jetonu tam **1 kez**, `<file name="notes.md">` bloğu TEK kez ve bir **user** mesajında, prompt metni tek (dedupe kanıtı), eski `<attachment>` dökümü **0**; REST satırı `files[]` taşıyor + yazılı metin temiz. T2 üç dosya + bir PNG tek prompt — 3 blok (`alpha/beta/gamma`), her jeton bir kez, PNG `image_url` **veri parçası** olarak (metin kartı değil), REST satırı `files[3]` + `images[1]`. T3 aşırı boy frame temiz `Invalid message shape` reddi + sunucu ayakta + sonraki prompt provider'a ulaştı. T4 PDF: `/api/attachments/extract` cümleyi döndürdü, küçük PDF kırpılmadı, `lokma-pdf-*` geçici dizni **temizlendi**, PDF olmayan dosya dürüstçe **400** ile reddedildi. **(B) gerçek tarayıcı** (Playwright, canlı app): dört ek chip oldu, 300KB dosya **istemci tarafında** kırpıldı (kap işareti tam 1 kez, `TAIL-TOKEN` tarayıcıdan hiç çıkmadı), 3 dosya kartı render oldu, büyük kart `[truncated]` işaretledi, PNG **görsel** olarak render oldu, composer boşa döndü, telde aynı istekte 3 `<file>` bloğu + image part. Temizlik: geçici provider + iki oturum **stays-gone** (5 deneme), diskte `probe187-*`/`lokma-pdf-*` yok, `probe187-*` provider **0**, tokenless `/api/auth/me` **401** (kapı AÇIK kalmadı). Kapılar: kök `bun x tsc --noEmit` **0**; web koduna dokunulmadı (paketleme değişmedi, canlı bundle `index-Cb9oE5PW.js` aynı).
+- Kalan: YOK — REQ kapandı.
 
 ## Notlar
 

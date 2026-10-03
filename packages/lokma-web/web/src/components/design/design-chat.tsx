@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, RotateCcw, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SelectMenu, type SelectMenuGroup, type SelectMenuOption } from '@/components/ui/select-menu';
 import { COMPOSER_ENTER_HINT, COMPOSER_SHELL_CLASS, ComposerInput } from '@/components/chat/composer-input';
@@ -9,9 +9,12 @@ import { emitToast } from '@/components/shell';
 import { cn } from '@/lib/utils';
 import {
   DESIGN_TYPES,
+  DESIGN_SKILL_SELECT_CAP,
   formatUpdated,
+  groupSkillRows,
   overallLabel,
   projectLabel,
+  skillSelectionLabel,
   type DesignEvent,
   type NormalizedArtifact,
 } from './design';
@@ -141,6 +144,30 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
     return [...byCategory.entries()].map(([label, options]) => ({ label, options }));
   }, [s.systems]);
   const hasCatalog = s.systemsSource === 'catalog' && s.systems.length > 0;
+  // REQ-192 — the design-SKILL picker. A SECOND axis beside System, deliberately
+  // not merged into it: a system is the palette, a skill is the SKILL.md
+  // instruction set the model follows while producing. Rows are grouped by the
+  // server's taxonomy (Style / Layout / Accessibility / …) and searchable.
+  const skillGroups = React.useMemo<SelectMenuGroup[]>(
+    () =>
+      groupSkillRows(s.skills, s.skillGroups).map((group) => ({
+        label: group.label,
+        options: group.rows.map((row) => ({ value: row.id, label: row.name })),
+      })),
+    [s.skills, s.skillGroups],
+  );
+  const skillNames = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of s.skills) map.set(row.id, row.name);
+    return map;
+  }, [s.skills]);
+  const selectedSkills = React.useMemo(
+    () =>
+      s.form.skills
+        .map((id) => s.skills.find((row) => row.id === id))
+        .filter((row): row is NonNullable<typeof row> => Boolean(row)),
+    [s.form.skills, s.skills],
+  );
   const modelOptions = React.useMemo<SelectMenuOption[]>(() => {
     const rows: SelectMenuOption[] = [{ value: '', label: 'Default (auto)' }];
     if (s.form.model && !modelInCatalog) {
@@ -260,6 +287,113 @@ export function DesignChat({ studio }: { studio: DesignStudio }) {
           groups={modelGrouped}
           triggerAttrs={{ 'data-design-composer-model': '' }}
         />
+        {/* REQ-192 — the SKILL axis. Multi-select on purpose: one brief can ask
+            for a style AND a layout AND accessibility rules, and the prompt
+            carries all of them. The trigger summarises the set honestly, the
+            chips below are the per-skill remove + read affordances. */}
+        <div className="mt-2 border-t border-line pt-2" data-design-skills>
+          <div className="flex items-end gap-1.5">
+            <div className="min-w-0 flex-1">
+              <SelectMenu
+                label={`Design skills (${s.form.skills.length}/${DESIGN_SKILL_SELECT_CAP})`}
+                value=""
+                onChange={s.toggleSkill}
+                groups={skillGroups}
+                multi
+                multiValues={s.form.skills}
+                multiLabel={skillSelectionLabel(s.form.skills, skillNames)}
+                searchable
+                searchPlaceholder="Search design skills"
+                menuClassName="max-h-[320px] min-w-[15rem]"
+                triggerAttrs={{ 'data-design-composer-skills': '' }}
+              />
+            </div>
+            <button
+              type="button"
+              data-design-skills-reset
+              onClick={s.resetSkills}
+              disabled={s.form.skills.length === 0}
+              title="Clear every selected skill"
+              className="mb-px flex h-7 shrink-0 items-center gap-1 rounded-md border border-line bg-white px-1.5 text-[10px] text-zinc-500 hover:bg-[#F7F5F1] disabled:cursor-not-allowed disabled:opacity-40 dark:bg-[#0F0F11] dark:text-zinc-400 dark:hover:bg-[#242427]"
+            >
+              <RotateCcw className="h-3 w-3" /> Reset
+            </button>
+          </div>
+          {s.skills.length === 0 && s.skillsUnscoped > 0 ? (
+            <p data-design-skills-empty className={cn('mt-1 text-[10px]', META_CLASS)}>
+              No design-scoped skills installed — {s.skillsUnscoped} skill(s) were skipped because they declare no
+              {' `scope: design`'} in their frontmatter.
+            </p>
+          ) : null}
+          {s.skills.length === 0 && s.skillsUnscoped === 0 ? (
+            <p data-design-skills-empty className={cn('mt-1 text-[10px]', META_CLASS)}>
+              No design skills found in this workspace.
+            </p>
+          ) : null}
+          {selectedSkills.length > 0 ? (
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {selectedSkills.map((row) => (
+                <span
+                  key={row.id}
+                  data-design-skill-chip={row.id}
+                  className="inline-flex items-center gap-1 rounded-full border border-line bg-white px-1.5 py-0.5 text-[10px] text-ink dark:bg-[#0F0F11] dark:text-white"
+                >
+                  <button
+                    type="button"
+                    title={'Read ' + row.name + ' (SKILL.md)'}
+                    data-design-skill-read={row.id}
+                    onClick={() => s.previewSkill(row.id)}
+                    className="max-w-[9rem] truncate"
+                  >
+                    {row.name}
+                  </button>
+                  <button
+                    type="button"
+                    title={'Remove ' + row.name}
+                    aria-label={'Remove ' + row.name}
+                    data-design-skill-remove={row.id}
+                    onClick={() => s.toggleSkill(row.id)}
+                    className="text-zinc-400 hover:text-rose-600 dark:hover:text-rose-300"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {s.skillPreview || s.skillPreviewLoading || s.skillPreviewError ? (
+            <div data-design-skill-preview className="mt-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className={cn('truncate text-[10px] font-medium', META_CLASS)}>
+                  {s.skillPreviewLoading
+                    ? 'Reading SKILL.md…'
+                    : (s.skillPreview?.name ?? 'SKILL.md')}
+                </p>
+                <button
+                  type="button"
+                  data-design-skill-preview-close
+                  title="Close preview"
+                  aria-label="Close skill preview"
+                  onClick={() => s.previewSkill(null)}
+                  className="text-zinc-400 hover:text-rose-600 dark:hover:text-rose-300"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+              {s.skillPreviewError ? (
+                <p className="mt-1 text-[10px] text-rose-600 dark:text-rose-300">{s.skillPreviewError}</p>
+              ) : null}
+              {s.skillPreview ? (
+                <pre
+                  data-design-skill-preview-body
+                  className="mt-1 max-h-40 overflow-y-auto rounded-md border border-line bg-white p-1.5 font-mono text-[10px] leading-4 whitespace-pre-wrap text-zinc-600 dark:bg-[#0F0F11] dark:text-zinc-400"
+                >
+                  {s.skillPreview.content}
+                </pre>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
         <div className="mt-3 border-t border-line pt-2.5">
           <label htmlFor="design-brief" className={LABEL_CLASS}>
             Brief

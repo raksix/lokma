@@ -1,7 +1,8 @@
 # REQ-194 — Settings bölümleri tam ekran (full-screen) açılabilsin, en azından Models
 
-**Status:** in-progress
+**Status:** done
 **Tarih:** 2026-10-03
+**Kapanış commit'leri:** bc6948c (slice 1) · 902385f (slice 2) · 8ad5f48 (düzeltme) · e5ea527 (AST kapısı) · 3371ec7 (canlı prob)
 **Kaynak:** Kullanıcı mesajı (3 Ekim 2026):
 > "settings modeli daha büyük full screen gibi bişi olsun"
 
@@ -106,3 +107,73 @@ Düzen bitti; **prob ve ekran görüntüsü** sırada.
 
 - **`scripts/probe-settings-fullscreen.cjs`** (canlı, login gate AÇIK kalmalı): shell ölçümü (768×640 varsayılan / tam ekran), reload kalıcılığı, Models üç kolon + `/` + önizleme paneli, 1500px ve 390px taşma kontrolü, ilk/son satır yükseklik farkı (600+ satırda akıcılık göstergesi). Mint'lenmiş superadmin token ile (prob `requireLogin`'ı **asla** açmıyor).
 - Sonra: `Status: done` + `git mv` → `finished/` + README + `Docs/00` kapanışı.
+
+## Slice 3 — canlı prob + GERÇEK ürün hatası (`8ad5f48`, `e5ea527`, `3371ec7`)
+
+Düzen ölçülürken **slice 2'nin ekranda hiç görünmediği** ortaya çıktı: Models
+bölmesinin orta kolonu **0px**'di.
+
+1. **Kök neden:** `settings-modal.tsx:309-311` gövdenin üstündeki üç satırlık
+   yorum **çıplak `//`** ile yazılmıştı. JSX **children** konumunda `//` yorum
+   DEĞİLDİR — parser metin olarak saklar, yani 213 karakterlik bir text node
+   DOM'a render edilir. Ölçüm: o text node `x=209..1458` (**1249px**), flex
+   satırının **anonim flex öğesi** oluyor ve gövdeyi sağa itiyor (x=1467/1498).
+   Sonuç: orta kolon `180px 0px 240px`, kaydırma kuyusu 86px, `overflowX=78`.
+   `tsc` 0, 70 birim assert yeşil, build yeşil — **hiçbir render ölçümü
+   dışında görünmez**. Düzeltme: yorum JSX yorum biçimine çevrildi (`8ad5f48`).
+2. **Teşhis yolu (kuramsal değil, ölçüm):** ilk varsayım "flex `justify-content`"
+   idi — `flex-start` zorlanınca dağılım **değişmedi**; `transform: none` ve
+   `position: static` ölçüldü (yani görsel kayma değil, gerçek layout); aynı
+   sınıflarla kurulmuş **klon** doğru dizildi (1290px) → sınıflar suçlu değil;
+   `row.childNodes` üç eleman gösterdi: `NAV`, **`#text`**, `DIV`. Metin
+   düğümünün ham içeriği **birebir yorumun kendisiydi**.
+3. **Kalıcı kapı (`e5ea527`):** `scripts/audit-jsx-text-comments.cjs` — TypeScript
+   AST'siyle **birebir** taraması. Satır sezgiseli denendi ve **başarısız
+   oldu**: gerçek tek örneği **kaçırdı**, buna karşılık arrow-function gövdesi
+   içindeki (JS bağlamında geçerli) üç yorumu **işaretledi**. AST'de yorumlar
+   `JsxText` olmadığı için doğru yerde çıkmıyorlar; bulgu başına **exit 1**.
+4. **Canlı prob (`3371ec7`):** `scripts/probe-settings-fullscreen.cjs` —
+   **47 assert**, mint'lenmiş superadmin token ile (login gate **AÇIK**,
+   `requireLogin` hiç çevrilmedi). Varsayılan 768×640 geriye-dönük guard, tam
+   ekran viewport, Esc sırası (önce moddan çıkar, ikinci basışta kapanır),
+   reload kalıcılığı, `?settings=models&fullscreen=1` + parametre silme, üç kolon
+   + kapaksız kuyu, `/` kısayolunun **iki** yarısı, seçim → önizleme,
+   önizlemenin `context|ctx|price|cost|token` **uydurmaması**, 1500px ve 390px
+   taşma yok.
+5. **Proven-to-fail (iki kapı, ikisi de ölçüldü):** `git show 902385f` ile
+   **aynen** orijinal blok geri kondu → bundle `index-DpD-8Pw2.js` (yani
+   yayınlanan hatalı hash), orta kolon yeniden **0px**, prob **rc=1**. AST kapısı
+   da aynı mutasyonda **rc=1**. Düzeltilmiş dosya `md5sum` ile **bayt-aynı**
+   geri alındı (`b4a840df…`), düzeltilmiş build'de ikisi de yeşil.
+
+### Ölçüm (slice 3)
+
+- Canlı prob **47/47 PASS**, `rc=0` (düzeltilmiş build).
+- `bun src/components/settings/settings-modal.test.ts` → **70 passed** (değişmedi).
+- `bun src/components/providers/models.test.ts` → **66 passed** (değişmedi).
+- Kök `bun x tsc --noEmit` → **0 hata**.
+- `env -u NODE_CHANNEL_FD -u NODE_ENV bun run build` → `index-JkClP2LT.js` (684.66 kB).
+- Canlı: `pm2 restart lokma-web` → servis edilen == disk (`index-JkClP2LT.js`),
+  `web=200`, `api /health=200`, login gate **ON** (tokenless `/api/auth/me` → **401**).
+- Ölçülen düzelme: orta kolon `180px 0px 240px` → **`180px 806px 240px`**,
+  kuyu `86px` → **`620px`**, `overflowX 78` → **`0`**.
+- Ekran görüntüleri `/tmp/req194-fullscreen-general.png`,
+  `/tmp/req194-models-fullscreen.png`, `/tmp/req194-models-390.png`
+  (vision kredisi bittiği için kanıt **computed style** ölçümü; bu skill'in
+  "computed style, ekran görüntüsü değil" kuralı gereği).
+
+### Ölçülen iki prob kusuru (ürün hatası **değil**)
+
+- `modelsInfo()` yardımcısı `data-models-pane` kancasına bağlıydı; o nitelik
+  **yalnız wide modda** var (`wide ? 'wide' : undefined` nitelik basmaz), yani
+  küçük kabuk kontrolleri **var olmayan** bir pane ölçüyordu ("no models pane").
+  Yardımcı artık daima render edilen `data-models-scroll`'a bakıyor, kancanın
+  kendisi olduğu durum kimlikle çözülüyor.
+- 390px taşma kontrolü **backdrop** öğesini ölçüyordu; onun `clientWidth`'i
+  viewport kaydırma çubuğu payını (390−5) içermiyor, dolayısıyla ürünün değil
+  çubuğun 5px'ini "taşma" diye raporluyordu. Artık **içerik** kutuları
+  (shell/body/list) ölçülüyor: `{"shell":0,"body":0,"list":0}`.
+
+### Sonuç
+
+Tüm kapsam (1-7) ve kabul kriterleri karşılandı; `Status: done`.

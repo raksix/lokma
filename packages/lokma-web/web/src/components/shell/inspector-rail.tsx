@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Beaker, Brain, Clock3, Cpu, Folder, FolderOpen, GitBranch, Globe, HardDrive, Info, Layers, ListTodo, Package, Plug2, Puzzle, Settings, Star, Terminal, Users, Workflow } from 'lucide-react';
+import { Activity, BarChart3, Beaker, Brain, Clock3, Cpu, Folder, FolderOpen, GitBranch, Globe, HardDrive, Info, Layers, ListTodo, Package, Plug2, Puzzle, Repeat, Settings, Star, Terminal, Users, Workflow } from 'lucide-react';
 import { surfacesWithHost, type Surface, type SurfaceId } from '@lokma/shared/surfaces';
 import { cn } from '@/lib/utils';
 import { INSPECTOR_DRAG_MIME, encodeInspectorDrag } from '@/components/panes/panes';
@@ -110,6 +110,7 @@ const SURFACE_ICONS: Partial<Record<SurfaceId, typeof Info>> = {
   plugins: Package,
   observability: Activity,
   cron: Clock3,
+  loops: Repeat,
   extras: Star,
   memory: Brain,
   todos: ListTodo,

@@ -72,6 +72,12 @@ export const LazyObservabilityPane = React.lazy(() =>
 export const LazyCronApprovalsPane = React.lazy(() =>
   import('@/components/cron/cron-pane').then((m) => ({ default: m.CronApprovalsPane })),
 );
+// REQ-202 — the Loops console is ONE component behind two hosts (the rail's
+// Loops pane/tab and the Settings → Loops section), so it gets a single lazy
+// binding and both surfaces import this name.
+export const LazyLoopsPane = React.lazy(() =>
+  import('@/components/loops/loop-console').then((m) => ({ default: m.LoopConsole })),
+);
 export const LazyExtrasPane = React.lazy(() =>
   import('@/components/extras/extras-pane').then((m) => ({ default: m.ExtrasPane })),
 );

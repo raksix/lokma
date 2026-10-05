@@ -29,7 +29,10 @@ function check(name: string, cond: boolean): void {
 }
 
 // Registry shape — OpenCode-style categories in display order.
-check('eighteen sections', SETTINGS_SECTIONS.length === 18);
+check('nineteen sections', SETTINGS_SECTIONS.length === 19);
+// REQ-202 Kapsam 1 — the Loops console section (beside Cron: both are
+// scheduler surfaces, and the rail's Loops icon opens this same section).
+check('loops section present', SETTINGS_SECTIONS.some((s) => s.id === 'loops'));
 check('general first', SETTINGS_SECTIONS[0].id === 'general');
 check('account second (own profile only)', SETTINGS_SECTIONS[1].id === 'account');
 check('admin third (users/roles/projects/policy)', SETTINGS_SECTIONS[2].id === 'admin');

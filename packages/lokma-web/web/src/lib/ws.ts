@@ -341,6 +341,10 @@ export function applyServerFrame(state: WsUiState, msg: ServerMessage): WsUiStat
     }
     case 'agent_state':
       return state;
+    case 'loop':
+      // REQ-202: loop changes reach the console through the `loop-frame`
+      // bridge (dispatched by the socket layer), not through chat state.
+      return state;
     case 'terminal/data':
     case 'terminal/exit':
       // Terminal traffic belongs to the TerminalPane (it reads the same

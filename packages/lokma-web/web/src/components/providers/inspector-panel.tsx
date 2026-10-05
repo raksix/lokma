@@ -9,6 +9,7 @@ import {
   LazyAdminPane,
   LazyBrowserPane,
   LazyCronApprovalsPane,
+  LazyLoopsPane,
   LazyExtrasPane,
   LazyGitPane,
   LazyModelsPane,
@@ -107,6 +108,8 @@ export type InspectorTab =
   | 'plugins'
   | 'observability'
   | 'cron'
+  // REQ-202 — the Loops console as an Inspector tab.
+  | 'loops'
   | 'extras'
   | 'todos';
 
@@ -156,6 +159,10 @@ export function InspectorPanel({
         <LazyExtrasPane onOpenTab={(t) => setTab(t)} />
       ) : tab === 'cron' ? (
         <LazyCronApprovalsPane />
+      ) : tab === 'loops' ? (
+        // REQ-202 — the Loops console, same component as the pane tab and
+        // the Settings section (one implementation, three hosts).
+        <LazyLoopsPane />
       ) : tab === 'observability' ? (
         <LazyObservabilityPane />
       ) : tab === 'plugins' ? (

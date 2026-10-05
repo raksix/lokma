@@ -321,17 +321,15 @@ export const SURFACES: readonly Surface[] = [
   // only loops created inside this harness (by the user or by the agent) are
   // catalogued, which is the distinction the request turns on.
   //
-  // `hosts: []` on purpose — the rail entry arrives WITH the Loops console
-  // (REQ-202), not before it. A rail entry whose pane does not exist yet is a
-  // dead button, which is worse than a surface the model can reach but the
-  // user has not been given a click path to. The catalog rows below still do
-  // their real job now: they are what `READ_TOOLS`/`WRITE_TOOLS` derive from
-  // and what `<available_surfaces>` advertises.
+  // REQ-202: the rail entry arrived WITH the console in this same wave — the
+  // pane, the Inspector tab and the Settings → Loops section all render the
+  // same `LoopConsole`, so `hosts: ['inspector']` is now honest (a rail entry
+  // whose pane does not exist is a dead button).
   {
     id: 'loops',
     label: 'Loops',
     opens: 'pane',
-    hosts: [],
+    hosts: ['inspector'],
     tools: [
       { name: 'loop_list', summary: 'List loops with status, trigger, spent budget and last turn outcome', gate: 'read' },
       { name: 'loop_create', summary: 'Create a repeating loop (approval-gated) with a prompt, cwd and trigger', gate: 'write' },

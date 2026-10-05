@@ -34,6 +34,7 @@ import {
   type WsStatus,
   type WsUiState,
 } from '@/lib/ws';
+import { announceLoopChange } from '@/lib/loop-frame';
 
 /**
  * useWs — typed WS hook for harness chat streaming.
@@ -212,6 +213,11 @@ export function useWs(sessionId: string): UseWs {
         // REQ-149: session data (list pushes + transcript snapshots/appends)
         // folds into the session store — it ignores every other frame type.
         useSessionStore.getState().applyWsEvent(msg);
+        // REQ-202 kapsam 5: the loop console's live frame. The bridge lives in
+        // lib/ so this socket layer never imports a component module (that
+        // would drag the console into the chat's initial chunk); the console
+        // listens for the event and re-reads only the named loops.
+        if (msg.type === 'loop') announceLoopChange(msg.loopIds);
       };
       ws.onerror = () => {
         // Error details arrive via onclose; just make sure a dead socket closes.

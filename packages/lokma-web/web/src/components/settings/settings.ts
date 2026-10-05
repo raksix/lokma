@@ -467,6 +467,10 @@ export const SETTINGS_SECTIONS = [
   { id: 'vault', label: 'Vault' },
   { id: 'memory', label: 'Memory' },
   { id: 'cron', label: 'Cron' },
+  // REQ-202 Kapsam 1 — the Loops console section. The rail's Loops icon
+  // ALSO exists (kapsam 1 asks for both entries): the icon is its own pane
+  // tab while this section is the modal route. Same component, two hosts.
+  { id: 'loops', label: 'Loops' },
   { id: 'shortcuts', label: 'Shortcuts' },
   { id: 'plugins', label: 'Plugins' },
   // REQ-166 — Skills left the panes too: the live registry + curator patch

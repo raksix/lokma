@@ -21,6 +21,7 @@ import {
   enqueuePrompt,
   type TurnReport,
 } from '../session-runs.js';
+import { emitLoopChange } from './events.js';
 
 /**
  * Loop executor — the ACTION half (REQ-201).
@@ -218,6 +219,13 @@ export async function runLoopTurn(
     // turn plus a "stopped" badge.
     final = await getLoop(loopId);
   }
+  // REQ-202 kapsam 5: the turn is BOOKED and the status settled — only now is
+  // a console row allowed to change. Announcing earlier would render the row
+  // with `inFlightSince` cleared while `spent.iters` still reads the old
+  // value, which is exactly the "one iteration behind" flicker the frame is
+  // meant to remove.
+  emitLoopChange([loopId]);
+
   return { started: true, reason: gate.reason, loop: final, report, stopReason: stopReason ?? undefined };
 }
 

@@ -59,6 +59,9 @@ export const INSPECTOR_TABS = [
   { id: 'plugins', label: 'Plugins' },
   { id: 'observability', label: 'Observability' },
   { id: 'cron', label: 'Cron' },
+  // REQ-202 — the Loops console: the rail entry's pane tab (kapsam 1).
+  // Same component as Settings → Loops, one implementation.
+  { id: 'loops', label: 'Loops' },
   { id: 'extras', label: 'Extras' },
   { id: 'todos', label: 'Todos' },
 ] as const;
@@ -77,6 +80,7 @@ export const TILING_BAR_TABS: InspectorTabId[] = [
   'plugins', // onOpenPlugins
   'observability', // onOpenObservability
   'cron', // onOpenCron
+  'loops', // onOpenLoops (REQ-202)
   'extras', // onOpenExtras
   'browser', // harness addition (W3-12 per-agent tabs)
 ];

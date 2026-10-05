@@ -233,6 +233,17 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
     reasoningEffort: z.enum(REASONING_EFFORTS).optional(),
   }),
   z.object({ type: z.literal('agent_state'), agentId: z.string(), state: z.string(), sessionId: z.string().optional() }),
+  /**
+   * REQ-202 kapsam 5 — the loop console's live frame.
+   *
+   * The payload is deliberately just the CHANGED ids, never the loop records:
+   * a frame that carried rows would need the loop schema on the wire (and a
+   * migration every time a field is added), while an id list says "re-read
+   * these", which the client already does through the same route the console
+   * mounted with. An EMPTY list means "the catalog changed shape" (a create or
+   * a delete) and asks for a full re-read.
+   */
+  z.object({ type: z.literal('loop'), loopIds: z.array(z.string().max(64)).max(200) }),
   // Terminal pane (W3-10): live process output + exit, scoped to the
   // spawning session so tabs in other sessions never see each other's bytes.
   z.object({

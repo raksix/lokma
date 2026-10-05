@@ -58,6 +58,7 @@ import {
   type SessionRunState,
 } from '../session-runs.js';
 import { deliverToSession } from '../session-delivery.js';
+import { onLoopChange } from '../loops/events.js';
 import { resolveProviderUpstream } from './providers.js';
 import { requestToken } from './auth.js';
 import {
@@ -884,6 +885,15 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
       );
     });
 
+    // REQ-202 kapsam 5 — the loop console's live frame. Every attached socket
+    // gets the CHANGED ids (never the records) so the panel re-reads through
+    // the same route it mounted with. Loops are global, exactly like agents:
+    // no session scoping applies. The bus catches its own listener errors, so
+    // a dead socket can never fail the turn that announced the change.
+    const offLoop = onLoopChange((ev) => {
+      socket.send(encodeServerMessage({ type: 'loop', loopIds: [...ev.loopIds] }));
+    });
+
     // REQ-070: the run state lives on the SESSION (session-runs.js), not the
     // socket. This socket attaches for fan-out; a refresh detaches it while
     // the run continues. Only an explicit `abort` cancels a run.
@@ -1130,6 +1140,7 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
       offData();
       offExit();
       offAgent();
+      offLoop();
       // REQ-149: drop this socket from every feed registry (transcript
       // watchers + session-list subscribers).
       unsubscribeSocket(socket);

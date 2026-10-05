@@ -16,6 +16,7 @@ import {
   Palette,
   Plug2,
   Puzzle,
+  Repeat,
   Settings,
   Shield,
   ShieldCheck,
@@ -37,6 +38,7 @@ import {
   LazyAdminPane,
   LazyAgentsPane,
   LazyCronApprovalsPane,
+  LazyLoopsPane,
   LazyMemoryPane,
   LazyModelsPane,
   LazyOrchestrationPane,
@@ -94,6 +96,8 @@ const SECTION_ICONS: Record<SettingsSectionId, typeof Settings> = {
   'mcp': Boxes,
   'memory': Brain,
   'cron': Clock3,
+  // REQ-202 — the Loops console section.
+  'loops': Repeat,
   'shortcuts': Keyboard,
   'plugins': Package,
   // REQ-166 — Skills section (moved out of the panes).
@@ -372,6 +376,15 @@ export function SettingsModal({
                 <LazyMemoryPane />
               ) : section === 'cron' ? (
                 <LazyCronApprovalsPane />
+              ) : section === 'loops' ? (
+                // REQ-202 Kapsam 1 — the Loops console as a Settings section.
+                // The `@container` host mirrors REQ-164: the console's
+                // two-column split is a container query, so without a real
+                // query container it can never resolve its md breakpoint and
+                // the detail column would sit under the list forever.
+                <div className="@container h-full min-h-0">
+                  <LazyLoopsPane />
+                </div>
               ) : section === 'plugins' ? (
                 <LazyPluginsPane />
               ) : section === 'skills' ? (

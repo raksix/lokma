@@ -4,6 +4,7 @@ import {
   BarChart3,
   Beaker,
   Clock3,
+  Repeat,
   FolderOpen,
   GitBranch,
   Globe,
@@ -43,6 +44,7 @@ export const TAB_ICONS: Record<InspectorTabId, React.ReactNode> = {
   plugins: <Package className="h-3 w-3" />,
   observability: <Activity className="h-3 w-3" />,
   cron: <Clock3 className="h-3 w-3" />,
+  loops: <Repeat className="h-3 w-3" />,
   extras: <Star className="h-3 w-3" />,
   todos: <ListTodo className="h-3 w-3" />,
 };

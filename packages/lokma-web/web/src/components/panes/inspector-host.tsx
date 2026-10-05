@@ -9,6 +9,7 @@ import {
   LazyAdminPane,
   LazyBrowserPane,
   LazyCronApprovalsPane,
+  LazyLoopsPane,
   LazyExtrasPane,
   LazyGitPane,
   LazyModelsPane,
@@ -85,6 +86,8 @@ function LazyTab({
   if (tab === 'plugins') return <LazyPluginsPane />;
   if (tab === 'observability') return <LazyObservabilityPane />;
   if (tab === 'cron') return <LazyCronApprovalsPane />;
+  // REQ-202 — the Loops console (same component as Settings → Loops).
+  if (tab === 'loops') return <LazyLoopsPane />;
   if (tab === 'todos') return <LazyTodosPane sessionId={sessionId} onOpenSession={onOpenSession} />;
   if (tab === 'extras') {
     return <LazyExtrasPane onOpenTab={(t: ExtrasTabId) => onOpenInspectorTab(t)} />;

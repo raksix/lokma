@@ -17,6 +17,7 @@ import { LOOP_DEFAULT_TURN_TIMEOUT_MS } from '../agent-loop.js';
 import { getRunState } from '../session-runs.js';
 import { runLoopTurn, loopSessionId } from '../loops/executor.js';
 import { pumpSessionRun } from './ws.js';
+import { emitLoopChange } from '../loops/events.js';
 
 /**
  * Harness-owned loops API (REQ-200). Backed by
@@ -94,6 +95,9 @@ export async function loopRoutes(app: FastifyInstance): Promise<void> {
     }
     try {
       const loop = await createLoop(parsed.data);
+      // REQ-202 kapsam 5: a NEW row means the catalog changed, not one record,
+      // so the frame carries no id and every console re-reads its list.
+      emitLoopChange();
       return reply.status(201).send({ loop });
     } catch (e) {
       return loopErr(reply, e);
@@ -109,6 +113,7 @@ export async function loopRoutes(app: FastifyInstance): Promise<void> {
     try {
       assertLoopIdShape(id);
       const loop = await updateLoop(id, parsed.data);
+      emitLoopChange([id]);
       return { loop };
     } catch (e) {
       return loopErr(reply, e);
@@ -180,6 +185,7 @@ export async function loopRoutes(app: FastifyInstance): Promise<void> {
       // later, so the panel can say "finishing this turn" instead of claiming the
       // agent already stopped.
       const { loop, deferred } = await requestStop(id);
+      emitLoopChange([id]);
       return { loop, deferred };
     } catch (e) {
       return loopErr(reply, e);
@@ -191,6 +197,7 @@ export async function loopRoutes(app: FastifyInstance): Promise<void> {
     try {
       assertLoopIdShape(id);
       const { loop, cutTurn } = await abortLoop(id);
+      emitLoopChange([id]);
       if (cutTurn) {
         // Cut through the SAME AbortController the chat Stop button uses, so the
         // agent loop really stops and the turn's report settles as `aborted`
@@ -209,6 +216,7 @@ export async function loopRoutes(app: FastifyInstance): Promise<void> {
     try {
       assertLoopIdShape(id);
       const loop = await setLoopStatus(id, 'running');
+      emitLoopChange([id]);
       return { loop };
     } catch (e) {
       return loopErr(reply, e);
@@ -219,7 +227,9 @@ export async function loopRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     try {
       assertLoopIdShape(id);
-      return await deleteLoop(id);
+      const out = await deleteLoop(id);
+      emitLoopChange();
+      return out;
     } catch (e) {
       return loopErr(reply, e);
     }

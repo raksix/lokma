@@ -118,3 +118,29 @@ Proven-to-fail (ikisi de RC=1, dosyalar md5 ile bayt bayt geri alındı): (1) lo
 **Kapılar:** canlı prob **54/0** (RC=0) · saf kurallar **51/51** · konsol probu **7/7** · store probu **73/0** · kök `bun x tsc --noEmit` **0** · core + server + web build yeşil · `pm2 restart` sonrası servis edilen chunk == disk (`index-UJu4zcAg.js`) · `/health` 200 · jetonsuz `/api/auth/me` prob öncesi **ve** sonrası **401** (login kapısı hiç açılmadı) · prob bıraktığı loop/fixture **0** (silme + kalıcılık doğrulamasıyla).
 
 **Sıradaki tur:** REQ'in Kontrol'ünün son satırı "prob (+ **ekran görüntüsü**)" diyor. Prob canlı ve yeşil; kalan parça konsolun ekran görüntüsü (kapsam 1'in iki giriş noktasından biri + satır/detay) ve Bitirme'nin `git mv → finished/` + README + `Docs/00` kapanışı. Ayrıca ölçülmemiş tek kapsam kalıyor: **kapsam 5'in "canlı satır WS frame ile anında güncellenir, frame yoksa poll" ölçümü** — prob şu an poll yolunu ölçüyor, frame yolu ölçülmedi.
+
+### Tur 5 (`6cf41c6`) — kapsam 5'in frame yolu hiç ölçülmemişti; prob, frame ölüyken de yeşil kalıyordu
+
+Yukarıdaki "sıradaki tur" notunun işaret ettiği boşluk kapandı, ama boşluğun **ne ölçtüğü** önce ölçüldü: prob'un 1'den 13'e kadar olan her adımı 5 sn'lik **poll** yolunu kullanıyordu. Yani REQ'in kendi "soket yoksa 5 sn poll" cümlesi, **frame yolu tamamen ölüyken de** prob'u yeşil bırakıyordu — düşen katman sessizce yedek yolla örtülüyordu.
+
+Ölçüm iki bağımsız eksende yapıldı, çünkü tek başına ikisi de belirsiz:
+
+- **Tel:** CDP `Network.webSocketFrameReceived` ile gerçek `{"type":"loop","loopIds":["l_…"]}` frame'i yakalanıyor **ve şekli doğrulanıyor**. Alt dize araması, adı ya da iç içe bir gövdeyi taşıyan bir frame'i de kabul ederdi; o frame konsola "katalog değişti" diye ulaşıp hedefli tazeleme yerine tam yeniden okuma tetiklerdi — yani kapsam 5'in istediği şey değil.
+- **DOM:** satır poll aralığının çok altında değişiyor **ve** o pencerede **sıfır** `GET /api/loops` liste çekişimi var. İkinci eksen ancak bir **negatif kontrol** ile anlamlı: önce poll'un gerçekten çalıştığı ölçülüyor (boştaki liste çekişimleri ~4999 ms aralıkla), aksi hâlde "pencerede çekişim yok" gözlemi "prob çekişimleri göremiyor" demek olurdu. CDP oturumu sokettan **sonra** açılıyor: zaten açık bir soket yeni bir CDP oturumuna tekrar oynatmıyor, sayfa oluşturulurken açılan oturum hiçbir şey görmez ve frame kontrolü boşuna yeşil kalırdı.
+
+**Proven-to-fail iki mutasyonla kanıtlandı** (ikisi de RC=1, kaynak `md5sum` ile **bayt bayt** geri alındı, yeniden kurulan bundle aynı hash'e döndü — `index-UJu4zcAg.js`):
+
+| mutasyon | hangi kontrol kırmızıya düştü | anlamı |
+|---|---|---|
+| soket köprüsü frame'i alıyor, id'leri **yutuyor** (`announceLoopChange([])`) | "pencerede katalog poll'u çalışmadı" → `list fetches=1` | frame hedefli tazeleme yerine tam yeniden okumaya düşüyor; DOM yine de hızlı çünkü yeniden okuma da hızlı — **zamanlama kontrolü bu mutasyonda yeşil kalıyor** |
+| köprü tamamen kaldırılıyor (`loop` frame'i hiç ilan edilmiyor) | "satır frame ile yeniden çizildi" → `dom NEVER` | frame yolu gerçekten ölü; satır ancak bir sonraki poll'da hareket eder |
+
+İki mutasyon **farklı** kontrolü kırmızıya düşürdüğü için ikisi de yük taşıyor; ilk mutasyonun "hızlı DOM" gözlemi tek başına yanıltıcıydı ve yalnız `fetches-in-window` kontrolü onu yakaladı. Ders: bir ölçüm iki bağımsız kanaldan geliyorsa, her birinin **kendi** kırıklığının hangi assertion'ı düşürdüğünü ayrı ayrı doğrula — yoksa "yeşil" olan, kanaldan biri değil muhtemelen diğeridir.
+
+**Ekran görüntüleri:** Kontrol'ün son satırı gereken iki kare alındı — `assets/REQ-202-ss1-loop-konsol-liste.png` (kapsam 1'in Settings → **Loops** giriş noktası, satır) ve `assets/REQ-202-ss2-loop-konsol-detay.png` (detay: "WHAT IS LEFT" 2 madde, kontrol düğmeleri, ledger). İkisi de **gerçek** bir loop + gerçek `scope.md` ile, elle hiçbir alan doldurulmadan çekildi ve prob bıraktığı loop **0** ile bitti.
+
+**Vision uyarısı (bu turde ölçüldü, kayda değer):** ss1'i okuyan vision iki şeyi **yanlış** söyledi — konsolun görünmediğini (aynı yanıtta satırın adını, rozetini, `iter 0/400` ve ipucunu ayrıntılıyla saymış), ve `state.json` bloğunun ss2'de "görünmediğini" (blok panelin altında, kırpılmış). Buna karşılık **bütçe** etiketlerini doğru okudu: `0.0/24h · $0.00/$50`. Şüphe edilip **DOM'dan ölçüldü** (`innerText` + `getComputedStyle`) ve iki şey doğrulandı: (1) sunucu bütçeyi **varsayılan** olarak atıyor (`maxHours:24, maxUsd:50`) — yani etiketler uydurma değil, prob'un "tavansız bütçe" kontrolünün ölçtüğü **farklı** bir kayıt durumu; (2) satır ipucu **tam metni** taşıyor, vision'un "truncated" dediği şey CSS `text-overflow: ellipsis` (`scrollWidth 287` / `clientWidth 215`). Yani ekran görüntüleri **dürüst kanıt**; ekran görüntüsü kanıtı da bu REQ'in ortak dersini tekrarlıyor: renk, dolgu veya "görünüyor/yok" iddiası ölçülmeden kabul edilmiyor.
+
+**Kapılar:** canlı prob **61/0** (RC=0) · saf kurallar **51/0** · konsol probu **7/0** · store probu **73/0** (token'lı) · core store **128/0** · server bus **7/0** (temp HOME ile) · kök `bun x tsc --noEmit` **0** · web build yeşil (**1757 modules**) · `pm2 restart lokma-web` sonrası servis edilen chunk == disk (`index-UJu4zcAg.js`) · `/health` 200 · jetonsuz `/api/auth/me` prob öncesi **ve** sonrası **401** (login kapısı hiç açılmadı) · prob bıraktığı loop/fixture **0** · çalışma ağacı temiz.
+
+**Kapanışa kalan tek şey:** Bitirme'nin `Status: done` + hash + `git mv → finished/` + README index satırı + `Docs/00` kronoloji girdisi. Kapsam 1–7'in tamamı ölçüldü ve kanıtlandı; ayrı bir kod değişikliği gerektiren açık kapsam yok.

@@ -19,6 +19,7 @@
 
 ## İstekler
 
+- [REQ-204](REQ-204-sublume-interactive-subtitle-vocabulary.md) — **Sublume**: interactive-subtitle vocabulary learning, Lokma'nın içinde bundled subsystem (player + kelime popover + kişisel sözlük + FSRS review) — pending
 - [REQ-001](finished/REQ-001-explorer-sag-menu.md) — Explorer sağ menüde olacak — done
 - [REQ-002](finished/REQ-002-dosya-sekme-olarak-acilsin.md) — Explorer'dan açılan dosya son aktif pane'de sekme açılsın — done
 - [REQ-003](finished/REQ-003-new-session-renk.md) — New Session butonuna renk ekle — done

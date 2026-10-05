@@ -1,6 +1,6 @@
 # REQ-201 — Loop yürütücüsü: arka planda tekrarlı koşu (cron'dan ayrı kavram)
 
-**Status:** in-progress (tur 2/5 — yürütücü eylem katmanı bitti, commit `79f75ef`)
+**Status:** in-progress (tur 3/5 — run rotası bitti, commit `ce81510`)
 **Tarih:** 2026-10-03
 **Kaynak:** Kullanıcı mesajı (3 Ekim 2026):
 > "abi var olan loopları lokmaya ekleme sadece biz ya da agent loop oluşturunca lokma harnessinde çalışan loopları arayüzden görebileceğiz.
@@ -102,4 +102,26 @@ istersek tüm looplar istersek proje bazlı"
 
 **Bu turda ölçülen ek kapı tuzağı:** kök `bun x tsc --noEmit` **yeşil** kaldı, `packages/lokma-web/server` kendi build'i 4 hata verdi. Sebep: `let terminal` değişkeninin TÜM atamaları bir closure içinde olduğu için kontrol akışı analizi onu başlangıç değerine daraltıyor ve okuma yeri `never` oluyor. Holder **nesne** kullanıldı. Kök kapı tek başına her paketin tsconfig'ini kapsamıyor.
 
-**Sonraki tur (3/5):** `POST /api/loops/:id/run` rotası + `GET /api/loops/:id` (ledger detayı) + tur 4'te `create_loop`/`list_loops` araçları, tur 5'te `stop`/`abort` dürüstlüğü (`stop` mevcut turu bitirip `paused`, `abort` `error:aborted`) + `resumeOnBoot`.
+
+### Tur 3/5 — run rotası (`ce81510`) ✅
+
+**Bitti:** `POST /api/loops/:id/run` artık bir turu gerçekten başlatıyor ve **202** ile dönüyor — turu beklemeden. Tur mevcut session kuyruğuna `pumpSessionRun` ile biniyor (yeni kuyruk yok).
+
+**Ölçülen karar — rota turu SENKRON bekleyemez:**
+
+- Canlı nginx `/api/` için `proxy_read_timeout 60s` veriyor (`/etc/nginx/sites-enabled/lokma.fermag.com.tr:36`), bir loop turu ise `LOOP_DEFAULT_TURN_TIMEOUT_MS` = **180s**. Senkron bir cevap, **gerçekten token harcayan** bir koşunun üstünde 504 verirdi: kullanıcı "başlattım, hiçbir şey olmadı" derken arka planda tur koşuyor. Bu, dürüstlüğün tersi — kullanıcıya yalan söyleyen bir hata. 202 + kayıt + `GET /api/loops/:id`'den ilerleme okuması doğru şek.
+- **Reddedilmeler senkron kaldı** (404 / 409 / terminal). Reddedilen bir tıklamanın "kabul edildi" gibi dönmesi, kullanıcıya sonsuza kadar bekleyen bir çalıştırma vaadi demek.
+
+**Prob düzeltmeleri (üçü de kendi hatam):**
+
+1. **`status === 'running'` yarış koşulu.** İlk koşumda 7 kırmızı verdi; kanıt transcript satırının **yazıldığı**ydı (`the prompt landed in the transcript` geçti) — yani dispatch gerçekten oluyordu, `running` sadece bu prob HOME'unda (sağlayıcısız) milisaniyeler içinde kaybolan geçici durum. Bir yarış ölçüm değildir. Kalıcı iz `lastRunStartedAt`'a geçti.
+2. **409 testi de aynı yarışın kurbanıydı** — birinci tur reddedilmeden önce ikinci istek atılıyordu. `running` durumu doğrudan store'dan kuruldu (deterministik), "tur bitmiş" senaryosu ise gerçek executor ile timeout'a düşürüldü.
+3. **404 assert'i yanlış id uyduruyordu.** `assertLoopIdShape` şekil doğruluyor (`l_` + uzunluk); uydurduğum id şekle uymadığı için 400 `bad_loop_id` geliyordu. İki ayrı yol ayrı ayrı ölçülüyor: şekil geçersiz → 400, şekil geçerli ama yok → 404.
+
+**Kanıtlanamayan kural (dürüst sınır):** ilk PTF, `void runLoopTurn` → `await runLoopTurn` mutasyonunun **yeşil kaldığını** gösterdi. Beş örneklemde iki varyant **birebir aynı** ölçüldü (`status=error, startedAt=SET`): bu prob düzeyinde `app.inject`, senkron/arka plan ayrımını göremiyor. Kural üretimde gerçekten yük taşıyor (180s tur vs 60s proxy) ama **bu test koşulu onu üretemiyor** — sahte bir kırmızı yazmak yerine mutasyonu, gerçekten ayırt edilebilir olan "202 gövdesi tur-öncesi kaydı taşır" kuralına çevirdim. Ölçülen fark: 24/31 → kırmızı.
+
+**PTF altyapısında üç gerçek hata (hepsi ölçüldü, ürün dosyaları bozuk bırakıyordu):** (1) `restore` iki argüman bekliyordu, çağrı yerleri tek geçiyordu → `set -u` betiği ilk vakada öldürüyor, **hiçbir şey geri alınmıyor** ve `routes/loops.ts` mutasyonlu kalıyordu. (2) `expect_red` hata halinde `verify_restore`'ı **mutasyonlu dosyayla** çağırıyordu → "RESTORE FAILED" + bozuk ağaç. (3) Başarılı yolda hiç restore yoktu (sadece `trap`'e güveniliyordu). Üçü de düzeltildi: tek argümanlı `restore`, her çıkış yolunda geri alma, sonda zorunlu `verify_restore`.
+
+**Kapılar:** kök `tsc` 0 · server build 0 · **run-route probu 31/31** · executor 76/76 (regresyon yok) · store 118 · runner 72 · **PTF 6/6 kırmızı** (byte-for-byte md5 geri alma, `md5sum -c` ile doğrulandı).
+
+**Sonraki tur (4/5):** `create_loop`/`list_loops` ajan araçları (REQ-181 kataloğundan) — ajan da loop kurabilsin. Tur 5'te `stop`/`abort` dürüstlüğü (`stop` mevcut turu bitirip `paused`, `abort` `error:aborted`) + `resumeOnBoot`.

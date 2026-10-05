@@ -2163,4 +2163,16 @@ export const api = {
   resumeLoop: (id: string) => post<LoopMutationRes>(`${loopPath(id)}/resume`, {}),
   /** Remove the loop's directory; history is kept server-side. */
   deleteLoop: (id: string) => del<LoopDeleteRes>(loopPath(id)),
+  /**
+   * REQ-202 kapsam 4 — `Open ledger (md)`: the raw `ledger.md` as a download.
+   *
+   * The loop directory lives OUTSIDE every workspace jail, so this is its own
+   * route rather than `/api/files/download?cwd=`. Blob-based because the call is
+   * authenticated (a plain `window.open` would drop the Bearer header).
+   */
+  downloadLoopLedger: async (id: string): Promise<Blob> => {
+    const res = await authedFetch(`${loopPath(id)}/ledger`);
+    if (!res.ok) throw await toApiError(res);
+    return res.blob();
+  },
 };

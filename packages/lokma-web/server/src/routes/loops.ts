@@ -8,6 +8,7 @@ import {
   listLoops,
   listProjectLoops,
   LoopError,
+  readLedger,
   requestStop,
   setLoopStatus,
   updateLoop,
@@ -83,6 +84,30 @@ export async function loopRoutes(app: FastifyInstance): Promise<void> {
     try {
       assertLoopIdShape(id);
       return await getLoopDetail(id);
+    } catch (e) {
+      return loopErr(reply, e);
+    }
+  });
+
+  // REQ-202 kapsam 4 — `Open ledger (md)`.
+  //
+  // The ledger lives in `~/.lokma/loops/<id>/ledger.md`, which is outside every
+  // workspace jail, so `/api/files/download?cwd=` cannot serve it and the
+  // console needs its own route. The path is NOT derived from a client string:
+  // `assertLoopIdShape` is the SAME guard the other routes use, then the file
+  // name is a fixed literal — so there is no second, weaker path guard and no
+  // way to read a loop's neighbours. Unknown loop → 404 before any read, which
+  // is what keeps this from answering for an id that does not exist.
+  app.get('/api/loops/:id/ledger', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    try {
+      assertLoopIdShape(id);
+      await getLoopDetail(id); // 404 when unknown — the guard, not the file read.
+      const body = await readLedger(id);
+      return reply
+        .type('text/markdown; charset=utf-8')
+        .header('content-disposition', `attachment; filename="${id}-ledger.md"`)
+        .send(body);
     } catch (e) {
       return loopErr(reply, e);
     }

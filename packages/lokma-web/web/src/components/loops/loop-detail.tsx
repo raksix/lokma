@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { emitToast } from '@/components/shell';
+import { downloadBlob } from '@/components/usage/usage';
 import { api, type LoopDetailRes, type LoopPauseRes, type LoopView } from '@/lib/api';
 import {
   activityLabel,
@@ -68,12 +69,14 @@ function LoopControls({
   confirmDelete,
   onAction,
   onConfirmDelete,
+  onOpenLedger,
 }: {
   loop: LoopView;
   busy: LoopAction | null;
   confirmDelete: boolean;
   onAction: (a: LoopAction) => void;
   onConfirmDelete: (next: boolean) => void;
+  onOpenLedger: () => void;
 }) {
   const terminal = loop.status === 'done' || loop.status === 'error';
   const disabled = (a: LoopAction) => busy !== null || (terminal && a !== 'resume' && a !== 'delete');
@@ -129,6 +132,19 @@ function LoopControls({
           Delete
         </Button>
       )}
+      {/*
+        kapsam 4's `Open ledger (md)`. Never disabled by `terminal`: history is
+        kept, so a finished loop's ledger is exactly the file worth downloading.
+      */}
+      <Button
+        variant="ghost"
+        size="sm"
+        aria-label="Open ledger (md)"
+        disabled={busy !== null}
+        onClick={onOpenLedger}
+      >
+        Open ledger
+      </Button>
       {busy ? <Loader2 className="h-3 w-3 animate-spin text-zinc-400" aria-hidden="true" /> : null}
     </div>
   );
@@ -195,6 +211,17 @@ export function LoopDetail({
     }
   }
 
+  async function openLedger(): Promise<void> {
+    try {
+      // The existing shared download helper — a second blob-to-anchor
+      // implementation here would be the 11th copy of the same four lines.
+      const blob = await api.downloadLoopLedger(loop.id);
+      downloadBlob(`${loop.id}-ledger.md`, blob);
+    } catch (e) {
+      emitToast(e instanceof Error ? e.message : 'Could not open the ledger');
+    }
+  }
+
   const remaining = detail ? remainingLabel(detail.remaining) : null;
   const reason = stopReasonLabel(loop.stopReason);
   const outcome = outcomeLabel(loop.lastRunOutcome);
@@ -223,6 +250,7 @@ export function LoopDetail({
         confirmDelete={confirmDelete}
         onAction={(a) => void act(a)}
         onConfirmDelete={setConfirmDelete}
+        onOpenLedger={() => void openLedger()}
       />
 
       <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-zinc-600 dark:text-zinc-300">

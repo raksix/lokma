@@ -1,7 +1,7 @@
 # REQ-203 — Loop görünümü proje bazlı olabilsin (tüm looplar ↔ tek proje)
 
-**Status:** pending
-**Tarih:** 2026-10-03
+**Status:** in-progress (tur 1/5 — saf kurallar katmanı)
+**Tarih:** 2026-10-03 · ilk uygulama 2026-10-05
 **Kaynak:** Kullanıcı mesajı (3 Ekim 2026):
 > "abi var olan loopları lokmaya ekleme sadece biz ya da agent loop oluşturunca lokma harnessinde çalışan loopları arayüzden görebileceğiz.
 
@@ -38,6 +38,59 @@ istersek tüm looplar istersek proje bazlı"
 - Yeni: `packages/lokma-web/web/src/components/loops/loop-console.tsx` (görünüm anahtarı + filtreler)
 - `packages/lokma-core/src/auth/store.ts` (proje–cwd eşleşmesi kontrolü)
 - `packages/lokma-web/web/src/stores/layout.ts` (snapshot)
+
+## Uygulama günlüğü (worker)
+
+### Tur 1/5 — saf kurallar katmanı (`4226f7d`)
+
+Yeni: `packages/lokma-web/web/src/components/loops/loop-view.ts` (I/O'suz, JSX'siz —
+her dürüstlük kuralı DOM olmadan kanıtlanabilir) + `loop-view.test.ts` (**71/0**).
+
+Ölçülen kararlar:
+
+1. **Proje eşleşmesi İKİ sinyale birden bakar** (`projectId` **veya** `cwd` ↔ proje
+   `cwd`'si). Yalnız `projectId` filtresi, projesi sonradan oluşturulmuş bir loop'u
+   düşürür ve "loop'um kayboldu" okuması doğar. Kapsam 3 tek doğruluk kaynağı ister —
+   bu katman **ikinci bir yol yazmaz**, ikisini de okur.
+2. **İki sinyal çelişirse** sessizce kazanan seçilmez: `conflict` durumu + rozet
+   `project conflict · cwd is <ad>`. Sıralama claim'e (explicit atama) gider, ama
+   çelişki görünür kalır — loop hiçbir projede kaybolmaz.
+3. **cwd'si boş olan proje kaydı hiçbir şeyi sahiplenmez** (`sameCwd('','')` tasarım
+   gereği true — `splitByProjects`'ın notu). Aksi halde `p_ghost` bütün projesiz
+   loop'ları yutardı.
+4. **Silinen proje loop'u silmez**: `missing` durumu, listede `project missing`
+   rozeti, ve loop **eski proje id'sine hâlâ cevap verir** (kullanıcı o id'yi seçili
+   bırakmış olabilir).
+5. **Proje görünümü hiçbir zaman "hepsine" genişlemez**: silinmiş bir seçim
+   `unscoped` bildirir ve **hiçbir şey listelemez** (kapalı kapı = sessiz veri
+   kaybı değil, dürüst boş liste).
+6. **Çapraz görünüm uyarısı** yalnız **başka projelerde `running`** loop'ları sayar ve
+   **arama/durum filtresinden ÖNCE** hesaplanır — arama kutusunun gizlediği çalışan
+   işi uyarı da gizlemesin diye. `runningElsewhere` "0 loops" dolgusu üretmez.
+7. **Sıralama**: önce `running`, sonra en yeni `updatedAt`; tarih parse edilemezse
+   **sona** düşer (throwing değil).
+8. **Snapshot** `lokma-loops-view:v1` altında; okunurken **şekil doğrulaması**
+   (bilinmeyen `mode` reddedilir → görünüm kendini genişletemez, bozuk JSON
+   default'a düşer, storage `throw` ederse console düşmez).
+
+**Kanıt:** tsc 0 · prob 71/0 · **proven-to-fail ×3, her biri FARKLI bir assertion'ı
+düşürdü**: cwd eşleşmesi kaldırıldı → kapsam 3 · uyarı aramayla daraltıldı → kapsam 5 ·
+unscoped genişlemesi → kapsam 4. Kaynak md5 bayt-aynı geri alındı.
+
+Not (prob kusuru, ürün hatası değil): ilk badge metni bir çelişkide
+`project missing` yazıyordu — projeyi **var** olan bir loop için "missing" demek
+yanlış; sınır vakası yakaladı, metin `project conflict · cwd is …` oldu.
+
+### Kalan (tur 2+)
+
+- `loop-console.tsx`: görünüm anahtarı + durum filtresi + arama + proje seçici +
+  uyarı satırı + `projesiz` grup başlığı, `useSessionStore`'un `projects`'i ve
+  aktif oturumun `cwd`'si ile ilk seçim.
+- `loop-row.tsx`: proje rozetini `loopProjectState` üzerinden bas (şu an
+  `loop.projectId`'yi ham gösteriyor — silinmiş projede yanlış okuma).
+- Sunucu: `createLoop`'ta `cwd` ↔ proje `cwd` eşleşmesi kapsam 3 sözleşmesi
+  (aynı cwd'de ikinci proje reddi dahil) — `auth/store.ts`.
+- Sonra: `scripts/probe-loop-project-view.cjs` + canlı bundle hash + ekran görüntüsü.
 
 ## Bitirme (done)
 

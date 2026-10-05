@@ -78,6 +78,10 @@ export * from './observability/index.js';
 // CronApprovals pane, Docs/30 §5 + §6)
 export * from './cron/index.js';
 
+// Loops (harness-owned loop records + measured budget + append-only ledger —
+// the data model behind REQ-200; the executor is REQ-201)
+export * from './loops/index.js';
+
 // Themes (canonical named-theme registry for CLI + server + web,
 // Phase 3 themes polish)
 export * from './themes/index.js';

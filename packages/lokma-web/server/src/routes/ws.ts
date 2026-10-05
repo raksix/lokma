@@ -471,7 +471,7 @@ async function runClaudeEngineTurn(
  * Frames broadcast to attached sockets; with none attached the run still
  * completes into the transcript (refresh-proof).
  */
-async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: string): Promise<void> {
+export async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: string): Promise<void> {
   const state = getRunState(sessionId);
   if (state.running) return;
   state.running = true;

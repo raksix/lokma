@@ -1,4 +1,4 @@
-# REQ-196 — Loop veri modeli ve kalıcılığı (state + bütçe + ledger)
+# REQ-200 — Loop veri modeli ve kalıcılığı (state + bütçe + ledger)
 
 **Status:** pending
 **Tarih:** 2026-10-03
@@ -9,7 +9,7 @@ istersek tüm looplar istersek proje bazlı"
 
 > Ayrım **vurgulu**: Hermes'in `~/.hermes/loops/` altındaki mevcut loop'lar (redwind-w1/w2/w3, grammar-sprint vb.) Lokma'ya **eklenmez** — yalnız **Lokma harness'i içinde** (kullanıcı ya da ajan) oluşturulan loop'lar katalogda görünür.
 
-**İlişkiler:** REQ-196 (veri modeli) → REQ-197 (yürütücü) → REQ-198 (arayüz) · REQ-199 (proje bazlı görünüm) · REQ-181 (yüzey→araç kataloğu: loop aracı da katalogdan gelir) · REQ-062 (proje kapsamı) · mevcut `cron/` (zamanlanmış iş) ile **aynı yüzey değil**.
+**İlişkiler:** REQ-200 (veri modeli) → REQ-201 (yürütücü) → REQ-202 (arayüz) · REQ-203 (proje bazlı görünüm) · REQ-181 (yüzey→araç kataloğu: loop aracı da katalogdan gelir) · REQ-062 (proje kapsamı) · mevcut `cron/` (zamanlanmış iş) ile **aynı yüzey değil**.
 
 ## Bugünkü durum (ölçülmüş, `file:line`)
 

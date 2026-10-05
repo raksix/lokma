@@ -66,3 +66,19 @@ Kapsam 3 "detay paneli: `state.json`'ın **ham** içeriği … `scope.md`'deki i
 **Kapılar:** store probu **114 → 128**; proven-to-fail (null'ı `[]` yapmak → "no scope.md yields remaining=null" kırmızı, dosya bayt bayt geri alındı) · kök `bun x tsc --noEmit` **0** (önce `lokma-core` dist'i yeniden kuruldu — workspace paketi `dist/`'ten çözülüyor) · core + server + web build yeşil · **çalışan sunucuda ölçüldü**: detay 5/5, `scope.md` round-trip 3/3 (yaz → gerçek liste → sil → tekrar `null`), prob artıkları **0**, loop kilidi **0**, jetonsuz `/api/auth/me` **401** (login kapısı hiç açılmadı).
 
 **Sıradaki tur:** istemci — satır + detay bileşenleri (`components/loops/`), Settings → **Loops** bölümü, `ws.ts` `loop` frame reducer'ı (soket yoksa 5 sn poll).
+
+### Tur 2 (`4e18c1e`) — konsolun istemci katmanı yoktu; satırın nasıl konuşacağı da
+
+Sunucuda rotalar tamdı (`routes/loops.ts`: list · detail · create · patch · run · pause · abort · resume · delete) ama **istemcide hiçbir şey yoktu**: `grep -rn "loop" web/src/lib/api.ts` → 0. Yani konsol hiçbir şekilde var olamazdı. Tur 2 o katmanı + satırın **dürüstlük kurallarını** getirdi:
+
+- `api.ts`: `LoopView` (`LoopSchema`'ın alan alan aynısı) + `LoopDetailRes` + 10 uç çağrısı. Kontrol yanıtlarının dürüstlük bayrakları **tipte** taşınıyor — `pauseLoop.deferred`, `abortLoop.cutTurn`, `runLoop.accepted`: "sıraya alındı", "bu tur bitiyor" ve "gerçekten kesildi" bir cümleden ayrıştırılacak metin değil, render edilecek alan.
+- `components/loops/loop.ts` saf kurallar; hepsi bir **reddediş**:
+  - `remainingLabel(null)` ≠ `[]` — `scope.md` yoksa **hiç** kalan bloğu yok; dosya var ve hepsi işaretliyse bunu söyler;
+  - `nextHintLabel` ipucu yoksa `null` — "next run soon" gibi bir yedek, **uydurma sıra** olurdu;
+  - `turnInFlight` `status`'u değil `inFlightSince`'i okur — `running` = **donanıyor**, yanında tur yok; canlı nokta oradan gelir. `stopRequested` bunu ezer: ertelenen stop "running" değil "finishing this turn" der;
+  - `budgetBars` sıfır tavanı 1 değil **0** yapar (tavansız bütçe dolu çubuk çizmemeli);
+  - `bestScoreLabel`/`targetScoreLabel` 0 değil `null` — skorlar opak string, harness ölçeği bilmez.
+
+**Kapılar:** prob **51/51** · proven-to-fail üç envanter mutasyonunda da kırmızı (uydurma nextHint · scope'suz loop'a uydurma liste · sıfır tavanı dolu çubuk) ve dosyalar md5 ile **bayt bayt** geri alındı · kök `bun x tsc --noEmit` **0** · web build yeşil · servis edilen chunk gerçek JS ve `/api/loops` taşıyor · jetonsuz `/api/auth/me` her iki portta **401** (login kapısı hiç açılmadı). Ayrıca `web/dist/assets` içinden 24 saatlik varlık grafiği korunarak **1848 süperflu chunk** silindi (163.5 MB, 179M → 19M) — `emptyOutDir` false kaldığı için kutu şişmesin diye.
+
+**Sıradaki tur:** bileşenler — `loop-console.tsx` + `loop-row.tsx` + `loop-detail.tsx` (kapsam 2/3/4/6/7: satır, detay paneli, ikonlu kontroller, dürüst durumlar, boş durum), Settings → **Loops** bölümü + rail'deki **Loops** pane girişi, `ws.ts` `loop`/canlı güncelleme reducer'ı (soket yoksa 5 sn poll).

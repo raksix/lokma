@@ -8,9 +8,13 @@ import {
   type LoopIterationMeasurement,
   type LoopOrigin,
   type LoopPatch,
+  type LoopRunOutcome,
   type LoopStatus,
   type LoopStopReason,
+  type LoopTrigger,
+  type LoopTriggerInput,
 } from '@lokma/shared';
+import { assertValidSchedule } from '../cron/cron.js';
 import { ensureDir, readJson, writeAtomic } from '../utils/fs.js';
 import { LOOPS_DIR, ledgerPath, loopDir, readLedger } from './ledger.js';
 import { acquireLoopCwd, cwdLockConflict, releaseLoopCwd } from './lock.js';
@@ -65,6 +69,61 @@ const TERMINAL_STATUSES: ReadonlySet<LoopStatus> = new Set<LoopStatus>(['done', 
 const MAX_PROMPT_BYTES = 64 * 1024;
 
 export const DEFAULT_LOOP_BUDGET: LoopBudget = { maxIters: 400, maxHours: 24, maxUsd: 50 };
+
+/** REQ-201 defaults: 60s between turns, 3 no-progress turns → `idle`. */
+export const DEFAULT_COOLDOWN_SECONDS = 60;
+export const DEFAULT_MAX_EMPTY_ITERS = 3;
+
+/**
+ * Cooldown + empty guard bounds. Both are "how careful is this loop" knobs, so
+ * an unusable value falls back to the default instead of throwing — unlike
+ * `intervalMinutes`, where a missing number would silently change the loop's
+ * whole behaviour (see `resolveTrigger`).
+ */
+function pickGuard(value: number | null | undefined, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return fallback;
+  return Math.trunc(value);
+}
+
+/**
+ * Turn the loose create/patch input into a validated `LoopTrigger`. Unknown or
+ * partial input resolves to `manual` rather than throwing: a loop whose trigger
+ * was never chosen is a loop the user drives by hand, and failing the whole
+ * creation over a missing optional field would be a worse answer than a
+ * loop that simply waits for a button press.
+ *
+ * `interval` without a usable number is a caller bug worth refusing — it means
+ * someone asked for a repeating loop and the number got lost, and silently
+ * answering "manual" would leave a background loop that never repeats.
+ */
+export function resolveTrigger(input: LoopTriggerInput | undefined): LoopTrigger {
+  const kind = input?.kind ?? 'manual';
+  if (kind === 'interval') {
+    const minutes = input?.intervalMinutes;
+    if (typeof minutes !== 'number' || !Number.isFinite(minutes) || minutes < 1) {
+      throw new LoopError('bad_trigger', 'intervalMinutes must be a number >= 1 for an interval trigger');
+    }
+    return { kind: 'interval', intervalMinutes: minutes };
+  }
+  if (kind === 'cron') {
+    const schedule = input?.schedule;
+    if (typeof schedule !== 'string' || schedule.trim().length === 0) {
+      throw new LoopError('bad_trigger', 'schedule must be a 5-field cron string for a cron trigger');
+    }
+    // The SAME validator cron uses — one calendar, two concepts. Wrapping the
+    // error keeps the loop route's `{ code }` contract while naming the field.
+    try {
+      assertValidSchedule(schedule.trim());
+    } catch {
+      throw new LoopError('bad_trigger', 'schedule must be 5 fields: `minute hour day month weekday` (e.g. `0 3 * * *`)');
+    }
+    return { kind: 'cron', schedule: schedule.trim() };
+  }
+  if (kind === 'event') {
+    return { kind: 'event', event: input?.event ?? 'file_changed', path: input?.path ?? null };
+  }
+  return { kind: 'manual' };
+}
 
 /** Reject traversal + absurd values before any path is built. */
 export function assertLoopIdShape(loopId: unknown): asserts loopId is string {
@@ -201,6 +260,9 @@ export async function createLoop(input: {
   budget?: Partial<LoopBudget> | undefined;
   target?: string | null;
   nextHint?: string | null;
+  trigger?: LoopTriggerInput | undefined;
+  cooldownSeconds?: number | null;
+  maxEmptyIters?: number | null;
 }): Promise<Loop> {
   assertNameShape(input.name);
   assertCwdShape(input.cwd);
@@ -222,6 +284,12 @@ export async function createLoop(input: {
     spent: { iters: 0, hours: 0, usd: 0, tokens: 0 },
     score: { best: null, last: null, target: input.target ?? null },
     nextHint: input.nextHint ?? null,
+    trigger: resolveTrigger(input.trigger),
+    cooldownSeconds: pickGuard(input.cooldownSeconds, DEFAULT_COOLDOWN_SECONDS),
+    maxEmptyIters: pickGuard(input.maxEmptyIters, DEFAULT_MAX_EMPTY_ITERS),
+    lastRunOutcome: null,
+    emptyIters: 0,
+    lastRunStartedAt: null,
     model: typeof input.model === 'string' && input.model.trim() ? input.model.trim() : 'inherit',
     reasoningEffort:
       typeof input.reasoningEffort === 'string' && input.reasoningEffort.trim()
@@ -266,8 +334,17 @@ export async function updateLoop(loopId: string, patch: LoopPatch): Promise<Loop
       ...current.score,
       target: patch.target === undefined ? current.score.target : patch.target,
     },
-      nextHint: patch.nextHint === undefined ? current.nextHint : patch.nextHint,
-      updatedAt: new Date().toISOString(),
+    nextHint: patch.nextHint === undefined ? current.nextHint : patch.nextHint,
+    trigger: patch.trigger === undefined ? current.trigger : resolveTrigger(patch.trigger),
+    cooldownSeconds:
+      patch.trigger?.cooldownSeconds === undefined || patch.trigger?.cooldownSeconds === null
+        ? current.cooldownSeconds
+        : pickGuard(patch.trigger.cooldownSeconds, current.cooldownSeconds),
+    maxEmptyIters:
+      patch.trigger?.maxEmptyIters === undefined || patch.trigger?.maxEmptyIters === null
+        ? current.maxEmptyIters
+        : pickGuard(patch.trigger.maxEmptyIters, current.maxEmptyIters),
+    updatedAt: new Date().toISOString(),
   };
   const saved = await persist(next);
   if (movingCwd) await releaseLoopCwd(loopId, current.cwd);
@@ -426,6 +503,31 @@ export async function recordIteration(
   });
   await releaseLoopCwd(loopId, current.cwd);
   return saved;
+}
+
+/**
+ * Stamp ONE finished turn: its measured outcome + when it started. The
+ * executor calls this before `recordIteration` so the idle guard's consecutive
+ * counter and `lastRunStartedAt` (what `interval` measures from) are persisted
+ * even when the turn does NOT count as an iteration.
+ *
+ * Deliberately separate from `recordIteration`: an empty turn records time and
+ * cost but must not advance `spent.iters`, so the two writes cannot be one.
+ */
+export async function recordRunTiming(
+  loopId: string,
+  opts: { outcome: LoopRunOutcome; startedAt: string },
+): Promise<Loop> {
+  const current = await getLoop(loopId);
+  const emptyIters = opts.outcome === 'empty' ? current.emptyIters + 1 : 0;
+  const next: Loop = {
+    ...current,
+    lastRunOutcome: opts.outcome,
+    emptyIters,
+    lastRunStartedAt: opts.startedAt,
+    updatedAt: new Date().toISOString(),
+  };
+  return persist(next);
 }
 
 /**

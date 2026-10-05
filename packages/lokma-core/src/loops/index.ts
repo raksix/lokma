@@ -9,7 +9,9 @@ export {
   betterScore,
   budgetBreach,
   createLoop,
+  DEFAULT_COOLDOWN_SECONDS,
   DEFAULT_LOOP_BUDGET,
+  DEFAULT_MAX_EMPTY_ITERS,
   deleteLoop,
   getLoop,
   getLoopDetail,
@@ -17,7 +19,9 @@ export {
   listProjectLoops,
   LoopError,
   recordIteration,
+  recordRunTiming,
   resolveBudget,
+  resolveTrigger,
   setLoopStatus,
   stopLoop,
   targetReached,
@@ -47,3 +51,13 @@ export {
   releaseLoopCwd,
 } from './lock.js';
 export type { LoopCwdLockResult } from './lock.js';
+export {
+  countIterationFor,
+  DEFAULT_LOOP_COOLDOWN_SECONDS,
+  DEFAULT_LOOP_MAX_EMPTY_ITERS,
+  earliestNextTurn,
+  initLoopCalendar,
+  shouldStart,
+  stopReasonAfterTurn,
+} from './runner.js';
+export type { DueReason, NextTurn } from './runner.js';

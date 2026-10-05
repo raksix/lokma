@@ -54,3 +54,15 @@ istersek tüm looplar istersek proje bazlı"
 
 - **Write-only:** kod yazılmadı.
 - Kapsam disiplini: bu dalga **görünürlük + yönetim** katmanı; executor ayrı REQ (aşağıda). Kullanıcının "looplar arka planda çalışcak zaten" cümlesi = UI'ın onlara **dokunmaması**, panelin **izleme + kontrol** olması.
+
+### Tur 1 (`a2da97b`) — konsolun gösterdiği iki dosya sunucuda ölçülmüyordu
+
+Kapsam 3 "detay paneli: `state.json`'ın **ham** içeriği … `scope.md`'deki işaretlenmemiş maddeler" diyor; `getLoopDetail` (`loops/store.ts:837`) yalnız `loop + ledger + ledgerPath` döndürüyordu. Yani konsol ya kaydı **yeniden serileştirmek** (diskteki metin değil) ya da kalan iş listesini **uydurmak** zorundaydı — ikisi de REQ'in yasakladığı şey. Aradaki boşluk ölçülüp kapandı:
+
+- `stateJson` metin olarak okunuyor (**bayt bayt** diskten, yeniden serileştirme yok) + `statePath`;
+- `hasScope` + `remaining`: **`scope.md` yoksa `null`**, dosya var ama hepsi işaretliyse `[]`. Bu ikisi ayrı kalmalı — dosyasız bir loop'ta `[]` dönseydi konsol "0 madde kaldı" derdi, sanki biri liste yazmış gibi;
+- `parseScopeRemaining` dışa açıldı: yalnız `- [ ]` satırlarını sayar (girintili ve `*`/`+` madde işareti de kabul), `- [x]` ve düz metin kalan iş sayılmaz.
+
+**Kapılar:** store probu **114 → 128**; proven-to-fail (null'ı `[]` yapmak → "no scope.md yields remaining=null" kırmızı, dosya bayt bayt geri alındı) · kök `bun x tsc --noEmit` **0** (önce `lokma-core` dist'i yeniden kuruldu — workspace paketi `dist/`'ten çözülüyor) · core + server + web build yeşil · **çalışan sunucuda ölçüldü**: detay 5/5, `scope.md` round-trip 3/3 (yaz → gerçek liste → sil → tekrar `null`), prob artıkları **0**, loop kilidi **0**, jetonsuz `/api/auth/me` **401** (login kapısı hiç açılmadı).
+
+**Sıradaki tur:** istemci — satır + detay bileşenleri (`components/loops/`), Settings → **Loops** bölümü, `ws.ts` `loop` frame reducer'ı (soket yoksa 5 sn poll).

@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   LoopSchema,
@@ -833,14 +833,75 @@ export async function deleteLoop(loopId: string): Promise<{ id: string }> {
   return { id: loopId };
 }
 
-/** Loop record + ledger tail — the console detail payload (REQ-202 reads it). */
+function scopePath(loopId: string): string {
+  return join(loopDir(loopId), 'scope.md');
+}
+
+/**
+ * The unchecked `- [ ]` items of a loop's `scope.md` (REQ-202 kapsam 3).
+ *
+ * Two rules make this honest rather than invented:
+ *
+ * 1. **`scope.md` is OPTIONAL.** A loop without one has no remaining-work list
+ *    and the console must say so — it must never fall back to a synthesized
+ *    checklist, because "3 items left" that nobody wrote is a lie the user
+ *    acts on. `remaining` is `null` (not `[]`) so the client can tell "no list"
+ *    from "an empty list"; only `hasScope` distinguishes the two.
+ * 2. **Parsing is line-shaped, never semantic.** A checkbox line is `- [ ]`
+ *    (optionally indented, optionally a `*` or `+` bullet). `- [x]`/`- [X]`
+ *    are checked, so they are NOT remaining work. Anything else in the file is
+ *    prose and is ignored — the ledger and the record already carry progress.
+ */
+export function parseScopeRemaining(text: string): string[] {
+  return text
+    .split('\n')
+    .map((line) => /^\s*[-*+]\s+\[ \]\s+(.*\S)\s*$/.exec(line))
+    .filter((m): m is RegExpExecArray => m !== null)
+    .map((m) => m[1].trim());
+}
+
+/** Loop record + ledger tail + the two files the console renders verbatim. */
 export async function getLoopDetail(loopId: string, tailLines = 20): Promise<{
   loop: Loop;
   ledger: string;
   ledgerPath: string;
+  /**
+   * The RAW `state.json` text. The console shows it because the user asked to
+   * see the file, and it is read as text (never re-serialized from the parsed
+   * record) so what the user reads is literally what is on disk.
+   */
+  stateJson: string;
+  statePath: string;
+  /** False when the loop has no `scope.md` — the console renders no list then. */
+  hasScope: boolean;
+  /** Unchecked `scope.md` items; `null` when there is no `scope.md` at all. */
+  remaining: string[] | null;
 }> {
   const loop = await getLoop(loopId);
   const raw = await readLedger(loopId);
   const lines = raw.trimEnd().split('\n');
-  return { loop, ledger: lines.slice(-Math.max(1, tailLines)).join('\n'), ledgerPath: ledgerPath(loopId) };
+  const sp = scopePath(loopId);
+  let scopeText: string | null = null;
+  try {
+    scopeText = await readFile(sp, 'utf-8');
+  } catch {
+    // No scope.md — an optional file is absent, not an error.
+  }
+  const state = statePath(loopId);
+  let stateJson = '';
+  try {
+    stateJson = await readFile(state, 'utf-8');
+  } catch {
+    // getLoop() already parsed it; an unreadable copy is reported as empty
+    // rather than 500-ing a detail view that has a valid record in hand.
+  }
+  return {
+    loop,
+    ledger: lines.slice(-Math.max(1, tailLines)).join('\n'),
+    ledgerPath: ledgerPath(loopId),
+    stateJson,
+    statePath: state,
+    hasScope: scopeText !== null,
+    remaining: scopeText === null ? null : parseScopeRemaining(scopeText),
+  };
 }

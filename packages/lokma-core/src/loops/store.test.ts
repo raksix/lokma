@@ -46,7 +46,9 @@ import {
   appendLedger,
   formatLedgerEntry,
   ledgerPath,
+  loopDir,
   LOOPS_DIR,
+  parseScopeRemaining,
 } from './index.js';
 import { readFile, mkdir, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -264,6 +266,46 @@ await ensureDir(join(LOOPS_DIR, 'l_00000000'));
   assert(detail.ledger.includes('run 3 did work'), 'ledger tail contains the newest entry');
   assert(detail.ledgerPath === ledgerPath(loop.id), 'detail reports the real ledger path');
   assert(detail.loop.id === loop.id, 'detail carries the record');
+
+  // ─── detail payload: raw state.json + honest scope (REQ-202 kapsam 3) ──
+  // The console SHOWS these files; it must never re-serialize or invent them.
+  assert(detail.statePath === join(loopDir(loop.id), 'state.json'), 'detail reports the real state path');
+  const stateOnDisk = await readFile(join(loopDir(loop.id), 'state.json'), 'utf-8');
+  assert(detail.stateJson === stateOnDisk, 'detail carries state.json BYTE-FOR-BYTE from disk');
+  assert(JSON.parse(detail.stateJson).id === loop.id, 'the raw state text really is the record');
+  // No scope.md on this loop yet: `null` (absent) must differ from `[]` (empty
+  // list) or the console renders "0 items left" as if a list had been written.
+  assert(detail.hasScope === false, 'a loop without scope.md reports hasScope=false');
+  assert(detail.remaining === null, 'no scope.md yields remaining=null, NOT an empty list');
+
+  // Checkbox parsing, measured on a real file the probe writes.
+  const scopeText = [
+    '# Working notes',
+    '',
+    '- [x] slice 1 done',
+    '- [ ] slice 2 pending',
+    '  - [ ] indented sub-item',
+    '* [ ] star bullet',
+    '- [X] uppercase checked',
+    '- [] missing space is prose',
+    'not a bullet at all',
+    '- [ ]   ',
+  ].join('\n');
+  await writeFile(join(loopDir(loop.id), 'scope.md'), scopeText, 'utf-8');
+  const withScope = await getLoopDetail(loop.id, 5);
+  assert(withScope.hasScope === true, 'scope.md is detected once written');
+  assert(
+    JSON.stringify(withScope.remaining) === JSON.stringify(['slice 2 pending', 'indented sub-item', 'star bullet']),
+    'only unchecked boxes are remaining work — checked and prose lines are not',
+  );
+  // A scope.md that is entirely checked is an EMPTY list, which must stay `[]`.
+  await writeFile(join(loopDir(loop.id), 'scope.md'), '- [x] all done\n- [X] really all', 'utf-8');
+  const allDone = await getLoopDetail(loop.id, 5);
+  assert(JSON.stringify(allDone.remaining) === '[]', 'a fully checked scope is an empty list, not null');
+  // The pure parser is exported and behaves the same without a file.
+  assert(parseScopeRemaining(scopeText).length === 3, 'parseScopeRemaining is usable on its own');
+  assert(parseScopeRemaining('nothing here').length === 0, 'prose-only scope yields no items');
+  await rm(join(loopDir(loop.id), 'scope.md'), { force: true });
   const full = await readFile(ledgerPath(loop.id), 'utf-8');
   assert(full.includes('run 1 did work') && full.includes('run 3 did work'), 'ledger is append-only — earliest entry survives');
 

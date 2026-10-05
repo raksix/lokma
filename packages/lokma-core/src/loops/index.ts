@@ -20,6 +20,7 @@ export {
   listProjectLoops,
   LoopError,
   markTurnDispatched,
+  parseScopeRemaining,
   recordIteration,
   recordRunTiming,
   requestStop,

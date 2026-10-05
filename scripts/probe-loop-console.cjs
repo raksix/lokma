@@ -369,6 +369,103 @@ async function main() {
     const hintText = hint ? (await hint.innerText()).replace(/\s+/g, ' ') : '';
     ok('the row shows the hint the loop actually wrote', !!hint && hintText.indexOf('probe hint line') !== -1, 'hint=' + JSON.stringify(hintText));
 
+    // ── kapsam 5, the half every other step stands on: the row must move on
+    // the WS FRAME, not on the 5s poll. Step 10 above waits out the poll, so
+    // without this section the whole probe would pass with the frame path dead
+    // (the poll would paper over it) — the REQ's own "frame yoksa poll" wording
+    // would be satisfied by the fallback alone.
+    //
+    // Two independent measurements, because either alone is ambiguous:
+    //  (1) the WIRE — CDP `Network.webSocketFrameReceived` catches the actual
+    //      `{"type":"loop","loopIds":["<id>"]}` frame the server sent;
+    //  (2) the DOM — the row changes in well under the poll interval, and no
+    //      `GET /api/loops` list fetch happens inside that window. (2) is only
+    //      load-bearing because the poll IS observable: the idle baseline above
+    //      measured list fetches at ~4999ms gaps, so "zero list fetches" is a
+    //      real negative control and not "the probe cannot see polls".
+    step('10b', 'kapsam 5 — the row moves on the WS frame, not on the poll');
+    // The CDP session attaches AFTER the socket exists: an already-open socket
+    // does not replay into it, so a session created at page creation sees
+    // nothing and the frame assertion would pass vacuously.
+    const cdp = await ctx.newCDPSession(page);
+    await cdp.send('Network.enable');
+    const loopFrames = [];
+    cdp.on('Network.webSocketFrameReceived', (ev) => {
+      const payload = (ev.response && ev.response.payloadData) || '';
+      if (payload.indexOf('"loop"') !== -1) loopFrames.push(payload);
+    });
+    const listFetches = [];
+    page.on('response', (r) => {
+      const url = r.url();
+      if (r.request().method() === 'GET' && /\/api\/loops(\?|$)/.test(url)) listFetches.push(Date.now());
+    });
+
+    // Baseline: the poll really is running, so "no fetch in the window" means
+    // something. A silent poll would make the negative control vacuous.
+    await sleep(11000);
+    const idleFetches = listFetches.length;
+    ok(
+      'the poll fallback really is running (so the negative control is not vacuous)',
+      idleFetches >= 1,
+      'GET /api/loops while idle in 11s=' + idleFetches,
+    );
+
+    const frameHint = 'probe frame hint ' + Date.now().toString(36);
+    const t0 = Date.now();
+    const framed = await rest('PATCH', '/api/loops/' + loopId, { nextHint: frameHint });
+    ok('the PATCH that triggers the frame is accepted', framed.status === 200, 'status=' + framed.status);
+
+    let domAt = null;
+    while (Date.now() - t0 < 3000) {
+      const el = await page.$('[data-loop-next-hint]');
+      if (el && (await el.innerText()).indexOf(frameHint) !== -1) {
+        domAt = Date.now() - t0;
+        break;
+      }
+      await sleep(60);
+    }
+    ok(
+      'the row re-rendered on the frame, not by waiting out the poll',
+      domAt !== null && domAt < 3000,
+      'dom ' + (domAt === null ? 'NEVER' : domAt + 'ms') + ' vs the 5000ms poll interval',
+    );
+    // The discriminating assertion. A poll-driven refresh would land inside this
+    // window; a frame-driven one cannot.
+    const fetchesInWindow = listFetches.filter((t) => t >= t0).length;
+    ok(
+      'no catalog poll ran in the window (the FRAME moved the row)',
+      fetchesInWindow === 0,
+      'list fetches inside the window=' + fetchesInWindow,
+    );
+    ok(
+      'the server really sent a `loop` frame naming this loop',
+      loopFrames.some((p) => p.indexOf(loopId) !== -1),
+      'loop frames=' + loopFrames.length + ' last=' + JSON.stringify(loopFrames.slice(-1)[0] || null),
+    );
+    ok(
+      'the frame arrived over the socket, not as a re-read',
+      loopFrames.length > 0,
+      'loop frames observed=' + loopFrames.length,
+    );
+    // Shape, not just "a string containing loop": the frame is only useful if
+    // it names ids in the documented field. A frame carrying the loop's name or
+    // a nested payload would satisfy a naive substring check and reach the
+    // console as "the catalog changed", i.e. a full re-read instead of the
+    // targeted refresh kapsam 5 asks for.
+    const shaped = loopFrames.filter((p) => {
+      try {
+        const m = JSON.parse(p);
+        return m && m.type === 'loop' && Array.isArray(m.loopIds);
+      } catch {
+        return false;
+      }
+    });
+    ok(
+      'the frame carries the documented shape {type:"loop",loopIds:[]}',
+      shaped.length > 0,
+      'well-shaped frames=' + shaped.length + '/' + loopFrames.length,
+    );
+
     step(11, 'kapsam 7 — the empty catalog has its own copy');
     const emptyCopy = await page.evaluate(() => {
       const el = document.querySelector('[data-loop-empty]');

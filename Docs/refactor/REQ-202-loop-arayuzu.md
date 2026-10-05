@@ -98,3 +98,23 @@ Proven-to-fail iki mutasyonla kanıtlandı (ikisi de RC=1, dosya md5 ile bayt ba
 **Kapılar:** server bus **7/7** · web saf kurallar **51/51** · konsol probu **7/7** · dokunulan `panes.test` **160/0** + `settings-modal.test` **71/0** · kök `bun x tsc --noEmit` **0** · shared + server + web build yeşil (**1757 modules**) · `pm2 restart lokma-web` sonrası servis edilen chunk == disk (`index-CnKjzIq4.js`), konsol chunk'ı **200** ve gerçek JS · jetonsuz `/api/auth/me` her iki portta **401** (login kapısı hiç açılmadı) · `/health` 200.
 
 **Sıradaki tur:** REQ'in Kontrol bölümünün istediği **canlı probe** — `scripts/probe-loop-console.cjs` yok (ölçülmüş: `ls` → no such file). Birim prob'lar yeşil ama REQ bir REQ'de "unit tests değil, DEPLOYED sunucu" kuralıyla kapanmaz; login kapısı açılmadan (`HOME=/root bun scripts/mint-e2e-token.mjs`) süperadmin token'ıyla konsolun satır → detay → kontrol zinciri canlı ölçülecek.
+
+### Tur 4 (`8b49426`, `dac258e`) — canlı prob bir eksik kapsamı buldu; sonra kendi dört kusurunu buldu
+
+`scripts/probe-loop-console.cjs` yazıldı ve **çalışan sunucuya** karşı koştu (jetonsuz kapı ölçümü hariç her istek gerçek ürün rotası; hiçbir satır/durum/ledger elle yazılmadı). İlk koşu **41/3** çıktı ve üç kırmızıdan **biri gerçek ürün kusuruydu**:
+
+**Kapsam 4'te listelenen `Open ledger (md)` kontrolü hiç yoktu.** Detay panelinde Pause/Resume/Run now/Stop/Delete vardı, ledger dosyasını almanın hiçbir yolu yoktu — yani "Open ledger" hiç yaşamamış bir kabul kriteriydi ve yalnız canlı prob bunu görebilirdi. Yol açtı: loop dizini `~/.lokma/loops/<id>/` **her workspace jail'inin dışında**, dolayısıyla mevcut dosya indirme rotası onu servis edemiyor. Koruma **bilinçli olarak ikinci bir yol denetimi değil**: her kardeş rotanın kullandığı `assertLoopIdShape` aynısı, dosya adı sabit literal, bilinmeyen loop herhangi bir okumadan önce 404. İstemci tarafında mevcut paylaşılan `downloadBlob` yardımcısı yeniden kullanıldı (createObjectURL/anchor kopyası bir 11. kopya olmasın diye); terminal loop'ta buton açık kalıyor çünkü geçmiş korunuyor.
+
+Kalan iki kırmızı **probun kendi kusuruydu** ve dördüncüsü ancak ikinci turda göründü:
+- **"tokenless" kapı kontrolü** probun kendi auth başlığını kullanıyordu → 200 döndü → yani "kapı hiç açılmadı" kanıtlamak için var olan kontrol, tek Credential taşıyan istek olmuştu;
+- tur ortasında çöken prob **RC=0** veriyordu (özet `try` bloğunun içindeydi) — hiç bitmemiş bir prob yeşil okunuyordu;
+- `draft → paused` bekleniyordu, ama yasal geçiş `draft → running`'dir ve Pause `bad_transition` ile **dürüstçe reddedilir** — doğru ürün kuralı kusur gibi okunuyordu;
+- ledger "hiç tur kaydedilmedi" metnini bekliyordu, ama ledger dosyası **her zaman** başlığını taşır, yani hiç boş değildir.
+
+Prob artık **sunucunun bu koşu için bastığı id**'ye göre eşleştiriyor: bir turda `rows=2` çıktı ve ikinci satır probun **kendi** bıraktığı bir throwaway dump scripti çöpüydü; "tam olarak bir satır" ancak katalogun başlangıçta boş olduğu kanıtlandıktan sonra bir anlam taşıyor.
+
+Proven-to-fail (ikisi de RC=1, dosyalar md5 ile bayt bayt geri alındı): (1) loop ipucu yazmamışken **uydurma** "next run soon" sırası → kırmızı; (2) `scope.md` yoksa **uydurma** "0 items left" listesini getiren panel → kırmızı. Ama (2) ilk iki mutasyon turunda **49/0'da yeşil kaldı**: koşudaki tek fixture `scope.md`'si **oldu** için no-scope dalının **tamamı ölçülmüyordu**. Dosyayı silip yeniden okuyan ikinci bir adım eklendiğinde kırmızıya düştü. Bu, probun varlık nedeni: **kıramayan assertion, assertion olmamaktan kötüdür.** Aynı tuzak ters yönde de bir kez tuttu: `/api/sessions/<taze id>` 404'ü **hiç loop karışmadan sade bir yüklemede** de ölçüldü, yani bu REQ'den önce gelen kabuk davranışı — kontrol loop'un kendi rotalarına daraltıldı.
+
+**Kapılar:** canlı prob **54/0** (RC=0) · saf kurallar **51/51** · konsol probu **7/7** · store probu **73/0** · kök `bun x tsc --noEmit` **0** · core + server + web build yeşil · `pm2 restart` sonrası servis edilen chunk == disk (`index-UJu4zcAg.js`) · `/health` 200 · jetonsuz `/api/auth/me` prob öncesi **ve** sonrası **401** (login kapısı hiç açılmadı) · prob bıraktığı loop/fixture **0** (silme + kalıcılık doğrulamasıyla).
+
+**Sıradaki tur:** REQ'in Kontrol'ünün son satırı "prob (+ **ekran görüntüsü**)" diyor. Prob canlı ve yeşil; kalan parça konsolun ekran görüntüsü (kapsam 1'in iki giriş noktasından biri + satır/detay) ve Bitirme'nin `git mv → finished/` + README + `Docs/00` kapanışı. Ayrıca ölçülmemiş tek kapsam kalıyor: **kapsam 5'in "canlı satır WS frame ile anında güncellenir, frame yoksa poll" ölçümü** — prob şu an poll yolunu ölçüyor, frame yolu ölçülmedi.

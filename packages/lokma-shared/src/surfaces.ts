@@ -35,6 +35,7 @@ export type SurfaceId =
   | 'plugins'
   | 'observability'
   | 'cron'
+  | 'loops'
   | 'extras'
   | 'memory'
   | 'todos'
@@ -313,6 +314,27 @@ export const SURFACES: readonly Surface[] = [
     tools: [
       { name: 'cron_list', summary: 'List scheduled jobs with their schedule and last run', gate: 'read' },
       { name: 'cron_create', summary: 'Create a scheduled job (approval-gated) with a prompt and schedule', gate: 'write' },
+    ],
+  },
+  // ── Loops (REQ-201) ─────────────────────────────────────────────────────
+  // Harness-owned loops. Deliberately NOT Hermes' `~/.hermes/loops/` trees:
+  // only loops created inside this harness (by the user or by the agent) are
+  // catalogued, which is the distinction the request turns on.
+  //
+  // `hosts: []` on purpose — the rail entry arrives WITH the Loops console
+  // (REQ-202), not before it. A rail entry whose pane does not exist yet is a
+  // dead button, which is worse than a surface the model can reach but the
+  // user has not been given a click path to. The catalog rows below still do
+  // their real job now: they are what `READ_TOOLS`/`WRITE_TOOLS` derive from
+  // and what `<available_surfaces>` advertises.
+  {
+    id: 'loops',
+    label: 'Loops',
+    opens: 'pane',
+    hosts: [],
+    tools: [
+      { name: 'loop_list', summary: 'List loops with status, trigger, spent budget and last turn outcome', gate: 'read' },
+      { name: 'loop_create', summary: 'Create a repeating loop (approval-gated) with a prompt, cwd and trigger', gate: 'write' },
     ],
   },
   // ── Extras ───────────────────────────────────────────────────────────────

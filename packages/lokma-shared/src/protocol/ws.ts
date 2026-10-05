@@ -258,7 +258,7 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('ui_action'),
     actionId: z.string().min(1).max(64),
-    action: z.enum(['open_browser', 'open_terminal', 'open_session', 'send_to_session', 'open_project']),
+    action: z.enum(['open_browser', 'open_terminal', 'open_session', 'send_to_session', 'open_project', 'open_loop']),
     url: z.string().max(2048).optional(),
     tabId: z.string().max(64).optional(),
     terminalId: z.string().max(64).optional(),
@@ -268,6 +268,11 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
     cwd: z.string().max(500).optional(),
     // REQ-182: display name so the confirmation modal/toast needs no refetch.
     projectName: z.string().max(60).optional(),
+    // REQ-201: the created loop's identity, so the console can badge the row
+    // as agent-created without a refetch. A Zod object drops unknown keys, so
+    // without these two lines the panel never learns which loop appeared.
+    loopId: z.string().max(64).optional(),
+    loopName: z.string().max(80).optional(),
     // REQ-193 slice 10 (Kapsam 5): the record's own agent-open stamp, so the
     // pane shows the "agent" badge on the FIRST paint. The tab list carries
     // the same field for later paints; a Zod object drops unknown keys, so

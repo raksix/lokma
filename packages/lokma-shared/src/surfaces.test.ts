@@ -128,6 +128,9 @@ for (const name of [
   'trace_get',
   'cron_list',
   'cron_create',
+  // REQ-201 kapsam 4 — the agent side of loop creation
+  'loop_list',
+  'loop_create',
   'plugin_list',
   'plugin_install',
   // Providers / Models
@@ -164,6 +167,19 @@ checks += 1;
 ok(surfaceToolNamesByGate('read').includes('read_file'), 'read gate includes read_file');
 ok(surfaceToolNamesByGate('write').includes('git_commit'), 'write gate includes git_commit');
 ok(surfaceTool('git_status')?.gate === 'read', 'git_status is a read');
+
+// REQ-201 kapsam 4 — the loop tools carry the real gates: listing is a read
+// (auto-runs), creating is a write (asks in `auto`, refused in `plan`). This
+// is the assertion that stops a background-spending tool from shipping as an
+// unlisted tool, because an unlisted name falls into `fallbackFor`'s
+// non-read branch by accident rather than by decision.
+ok(surfaceTool('loop_list')?.surface === 'loops', 'loop tools belong to the loops surface');
+ok(surfaceTool('loop_list')?.gate === 'read', 'loop_list is a read');
+ok(surfaceTool('loop_create')?.gate === 'write', 'loop_create is a write');
+// The Loops surface has no chrome entry until its console pane ships (REQ-202)
+// — asserted here so adding the rail row without the pane is a RED, not a
+// silently dead button.
+ok(surfacesWithHost('inspector').every((s) => s.id !== 'loops'), 'loops has no rail entry until its pane exists');
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 ok(surfaceById('vault')?.label === 'Vault', 'surfaceById resolves a label');

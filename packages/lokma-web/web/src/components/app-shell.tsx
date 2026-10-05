@@ -558,6 +558,12 @@ export function AppShell({ sessionId }: { sessionId: string }) {
           targetSessionId: entry.targetSessionId,
         });
         emitToast(`Agent opened project "${projectName}"${cwd ? ` at ${cwd}` : ''}`);
+      } else if (entry.action === 'open_loop') {
+        // REQ-201 — the agent created a loop. The Loops console (REQ-202) is
+        // the surface that lists them; until it ships, the honest minimum is a
+        // toast that names the loop, so the user learns a background loop now
+        // exists instead of finding out from its token bill.
+        emitToast(`Agent created loop "${entry.loopName ?? ''}"${entry.loopId ? ` (${entry.loopId})` : ''}`);
       }
       dismissUiAction(entry.actionId);
     }

@@ -49,7 +49,7 @@ function newUiSessionId(): string {
 }
 
 export type UiActionPayload = {
-  action: 'open_browser' | 'open_terminal' | 'open_session' | 'send_to_session' | 'open_project';
+  action: 'open_browser' | 'open_terminal' | 'open_session' | 'send_to_session' | 'open_project' | 'open_loop';
   /**
    * REQ-182: caller-minted frame id. open_project must know the id BEFORE
    * the frame ships — it registers its ack gate first, so a client that
@@ -68,6 +68,9 @@ export type UiActionPayload = {
   cwd?: string;
   /** REQ-182: display name, so the modal/toast needs no refetch. */
   projectName?: string;
+  /** REQ-201: the created loop, so the console can badge the new row live. */
+  loopId?: string;
+  loopName?: string;
   /**
    * REQ-193 slice 10 (Kapsam 5): when the agent opened/navigated this tab,
    * the record's own stamp. The client shows an "agent" badge from it — the

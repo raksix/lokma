@@ -8,6 +8,7 @@ import {
   buildCronTools,
   buildDesignTools,
   buildGitTools,
+  buildLoopTools,
   buildObservabilityTools,
   buildPluginTools,
   buildProviderTools,
@@ -594,6 +595,19 @@ export async function runAgentLoop(opts: AgentLoopOpts): Promise<AgentLoopResult
   // plugin registry (`plugins/registry.ts`) and the agent trace builder
   // (`observability/trace.ts`).
   for (const tool of buildCronTools()) registry.register(tool);
+  // REQ-201 kapsam 4 — the second half of "looplar biz ya da agent oluşturunca":
+  // the agent creates loops through the SAME store `POST /api/loops` writes, so
+  // an agent-made loop is an ordinary record (origin `agent`) the console lists.
+  // It lands in `draft`: creating a background loop must not silently start
+  // spending tokens, so the tool answers with the id + next step instead.
+  for (const tool of buildLoopTools({
+    emit: (payload) => {
+      const actionId = mintCallId('ui');
+      opts.send({ type: 'ui_action', actionId, ...payload, sessionId: opts.sessionId });
+    },
+  })) {
+    registry.register(tool);
+  }
   for (const tool of buildPluginTools()) registry.register(tool);
   for (const tool of buildObservabilityTools()) registry.register(tool);
   // REQ-181 wave 5: terminal — `terminal_write` types into the SAME live

@@ -19,6 +19,8 @@ export * from './provider-tools.js';
 export * from './usage-tools.js';
 // REQ-181 wave 4 — surface tool families (Cron, Plugins, Observability).
 export * from './cron-tools.js';
+// REQ-201 kapsam 4 — the agent creates loops too (harness-owned only).
+export * from './loops-tools.js';
 export * from './plugin-tools.js';
 export * from './observability-tools.js';
 export * from './terminal-tools.js';

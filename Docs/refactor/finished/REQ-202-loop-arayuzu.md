@@ -1,6 +1,7 @@
 # REQ-202 — Looplar arayüzden görülsün ve yönetilsin (durum, ne kaldı, pause/stop)
 
-**Status:** pending
+**Status:** done
+**Kapanış:** 2026-10-05 · commitler `a2da97b` `4e18c1e` `3305cc6` `8b49426` `dac258e` `6cf41c6` `ffd2b9d`
 **Tarih:** 2026-10-03
 **Kaynak:** Kullanıcı mesajı (3 Ekim 2026):
 > "abi var olan loopları lokmaya ekleme sadece biz ya da agent loop oluşturunca lokma harnessinde çalışan loopları arayüzden görebileceğiz.
@@ -143,4 +144,4 @@ Yukarıdaki "sıradaki tur" notunun işaret ettiği boşluk kapandı, ama boşlu
 
 **Kapılar:** canlı prob **61/0** (RC=0) · saf kurallar **51/0** · konsol probu **7/0** · store probu **73/0** (token'lı) · core store **128/0** · server bus **7/0** (temp HOME ile) · kök `bun x tsc --noEmit` **0** · web build yeşil (**1757 modules**) · `pm2 restart lokma-web` sonrası servis edilen chunk == disk (`index-UJu4zcAg.js`) · `/health` 200 · jetonsuz `/api/auth/me` prob öncesi **ve** sonrası **401** (login kapısı hiç açılmadı) · prob bıraktığı loop/fixture **0** · çalışma ağacı temiz.
 
-**Kapanışa kalan tek şey:** Bitirme'nin `Status: done` + hash + `git mv → finished/` + README index satırı + `Docs/00` kronoloji girdisi. Kapsam 1–7'in tamamı ölçüldü ve kanıtlandı; ayrı bir kod değişikliği gerektiren açık kapsam yok.
+**Kapanış:** Kapsam 1–7'nin tamamı ölçüldü; aşağıdaki beş tur notu kanıt zinciridir (veri modeli → istemci → bileşenler → canlı prob → frame ölçümü + ekran görüntüsü). Dosya `finished/`'e taşındı.

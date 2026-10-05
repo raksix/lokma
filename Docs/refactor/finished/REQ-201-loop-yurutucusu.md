@@ -1,6 +1,6 @@
 # REQ-201 — Loop yürütücüsü: arka planda tekrarlı koşu (cron'dan ayrı kavram)
 
-**Status:** in-progress (tur 5/5 — stop/abort dürüstlüğü + `resumeOnBoot` bitti, prob 67/67 + PTF 8/8)
+**Status:** done (2026-10-05 — tur 6: kapılar yeniden ölçüldü, canlı rota denetimi 16/16; tur 5'teki ürün değişikliği `641f804`)
 **Tarih:** 2026-10-03
 **Kaynak:** Kullanıcı mesajı (3 Ekim 2026):
 > "abi var olan loopları lokmaya ekleme sadece biz ya da agent loop oluşturunca lokma harnessinde çalışan loopları arayüzden görebileceğiz.
@@ -171,3 +171,25 @@ istersek tüm looplar istersek proje bazlı"
 **Kapılar:** kök `tsc` 0 · shared+core+server+web build yeşil (1752 modül) · **prob 67/67** · **PTF 8/8 kırmızı** (byte-exact geri alma) · regresyon yok: store 118 · runner 72 · executor 76 · run-route 31 · canlı `/health` 200 + login gate AÇIK (`/api/loops` token'siz 401) + servis edilen bundle == disk (`index-DptHRtFY.js`) + canlı rota denetimi: draft'a abort 400 `bad_transition`, bilinmeyen id 404, `deferred` alanı yoksa reddedildi, silinen loop yeniden okununca 404.
 
 **Kalan (REQ kapanışı):** konsolun (REQ-202) Stop/Abort düğmeleri bu iki cevabı (`deferred` / `cutTurn`) göstermeli; turn aralığını kuran ticker REQ-202'nin konsolüyle geliyor.
+
+### Tur 6/6 — kapanış: kapılar yeniden ölçüldü, ürün hatası çıkmadı ✅
+
+Bu tur kod yazmadı; **kapanış öncesi yeniden ölçüm** yaptı, çünkü tur 5'in "kapılar yeşil" cümlesi bir sonraki turda kendiliğinden doğrulanamaz.
+
+**Kapılar (hepsi yeniden koşuldu, `HOME` başına ayrı):** kök `tsc` 0 · kök build zinciri yeşil (shared→ai→core→server) · store **118** · runner **72** · executor **76/76** · stop-abort **67/67** · run-route **31/31** · loop araçları **70/70** · canlı `/health` 200 + gate AÇIK (token'siz 401) + servis edilen bundle == disk (`index-DptHRtFY.js`).
+
+**Canlı rota denetimi 16/16:** liste `{loops,count}` şekli, bozuk id → 400 `bad_loop_id`, **şekil geçerli ama yok** → 404, kurulum → 201 + `draft` (cwd kilidi/tur yok), draft'a `abort` → 400 `bad_transition`, `:id` + `:id/detail` okuma, `DELETE` + **silinince yeniden okuma 404** (listede yokluk değil), kapı hâlâ açık.
+
+**Bu turda ÜRÜN HATASI ÇIKMADI — üç kırmızının üçü de prob kusuruydu.** Kapatmadan önce ölçmek, "yeşil yazıp geçmek"ten farklı bir şey: kırmızıları **ürüne** atmak yerine **proba** yükledi.
+
+1. **Gövdesiz DELETE'ye `content-type: application/json` gönderdim** → Fastify'in boş-JSON parser'ı `FST_ERR_CTP_EMPTY_JSON_BODY` ile **400** döndü, yani loop silinmiyordu ve "silinen loop 404" assert'i kırmızıydı. Ürünün `DELETE /api/loops/:id`'si gövdesiz isteği bekliyor; **prob** hatalıydı (`references/probe-authoring-lessons.md`'deki mevcut tuzak — yeni bir bulgu değil, mevcut tuzağa düşmek).
+2. **Id şeklini `l_` + 24 hex sandım**, gerçek desen `/^l_[a-f0-9]{8}$/` → "404 bekliyorum" assert'i aslında **400**'ü ölçüyordu. Yani o assert hiçbir zaman 404 yolunu ölçmemişti: **400 doğru cevap**, prob'un varsayımı yanlıştı.
+3. **`GET /api/loops` çıplak dizi sandım**, gerçek yanıt `{loops, count}`.
+
+**Ölçüm altyapısı tuzağı (kendi hatam, üçüncü kez):** altı suite'i **tek** `HOME` altında koşturdum → `cwd_locked` 409 çakışması üç suite'i de kırmızı yaptı (REQ-200'ün "test başına kendi adresi+sayacı" kuralı). Ayrıca dört suite `bun:test` değil, kendi kendini raporlayan prob scripti (`PASS 67 / FAIL 0`, `76/76`) — `bun test` onları "0 pass 0 fail / Ran 0 tests" ile yeşil gösteriyor, yani **yanlış özet satırı** arıyorsan sessizce hiçbir şey ölçmeden geçersin.
+
+**Kapı tuzağı:** `bun test <dosya>` çıktısını `grep -E "^ *[0-9]+ (pass|fail)"` ile okumak bu repo'da **yanlış ölçüm** veriyor (hem `N passed` hem `0 pass` biçimleri var). Doğru okuma: `PASS x / FAIL y` ya da `x/y passed` desenlerinin ikisini birden aramak.
+
+**Kapanış gerekçesi:** kapsamın 7 maddesi de ölçülmüş ve kodda; "Kalan" satırı yalnız REQ-202'nin konsol işi (Stop/Abort düğmeleri + ticker) — yani **başka bir REQ'nin kapsamı**, REQ-201'in kendi işi değil.
+
+**Not (dürüst sınır):** canlı denetim **hiç token harcamayan** yollarla ölçüldü (draft kurma, reddedilmeler, okuma, silme). Gerçek bir turun `runAgentLoop`'a binip token yakması tur 2/3'ün kırmızı-sonra-izleme probunda kanıtlandı; bu turda bilerek tekrarlanmadı (sıfır maliyet kuralı).

@@ -419,7 +419,15 @@ export async function setLoopStatus(
     updatedAt: now,
   };
   const saved = await persist(next);
-  if (to === 'paused') await releaseLoopCwd(loopId, current.cwd);
+  // Release the directory whenever the loop is NOT running — not only on
+  // `paused`. REQ-201 measured this: a loop that stops ITSELF (`done` from
+  // target/budget/max_iters, or `error`) went terminal while still holding its
+  // cwd lock for the whole 15-minute lease, so a legitimate new loop in that
+  // directory was refused with "already worked on by loop X (running)" — a
+  // status it is not in. The lock exists to stop concurrent EDITING; a loop
+  // that is not editing must not hold it. Releasing is idempotent, so a
+  // `draft → paused` (which never claimed) is harmless.
+  if (to !== 'running') await releaseLoopCwd(loopId, current.cwd);
   return saved;
 }
 

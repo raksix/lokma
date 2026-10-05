@@ -1,6 +1,6 @@
 # REQ-201 — Loop yürütücüsü: arka planda tekrarlı koşu (cron'dan ayrı kavram)
 
-**Status:** in-progress (tur 3/5 — run rotası bitti, commit `ce81510`)
+**Status:** in-progress (tur 4/5 — ajan araçları bitti, commit `7cf3cff`)
 **Tarih:** 2026-10-03
 **Kaynak:** Kullanıcı mesajı (3 Ekim 2026):
 > "abi var olan loopları lokmaya ekleme sadece biz ya da agent loop oluşturunca lokma harnessinde çalışan loopları arayüzden görebileceğiz.
@@ -124,4 +124,24 @@ istersek tüm looplar istersek proje bazlı"
 
 **Kapılar:** kök `tsc` 0 · server build 0 · **run-route probu 31/31** · executor 76/76 (regresyon yok) · store 118 · runner 72 · **PTF 6/6 kırmızı** (byte-for-byte md5 geri alma, `md5sum -c` ile doğrulandı).
 
-**Sonraki tur (4/5):** `create_loop`/`list_loops` ajan araçları (REQ-181 kataloğundan) — ajan da loop kurabilsin. Tur 5'te `stop`/`abort` dürüstlüğü (`stop` mevcut turu bitirip `paused`, `abort` `error:aborted`) + `resumeOnBoot`.
+### Tur 4/5 — ajan loop araçları (`7cf3cff`) ✅
+
+**Bitti:** kapsam 4'ün ikinci yarısı. `loop_list` + `loop_create` ajanın `POST /api/loops`'in yazdığı **aynı** store'u sürüyor; ajanın yaptığı loop sıradan bir kayıt (`origin: 'agent'`), konsol onu listeler.
+
+**Ölçülen üç kural:**
+
+- **Kurmak başlatmak değildir.** `createLoop` `draft` yazar — cwd kilidi almaz, tur enqueue etmez. Ajan arka planda çalışan bir loop kurup **sessizce token harcamaya başlamamalı**; dönüş bu yüzden `loopId` + **`nextStep`** ("panelden başlat") taşır. Çağıranı hiçbir şey yapmaya bırakmayan cevap, komut taşımayan reddetmeyle aynı deliktir.
+- **Aynı cwd'de ikinci canlı loop İSİMLE reddedilir.** Store kilidi yalnız `draft → running`'da alıyor, yani iki `draft` sonradan en kötü anda, elinde yalnız bir kilit id'siyle çarpışırdı. Araç önce bakar ve loop'un **gerçek** durumunu okur (kilidin varsaydığı `running` değil — kilit sahibi sadece bir id'dir, kayıttan adı+statüsü çözülür). Terminal loop'lar engel değildir: geçmiş durur, yeni koşu normal yoldur.
+- **Katalog satırı gate'in tek kaynağıdır.** `loop_create` `write` (auto'da sorar, plan'da redder); katalog dışı bir isim `fallbackFor`'ın "okuma değil" dalına **kaza ile** düşerdi — bir token harcayan arka plan aracının onay kapısı kararla değil tesadüfle belirlenmiş olurdu.
+
+**Kablolama:** `ui_action` frame'ine `open_loop` + `loopId`/`loopName` (Zod nesnesi bilinmeyen anahtarı düşürür — bu satırlar olmadan istemci hangi loop'un çıktığını hiç öğrenemez), app-shell'de toast, ve katalogda `hosts: []`: rail girdisi REQ-202'nin konsolüyle **birlikte** gelir, şimdi cansız bir düğme olmaz.
+
+**Ürün hatası bulundu ve düzeltildi (`c3231fd`):** `setLoopStatus` cwd kilidini **yalnız** `paused`'ta bırakıyordu. Kendi kendine duran bir loop (`done` — target/budget/max_iters, ya da `error`) 15 dakikalık lease boyunca dizini tutmaya devam ediyordu; sonuç: o dizinde meşru bir yeni loop "loop X (running) tarafından işleniyor" diye reddediliyordu — loop'un **olmadığı** bir durumla. Kilit eşzamanlı **düzenlemeyi** engellemek içindir; düzenlemeyen loop tutmamalı. Artık `to !== 'running'` anahtarı.
+
+**Prob düzeltmeleri (üçü de kendi hatam):** (1) "eksik dizin reddedilir" assert'i **ürünün haklı olduğu** yerde kırmızıydı — `createLoop` dizinin varlığını bilerek istemiyor (cwd şekil doğrulaması + kilit normalizasyonu; proje kapsamlı bir loop henüz yaratılmamış bir dizin için taslaklanabilir). Assert ölçülen gerçeğe çevrildi: taslak **oluşur**, boş cwd `bad_cwd` ile reddedilir. (2) "UI'sız host cevap verir" assert'i **tautolojiydi** (`ok === false || ok === true` — hiçbir koşulda kırmızı olamaz, tam olarak bu repoda yasaklanan tuzak). Serbest dizin + **negatif kontrol** ile değiştirildi: aynı çağrı dolu dizinde gerçekten reddediyor. (3) `release(path, owner)` argüman sırası ters çağrılıyordu — prob bir `ReferenceError`'da ölüyordu, yani hiçbir şey ölçmüyordu.
+
+**PTF altyapısı (kendi hatam, iki kez):** geri alma ilk yazımda `md5sum -c` ile **doğruluyor** ama **geri almıyor**du (hash geri yazılamaz), ve fallback `git checkout --`'a düşüyordu — oysa `loops-tools.ts` + probu **untracked**'ti (checkout geri getiremez) ve ortak repoda `checkout` bir kardeşin commit'lenmemiş işini siler. Geri alma artık **byte-exact `cp`** yedeği + sonda zorunlu `verify_restore` (`md5sum -c` ile doğrulanarak).
+
+**Kapılar:** kök `tsc` 0 (kendi log'una yazıldı; boru hattının `tail`'i kodu **yazmıyor** — ilk ölçüm bunu yakaladı) · shared+core+server build yeşil · web build yeşil · **araç probu 70/70** · store 118 · runner 72 · katalog 285 · **PTF 7/7 kırmızı** (byte-exact geri alma) · canlı bundle hash == disk (`index-DptHRtFY.js`) + login gate AÇIK (`/api/loops` token'siz 401).
+
+**Sonraki tur (5/5):** `stop`/`abort` dürüstlüğü (`stop` mevcut turu **bitirip** `paused`, `abort` `error:aborted`) + `resumeOnBoot` (sunucu yeniden başlayınca `running` loop'lar kayıttan geri kalkar). Sonra kapsam 6'nın `resumeOnBoot` doğrulaması ve REQ kapanışı.

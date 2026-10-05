@@ -1296,6 +1296,131 @@ export type ApprovalDecisionView = {
 };
 export type ApprovalsRes = { decisions: ApprovalDecisionView[]; count: number };
 
+// ─── Loops (REQ-200 model · REQ-201 executor · REQ-202 console) ─────────────
+
+/**
+ * One loop record, mirroring `LoopSchema` in `@lokma/shared`.
+ *
+ * The client re-declares the shape rather than importing it: `api.ts` is the
+ * self-contained client layer and must not depend on a workspace package's
+ * build output. Every field the console reads must exist here — a field the
+ * server sends but this type omits reads as `undefined` in the UI and silently
+ * renders as "no progress".
+ *
+ * `nextHint` is deliberately `string | null` and NOT defaulted: kapsam 2 renders
+ * it verbatim as the "Sırada" row, and a fallback string would be an invented
+ * queue position.
+ */
+export type LoopStatus = 'draft' | 'running' | 'paused' | 'done' | 'error';
+export type LoopStopReason =
+  | 'target_score'
+  | 'max_iters'
+  | 'max_hours'
+  | 'budget'
+  | 'idle'
+  | 'stopped'
+  | 'error';
+export type LoopRunOutcome = 'ok' | 'empty' | 'aborted' | 'error';
+export type LoopTriggerInput = {
+  kind?: 'interval' | 'cron' | 'event' | 'manual';
+  intervalMinutes?: number | null;
+  schedule?: string | null;
+  event?: 'file_changed' | 'commit' | null;
+  path?: string | null;
+  cooldownSeconds?: number | null;
+  maxEmptyIters?: number | null;
+};
+
+export type LoopView = {
+  id: string;
+  name: string;
+  projectId: string | null;
+  cwd: string;
+  prompt: string;
+  origin: 'user' | 'agent';
+  status: LoopStatus;
+  /** Why it stopped — shown as a badge only when the loop is `done`/`error`. */
+  stopReason: LoopStopReason | null;
+  budget: { maxIters: number; maxHours: number; maxUsd: number };
+  spent: { iters: number; hours: number; usd: number; tokens: number };
+  /** Opaque score strings — the harness never pretends to know the scale. */
+  score: { best: string | null; last: string | null; target: string | null };
+  /** The loop's own "what is next", shown verbatim. Never a client default. */
+  nextHint: string | null;
+  trigger:
+    | { kind: 'interval'; intervalMinutes: number }
+    | { kind: 'cron'; schedule: string }
+    | { kind: 'event'; event: 'file_changed' | 'commit'; path?: string | null }
+    | { kind: 'manual' };
+  cooldownSeconds: number;
+  maxEmptyIters: number;
+  lastRunOutcome: LoopRunOutcome | null;
+  emptyIters: number;
+  lastRunStartedAt: string | null;
+  /** User pressed Stop while a turn was in flight (applied when it settles). */
+  stopRequested: boolean;
+  /** A turn was dispatched and has not been booked yet. */
+  inFlightSince: string | null;
+  model: string;
+  reasoningEffort: string;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
+export type LoopListRes = { loops: LoopView[]; count: number };
+export type LoopMutationRes = { loop: LoopView };
+
+/**
+ * REQ-202 kapsam 3 — what the detail panel renders.
+ *
+ * `remaining: null` and `remaining: []` are DIFFERENT states and must stay so:
+ * `null` = no `scope.md` exists (render the `nextHint` and no list), `[]` = the
+ * file exists and everything is checked. Collapsing them makes a loop with no
+ * scope file announce "0 items left" as if somebody had written a checklist.
+ */
+export type LoopDetailRes = {
+  loop: LoopView;
+  /** Last 20 ledger turns (the server tails it). */
+  ledger: string;
+  ledgerPath: string;
+  /** RAW `state.json` text, byte-for-byte from disk — never re-serialized. */
+  stateJson: string;
+  statePath: string;
+  hasScope: boolean;
+  remaining: string[] | null;
+};
+
+export type LoopCreateBody = {
+  name: string;
+  cwd: string;
+  prompt: string;
+  projectId?: string | null;
+  origin?: 'user' | 'agent';
+  model?: string;
+  reasoningEffort?: string;
+  budget?: Partial<LoopView['budget']>;
+  target?: string | null;
+  nextHint?: string | null;
+  trigger?: LoopTriggerInput;
+};
+
+/** Only editable fields — status/spent are NOT patchable (server-enforced). */
+export type LoopPatchBody = Partial<Omit<LoopCreateBody, 'origin'>>;
+
+/** `POST /:id/pause` — `deferred` means "finishing this turn", not "stopped". */
+export type LoopPauseRes = { loop: LoopView; deferred: boolean };
+/** `POST /:id/abort` — `cutTurn` means the in-flight turn was really cut. */
+export type LoopAbortRes = { loop: LoopView; cutTurn: boolean };
+/**
+ * `POST /:id/run` answers 202: the turn runs in the BACKGROUND, so `accepted`
+ * says "queued", never "finished". A refusal (404/409) still throws.
+ */
+export type LoopRunRes = { accepted: boolean; loop: LoopView; sessionId: string };
+export type LoopDeleteRes = { ok: boolean; id: string };
+
+// ─── One function per endpoint group ────────────────────────────────────────
 // ─── One function per endpoint group ────────────────────────────────────────
 
 /**
@@ -1308,6 +1433,15 @@ function designCwdQuery(path: string, cwd?: string): string {
   const sep = path.includes('?') ? '&' : '?';
   return `${path}${sep}cwd=${encodeURIComponent(cwd)}`;
 }
+
+// ─── Loops (REQ-202 console) ───────────────────────────────────────────────
+// Harness-owned loops only (REQ-200): Hermes' own `~/.hermes/loops/` trees are
+// deliberately NOT catalogued, so this endpoint is the single source for both
+// the Settings → Loops section and the Loops pane — one implementation, two
+// entry points (kapsam 1).
+const loopPath = (id: string) => `/api/loops/${encodeURIComponent(id)}`;
+
+// ─── One function per endpoint group ────────────────────────────────────────
 
 export const api = {
   // Health + config
@@ -1989,4 +2123,44 @@ export const api = {
   listCronRuns: () => get<CronRunsRes>('/api/cron/runs'),
   /** Newest-first WS decision history (fills as real answers arrive). */
   listApprovals: () => get<ApprovalsRes>('/api/approvals'),
+// Loops — REQ-202 kapsam 1: the ONE implementation behind both the Settings
+  // → Loops section and the Loops pane. Every control here is a live route;
+  // no console state is invented client-side.
+  //
+  // Kapsam 5 (live update) rides the WS `agent_state` frame + a 5s poll of
+  // `listLoops`; this slice ships the data layer the reducer will drive.
+  /** All harness loops, newest first (`[]` = empty catalog, kapsam 7). */
+  listLoops: () => get<LoopListRes>('/api/loops'),
+  /** REQ-203: project-scoped view; `'-'` means loops with NO project. */
+  listProjectLoops: (projectId: string) =>
+    get<LoopListRes>(`/api/loops?projectId=${encodeURIComponent(projectId)}`),
+  /** One record (404 `loop_not_found`, never a silent empty object). */
+  getLoop: (id: string) => get<{ loop: LoopView }>(loopPath(id)),
+  /**
+   * Detail payload (kapsam 3): ledger tail + the RAW `state.json` text +
+   * `scope.md` remaining items. `remaining === null` means NO scope file —
+   * distinct from `[]`, which means a file whose items are all checked.
+   */
+  getLoopDetail: (id: string) => get<LoopDetailRes>(`${loopPath(id)}/detail`),
+  /** Create in `draft` (server mints the id; 201). */
+  createLoop: (body: LoopCreateBody) => post<LoopMutationRes>('/api/loops', body),
+  /** Editable fields only — status/spent are rejected by the server. */
+  patchLoop: (id: string, body: LoopPatchBody) => patch<LoopMutationRes>(loopPath(id), body),
+  /**
+   * Fire ONE turn now — answers 202, the turn runs in the BACKGROUND. So the
+   * panel must say "queued", never "finished"; refusals (404/409) throw and
+   * are reported as rejections, not as accepted runs.
+   */
+  runLoop: (id: string, body?: { force?: boolean }) => post<LoopRunRes>(`${loopPath(id)}/run`, body ?? {}),
+  /**
+   * Pause — finishes the turn in flight and answers `deferred: true`, so the UI
+   * says "finishing this turn" instead of claiming the agent already stopped.
+   */
+  pauseLoop: (id: string) => post<LoopPauseRes>(`${loopPath(id)}/pause`, {}),
+  /** Abort — cuts the in-flight turn (`cutTurn: true`), unlike pause. */
+  abortLoop: (id: string) => post<LoopAbortRes>(`${loopPath(id)}/abort`, {}),
+  /** `paused → running` (409 on an illegal transition). */
+  resumeLoop: (id: string) => post<LoopMutationRes>(`${loopPath(id)}/resume`, {}),
+  /** Remove the loop's directory; history is kept server-side. */
+  deleteLoop: (id: string) => del<LoopDeleteRes>(loopPath(id)),
 };

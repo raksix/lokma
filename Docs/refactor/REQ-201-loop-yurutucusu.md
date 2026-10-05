@@ -1,6 +1,6 @@
 # REQ-201 — Loop yürütücüsü: arka planda tekrarlı koşu (cron'dan ayrı kavram)
 
-**Status:** in-progress (tur 1/5 — karar katmanı bitti, commit `aebbf85`)
+**Status:** in-progress (tur 2/5 — yürütücü eylem katmanı bitti, commit `79f75ef`)
 **Tarih:** 2026-10-03
 **Kaynak:** Kullanıcı mesajı (3 Ekim 2026):
 > "abi var olan loopları lokmaya ekleme sadece biz ya da agent loop oluşturunca lokma harnessinde çalışan loopları arayüzden görebileceğiz.
@@ -78,3 +78,28 @@ istersek tüm looplar istersek proje bazlı"
 **Prob düzeltmesi (kendi hatam):** cooldown için ilk PTF **yeşil** kaldı — çünkü `not_yet` assert'lerimin hepsi `interval` kullanıyordu ve interval zaten blokluyordu; cooldown hiçbir yerde *yük taşıyan* sebep değildi. Ayrıca yeni cron assert'leri ilk çalıştırmada **temiz hâlde** kırmızıydı: `initLoopCalendar` henüz çağrılmamıştı, yani takvim sessizce `() => false` stub'ıydı — ölçmeyen prob. İkisi de düzeltildi (cooldown için cooldown-0 kontrolü + sahte-cron eşleşmesi eklendi, takim başta gerçek matcher'a bağlandı).
 
 **Sonraki tur (2/5):** sunucu tarafı executor — `packages/lokma-web/server/src/loops/executor.ts`: `enqueuePrompt` + `pumpSessionRun` (mevcut kuyruk, ikinci kuyruk yok), transcript'e gerçek prompt yazma, `enqueuePrompt` dönüşünden tur bitişini ölçme (token/usd), ledger'a `formatLedgerEntry` yazma, `stop` mevcut turu **bitirip** `paused`, `abort` `error:aborted`. Sonra tur 3'te `POST /api/loops/:id/run` + tur 4'te `create_loop` aracı.
+
+### Tur 2/5 — yürütücü eylem katmanı (`79f75ef`) ✅
+
+**Bitti:** karar katmanı "tur atılmalı mı" diyordu; bu tur onu gerçekten çalıştırır. Loop prompt'unu **gerçek transcript'e** yazar, **mevcut session kuyruğuna** binerek turu koşturur, ölçülen sonucu loop kaydına + ledger'a yazar.
+
+- `loops/executor.ts` (yeni): `runLoopTurn` — çağrı başına **tek** tur (kendi kendine `while` kuran bir executor, loop'un gerçek temposunu model gecikmesine bağlardı = token yangını), loop başına **sabit** session id (`sess_loop_<id>`; tur 2 tur 1'i görmeli), `loopSessionId`, `loopOutcomeFor`, `resolveEffort`.
+- `session-runs.ts`: `tag` ile korelasyon + `TurnReport` (`awaitTurnReport` / `settleTurnReport` / `hasTurnWaiter`). Prompt **metniyle** eşleştirme tahmindi; tag kuyruk öğesiyle birlikte taşınıyor. Zaman aşımı zorunlu: rapor vermeyen bir tur loop'u sonsuza kadar bütçesi donmuş halde bekletti.
+- `routes/ws.ts`: pump bu öğenin yayınını sarıp **terminal frame'i** + ölçülen kullanımı kaydediyor, `finally` içinde raporu teslim ediyor — Claude engine yolu `void` döndüğü için tek ortak terminal sinyal bu.
+
+**İki ölçülen kural:**
+
+- **Hiç tool çalıştırmayan tur `ok` değil `empty`'dir.** Konuşma yapan bir loop'un hiçbir şey yapmadan "sağlıklı" görünmesi, boş-tur korumasının ölçtüğü şeyin metin olmadığı kanıtı.
+- **Faturalama OUTCOME'tan karar verir, raporun `billed` bayrağından değil.** Bayrağa güvenmek, mesajsız bir provider 500'ünü hem faturalanmayan hem de **bitmeyen** bıraktı: loop `running` kaldı ve ölü uca bütçesi bitene kadar sıcak tekrar denedi. `aborted` tur bilinçli olarak terminal **değil** — kullanıcının turu kesmesi arızalı loop demek değil.
+
+**Prob düzeltmesi (kendi hatam, üçü de):** (1) Stub'da `canned.outcome === 'complete'` **varsayılan** durumda `false` idi (`outcome` `undefined` ile default'lanıyor) → stub 0 faturaladı, prob executor'ı suçladı; tek seferde çözülüp karşılaştırılıyor. (2) Stub kuyruktaki öğeye **bakıyordu, shift etmiyordu** — gerçek pump shift ediyor, yani "tek kuyruk kullanıldı" assert'i prob'un kendi kirlettiği kuyrukla ölçülüyordu. (3) Her loop **kendi dizinine** taşındı: store aynı cwd'de ikinci loop'u reddediyor (kapsam 5), ortak dizin her bloğu alakasız `cwd_locked` ile düşürüyordu.
+
+**Prob kusuru — fixture kendi kuralını maskeliyordu:** iptal/hatâ turları `costUsd: 0` ile fixture'lanınca "iptal turu 0 maliyetlidir" assert'i **yanlış sebeple** geçiyordu. PTF'deki "iptali faturala" mutasyonu **yeşil kaldı** — kural hiç test edilmemişti. Fixture'ı adversarial yaptım (iptal turu gerçek token + gerçek maliyet taşır; sağlayıcı faturalar, harness kullanıcıya yazmaz), kuralı outcome tabanlı hale getirdim → 8/8 mutasyon kırmızı.
+
+**PTF altyapı kusurları (ölçüldü, ikisi de yanlış kırmızıydı):** (a) Script'in REPO_ROOT hesabı bir kademe eksikti → python dosyayı bulamadı, prob hiç çalışmadı ve script **yeşil** raporladı; artık yanlış kök `exit 2`. (b) Mutasyon anchor'ı eskimişti (ürün satırı taşınmış) → python `AssertionError`, prob **alakasız** bir sebeple kırmızı, script "red as required" dedi — yani **hiç test edilmemiş** bir kuralı onaylıyordu. Artık her mutasyon uyguladığını **marker dosyasıyla** kanıtlamak zorunda (bash değişkeni python alt süreci geçmez — bu da ölçüldü).
+
+**Kapılar:** kök `tsc` 0 · shared+ai+core+server build zinciri yeşil · executor probu **76/76** · PTF **8/8 kırmızı** (byte-for-byte md5 geri alma) · REQ-200 store probu 118/118 · runner probu 72/72 (regresyon yok).
+
+**Bu turda ölçülen ek kapı tuzağı:** kök `bun x tsc --noEmit` **yeşil** kaldı, `packages/lokma-web/server` kendi build'i 4 hata verdi. Sebep: `let terminal` değişkeninin TÜM atamaları bir closure içinde olduğu için kontrol akışı analizi onu başlangıç değerine daraltıyor ve okuma yeri `never` oluyor. Holder **nesne** kullanıldı. Kök kapı tek başına her paketin tsconfig'ini kapsamıyor.
+
+**Sonraki tur (3/5):** `POST /api/loops/:id/run` rotası + `GET /api/loops/:id` (ledger detayı) + tur 4'te `create_loop`/`list_loops` araçları, tur 5'te `stop`/`abort` dürüstlüğü (`stop` mevcut turu bitirip `paused`, `abort` `error:aborted`) + `resumeOnBoot`.

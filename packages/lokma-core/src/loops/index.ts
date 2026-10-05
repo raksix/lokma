@@ -4,6 +4,7 @@
  * (REQ-203) build on this; nothing here fires a run on its own.
  */
 export {
+  abortLoop,
   assertLoopIdShape,
   assertTransition,
   betterScore,
@@ -18,10 +19,13 @@ export {
   listLoops,
   listProjectLoops,
   LoopError,
+  markTurnDispatched,
   recordIteration,
   recordRunTiming,
+  requestStop,
   resolveBudget,
   resolveTrigger,
+  resumeLoopsOnBoot,
   setLoopStatus,
   stopLoop,
   targetReached,

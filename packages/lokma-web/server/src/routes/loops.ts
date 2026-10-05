@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import {
+  abortLoop,
   assertLoopIdShape,
   createLoop,
   deleteLoop,
@@ -7,12 +8,13 @@ import {
   listLoops,
   listProjectLoops,
   LoopError,
+  requestStop,
   setLoopStatus,
-  stopLoop,
   updateLoop,
 } from '@lokma/core';
 import { LoopCreateSchema, LoopPatchSchema } from '@lokma/shared';
 import { LOOP_DEFAULT_TURN_TIMEOUT_MS } from '../agent-loop.js';
+import { getRunState } from '../session-runs.js';
 import { runLoopTurn, loopSessionId } from '../loops/executor.js';
 import { pumpSessionRun } from './ws.js';
 
@@ -28,7 +30,8 @@ import { pumpSessionRun } from './ws.js';
  *  - `POST /api/loops`                       create in `draft` (server mints the id)
  *  - `PATCH /api/loops/:id`                  editable fields only — status/spent are NOT patchable
  *  - `POST /api/loops/:id/run`                fire ONE turn now — answers 202 (background)
- *  - `POST /api/loops/:id/pause`             user stop → `paused` + `stopReason: 'stopped'`
+ *  - `POST /api/loops/:id/pause`             user stop → `paused` (+`deferred` if a turn runs)
+ *  - `POST /api/loops/:id/abort`             user abort → cut the in-flight turn (+`cutTurn`)
  *  - `POST /api/loops/:id/resume`            `paused → running`
  *  - `DELETE /api/loops/:id`                 remove the loop's directory
  *
@@ -39,6 +42,12 @@ import { pumpSessionRun } from './ws.js';
  * live proxy reads `/api/` for 60s, so a synchronous answer would 504 on a
  * run that is really spending tokens. Refusals stay synchronous (404/409) so
  * a rejected click is reported as a rejection, not as an accepted run.
+ *
+ * `pause` and `abort` are DELIBERATELY different (REQ-201 kapsam 6): pause
+ * finishes the turn in flight and reports `deferred: true`, so no half-written
+ * file and no lost measurement; abort cuts it through the session's
+ * AbortController. Each says which one it did, because a stop that pretends to
+ * have interrupted work is worse than no stop at all.
  *
  * All failures answer `{ code, message }` (never raw stacks or secrets).
  * Every route below `/api/*` inherits the global login gate (REQ-076).
@@ -164,8 +173,32 @@ export async function loopRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     try {
       assertLoopIdShape(id);
-      const loop = await stopLoop(id);
-      return { loop };
+      // REQ-201 kapsam 6: a turn in flight is NOT cut here. `requestStop` records
+      // the request and the executor applies it once the turn books its real
+      // usage — cutting now is exactly the "yarım yazım bırakılmaz" case the REQ
+      // forbids. `deferred: true` tells the caller the badge will change a moment
+      // later, so the panel can say "finishing this turn" instead of claiming the
+      // agent already stopped.
+      const { loop, deferred } = await requestStop(id);
+      return { loop, deferred };
+    } catch (e) {
+      return loopErr(reply, e);
+    }
+  });
+
+  app.post('/api/loops/:id/abort', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    try {
+      assertLoopIdShape(id);
+      const { loop, cutTurn } = await abortLoop(id);
+      if (cutTurn) {
+        // Cut through the SAME AbortController the chat Stop button uses, so the
+        // agent loop really stops and the turn's report settles as `aborted`
+        // (the executor books the work it did, then the loop is already paused).
+        const state = getRunState(loopSessionId(id));
+        state.abort?.abort();
+      }
+      return { loop, cutTurn };
     } catch (e) {
       return loopErr(reply, e);
     }

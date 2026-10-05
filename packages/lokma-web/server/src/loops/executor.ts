@@ -4,6 +4,7 @@ import {
   formatLedgerEntry,
   getLoop,
   initLoopCalendar,
+  markTurnDispatched,
   recordIteration,
   recordRunTiming,
   SessionStore,
@@ -136,6 +137,13 @@ export async function runLoopTurn(
   // report to and time out against a turn that already finished.
   const tag = mintTurnTag();
   const reported = awaitTurnReport(tag, opts.timeoutMs);
+  // Stamp the dispatch BEFORE enqueueing, so the record on disk already says a
+  // turn is in flight. `POST /:id/pause` reads this flag to decide between
+  // "finish the turn then pause" and "pause right now", and boot recovery reads
+  // it to settle a turn that died with the process. Enqueueing first would open
+  // a window where the work is queued but the record still claims nothing is
+  // running — exactly the window a user clicks Stop in.
+  await markTurnDispatched(loopId, startedAt);
   enqueuePrompt(sessionId, {
     prompt: loop.prompt,
     model: loop.model,
@@ -202,8 +210,32 @@ export async function runLoopTurn(
   let final = measured;
   if (stopReason) {
     final = await setLoopStatus(loopId, stopReason === 'error' ? 'error' : 'done', { stopReason });
+  } else if (await applyDeferredStop(loopId)) {
+    // REQ-201 kapsam 6: the user pressed Stop WHILE this turn ran. The turn was
+    // deliberately not cut, so it finished and booked its real usage above — now
+    // the loop honours the request. Pausing AFTER the booking is the whole point:
+    // the ledger carries the turn's true measurement instead of a half-written
+    // turn plus a "stopped" badge.
+    final = await getLoop(loopId);
   }
   return { started: true, reason: gate.reason, loop: final, report, stopReason: stopReason ?? undefined };
+}
+
+/**
+ * Apply a stop the user requested while a turn was in flight. Returns true when
+ * this call is the one that paused the loop.
+ *
+ * Read AFTER the turn is booked on purpose, and re-read from the record rather
+ * than trusted from a variable captured before the turn: the pause route writes
+ * the flag concurrently, so a snapshot taken at turn start would miss a Stop the
+ * user pressed two seconds ago. A terminal loop (the turn's own budget/target
+ * stop already landed) is left alone — its stopReason is the more truthful one.
+ */
+async function applyDeferredStop(loopId: string): Promise<boolean> {
+  const current = await getLoop(loopId);
+  if (!current.stopRequested || current.status !== 'running') return false;
+  await setLoopStatus(loopId, 'paused', { stopReason: 'stopped' });
+  return true;
 }
 
 /**
@@ -229,6 +261,20 @@ function summarizeTurn(report: TurnReport): string {
 
 /** Re-exported so the server routes can report an unknown loop consistently. */
 export { LoopError };
+
+/**
+ * Abort a loop's in-flight turn NOW (REQ-201 kapsam 6).
+ *
+ * The cut is done by the caller (the route), because only it owns the session's
+ * `AbortController` — the very one the chat Stop button uses, so the agent loop
+ * honours the signal and the turn's report settles as `aborted` with the work it
+ * really did. This module therefore only reports whether there WAS a turn to cut,
+ * so the route can say `cutTurn: false` instead of implying a cut that never
+ * happened (a stop that pretends to have interrupted work is worse than no stop).
+ */
+export function loopTurnInFlight(loop: Pick<Loop, 'inFlightSince'>): boolean {
+  return loop.inFlightSince !== null;
+}
 
 /**
  * Resolve a stored effort level against the REAL ladder, falling back to `off`.

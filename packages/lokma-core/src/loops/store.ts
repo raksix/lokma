@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
@@ -16,7 +17,7 @@ import {
 } from '@lokma/shared';
 import { assertValidSchedule } from '../cron/cron.js';
 import { ensureDir, readJson, writeAtomic } from '../utils/fs.js';
-import { LOOPS_DIR, ledgerPath, loopDir, readLedger } from './ledger.js';
+import { appendLedger, formatLedgerEntry, LOOPS_DIR, ledgerPath, loopDir, readLedger } from './ledger.js';
 import { acquireLoopCwd, cwdLockConflict, releaseLoopCwd } from './lock.js';
 
 /**
@@ -198,6 +199,98 @@ function promptPath(loopId: string): string {
   return join(loopDir(loopId), 'prompt.md');
 }
 
+/**
+ * Per-loop write serialization.
+ *
+ * Every mutator below is a read-modify-write of the SAME `state.json`, and two
+ * of them can overlap for real: a Stop lands in the user's browser while the
+ * turn is still settling, so `requestStop` reads at t0 and `recordIteration`
+ * writes at t1. Without serialization the Stop's stale snapshot lands last and
+ * silently ERASES the turn's measured spend — the "counters are measured, never
+ * typed" guarantee is only true when the writers are ordered.
+ *
+ * REQ-201 measured it: after the fix to `requestStop`'s own re-read, the pause
+ * was right but `spent.iters`/`tokens`/`usd` came back at their pre-turn values,
+ * because the Stop's snapshot won the race by a millisecond.
+ *
+ * A promise CHAIN per loop id, not a mutex object: the next writer starts from
+ * the previous one's settlement either way (a failed write must not wedge the
+ * loop forever), and the chain is dropped from the map once it drains so ids do
+ * not accumulate for deleted loops.
+ */
+const loopWrites = new Map<string, Promise<unknown>>();
+
+/** The async context currently holding each loop's write chain. */
+const loopWriteOwners = new Map<string, symbol>();
+
+/**
+ * Per-caller chain ownership.
+ *
+ * Re-entrancy must be judged per CALLER: a module-level "currently held ids"
+ * Set would let loop B's unrelated write run inline while loop A's chain is
+ * mid-flight, silently bypassing the queue for one of them. And the check must
+ * NOT be a plain module counter either — a counter read at the wrong moment
+ * differs between two interleaved callers.
+ *
+ * `AsyncLocalStorage` is the primitive that answers this correctly in BOTH
+ * runtimes (Node and Bun), with the holder token carried down the async
+ * context: a nested call inherits the SAME token, a concurrent caller never
+ * sees it. Bun's `executionAsyncId` is explicitly not an option — it is not
+ * implemented and returns 0 on every call, which makes every caller look like
+ * the holder and disables the queue completely (measured: the Stop probe still
+ * lost its measurement with that fallback in place).
+ */
+const writeContext = new AsyncLocalStorage<{ token: symbol }>();
+
+/** Set only if `AsyncLocalStorage` is missing entirely — see `withLoopWrite`. */
+let writeContextBroken = false;
+
+function withLoopWrite<T>(loopId: string, fn: () => Promise<T>): Promise<T> {
+  if (!writeContextBroken) {
+    const held = writeContext.getStore();
+    if (held && loopWriteOwners.get(loopId) === held.token) return fn();
+    if (!held) {
+      const token = Symbol('loop-write');
+      return writeContext.run({ token }, () => enqueueLoopWrite(loopId, token, fn));
+    }
+  }
+  const token = Symbol('loop-write');
+  return enqueueLoopWrite(loopId, token, fn);
+}
+
+function enqueueLoopWrite<T>(loopId: string, token: symbol, fn: () => Promise<T>): Promise<T> {
+  const prev = loopWrites.get(loopId) ?? Promise.resolve();
+  const run = prev.then(
+    async () => {
+      loopWriteOwners.set(loopId, token);
+      try {
+        return await fn();
+      } finally {
+        if (loopWriteOwners.get(loopId) === token) loopWriteOwners.delete(loopId);
+      }
+    },
+    // A previous write REJECTED: start from its settlement anyway, so one bad
+    // write cannot wedge this loop's queue for the rest of the process.
+    async () => {
+      loopWriteOwners.set(loopId, token);
+      try {
+        return await fn();
+      } finally {
+        if (loopWriteOwners.get(loopId) === token) loopWriteOwners.delete(loopId);
+      }
+    },
+  );
+  const settled: Promise<unknown> = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  loopWrites.set(loopId, settled);
+  void settled.then(() => {
+    if (loopWrites.get(loopId) === settled) loopWrites.delete(loopId);
+  });
+  return run;
+}
+
 /** All loops from disk, newest first (powers the console header + list). */
 export async function listLoops(): Promise<Loop[]> {
   let names: string[];
@@ -290,6 +383,8 @@ export async function createLoop(input: {
     lastRunOutcome: null,
     emptyIters: 0,
     lastRunStartedAt: null,
+    stopRequested: false,
+    inFlightSince: null,
     model: typeof input.model === 'string' && input.model.trim() ? input.model.trim() : 'inherit',
     reasoningEffort:
       typeof input.reasoningEffort === 'string' && input.reasoningEffort.trim()
@@ -310,6 +405,7 @@ export async function createLoop(input: {
  * the measured-counter guarantee true.
  */
 export async function updateLoop(loopId: string, patch: LoopPatch): Promise<Loop> {
+  return withLoopWrite(loopId, async () => {
   const current = await getLoop(loopId);
   if (patch.name !== undefined) assertNameShape(patch.name);
   if (patch.cwd !== undefined) assertCwdShape(patch.cwd);
@@ -349,6 +445,7 @@ export async function updateLoop(loopId: string, patch: LoopPatch): Promise<Loop
   const saved = await persist(next);
   if (movingCwd) await releaseLoopCwd(loopId, current.cwd);
   return saved;
+  });
 }
 
 /**
@@ -406,6 +503,7 @@ export async function setLoopStatus(
   to: LoopStatus,
   opts: { stopReason?: LoopStopReason | null } = {},
 ): Promise<Loop> {
+  return withLoopWrite(loopId, async () => {
   const current = await getLoop(loopId);
   assertTransition(current.status, to);
   if (to === 'running') await claimCwd(loopId, current.cwd);
@@ -414,6 +512,12 @@ export async function setLoopStatus(
     ...current,
     status: to,
     stopReason: to === 'running' ? null : (opts.stopReason ?? null),
+    // Re-arming CLEARS a pending stop request. The flag means "stop after the
+    // turn in flight", so carrying it into a resumed loop would make the resumed
+    // loop pause again after exactly one turn — the user presses Resume and gets
+    // one silent turn. Measured while writing this: it is invisible in a unit
+    // probe of `requestStop` alone, because the resume path is a different writer.
+    stopRequested: to === 'running' ? false : current.stopRequested,
     startedAt: current.startedAt ?? (to === 'running' ? now : null),
     finishedAt: TERMINAL_STATUSES.has(to) ? now : null,
     updatedAt: now,
@@ -429,6 +533,7 @@ export async function setLoopStatus(
   // `draft → paused` (which never claimed) is harmless.
   if (to !== 'running') await releaseLoopCwd(loopId, current.cwd);
   return saved;
+  });
 }
 
 /**
@@ -473,6 +578,7 @@ export async function recordIteration(
   measurement: LoopIterationMeasurement,
   opts: { countIteration?: boolean } = {},
 ): Promise<Loop> {
+  return withLoopWrite(loopId, async () => {
   const current = await getLoop(loopId);
   if (TERMINAL_STATUSES.has(current.status)) {
     throw new LoopError('loop_terminal', `loop is ${current.status} — no further iterations`);
@@ -511,6 +617,7 @@ export async function recordIteration(
   });
   await releaseLoopCwd(loopId, current.cwd);
   return saved;
+  });
 }
 
 /**
@@ -521,11 +628,16 @@ export async function recordIteration(
  *
  * Deliberately separate from `recordIteration`: an empty turn records time and
  * cost but must not advance `spent.iters`, so the two writes cannot be one.
+ *
+ * `inFlightSince` is cleared here — this is the ONLY writer of "a turn is
+ * happening", so a crash mid-turn leaves the flag set (which is exactly what
+ * boot recovery reads) while a settled turn always clears it.
  */
 export async function recordRunTiming(
   loopId: string,
   opts: { outcome: LoopRunOutcome; startedAt: string },
 ): Promise<Loop> {
+  return withLoopWrite(loopId, async () => {
   const current = await getLoop(loopId);
   const emptyIters = opts.outcome === 'empty' ? current.emptyIters + 1 : 0;
   const next: Loop = {
@@ -533,9 +645,99 @@ export async function recordRunTiming(
     lastRunOutcome: opts.outcome,
     emptyIters,
     lastRunStartedAt: opts.startedAt,
+    inFlightSince: null,
     updatedAt: new Date().toISOString(),
   };
   return persist(next);
+  });
+}
+
+/**
+ * Mark that a turn was dispatched and has NOT been booked yet.
+ *
+ * Written by the executor immediately before it enqueues the prompt, so the
+ * record on disk answers "is work in flight" even if the process dies mid-turn.
+ * `resumeOnBoot` reads exactly this: a `running` loop with no in-flight turn
+ * was armed, not busy, and is safe to re-arm — while one whose turn vanished
+ * with the process must have its interrupted bookkeeping settled first.
+ */
+export async function markTurnDispatched(loopId: string, startedAt: string): Promise<Loop> {
+  return withLoopWrite(loopId, async () => {
+  const current = await getLoop(loopId);
+  return persist({
+    ...current,
+    inFlightSince: startedAt,
+    lastRunStartedAt: startedAt,
+    updatedAt: new Date().toISOString(),
+  });
+  });
+}
+
+/**
+ * The user pressed Stop while a turn was in flight: FINISH the turn, then pause.
+ *
+ * The request is recorded, never applied here. Cutting the turn now would leave
+ * a half-written file and lose the measured usage of real work the provider
+ * already billed — the REQ's own rule ("yarım yazım bırakılmaz"). The executor
+ * reads the flag when the turn settles and pauses with `stopReason: 'stopped'`,
+ * so the loop stops after exactly one more turn and its ledger carries that
+ * turn's real measurement.
+ *
+ * A loop with NO turn in flight pauses immediately — there is nothing to wait
+ * for, and deferring would leave a running loop that never stops.
+ */
+export async function requestStop(loopId: string): Promise<{ loop: Loop; deferred: boolean }> {
+  return withLoopWrite(loopId, async () => {
+  const current = await getLoop(loopId);
+  if (current.status === 'paused') return { loop: current, deferred: false };
+  if (current.status === 'draft') throw new LoopError('bad_transition', 'cannot go draft → paused');
+  if (TERMINAL_STATUSES.has(current.status)) {
+    throw new LoopError('loop_terminal', `loop is ${current.status} — nothing to stop`);
+  }
+  if (current.inFlightSince !== null) {
+    await persist({
+      ...current,
+      stopRequested: true,
+      updatedAt: new Date().toISOString(),
+    });
+    // RE-READ AFTER writing, and this is load-bearing rather than defensive.
+    // The turn can settle in the window between our read and our write (the
+    // executor reads the flag immediately after it books the turn). Whoever
+    // writes the flag owns the decision, because the executor only looks once:
+    // if the turn has since settled, no future turn will ever consume the flag,
+    // so the loop would run ONE MORE turn against an explicit Stop request.
+    // Measured here — the probe's Stop lands concurrently with the turn and the
+    // loop came back still `running` with the flag set and unread.
+    const fresh = await getLoop(loopId);
+    if (fresh.inFlightSince !== null) return { loop: fresh, deferred: true };
+  }
+  return { loop: await setLoopStatus(loopId, 'paused', { stopReason: 'stopped' }), deferred: false };
+  });
+}
+
+/**
+ * The user pressed Abort: CUT the in-flight turn now.
+ *
+ * `runState.abort` is the same controller the chat Stop button uses, so an
+ * aborted loop turn really dies (the agent loop honours the signal) and its
+ * report settles as `aborted` — the executor books the work it DID do and the
+ * loop pauses. Unlike `requestStop`, this is the deliberate cut the REQ pairs
+ * with `error:aborted`.
+ *
+ * With nothing in flight this is an ordinary stop: there is no turn to cut, so
+ * deferring would be a lie about what happened.
+ */
+export async function abortLoop(loopId: string): Promise<{ loop: Loop; cutTurn: boolean }> {
+  const current = await getLoop(loopId);
+  if (current.status === 'paused') return { loop: current, cutTurn: false };
+  if (current.status === 'draft') throw new LoopError('bad_transition', 'cannot go draft → paused');
+  if (TERMINAL_STATUSES.has(current.status)) {
+    throw new LoopError('loop_terminal', `loop is ${current.status} — nothing to abort`);
+  }
+  return {
+    loop: await setLoopStatus(loopId, 'paused', { stopReason: 'stopped' }),
+    cutTurn: current.inFlightSince !== null,
+  };
 }
 
 /**
@@ -563,7 +765,64 @@ export async function stopLoop(loopId: string): Promise<Loop> {
   return setLoopStatus(loopId, 'paused', { stopReason: 'stopped' });
 }
 
-/** Delete a loop's directory (the pane's two-click Delete; unknown → 404). */
+/**
+ * REQ-201 kapsam 6: bring `running` loops back from the record after a restart.
+ *
+ * Status lives on disk, not in memory, so a `running` loop survives a server
+ * restart as a RECORD while its turn did not: the turn died with the process.
+ * Recovery therefore has two halves, and conflating them is the bug this
+ * function exists to prevent:
+ *
+ * - **A turn was in flight** (`inFlightSince` set). Its output is unrecoverable,
+ *   so the honest move is to book it as `aborted` — real tokens spent, no
+ *   iteration credit — clear the in-flight stamp, and leave the loop `running`
+ *   so the ticker picks it up again on its normal schedule.
+ * - **No turn was in flight.** The loop was merely ARMED: nothing to settle,
+ *   nothing to lie about. Left exactly as-is.
+ *
+ * A loop parked at `zero_cost` (`budget.maxUsd === 0`, the documented off
+ * switch) is reported but NOT resumed — re-arming it would defeat the only
+ * switch the user has over a background loop that spends real money.
+ *
+ * Returns one honest line per loop that needed work, so boot can log what it
+ * did instead of silently mutating records.
+ */
+export async function resumeLoopsOnBoot(now = new Date()): Promise<string[]> {
+  const notes: string[] = [];
+  for (const loop of await listLoops()) {
+    if (loop.status !== 'running') continue;
+    if (loop.budget.maxUsd === 0) {
+      notes.push(`${loop.id} ${loop.name}: running but parked at zero cost — left paused for the user`);
+      await setLoopStatus(loop.id, 'paused', { stopReason: 'budget' });
+      continue;
+    }
+    if (loop.inFlightSince === null) {
+      notes.push(`${loop.id} ${loop.name}: re-armed (no turn was in flight)`);
+      continue;
+    }
+    // The turn is gone. Book what really happened: tokens spent, no credit.
+    await recordRunTiming(loop.id, { outcome: 'aborted', startedAt: loop.inFlightSince });
+    await recordIteration(
+      loop.id,
+      { seconds: 0, tokens: 0, usd: 0 },
+      { countIteration: false },
+    );
+    await appendLedger(
+      loop.id,
+      formatLedgerEntry({
+        iteration: loop.spent.iters,
+        at: now.toISOString(),
+        summary: `turn interrupted by a server restart at ${loop.inFlightSince} — no usage recovered`,
+        measured: 'unknown (process ended mid-turn)',
+      }),
+    );
+    notes.push(`${loop.id} ${loop.name}: interrupted turn settled as aborted, loop still running`);
+  }
+  return notes;
+}
+
+/**
+ * Delete a loop's directory (the pane's two-click Delete; unknown → 404). */
 export async function deleteLoop(loopId: string): Promise<{ id: string }> {
   const loop = await getLoop(loopId); // 404 before removing anything.
   // Release the cwd lock too — a deleted loop must not keep a directory claimed

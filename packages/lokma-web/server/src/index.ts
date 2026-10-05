@@ -1,5 +1,6 @@
 import { createApp } from './app.js';
 import { startCronTicker } from './cron-runner.js';
+import { resumeLoopsOnBoot } from '@lokma/core';
 
 /**
  * Lokma server entry — Fastify 5 + WS.
@@ -15,6 +16,17 @@ export async function startServer(opts: { port?: number; host?: string } = {}): 
   // Agent-runner daemon, wave 1: fire due cron jobs every 30s.
   // Started here (never in createApp) so in-process probes stay inert.
   startCronTicker(app);
+  // REQ-201 kapsam 6: a `running` loop survives a restart as a RECORD while its
+  // turn died with the process. Recovery runs here — after `listen`, so a failure
+  // can never keep the server from serving — and logs what it settled instead of
+  // mutating records silently. Never throws: a boot must not die on bookkeeping.
+  try {
+    for (const note of await resumeLoopsOnBoot()) {
+      app.log.info('[loops] boot recovery: ' + note);
+    }
+  } catch (e) {
+    app.log.warn('[loops] boot recovery failed: ' + String(e));
+  }
   console.log(`[lokma-server] listening on http://${host}:${port} — health at /health`);
 }
 

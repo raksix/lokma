@@ -159,6 +159,29 @@ export const LoopSchema = z.object({
   emptyIters: z.number().int().min(0).max(100),
   /** When the last turn STARTED — `interval` is measured from here. */
   lastRunStartedAt: z.string().datetime().nullable(),
+  /**
+   * REQ-201: the user pressed Stop while a turn was in flight.
+   *
+   * A stop must NOT cut the turn — an interrupted turn leaves half-written
+   * output — so the request is STORED and the executor applies it when the turn
+   * settles: the turn books its real usage first, then the loop pauses. Without
+   * this flag the only honest-looking option is to pause immediately, which
+   * reports "stopped" while the agent keeps editing the directory.
+   *
+   * `.default()` (not a required key) is deliberate: rows written before this
+   * field existed must still parse, or `listLoops` would silently DROP every
+   * existing loop from the console.
+   */
+  stopRequested: z.boolean().default(false),
+  /**
+   * REQ-201: when a turn was DISPATCHED and has not been booked yet.
+   *
+   * `status: 'running'` means "the loop is armed", not "a turn is right now", so
+   * it cannot answer "is work in flight" — a boot recovery needs the sharper
+   * question, and a loop whose turn died with the process must not keep a
+   * frozen `lastRunStartedAt` as if it were still running.
+   */
+  inFlightSince: z.string().datetime().nullable().default(null),
   model: z.string().min(1).max(200),
   reasoningEffort: z.string().min(1).max(40),
   createdAt: z.string().datetime(),

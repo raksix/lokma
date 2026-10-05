@@ -1,6 +1,6 @@
 # REQ-201 — Loop yürütücüsü: arka planda tekrarlı koşu (cron'dan ayrı kavram)
 
-**Status:** in-progress (tur 4/5 — ajan araçları bitti, commit `7cf3cff`)
+**Status:** in-progress (tur 5/5 — stop/abort dürüstlüğü + `resumeOnBoot` bitti, prob 67/67 + PTF 8/8)
 **Tarih:** 2026-10-03
 **Kaynak:** Kullanıcı mesajı (3 Ekim 2026):
 > "abi var olan loopları lokmaya ekleme sadece biz ya da agent loop oluşturunca lokma harnessinde çalışan loopları arayüzden görebileceğiz.
@@ -145,3 +145,29 @@ istersek tüm looplar istersek proje bazlı"
 **Kapılar:** kök `tsc` 0 (kendi log'una yazıldı; boru hattının `tail`'i kodu **yazmıyor** — ilk ölçüm bunu yakaladı) · shared+core+server build yeşil · web build yeşil · **araç probu 70/70** · store 118 · runner 72 · katalog 285 · **PTF 7/7 kırmızı** (byte-exact geri alma) · canlı bundle hash == disk (`index-DptHRtFY.js`) + login gate AÇIK (`/api/loops` token'siz 401).
 
 **Sonraki tur (5/5):** `stop`/`abort` dürüstlüğü (`stop` mevcut turu **bitirip** `paused`, `abort` `error:aborted`) + `resumeOnBoot` (sunucu yeniden başlayınca `running` loop'lar kayıttan geri kalkar). Sonra kapsam 6'nın `resumeOnBoot` doğrulaması ve REQ kapanışı.
+
+### Tur 5/5 — durdurma dürüstlüğü + boot kurtarma ✅
+
+**Bitti:** kapsam 6'nın iki yarısı. `stop` **turu kesmiyor** — isteği kaydedip tur gerçek ölçümünü yazdıktan sonra duruyor; `abort` turu **kesiyor** (chat'in Stop düğmesiyle aynı `AbortController` üzerinden). Sunucu yeniden başlayınca `running` loop'lar kayıttan kalkıyor.
+
+**Yeni alanlar (ikisi de `.default()`'lı — eski satırlar kaybolmasın diye):**
+- `stopRequested` — "tur bittikten sonra dur" isteği.
+- `inFlightSince` — "bir tur şu an gerçekten koşuyor" damgası. `status: 'running'` bunu **söylemez** (loop "kurulmuş" demektir, "şu an çalışıyor" değil), ve recovery'nin sorduğu keskin soru budur.
+
+**Üç ölçülen ürün hatası (hepsi tur yazarken çıktı, hepsi gerçek):**
+
+1. **`writeAtomic` aynı süreçte çakışıyordu.** Temp adı `${path}.tmp.${pid}` idi; süreç başına tek yazıcı varsayımı yanlış. Stop tur bitişine denk gelince `prompt.md` aynı anda iki kez yazılıyor, ikinci `writeFile` ilkinin temp'ini eziyor ve ilk `rename` **ENOENT** ile ölüyor — yani kullanıcının Stop'u hiçbir şey yapmadan çöküyordu. Temp adı artık **çağrı başına** benzersiz + hata halinde `.tmp` temizliği.
+
+2. **Bayat snapshot ölçümü SİLİYORDU.** `requestStop` kaydı turn başında okuyor, tur settle olduktan sonra yazıyordu → `spent.iters/tokens/usd` turn'ün gerçek ölçümüne geri dönüyordu. "Sayaçlar ölçümden gelir" garantisi **yazarlar sıralıysa** doğrudur: store'a **loop başına yazı sıralaması** (`withLoopWrite`) girdi. Ölçüm: duraklatma doğruydu ama sayaçlar tur öncesi değerdeydi.
+
+3. **Bayat `stopRequested` resume'a miras kalıyordu.** Kullanıcı Resume'a basar, loop bir tur daha koşup kendiliğinden duruyordu. `→ running` geçişi bayrağı temizler.
+
+**Ölçülen tuzaklar:**
+- **Bun `executionAsyncId`'yi uygulamıyor** (her çağrıda 0 döner) → yeniden-giriş kontrolü "her çağıran sahiptir" der ve **kuyruk tamamen kapanır**. Doğru cevap `AsyncLocalStorage`: çağıranın token'ı async context boyunca taşınır, iç içe çağrı aynı token'ı görür, eşzamanlı çağıran görmez.
+- **Modül düzeyi "şu an tutulan id'ler" Set'i YANLIŞ**: loop B'nin yazımı loop A'nın zincirindeyken inline koşardı. Yeniden-giriş **çağıran** bazında olmalı.
+- **Prob hatası (kendi hatam, iki kez):** duraklatılmış bir loop'un ardından ikinci turn başlatmak `already_running` ile **reddedilir** — yani "işaretle, sonra turn koş" modeli gerçeği modellediremiyor; doğru sıra turn'ün koşması, ortasında Stop. Aynı hata ikinci blokta da: `running` + `force` yok = `already_running`.
+- **PTF 8 yeşil kaldı** (ölçülen): temp-ad mutasyonu 63 assert'i hiç kırmızı yapmadı, çünkü çakışma **aynı dosyaya eşzamanlı iki yazım** istiyor ve prob'ta öyle bir yazım yoktu. Prob'a gerçek 24 eşzamanlı `writeAtomic` eklendi — sonra PTF 8 kırmızı oldu. Yani ilk turda o kural **hiç test edilmemişti**.
+
+**Kapılar:** kök `tsc` 0 · shared+core+server+web build yeşil (1752 modül) · **prob 67/67** · **PTF 8/8 kırmızı** (byte-exact geri alma) · regresyon yok: store 118 · runner 72 · executor 76 · run-route 31 · canlı `/health` 200 + login gate AÇIK (`/api/loops` token'siz 401) + servis edilen bundle == disk (`index-DptHRtFY.js`) + canlı rota denetimi: draft'a abort 400 `bad_transition`, bilinmeyen id 404, `deferred` alanı yoksa reddedildi, silinen loop yeniden okununca 404.
+
+**Kalan (REQ kapanışı):** konsolun (REQ-202) Stop/Abort düğmeleri bu iki cevabı (`deferred` / `cutTurn`) göstermeli; turn aralığını kuran ticker REQ-202'nin konsolüyle geliyor.

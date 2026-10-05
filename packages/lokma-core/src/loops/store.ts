@@ -13,6 +13,7 @@ import {
 } from '@lokma/shared';
 import { ensureDir, readJson, writeAtomic } from '../utils/fs.js';
 import { LOOPS_DIR, ledgerPath, loopDir, readLedger } from './ledger.js';
+import { acquireLoopCwd, cwdLockConflict, releaseLoopCwd } from './lock.js';
 
 /**
  * Harness-owned loop store (REQ-200). One directory per loop under
@@ -246,10 +247,16 @@ export async function updateLoop(loopId: string, patch: LoopPatch): Promise<Loop
   if (patch.cwd !== undefined) assertCwdShape(patch.cwd);
   if (patch.prompt !== undefined) assertPromptShape(patch.prompt);
   if (patch.projectId !== undefined) assertProjectIdShape(patch.projectId);
+  const nextCwd = patch.cwd === undefined ? current.cwd : patch.cwd.trim();
+  // Editing the cwd of a RUNNING loop re-points its lock; the old directory must
+  // be released and the new one claimed, or the loop keeps editing a directory it
+  // no longer owns (or edits one that is already somebody else's).
+  const movingCwd = nextCwd !== current.cwd;
+  if (movingCwd && current.status === 'running') await claimCwd(loopId, nextCwd);
   const next: Loop = {
     ...current,
     name: patch.name === undefined ? current.name : patch.name.trim(),
-    cwd: patch.cwd === undefined ? current.cwd : patch.cwd.trim(),
+    cwd: nextCwd,
     prompt: patch.prompt === undefined ? current.prompt : patch.prompt.trim(),
     projectId: patch.projectId === undefined ? current.projectId : patch.projectId,
     model: patch.model === undefined ? current.model : patch.model.trim(),
@@ -259,10 +266,12 @@ export async function updateLoop(loopId: string, patch: LoopPatch): Promise<Loop
       ...current.score,
       target: patch.target === undefined ? current.score.target : patch.target,
     },
-    nextHint: patch.nextHint === undefined ? current.nextHint : patch.nextHint,
-    updatedAt: new Date().toISOString(),
+      nextHint: patch.nextHint === undefined ? current.nextHint : patch.nextHint,
+      updatedAt: new Date().toISOString(),
   };
-  return persist(next);
+  const saved = await persist(next);
+  if (movingCwd) await releaseLoopCwd(loopId, current.cwd);
+  return saved;
 }
 
 /**
@@ -289,6 +298,31 @@ export function assertTransition(from: LoopStatus, to: LoopStatus): void {
   }
 }
 
+/**
+ * Claim the loop's `cwd` before it starts editing it, or refuse HONESTLY.
+ *
+ * The conflict message names the holder and the directory, because "locked" with
+ * no owner is the one answer that leaves the user with nothing to do (the same
+ * rule as the install-hint lesson: a refusal that names a blocked thing must
+ * carry what to do next). Status 409 — the request was well-formed, the state
+ * just does not allow it — and `code: 'cwd_locked'` so the console can badge
+ * the row without parsing English.
+ */
+async function claimCwd(loopId: string, cwd: string): Promise<void> {
+  const conflict = await cwdLockConflict(loopId, cwd);
+  if (conflict) {
+    throw new LoopError(
+      'cwd_locked',
+      `${conflict.path} is already held by ${conflict.holderLoopId ?? conflict.holder} (lease until ${new Date(conflict.until).toISOString()})`,
+      409,
+    );
+  }
+  const claim = await acquireLoopCwd(loopId, cwd);
+  if (!claim.ok) {
+    throw new LoopError('cwd_locked', `${claim.path} is already held by ${claim.holderLoopId ?? claim.holder}`, 409);
+  }
+}
+
 /** Move the loop to an explicit status, stamping terminal timestamps. */
 export async function setLoopStatus(
   loopId: string,
@@ -297,6 +331,7 @@ export async function setLoopStatus(
 ): Promise<Loop> {
   const current = await getLoop(loopId);
   assertTransition(current.status, to);
+  if (to === 'running') await claimCwd(loopId, current.cwd);
   const now = new Date().toISOString();
   const next: Loop = {
     ...current,
@@ -306,7 +341,9 @@ export async function setLoopStatus(
     finishedAt: TERMINAL_STATUSES.has(to) ? now : null,
     updatedAt: now,
   };
-  return persist(next);
+  const saved = await persist(next);
+  if (to === 'paused') await releaseLoopCwd(loopId, current.cwd);
+  return saved;
 }
 
 /**
@@ -355,6 +392,7 @@ export async function recordIteration(
   if (TERMINAL_STATUSES.has(current.status)) {
     throw new LoopError('loop_terminal', `loop is ${current.status} — no further iterations`);
   }
+  if (current.status === 'draft') await claimCwd(loopId, current.cwd);
   const count = opts.countIteration !== false;
   const spent: Loop['spent'] = {
     iters: current.spent.iters + (count ? 1 : 0),
@@ -378,12 +416,16 @@ export async function recordIteration(
   const reached = targetReached(candidate);
   const stopReason: LoopStopReason | null = reached ? 'target_score' : breach;
   if (!stopReason) return persist(candidate);
-  return persist({
+  // A terminal stop must hand the directory back, or a finished loop would hold
+  // its cwd until the lease expires 15 minutes later.
+  const saved = await persist({
     ...candidate,
     status: 'done',
     stopReason,
     finishedAt: now,
   });
+  await releaseLoopCwd(loopId, current.cwd);
+  return saved;
 }
 
 /**
@@ -413,7 +455,10 @@ export async function stopLoop(loopId: string): Promise<Loop> {
 
 /** Delete a loop's directory (the pane's two-click Delete; unknown → 404). */
 export async function deleteLoop(loopId: string): Promise<{ id: string }> {
-  await getLoop(loopId); // 404 before removing anything.
+  const loop = await getLoop(loopId); // 404 before removing anything.
+  // Release the cwd lock too — a deleted loop must not keep a directory claimed
+  // for the rest of the lease.
+  await releaseLoopCwd(loopId, loop.cwd);
   const { rm } = await import('node:fs/promises');
   await rm(loopDir(loopId), { recursive: true, force: true });
   return { id: loopId };

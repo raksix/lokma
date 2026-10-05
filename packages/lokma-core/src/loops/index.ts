@@ -34,3 +34,16 @@ export {
   readLedger,
   trimLedger,
 } from './ledger.js';
+export {
+  acquireLoopCwd,
+  cwdLockConflict,
+  heartbeatLoopCwd,
+  listLoopLocks,
+  loopCwdPath,
+  loopIdFromLockOwner,
+  loopLockOwner,
+  LOOP_LOCK_LEASE_MS,
+  normalizeLoopCwd,
+  releaseLoopCwd,
+} from './lock.js';
+export type { LoopCwdLockResult } from './lock.js';

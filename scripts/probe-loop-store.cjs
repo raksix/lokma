@@ -162,6 +162,51 @@ async function main() {
   // shape we CAN reach: a paused loop still reports honestly.
   ok(stateOnDisk(id).finishedAt === null, 'a paused loop has no finishedAt (it never finished)');
 
+  // ─── cwd lock discipline over the wire (kapsam 5) ─────────────────────
+  // The holder must be RUNNING for the lock to be held: the transitions block
+  // above left it paused, and a paused loop has (correctly) given its directory
+  // back — so resuming it here is what makes the refusals below mean something.
+  await expectStatus('POST', `/api/loops/${id}/resume`, undefined, 200, 'resume the holder so it owns the directory');
+
+  // A second loop on the SAME directory must be refused with 409 + a machine
+  // code, and the refusal must NAME the holder — a "locked" answer with no owner
+  // is the one reply that leaves the user with nothing to do.
+  const rival = await expectStatus(
+    'POST',
+    '/api/loops',
+    { name: 'probe rival', cwd: '/tmp/lokma-loop-probe/', prompt: 'collide on purpose' },
+    201,
+    'a second loop on the locked directory is created (draft — creation never locks)',
+  );
+  const rivalId = rival.loop?.id;
+  created.push(rivalId);
+  const locked = await api('POST', `/api/loops/${rivalId}/resume`);
+  ok(locked.status === 409, `starting the rival on a held directory → 409 (got ${locked.status})`);
+  ok(locked.json?.code === 'cwd_locked', `the refusal carries the cwd_locked code (got ${locked.json?.code})`);
+  ok(typeof locked.json?.message === 'string' && locked.json.message.includes(id), 'the refusal names the holding loop id');
+  ok(typeof locked.json?.message === 'string' && locked.json.message.includes('/tmp/lokma-loop-probe'), 'the refusal names the directory');
+  ok(stateOnDisk(rivalId).status === 'draft', 'the refused start left the rival draft on disk');
+
+  // The same directory spelled differently is still the same directory.
+  const twin = await expectStatus(
+    'POST',
+    '/api/loops',
+    { name: 'probe twin', cwd: '/tmp/lokma-loop-probe//', prompt: 'same dir, other spelling' },
+    201,
+    'a third loop on a differently spelled path is created',
+  );
+  const twinId = twin.loop?.id;
+  created.push(twinId);
+  const twinLocked = await api('POST', `/api/loops/${twinId}/resume`);
+  ok(twinLocked.status === 409 && twinLocked.json?.code === 'cwd_locked', 'a trailing-slash spelling does not slip past the lock');
+
+  // Pausing the holder hands the directory back, so the rival can then start —
+  // the release half of the guarantee, which a create-only check would miss.
+  await expectStatus('POST', `/api/loops/${id}/pause`, undefined, 200, 'pausing the holder again');
+  const afterRelease = await expectStatus('POST', `/api/loops/${rivalId}/resume`, undefined, 200, 'the released directory can now be claimed');
+  ok(stateOnDisk(rivalId).status === 'running', 'the rival is running on the released directory');
+  await expectStatus('POST', `/api/loops/${rivalId}/pause`, undefined, 200, 'pause the rival before cleanup');
+
   // ─── project scoping ──────────────────────────────────────────────────
   const scoped = await expectStatus(
     'POST',
@@ -201,16 +246,34 @@ async function main() {
   const leftovers = existsSync(LOOPS_DIR) ? readdirSync(LOOPS_DIR).filter((d) => created.includes(d)) : [];
   ok(leftovers.length === 0, 'no probe loop directory survives the cleanup');
 
+  // Lock files outlive the process that wrote them, so the cleanup claim is
+  // incomplete without them: a leftover would make the NEXT probe run fail with
+  // a ghost "held by l_xxxx" refusal on a directory nobody is using.
+  const lockDir = '/root/.lokma/agentlocks/locks';
+  const leftLocks = existsSync(lockDir) ? readdirSync(lockDir).filter((f) => f.endsWith('.json')) : [];
+  ok(leftLocks.length === 0, `no probe lock file survives the cleanup (${leftLocks.length} left)`);
+
   console.log(`\n${passed} passed`);
 }
 
 main().catch((e) => {
   console.error(String(e));
-  // Leave no state behind even on a red run.
+  // Leave no state behind even on a red run — including lock files, or the next
+  // run inherits a ghost holder on a directory it is about to reuse.
   for (const loopId of created) {
     try {
       rmSync(join(LOOPS_DIR, loopId), { recursive: true, force: true });
     } catch {}
   }
+  try {
+    const lockDir = '/root/.lokma/agentlocks/locks';
+    if (existsSync(lockDir)) {
+      for (const f of readdirSync(lockDir)) {
+        if (!f.endsWith('.json')) continue;
+        const raw = readFileSync(join(lockDir, f), 'utf-8');
+        if (created.some((id) => raw.includes(id))) rmSync(join(lockDir, f), { force: true });
+      }
+    }
+  } catch {}
   process.exit(1);
 });

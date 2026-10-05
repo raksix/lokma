@@ -6,10 +6,20 @@ import { expandHome, ensureDir } from '../utils/fs.js';
 
 /**
  * Advisory file locks — Layer 1 collision-free primitive.
- * See Docs/30 §10.1 — .agentlocks/locks/<sha1(path)>.json + heartbeat + lease.
+ * See Docs/30 §10.1 — `~/.lokma/agentlocks/locks/<sha1(path)>.json` + heartbeat
+ * + lease.
+ *
+ * The directory is HOME-anchored on purpose. It used to be the RELATIVE
+ * `.agentlocks/locks`, which `expandHome` passes through untouched — so the
+ * locks were created wherever the process happened to be started (`packages/
+ * lokma-core/.agentlocks/` when a test ran there), where they outlived the run
+ * and were picked up as untracked repo pollution. A relative lock directory also
+ * makes two processes with different working directories disagree about who
+ * holds a lock, which defeats the point of a shared primitive. Locks are shared
+ * state, so they live with the rest of the harness state under `~/.lokma/`.
  */
 
-const LOCKS_DIR = '.agentlocks/locks';
+const LOCKS_DIR = '~/.lokma/agentlocks/locks';
 
 function lockPath(filePath: string): string {
   const hex = sha1HexSync(filePath);

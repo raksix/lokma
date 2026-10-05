@@ -12,9 +12,20 @@
  * — the probe proves it by type, not by call), budget self-stop at maxIters /
  * maxUsd, the target-score stop, empty-turn guard (iters do NOT advance),
  * terminal-is-terminal refusal, illegal transitions, project scoping, ledger
- * append + trim (never delete), corrupt state row skipped not fatal.
+ * append + trim (never delete), corrupt state row skipped not fatal, and the
+ * cwd lock discipline: one directory one owner, both entry points into
+ * `running` guarded, every exit path (pause / terminal stop / delete / cwd
+ * change) handing the directory back, and an expired lease never wedging it.
  */
 import {
+  acquireLoopCwd,
+  cwdLockConflict,
+  heartbeatLoopCwd,
+  listLoopLocks,
+  loopIdFromLockOwner,
+  loopLockOwner,
+  normalizeLoopCwd,
+  releaseLoopCwd,
   budgetBreach,
   betterScore,
   createLoop,
@@ -31,6 +42,7 @@ import {
   stopLoop,
   targetReached,
   trimLedger,
+  updateLoop,
   appendLedger,
   formatLedgerEntry,
   ledgerPath,
@@ -38,8 +50,11 @@ import {
 } from './index.js';
 import { readFile, mkdir, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { sha1HexSync } from '@lokma/shared';
 import { ensureDir } from '../utils/fs.js';
+import { acquire, listLocks, release } from '../agents/locks.js';
 
 const HOME = process.env.HOME ?? '';
 if (!HOME.startsWith('/tmp/')) {
@@ -67,7 +82,62 @@ async function expectCode(fn: () => Promise<unknown>, code: string, label: strin
   throw new Error(`FAIL: ${label} — no error thrown`);
 }
 
-const BASE = { name: 'probe loop', cwd: '/tmp/probe-loop', prompt: 'do the thing' };
+/** The HTTP status a refusal carries — the console renders 409, not the text. */
+async function expectStatus(fn: () => Promise<unknown>, status: number, label: string): Promise<void> {
+  try {
+    await fn();
+  } catch (e) {
+    if (e instanceof LoopError && e.status === status) {
+      passed += 1;
+      console.log(`PASS: ${label}`);
+      return;
+    }
+    throw new Error(`FAIL: ${label} — wrong status ${e instanceof LoopError ? e.status : String(e)}`);
+  }
+  throw new Error(`FAIL: ${label} — no error thrown`);
+}
+
+/** The refusal's own words: a message that names no holder names no remedy. */
+async function refusalMessage(fn: () => Promise<unknown>): Promise<string> {
+  try {
+    await fn();
+  } catch (e) {
+    return e instanceof LoopError ? e.message : String(e);
+  }
+  throw new Error('FAIL: expected a refusal, got success');
+}
+
+/**
+ * A loop per DIRECTORY, by construction. These probes used to share one
+ * `cwd`, which was harmless until the cwd lock made it a genuine conflict
+ * (six loops claiming `/tmp/probe-loop`); a factory is what stops the next
+ * added loop from silently colliding with an earlier one.
+ */
+const mkBase = (name: string) => ({ name, cwd: `/tmp/probe-loop/${name.replace(/\W+/g, '-')}`, prompt: 'do the thing' });
+/**
+ * Write a lock file straight to disk, bypassing `acquire()`. Needed to leave an
+ * EXPIRED lock behind: `acquire()` overwrites one the moment it sees it stale,
+ * so there would be nothing on disk to read.
+ *
+ * `expiredAgoMs` is subtracted from now so the file is unambiguously in the past
+ * — a 1 ms lease is already in the past, but "already" measured across a second
+ * boundary is a race the probe does not need.
+ */
+async function writeLockFile(path: string, owner: string, expiredAgoMs: number, reason: string): Promise<void> {
+  const now = Date.now();
+  const lock = {
+    path,
+    owner,
+    acquiredAt: now - expiredAgoMs - 60_000,
+    leaseUntil: now - expiredAgoMs,
+    mode: 'exclusive' as const,
+    reason,
+  };
+  await ensureDir('~/.lokma/agentlocks/locks');
+  await writeFile(join(homedir(), '.lokma/agentlocks/locks', `${sha1HexSync(path)}.json`), JSON.stringify(lock, null, 2), 'utf-8');
+}
+
+const BASE = mkBase('probe loop');
 
 async function main(): Promise<void> {
   // ─── create: mint, draft, disk evidence ────────────────────────────────
@@ -88,10 +158,10 @@ async function main(): Promise<void> {
   assert(promptMirror.trim() === 'do the thing', 'prompt.md is readable without parsing JSON');
 
   // ─── validation ────────────────────────────────────────────────────────
-  await expectCode(() => createLoop({ ...BASE, name: '  ' }), 'bad_name', 'blank name refused');
-  await expectCode(() => createLoop({ ...BASE, prompt: '' }), 'bad_prompt', 'blank prompt refused');
-  await expectCode(() => createLoop({ ...BASE, projectId: '../escape' }), 'bad_project_id', 'traversal projectId refused');
-  await expectCode(() => createLoop({ ...BASE, origin: 'cron' }), 'bad_origin', 'unknown origin refused');
+  await expectCode(() => createLoop({ ...mkBase('blank-name'), name: '  ' }), 'bad_name', 'blank name refused');
+  await expectCode(() => createLoop({ ...mkBase('noprompt'), prompt: '' }), 'bad_prompt', 'blank prompt refused');
+  await expectCode(() => createLoop({ ...mkBase('escape'), projectId: '../escape' }), 'bad_project_id', 'traversal projectId refused');
+  await expectCode(() => createLoop({ ...mkBase('cron'), origin: 'cron' }), 'bad_origin', 'unknown origin refused');
   await expectCode(() => getLoop('l_zzzzzzzz'), 'bad_loop_id', 'non-server id shape refused');
 
   // ─── measured counters: only recordIteration moves them ────────────────
@@ -118,7 +188,7 @@ async function main(): Promise<void> {
   assert(budgetBreach({ spent: { iters: 1, hours: 24, usd: 1 }, budget: { maxIters: 400, maxHours: 24, maxUsd: 50 } }) === 'max_hours', 'maxHours breach detected');
   assert(budgetBreach({ spent: { iters: 1, hours: 1, usd: 50 }, budget: { maxIters: 400, maxHours: 24, maxUsd: 50 } }) === 'budget', 'maxUsd breach detected');
 
-  const capped = await createLoop({ ...BASE, name: 'capped', budget: { maxIters: 2 } });
+  const capped = await createLoop({ ...mkBase('capped'), budget: { maxIters: 2 } });
   await recordIteration(capped.id, { seconds: 1, tokens: 1, usd: 0 });
   const cappedAfter2 = await recordIteration(capped.id, { seconds: 1, tokens: 1, usd: 0 });
   assert(cappedAfter2.status === 'running' && cappedAfter2.spent.iters === 2, 'the allowed 2 iterations both ran');
@@ -133,7 +203,7 @@ async function main(): Promise<void> {
   );
 
   // Zero usd/hours cap means "no ceiling" for that dimension.
-  const free = await createLoop({ ...BASE, name: 'free', budget: { maxIters: 1, maxUsd: 0, maxHours: 0 } });
+  const free = await createLoop({ ...mkBase('free'), budget: { maxIters: 1, maxUsd: 0, maxHours: 0 } });
   const freeFirst = await recordIteration(free.id, { seconds: 3600, tokens: 999, usd: 12.5 });
   assert(freeFirst.status === 'running' && freeFirst.stopReason === null, 'a 0 usd/hours cap means unlimited spend and time');
   const freeSecond = await recordIteration(free.id, { seconds: 1, tokens: 1, usd: 0.1 });
@@ -142,7 +212,7 @@ async function main(): Promise<void> {
   assert(resolveBudget({ maxUsd: -3 }).maxUsd === 50, 'a negative cap is ignored');
 
   // ─── target score stops the loop ───────────────────────────────────────
-  const targeted = await createLoop({ ...BASE, name: 'targeted', target: 'PASS' });
+  const targeted = await createLoop({ ...mkBase('targeted'), target: 'PASS' });
   await recordIteration(targeted.id, { seconds: 1, tokens: 1, usd: 0, score: '9/10' });
   const hit = await recordIteration(targeted.id, { seconds: 1, tokens: 1, usd: 0, score: 'PASS' });
   assert(hit.status === 'done' && hit.stopReason === 'target_score', 'reaching the target score stops the loop');
@@ -165,8 +235,8 @@ async function main(): Promise<void> {
   await expectCode(() => setLoopStatus(capped.id, 'paused'), 'loop_terminal', 'terminal wins over any transition');
 
   // ─── project scoping + listing ─────────────────────────────────────────
-  const projLoop = await createLoop({ ...BASE, name: 'scoped', projectId: 'demo-project' });
-  const freeLoop = await createLoop({ ...BASE, name: 'unscoped' });
+  const projLoop = await createLoop({ ...mkBase('scoped'), projectId: 'demo-project' });
+  const freeLoop = await createLoop(mkBase('unscoped'));
   const all = await listLoops();
   assert(all.length === 6, `list returns every loop (${all.length})`);
   assert(all[0].createdAt >= all[all.length - 1].createdAt, 'list is newest first');
@@ -216,6 +286,147 @@ await ensureDir(join(LOOPS_DIR, 'l_00000000'));
   await deleteLoop(projLoop.id);
   assert(!existsSync(`${HOME}/.lokma/loops/${projLoop.id}`), 'delete removes the loop directory');
   assert((await listLoops()).length === 5, 'the deleted loop is gone from the list');
+
+  // ─── cwd lock discipline (kapsam 5 — two loops, one directory) ────────
+  // A lock that nobody ever takes is not a lock: every assertion below goes
+  // through the SAME store entry points a real start/resume uses, so a gate
+  // that was never wired would fail here rather than pass vacuously.
+  const shared = '/tmp/probe-lock-shared';
+  const a = await createLoop({ ...BASE, name: 'lock a', cwd: shared });
+  const b = await createLoop({ ...BASE, name: 'lock b', cwd: `${shared}/` }); // same dir, other spelling
+
+  assert(normalizeLoopCwd(`${shared}/`) === normalizeLoopCwd(shared), 'a trailing slash is not a different directory');
+  assert(normalizeLoopCwd('~') === process.env.HOME, '~ expands to the home directory');
+  assert(normalizeLoopCwd('/a//b///c/') === '/a/b/c', 'duplicate and trailing slashes collapse');
+  assert(loopLockOwner(a.id) === `loop:${a.id}`, 'the lock owner names the loop');
+  assert(loopIdFromLockOwner(`loop:${a.id}`) === a.id, 'the owner parses back to the loop id');
+  assert(loopIdFromLockOwner('agent_123') === null, "an agent's lock is not a loop's");
+
+  const first = await acquireLoopCwd(a.id, shared);
+  assert(first.ok, 'the first claim takes the directory');
+  const reClaim = await acquireLoopCwd(a.id, shared);
+  assert(reClaim.ok && reClaim.held === 'already', 'a loop re-claiming its own directory is not a conflict');
+  const denied = await acquireLoopCwd(b.id, shared);
+  assert(!denied.ok && denied.holderLoopId === a.id, 'a second loop on the same directory is refused');
+  const badSpell = await acquireLoopCwd(b.id, `${shared}//`);
+  assert(!badSpell.ok, 'the refusal survives a differently spelled path');
+
+  // A running loop refuses to start, and says WHO holds it — 409 + a machine
+  // code, because "locked" with no owner leaves the user with nothing to do.
+  await expectStatus(() => setLoopStatus(b.id, 'running'), 409, 'starting on a locked cwd is 409');
+  await expectCode(() => setLoopStatus(b.id, 'running'), 'cwd_locked', 'the refusal carries a machine code');
+  const msg = await refusalMessage(() => setLoopStatus(b.id, 'running'));
+  assert(msg.includes(a.id), 'the refusal names the holding loop');
+  assert(msg.includes(shared), 'the refusal names the directory');
+  assert((await getLoop(b.id)).status === 'draft', 'a refused start leaves the loop draft');
+
+  // The other entry point into `running` — the draft promotion inside
+  // recordIteration. Wiring only setLoopStatus would leave this path unguarded.
+  await expectCode(() => recordIteration(b.id, { seconds: 1, tokens: 1, usd: 0 }), 'cwd_locked', 'the first iteration also refuses a locked cwd');
+  assert((await getLoop(b.id)).spent.iters === 0, 'the refused iteration counted nothing');
+
+  // An AGENT holding a directory blocks a loop the same way. Its own directory:
+  // `shared` is held by loop `a`, so acquiring the agent lock THERE would fail
+  // silently and the next three asserts would read "no lock anywhere" — green
+  // for the wrong reason. The acquire's own `ok` is asserted for that reason.
+  const agentDir = '/tmp/probe-lock-agent';
+  const agentClaim = await acquire(agentDir, 'agent_999', 60_000, 'probe');
+  assert(agentClaim.ok, 'the agent took its own directory');
+  const c = await createLoop({ ...BASE, name: 'lock c', cwd: agentDir });
+  const agentBlocked = await cwdLockConflict(c.id, agentDir);
+  assert(agentBlocked !== null && agentBlocked.holder === 'agent_999', "an agent's lock blocks a loop");
+  assert(agentBlocked !== null && agentBlocked.holderLoopId === null, "an agent holder reports no loop id");
+  await expectCode(() => setLoopStatus(c.id, 'running'), 'cwd_locked', "a loop cannot start on an agent's directory");
+  await release(agentDir, 'agent_999');
+
+  // Lease semantics: an EXPIRED lock never conflicts (a crashed loop must not
+  // wedge its directory forever), and a live one is refreshed by heartbeat.
+  // The expired lock is written to disk DIRECTLY: `acquire()` overwrites an
+  // expired lock, so asking the primitive to make one leaves nothing to read
+  // and the assertion below would be green for the wrong reason.
+  const staleDir = '/tmp/probe-lock-stale';
+  await writeLockFile(staleDir, 'agent_stale', 60_000, 'expired');
+  const d = await createLoop({ ...BASE, name: 'lock d', cwd: staleDir });
+  const liveReader = (await listLocks()).find((x) => x.path === staleDir);
+  assert(liveReader !== undefined && liveReader.leaseUntil <= Date.now(), 'the expired lock really is on disk and expired');
+  assert((await cwdLockConflict(d.id, staleDir, Date.now())) === null, 'an expired lock does not conflict');
+  // The negative control: same directory, same reader, a LIVE lease — if this
+  // were null too, the line above proved nothing.
+  const liveDir = '/tmp/probe-lock-live';
+  const liveClaim = await acquire(liveDir, 'agent_live', 60_000, 'live');
+  assert(liveClaim.ok, 'the live lease was really taken');
+  assert((await cwdLockConflict(d.id, liveDir, Date.now())) !== null, 'a live lock DOES conflict (control)');
+  // An expired lock is also TAKEN — the primitive's own recovery path, which is
+  // what makes a crashed loop's directory reusable without a manual unlock.
+  const tookExpired = await acquire(staleDir, 'agent_fresh', 60_000, 'fresh');
+  assert(tookExpired.ok, 'an expired lease can be re-claimed');
+  await release(staleDir, 'agent_fresh');
+
+  assert(await heartbeatLoopCwd(a.id, shared), 'the holding loop can heartbeat its own lease');
+  const listed = await listLoopLocks();
+  assert(listed.some((l) => l.loopId === a.id), 'listLoopLocks reports the loop by id');
+  assert(listed.every((l) => l.owner.startsWith('loop:')), 'listLoopLocks holds no agent locks');
+
+  // Pause / terminal / delete all hand the directory back. Without the release
+  // a finished loop would sit on its cwd for the whole 15 minute lease.
+  await releaseLoopCwd(a.id, shared);
+  assert((await cwdLockConflict(c.id, shared)) === null, 'a released directory is free again');
+  assert(!(await releaseLoopCwd(a.id, shared)), 'releasing twice is a no-op, not an error');
+
+  await setLoopStatus(a.id, 'running');
+  assert((await cwdLockConflict(c.id, shared)) !== null, 'a running loop holds its directory');
+  await setLoopStatus(a.id, 'paused');
+  assert((await cwdLockConflict(c.id, shared)) === null, 'pausing releases the directory');
+
+  // The budget self-stop must release too — it persists `done` without going
+  // through setLoopStatus, so a gate written only in the transition helper
+  // would leave a finished loop holding its cwd.
+  // `maxIters` is an ALLOWANCE, so the stop lands on the iteration AFTER the cap.
+  const tiny = await createLoop({ ...BASE, name: 'lock tiny', cwd: shared, budget: { maxIters: 1 } });
+  await setLoopStatus(tiny.id, 'running');
+  const stillGoing = await recordIteration(tiny.id, { seconds: 1, tokens: 1, usd: 0 });
+  assert(stillGoing.status === 'running', 'the 1-iteration allowance still runs its first iteration');
+  assert((await cwdLockConflict(c.id, shared)) !== null, 'the running tiny loop holds the directory');
+  const done = await recordIteration(tiny.id, { seconds: 1, tokens: 1, usd: 0 });
+  assert(done.status === 'done' && done.stopReason === 'max_iters', 'the tiny loop stopped on its cap');
+  assert((await cwdLockConflict(c.id, shared)) === null, 'a terminal stop releases the directory');
+
+  // Editing the cwd of a running loop re-points its lock instead of stranding it.
+  const moveA = '/tmp/probe-lock-move-a';
+  const moveB = '/tmp/probe-lock-move-b';
+  const mover = await createLoop({ ...BASE, name: 'lock mover', cwd: moveA });
+  await setLoopStatus(mover.id, 'running');
+  const moved = await updateLoop(mover.id, { cwd: moveB });
+  assert(moved.cwd === moveB, 'the loop moved directory');
+  assert((await cwdLockConflict(c.id, moveA)) === null, 'the OLD directory was released');
+  assert((await cwdLockConflict(c.id, moveB)) !== null, 'the NEW directory is held');
+
+  // A loop may not move ONTO a directory somebody else holds. The directory is
+  // really held (its own acquire is asserted) — pointing at a free directory
+  // would make the refusal below pass for the wrong reason.
+  const busyDir = '/tmp/probe-lock-busy';
+  const busyClaim = await acquire(busyDir, 'agent_busy', 60_000, 'busy');
+  assert(busyClaim.ok, 'the busy directory was really taken');
+  await expectCode(() => updateLoop(mover.id, { cwd: busyDir }), 'cwd_locked', 'moving onto a held directory is refused');
+  assert((await getLoop(mover.id)).cwd === moveB, 'the refused move changed nothing');
+  assert((await cwdLockConflict(c.id, moveB)) !== null, 'the refused move did not drop the held lock');
+  await release(busyDir, 'agent_busy');
+
+  // Deleting a running loop releases its directory.
+  await deleteLoop(mover.id);
+  assert((await cwdLockConflict(c.id, moveB)) === null, 'delete releases the directory');
+
+  // Zero leftovers: loops AND the lock files the probe wrote. A lock file
+  // outlives the process that wrote it, so "the test cleaned up" needs proof —
+  // including the directly-written expired one, which no `release()` can remove.
+  // `loop` is here too: the transitions section left it RESUMED, and a running
+  // loop legitimately still holds its directory.
+  await stopLoop(loop.id);
+  for (const id of [a.id, b.id, c.id, d.id, tiny.id, loop.id]) await deleteLoop(id);
+  await release(liveDir, 'agent_live');
+  await rm(join(homedir(), '.lokma/agentlocks/locks', `${sha1HexSync(staleDir)}.json`), { force: true });
+  assert((await listLoopLocks()).length === 0, 'the probe left no loop lock behind');
+  assert((await listLocks()).length === 0, 'the probe left no lock file of any owner behind');
 
   console.log(`\n${passed} passed`);
 }

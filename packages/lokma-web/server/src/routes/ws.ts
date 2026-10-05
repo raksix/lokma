@@ -4,6 +4,7 @@ import {
   SessionStore,
   TerminalError,
   UsageLedger,
+  type SessionMessage,
   canViewSession,
   compactSession,
   compactionStatus,
@@ -53,6 +54,7 @@ import {
   enqueuePrompt,
   getRunState,
   pruneRunState,
+  settleTurnReport,
   type SessionRunState,
 } from '../session-runs.js';
 import { deliverToSession } from '../session-delivery.js';
@@ -414,6 +416,13 @@ async function runClaudeEngineTurn(
         app.log.warn('[ws] claude handle persist failed session=' + sessionId + ': ' + String(e));
       }
     }
+    // REQ-201: same measured-usage hand-off as the built-in loop — an engine
+    // turn that never publishes it would bill the loop's budget at zero.
+    lastTurnUsage.set(sessionId, {
+      inputTokens: estimateTokens(prompt.length),
+      outputTokens: estimateTokens(summary.result.length),
+      costUsd: summary.costUsd,
+    });
     try {
       await new UsageLedger(cwd).record({
         sessionId,
@@ -478,7 +487,31 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
     while (state.queue.length > 0) {
       const item = state.queue.shift();
       if (!item) break;
-      // Effective model: per-prompt override wins, then the bound bot's
+      // REQ-201: measure THIS turn, not the queue. The terminal frame the
+      // client is told is the one honest signal available for both run paths
+      // (the headless Claude engine returns void), so the recorder wraps the
+      // broadcast for this item only and never swallows a frame.
+      //
+      // A holder OBJECT, not a bare `let`: control-flow analysis narrows a
+      // local to its initializer when every assignment to it lives inside a
+      // closure, which typed this read site as `never` (root `tsc --noEmit`
+      // stayed green — only this package's own build caught it).
+      const turn: { terminal: TurnTerminal | null } = { terminal: null };
+      const turnStartMs = Date.now();
+      const turnSend: typeof send = (frame) => {
+        if (frame.type === 'done') {
+          turn.terminal = { outcome: frame.reason === 'aborted' ? 'aborted' : 'complete' };
+        } else if (frame.type === 'error') {
+          turn.terminal = { outcome: 'error', error: frame.message };
+        }
+        send(frame);
+      };
+      // Tool rows before the turn — the empty-turn guard counts REAL work
+      // (a tool actually ran), never an assistant paragraph, or a loop that
+      // only talks would never look idle.
+      const toolRowsBefore = await countToolRows(store, sessionId);
+      try {
+        // Effective model: per-prompt override wins, then the bound bot's
       // model, then the session meta. The bot context (SOUL + knowledge)
       // resolves live per turn; a deleted bot degrades to plain chat.
       const meta = await store.readMeta(sessionId);
@@ -509,7 +542,7 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
           sessionId,
           cwd,
           store,
-          send,
+          send: turnSend,
           state,
           model,
           claudeModel: claudeSel.claudeModel,
@@ -524,7 +557,7 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
       try {
         upstream = await resolveProviderUpstream(provider);
       } catch (e) {
-        send({ type: 'error', message: e instanceof Error ? e.message : String(e), sessionId });
+        turnSend({ type: 'error', message: e instanceof Error ? e.message : String(e), sessionId });
         continue;
       }
 
@@ -578,7 +611,7 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
           maxRetries: config?.retry?.maxAttempts,
           retryDelaysMs: config?.retry?.delaysSec ? config.retry.delaysSec.map((s) => s * 1000) : undefined,
           store,
-          send,
+          send: turnSend,
           deliverSessionPrompt,
           // REQ-181: the Testing Lab's check runner — the same in-process
           // `app.inject` contract as the REST route (a target exercises the
@@ -630,10 +663,10 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
           // Interrupted (Stop button or turn timeout): no usage billing —
           // the loop already kept the partial output it really produced.
           // Exactly one `done/aborted`.
-          send({ type: 'done', sessionId, reason: 'aborted' });
+          turnSend({ type: 'done', sessionId, reason: 'aborted' });
           continue;
         }
-        send({ type: 'done', sessionId, reason: 'complete' });
+        turnSend({ type: 'done', sessionId, reason: 'complete' });
         // Real accounting: token estimates from the core price table land
         // in the per-project usage ledger (powers GET /api/usage/*) and in
         // the `cost` frame (powers the header badge + message cost footer).
@@ -642,7 +675,9 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
         const inputTokens = estimateTokens(result.inputChars);
         const outputTokens = estimateTokens(result.outputChars);
         const { costUsd, priced } = estimateCost(model, inputTokens, outputTokens);
-        try {
+        // REQ-201: hand the measured cost to the turn report (the loop's
+        // budget is measured, never estimated again downstream).
+        lastTurnUsage.set(sessionId, { inputTokens, outputTokens, costUsd });        try {
           await new UsageLedger(cwd).record({
             sessionId,
             provider,
@@ -658,7 +693,7 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
           // Accounting must never break chat — log and keep streaming.
           app.log.warn(`[ws] usage record failed session=${sessionId}: ${String(e)}`);
         }
-        send({
+        turnSend({
           type: 'cost',
           sessionId,
           inputTokens,
@@ -675,11 +710,36 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
           // Interrupted (Stop button or turn timeout): the loop already
           // kept the partial output it really produced, no usage billing,
           // exactly one `done/aborted`.
-          send({ type: 'done', sessionId, reason: 'aborted' });
+          turnSend({ type: 'done', sessionId, reason: 'aborted' });
           continue;
         }
-        send({ type: 'error', message: e instanceof Error ? e.message : String(e), sessionId });
+        turnSend({ type: 'error', message: e instanceof Error ? e.message : String(e), sessionId });
         continue;
+      }
+      } finally {
+        // REQ-201: close the turn for the loop executor. A turn that produced
+        // NO terminal frame (a provider hang the outer timeout killed, a
+        // `continue` that skipped the bookkeeping) must still settle as an
+        // honest `error` — leaving the waiter to time out would report a stall
+        // as a silent timeout and freeze the loop's budget.
+        if (item.tag) {
+          const rows = await countToolRows(store, sessionId).catch(() => toolRowsBefore);
+          const usage = lastTurnUsage.get(sessionId) ?? null;
+          lastTurnUsage.delete(sessionId);
+          settleTurnReport(item.tag, {
+            outcome: turn.terminal?.outcome ?? 'error',
+            seconds: Math.max(0, (Date.now() - turnStartMs) / 1000),
+            inputTokens: usage?.inputTokens ?? 0,
+            outputTokens: usage?.outputTokens ?? 0,
+            costUsd: usage?.costUsd ?? 0,
+            // An aborted turn is never billed — the same rule the chat UI's
+            // usage frame already follows.
+            billed: turn.terminal?.outcome === 'complete' && usage !== null,
+            didWork: rows > toolRowsBefore,
+            rows,
+            ...(turn.terminal?.error ? { error: turn.terminal.error } : {}),
+          });
+        }
       }
     }
   } finally {
@@ -687,6 +747,24 @@ async function pumpSessionRun(app: FastifyInstance, sessionId: string, cwd: stri
     state.abort = null;
   }
 }
+
+/** REQ-201: how one turn ended, as seen by the loop's turn report. */
+type TurnTerminal = { outcome: 'complete' | 'aborted' | 'error'; error?: string };
+
+/**
+ * REQ-201: transcript tool-row count — the empty-turn guard's evidence of REAL
+ * work. A tool row exists only when a tool actually ran (the loop writes one
+ * per executed call), so a turn that only produced assistant prose reads as
+ * zero. Read failures answer 0 rather than throwing: a missing transcript must
+ * not be reported as an exception in the pump's finally block.
+ */
+async function countToolRows(store: SessionStore, sessionId: string): Promise<number> {
+  const rows = await store.read(sessionId).catch(() => [] as SessionMessage[]);
+  return rows.reduce((n, m) => (m.role === 'tool' ? n + 1 : n), 0);
+}
+
+/** REQ-201: usage recorded during the current turn, read by the finally block. */
+const lastTurnUsage = new Map<string, { inputTokens: number; outputTokens: number; costUsd: number }>();
 
 /** Reject every pending gate of a session (Stop button only — never socket close). */
 function rejectSessionGates(state: SessionRunState): void {

@@ -1,4 +1,4 @@
-import type { Loop, LoopRunOutcome, LoopTrigger } from '@lokma/shared';
+import type { Loop, LoopRunOutcome, LoopStopReason, LoopTrigger } from '@lokma/shared';
 import { budgetBreach, targetReached } from './store.js';
 
 /**
@@ -184,7 +184,7 @@ export function countIterationFor(outcome: LoopRunOutcome): boolean {
 export function stopReasonAfterTurn(
   loop: Pick<Loop, 'budget' | 'spent' | 'score' | 'emptyIters' | 'maxEmptyIters'>,
   outcome: LoopRunOutcome,
-): string | null {
+): LoopStopReason | null {
   const breach = budgetBreach(loop);
   if (breach) return breach;
   if (targetReached(loop)) return 'target_score';

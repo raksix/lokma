@@ -31,6 +31,13 @@ export type QueuedPrompt = {
   /** Resolved at enqueue time (the socket may be gone when the turn runs). */
   userId?: string;
   enqueuedAt: string;
+  /**
+   * REQ-201: correlation tag for a caller that is not the socket — the loop
+   * executor mints one per turn and matches it back on the finished report.
+   * Matching on prompt TEXT would be guesswork (a user can type the same
+   * sentence), so the tag travels with the queued item instead.
+   */
+  tag?: string;
 };
 
 export type PendingGate =
@@ -48,6 +55,37 @@ export type SessionRunState = {
 };
 
 const runs = new Map<string, SessionRunState>();
+
+/**
+ * REQ-201: what a finished turn actually cost and did. The pump resolves the
+ * waiting caller's promise with this instead of the caller polling a queue it
+ * cannot see drain — a loop must MEASURE its own iteration, and the measurement
+ * only exists where the run happened.
+ *
+ * `didWork` is the empty-turn guard's evidence, and it is deliberately NOT
+ * "the assistant said something": a turn can answer in prose forever and never
+ * touch the workspace. A turn counts as work when it ran a tool or wrote a
+ * file; only the caller decides what that means for its own bookkeeping.
+ */
+export type TurnReport = {
+  outcome: 'complete' | 'aborted' | 'error';
+  /** Measured wall time of the turn in seconds. */
+  seconds: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  /** True when the loop paused/aborted this turn — no usage is billed. */
+  billed: boolean;
+  /** Real progress: a tool ran or a file was written. */
+  didWork: boolean;
+  /** Transcript row count after the turn (progress proxy for callers). */
+  rows: number;
+  /** Failure reason when `outcome === 'error'` (never a raw stack). */
+  error?: string;
+};
+
+/** REQ-201: tag → the caller waiting on that turn. */
+const turnReports = new Map<string, (report: TurnReport) => void>();
 
 /** Get-or-create the run state for a session (pure map access — probe it). */
 export function getRunState(sessionId: string): SessionRunState {
@@ -101,4 +139,63 @@ export function broadcast(state: SessionRunState, data: string): number {
 /** Test seam — reset the whole map between probe cases. */
 export function __resetRunStates(): void {
   runs.clear();
+  turnReports.clear();
+}
+
+/**
+ * REQ-201: register a waiter for the turn carrying `tag`. MUST be called
+ * BEFORE the prompt is enqueued, otherwise a fast pump can finish the turn
+ * first and the report would be delivered to nobody (the classic
+ * default-matcher trap: bind the collaborator first).
+ *
+ * A timeout is mandatory. A turn that never reports — provider hang, queue
+ * pruned, pump crashed — must resolve as an honest `error`, never leave the
+ * loop waiting forever with its budget frozen.
+ */
+export function awaitTurnReport(tag: string, timeoutMs: number): Promise<TurnReport> {
+  return new Promise<TurnReport>((resolve) => {
+    let settled = false;
+    const finish = (report: TurnReport): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      turnReports.delete(tag);
+      resolve(report);
+    };
+    const timer = setTimeout(() => {
+      finish({
+        outcome: 'error',
+        seconds: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 0,
+        billed: false,
+        didWork: false,
+        rows: 0,
+        error: 'turn_timeout',
+      });
+    }, timeoutMs);
+    // A pending waiter must never hold the process open (loop turns are
+    // fire-and-forget from the ticker's perspective).
+    (timer as unknown as { unref?: () => void }).unref?.();
+    turnReports.set(tag, finish);
+  });
+}
+
+/**
+ * REQ-201: hand a finished turn's report to whoever registered its tag.
+ * Returns false when nobody is waiting (an ordinary socket turn, or a waiter
+ * that already timed out) — a missing waiter is never an error.
+ */
+export function settleTurnReport(tag: string | undefined, report: TurnReport): boolean {
+  if (!tag) return false;
+  const waiter = turnReports.get(tag);
+  if (!waiter) return false;
+  waiter(report);
+  return true;
+}
+
+/** REQ-201: is a waiter registered for this tag? (probe seam) */
+export function hasTurnWaiter(tag: string): boolean {
+  return turnReports.has(tag);
 }

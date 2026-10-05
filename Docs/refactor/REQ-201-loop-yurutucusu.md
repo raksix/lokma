@@ -1,6 +1,6 @@
 # REQ-201 — Loop yürütücüsü: arka planda tekrarlı koşu (cron'dan ayrı kavram)
 
-**Status:** pending
+**Status:** in-progress (tur 1/5 — karar katmanı bitti, commit `aebbf85`)
 **Tarih:** 2026-10-03
 **Kaynak:** Kullanıcı mesajı (3 Ekim 2026):
 > "abi var olan loopları lokmaya ekleme sadece biz ya da agent loop oluşturunca lokma harnessinde çalışan loopları arayüzden görebileceğiz.
@@ -53,3 +53,28 @@ istersek tüm looplar istersek proje bazlı"
 
 - **Write-only:** kod yazılmadı.
 - Kapsam disiplini: bu dalga **görünürlük + yönetim** katmanı; executor ayrı REQ (aşağıda). Kullanıcının "looplar arka planda çalışcak zaten" cümlesi = UI'ın onlara **dokunmaması**, panelin **izleme + kontrol** olması.
+
+## İlerleme günlüğü
+
+### Tur 1/5 — karar katmanı (`aebbf85`) ✅
+
+**Bitti:** REQ-200 şeması zaten REQ-201'i bekliyordu (`recordIteration(countIteration:false)` boş-tur kancası). Bunun üstüne **saf yürütücü politikası** yazıldı — saat parametreyle geçirildiği için store/kuyruk/model olmadan test edilebilir:
+
+- `loops/runner.ts` (yeni): `resolveTrigger` tetikleyici çözümü, `earliestNextTurn` (interval **başlangıçtan** ölçülür), `shouldStart`, `countIterationFor`, `stopReasonAfterTurn`, `initLoopCalendar`.
+- `schemas/loop.ts`: `LoopTrigger` ayrım-birleşimi (`interval|cron|event|manual`) + `trigger`/`cooldownSeconds`/`maxEmptyIters`/`lastRunOutcome`/`emptyIters`/`lastRunStartedAt` alanları + `LOOP_RUN_OUTCOMES`.
+- `loops/store.ts`: `resolveTrigger()`, `recordRunTiming()` (boş sayacı + başlangıç damgası; `recordIteration`'dan **ayrı** çünkü boş tur sayacı ilerletmemeli).
+- Kapsam dışı bırakılanlar (bilinçli): `POST /api/loops/:id/run`, `create_loop` aracı, sunucu tarafı executor, `resumeOnBoot`.
+
+**Ölçülen kararlar:**
+- Takvim **yeniden yazılmadı** — `cron`'un kendi `assertValidSchedule` + `matchesMinute`'ı kullanılıyor (tek takvim, iki kavram). `initLoopCalendar` enjeksiyonu bu yüzden var.
+- `maxUsd: 0` = literal kapatma anahtarı, her şeyden önce kontrol ediliyor (kapsam 7).
+- Boş tur `spent.iters`'ı **ilerletmiyor**; 3 ardışık boş turda `idle` ile kendini durduruyor (kapsam 3).
+- **Durma önceliği düzeltildi:** bütçe/hedef `idle`'den **önce** raporlanıyor. Boş tur `iters`'ı ilerletmediği için, `maxIters` dolmuş bir loop o tura değil daha önceki gerçek tura ulaşmıştır; `idle` demek stop'un gerçek sebebini gizlerdi. Prob bunu yakaladı (ürün düzeltildi, prob esnetilmedi).
+
+**Kapılar:** kök `tsc` 0 · shared + core + web build yeşil (1752 modül) · REQ-200 store probu **118/118** (yeni zorunlu alanlardan regresyon yok) · REQ-201 runner probu **72/72**.
+
+**Proven-to-fail (üçü de kırmızı, sonra md5 ile bayt bayt geri alındı):** cooldown tabanı devre dışı · interval'ı turun **bitişi** yerine başlangıcından ölçme · sıfır-maliyet anahtarını kaldırma.
+
+**Prob düzeltmesi (kendi hatam):** cooldown için ilk PTF **yeşil** kaldı — çünkü `not_yet` assert'lerimin hepsi `interval` kullanıyordu ve interval zaten blokluyordu; cooldown hiçbir yerde *yük taşıyan* sebep değildi. Ayrıca yeni cron assert'leri ilk çalıştırmada **temiz hâlde** kırmızıydı: `initLoopCalendar` henüz çağrılmamıştı, yani takvim sessizce `() => false` stub'ıydı — ölçmeyen prob. İkisi de düzeltildi (cooldown için cooldown-0 kontrolü + sahte-cron eşleşmesi eklendi, takim başta gerçek matcher'a bağlandı).
+
+**Sonraki tur (2/5):** sunucu tarafı executor — `packages/lokma-web/server/src/loops/executor.ts`: `enqueuePrompt` + `pumpSessionRun` (mevcut kuyruk, ikinci kuyruk yok), transcript'e gerçek prompt yazma, `enqueuePrompt` dönüşünden tur bitişini ölçme (token/usd), ledger'a `formatLedgerEntry` yazma, `stop` mevcut turu **bitirip** `paused`, `abort` `error:aborted`. Sonra tur 3'te `POST /api/loops/:id/run` + tur 4'te `create_loop` aracı.

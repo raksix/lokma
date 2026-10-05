@@ -82,3 +82,19 @@ Sunucuda rotalar tamdı (`routes/loops.ts`: list · detail · create · patch ·
 **Kapılar:** prob **51/51** · proven-to-fail üç envanter mutasyonunda da kırmızı (uydurma nextHint · scope'suz loop'a uydurma liste · sıfır tavanı dolu çubuk) ve dosyalar md5 ile **bayt bayt** geri alındı · kök `bun x tsc --noEmit` **0** · web build yeşil · servis edilen chunk gerçek JS ve `/api/loops` taşıyor · jetonsuz `/api/auth/me` her iki portta **401** (login kapısı hiç açılmadı). Ayrıca `web/dist/assets` içinden 24 saatlik varlık grafiği korunarak **1848 süperflu chunk** silindi (163.5 MB, 179M → 19M) — `emptyOutDir` false kaldığı için kutu şişmesin diye.
 
 **Sıradaki tur:** bileşenler — `loop-console.tsx` + `loop-row.tsx` + `loop-detail.tsx` (kapsam 2/3/4/6/7: satır, detay paneli, ikonlu kontroller, dürüst durumlar, boş durum), Settings → **Loops** bölümü + rail'deki **Loops** pane girişi, `ws.ts` `loop`/canlı güncelleme reducer'ı (soket yoksa 5 sn poll).
+
+### Tur 3 (`3305cc6`) — kesilmiş tur kurtarıldı, kapıda gerçek bir kusur çıktı
+
+Önceki tur konsol bileşenlerini yazmış ama **hiç commit etmeden** kesilmişti; ağaç kirliydi. Kural gereği yeni kod yazmadan önce bunu doğrulayıp kapıdan geçirip commit etmek gerekiyordu. Doğrulama sırasında **kapının kendisi kırmızıydı** — ve bu bir ürün kusuru, prob hatası değil:
+
+`events.ts` "filtre bir şey düşürdü mü" diye boşuma karar veriyordu (`ids.length === loopIds.length ? ids : []`). Bu iki **farklı** sinyali tek bir kurala indiriyordu. `'*'` anlamlı bir sentinel'dir ("adını bilmediğim bir şey değişti" → tam yeniden okuma), boş id ise **gürültüdür** (atılır, yanındaki gerçek id'ler yaşar). Sonuç: `['*', 'l_aaaaaaaa']` bildirimi okuyucuya id'leri verir ve o bildirimle birlikte gelen bir create/delete'i **kaçırırdı**.
+
+Proven-to-fail iki mutasyonla kanıtlandı (ikisi de RC=1, dosya md5 ile bayt bayt geri alındı):
+- eski "uzunluktan türet" hali → `blank ids are dropped` kırmızı;
+- **yalnız** wildcard degrade'i düşürülmüş hali → `a wildcard beside real ids` kırmızı.
+
+İkinci mutasyon aynı zamanda bir **boş assertion**'ı da yakaladı: eski prob yalnız yalnız `['*']` kontrol ediyordu, o da wildcard kuralı olmasa da `[]`'ye filtrelenirdi — yani o assertion hiçbir şey ölçmüyordu. Probu gerçek bozulan hal üzerine kurdum.
+
+**Kapılar:** server bus **7/7** · web saf kurallar **51/51** · konsol probu **7/7** · dokunulan `panes.test` **160/0** + `settings-modal.test` **71/0** · kök `bun x tsc --noEmit` **0** · shared + server + web build yeşil (**1757 modules**) · `pm2 restart lokma-web` sonrası servis edilen chunk == disk (`index-CnKjzIq4.js`), konsol chunk'ı **200** ve gerçek JS · jetonsuz `/api/auth/me` her iki portta **401** (login kapısı hiç açılmadı) · `/health` 200.
+
+**Sıradaki tur:** REQ'in Kontrol bölümünün istediği **canlı probe** — `scripts/probe-loop-console.cjs` yok (ölçülmüş: `ls` → no such file). Birim prob'lar yeşil ama REQ bir REQ'de "unit tests değil, DEPLOYED sunucu" kuralıyla kapanmaz; login kapısı açılmadan (`HOME=/root bun scripts/mint-e2e-token.mjs`) süperadmin token'ıyla konsolun satır → detay → kontrol zinciri canlı ölçülecek.

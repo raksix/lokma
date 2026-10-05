@@ -1,6 +1,6 @@
 # REQ-203 — Loop görünümü proje bazlı olabilsin (tüm looplar ↔ tek proje)
 
-**Status:** in-progress (tur 1/5 — saf kurallar katmanı)
+**Status:** in-progress (tur 2/5 — konsol yüzeyi + satır rozeti)
 **Tarih:** 2026-10-03 · ilk uygulama 2026-10-05
 **Kaynak:** Kullanıcı mesajı (3 Ekim 2026):
 > "abi var olan loopları lokmaya ekleme sadece biz ya da agent loop oluşturunca lokma harnessinde çalışan loopları arayüzden görebileceğiz.
@@ -81,16 +81,62 @@ Not (prob kusuru, ürün hatası değil): ilk badge metni bir çelişkide
 `project missing` yazıyordu — projeyi **var** olan bir loop için "missing" demek
 yanlış; sınır vakası yakaladı, metin `project conflict · cwd is …` oldu.
 
-### Kalan (tur 2+)
+### Tur 2/5 — konsol yüzeyi (`2e188b3`)
 
-- `loop-console.tsx`: görünüm anahtarı + durum filtresi + arama + proje seçici +
-  uyarı satırı + `projesiz` grup başlığı, `useSessionStore`'un `projects`'i ve
-  aktif oturumun `cwd`'si ile ilk seçim.
-- `loop-row.tsx`: proje rozetini `loopProjectState` üzerinden bas (şu an
-  `loop.projectId`'yi ham gösteriyor — silinmiş projede yanlış okuma).
-- Sunucu: `createLoop`'ta `cwd` ↔ proje `cwd` eşleşmesi kapsam 3 sözleşmesi
-  (aynı cwd'de ikinci proje reddi dahil) — `auth/store.ts`.
-- Sonra: `scripts/probe-loop-project-view.cjs` + canlı bundle hash + ekran görüntüsü.
+`loop-console.tsx` + `loop-row.tsx` üzerine tur 1'in saf kuralları bağlandı; iki yeni
+saf kural da (`adoptActiveProject`, `hasActiveFilters` + `LOOP_FILTERED_EMPTY_COPY`)
+probe'la kanıtlandı — prob **84/0** (`loop.test.ts` 51/0 · `loop-console.test.ts` 7/0).
+
+Ölçülen kararlar:
+
+1. **Tercih tek nesne, tek yazıcı.** Görünüm anahtarı + proje + durum filtresi +
+   arama kutusu ayrı `useState`'ler değil, `lokma-loops-view:v1` altındaki TEK
+   `LoopViewPrefs` nesnesidir (`updatePrefs` yazma + kalıcılık yapar). Ayrı
+   state'lerden biri yazılmayı unutsa panel yarım kaydedilmiş bir görünüm
+   gösterirdi.
+2. **Aktif oturumun projesi BİR KEZ benimsenir** (`adoptActiveProject`):
+   kullanıcının seçtiği proje asla ezilmez, `all` kipinde asla proje
+   ima edilmez, cwd hiçbir projeye düşmüyorsa **uydurulmaz** (kova = dürüst
+   boş kapsam). İki çağrı **aynı nesneyi** döndürür → geri besleme döngüsü yok.
+   `useKnownCwd` (primitif string, REQ-144) kullanıldı; `'loading'` ayrıca
+   `null`'a çevrildi, yoksa liste yüklenmeden "hiçbir cwd eşleşmedi" kararı
+   verilip proje sessizce kaybolurdu.
+3. **Uyarı satırı bir BUTTON.** Kapsam 5'in satırı yalnız metin değil: tıklanınca
+   `all` görünümüne geçer. Yoksa kullanıcı "3 loop başka yerde çalışıyor" satırını
+   görüp ne yapacağını bilemezdi. Sayı `runningElsewhere`'dan gelir, yani arama
+   kutusu onu daraltamaz.
+4. **Kapsam 4 dürüst kutu:** silinmiş proje seçiliyken liste **hiçbir şey
+   basmaz** ve `LOOP_UNSCOPED_COPY` ile nereye bakması gerektiğini söyler; "hiç
+   loop yok" kutusu bu kapsamda **gösterilmez** (yoksa o da bir uydurma yokluk).
+5. **İki boş durum FARKLI okunur.** Katalog boşsa `LOOP_EMPTY_COPY`; katalog
+   dolu ama filtreler boş gösteriyorsa `LOOP_FILTERED_EMPTY_COPY` + **yalnız
+   orada** görünen "Clear filters" butonu (`hasActiveFilters` kapsamı saymaz —
+   proje kapsamı bir filtre değil, bir yokluktur).
+6. **Satır rozeti artık ham `projectId` basmıyor.** `loop-row.tsx` `projectState`
+   prop'u alıyor ve `projectBadgeLabel` ile basıyor: gerçek proje adı /
+   `project missing` / `project conflict · cwd is <ad>` /
+   `no project`. Satır proje LİSTESİNİ bilmediği için burada türetmek doğru
+   olmazdı — liste bilgisi konsolun katmanında kalır.
+7. **Proje görünümünden yaratılan loop kapsama bağlı:** `createLoop` artık o
+   projenin `cwd` + `id`'sini gönderiyor, yoksa kullanıcı yeni loop'u yarattığı
+   görünümde göremezdi (`all` kipinde scope olmadığı için `.` kalır).
+8. `SelectMenu` proje seçicisi `__no_project__` sentinel'ı ile `null`'ı temsil
+   ediyor; sunucu üretimi bir id ile çakışamaz.
+
+**Kanıt:** kök `bun x tsc --noEmit` 0 · sterilize build yeşil (index-C6rvKis5) ·
+`pm2 restart lokma-web` sonrası canlı bundle == disk hash · canlı chunk'ta
+`data-loop-view-toggle` / `data-loop-running-elsewhere` /
+`data-loop-project-state` / `data-loop-filtered-empty` / `lokma-loops-view:v1` /
+`project conflict` **hepsi 1** (yeni kod gerçekten servis ediliyor) · `/health` 200.
+
+### Kalan (tur 3+)
+
+- Sunucu: `createLoop`'ta `cwd` ↔ proje `cwd` eşleşmesi sözleşmesi (kapsam 3'ün
+  YAZAN yarısı — aynı cwd'de ikinci proje reddi dahil) — `auth/store.ts`.
+- `scripts/probe-loop-project-view.cjs`: canlı bundle'da toggle → filtre →
+  uyarı satırı → kova akışı (prob klasörü henüz yok, bu REQ'nin ilk canlı
+  prob'u).
+- Ekran görüntüsü + close-out (`Status: done`, `finished/`, README + `Docs/00`).
 
 ## Bitirme (done)
 

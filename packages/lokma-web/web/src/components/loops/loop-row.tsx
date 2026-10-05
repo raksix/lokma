@@ -16,6 +16,7 @@ import {
   turnInFlight,
   usdLabel,
 } from './loop';
+import { projectBadgeLabel, type LoopProjectState } from './loop-view';
 
 /**
  * LoopRow — kapsam 2 (the readable one-line-per-loop row) + kapsam 6 (honest
@@ -63,6 +64,7 @@ export function LoopRow({
   selected,
   fresh,
   nowMs,
+  projectState,
   onSelect,
 }: {
   loop: LoopView;
@@ -70,6 +72,15 @@ export function LoopRow({
   /** A turn landed since the last paint (kapsam 5's "new" mark). */
   fresh: boolean;
   nowMs: number;
+  /**
+   * REQ-203 kapsam 4 — the resolved project cell.
+   *
+   * Pass the state in (do not derive it here): the row cannot know the project
+   * LIST, and the raw `loop.projectId` it used to print is exactly the lie this
+   * closes — an id under a "project" label reads as a real project even after
+   * the project was deleted.
+   */
+  projectState: LoopProjectState;
   onSelect: (id: string) => void;
 }) {
   const bars = budgetBars(loop);
@@ -79,6 +90,7 @@ export function LoopRow({
   const best = bestScoreLabel(loop);
   const reason = stopReasonLabel(loop.stopReason);
   const agoSource = loop.lastRunStartedAt ?? loop.updatedAt;
+  const project = projectBadgeLabel(projectState);
 
   return (
     <button
@@ -124,14 +136,10 @@ export function LoopRow({
         ) : null}
         {reason ? <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[10px]">{reason}</span> : null}
         {best ? <span className="shrink-0 tabular-nums">best {best}</span> : null}
-        {loop.projectId ? (
-          <span className="ml-auto flex shrink-0 items-center gap-1 truncate">
-            <FolderOpen className="h-3 w-3" aria-hidden="true" />
-            {loop.projectId}
-          </span>
-        ) : (
-          <span className="ml-auto shrink-0 rounded bg-muted px-1 py-0.5 text-[10px]">no project</span>
-        )}
+        <span className="ml-auto flex shrink-0 items-center gap-1 truncate">
+          <FolderOpen className="h-3 w-3" aria-hidden="true" />
+          <span data-loop-project-state={projectState.kind}>{project}</span>
+        </span>
       </div>
 
       {hint ? (

@@ -300,6 +300,49 @@ export function elsewhereWarningLabel(runningElsewhere: readonly LoopView[]): st
   return n === 1 ? '1 loop is running in another project' : `${n} loops are running in other projects`;
 }
 
+/**
+ * Adopt the active session's project ONCE (kapsam 1: "the active session's cwd
+ * selects the project").
+ *
+ * Three things this must NOT do, each of which is a way the console ends up
+ * lying about where it is scoped:
+ *
+ *  - it must not override a project the user already picked (`projectId` set),
+ *    otherwise every visit to the pane yanks the selection away;
+ *  - it must not fire in `all` mode — the "all" view is not scoped, so having a
+ *    project implied would leak the answer into the next toggle;
+ *  - it must not invent a project when the cwd matches none: no session, an
+ *    unknown cwd, or a list that has not loaded yet all mean "no opinion", and
+ *    the honest result is the no-project bucket.
+ *
+ * It is a ONE-STEP derivation (no feedback loop): once the id is set, the second
+ * call is a no-op because the first condition already holds.
+ */
+export function adoptActiveProject(
+  prefs: LoopViewPrefs,
+  cwd: string | null | undefined,
+  projects: readonly AuthProject[],
+): LoopViewPrefs {
+  if (prefs.mode !== 'project') return prefs;
+  if (prefs.projectId !== null) return prefs;
+  const matched = projectIdForCwd(cwd, projects);
+  if (!matched) return prefs;
+  return { ...prefs, projectId: matched };
+}
+
+/**
+ * Is any FILTER (not the scope) currently narrowing the list? The empty state
+ * needs this: with a filter on, "no rows" means "your filter hid them", and
+ * saying "no loops yet" there would be a fabricated absence.
+ */
+export function hasActiveFilters(prefs: LoopViewPrefs): boolean {
+  return prefs.status !== 'all' || prefs.query.trim().length > 0;
+}
+
+/** Empty-state copy that distinguishes "no catalog" from "nothing matches". */
+export const LOOP_FILTERED_EMPTY_COPY =
+  'No loop matches these filters. Clear them to see the whole view.';
+
 /** The project-view header: which project (or bucket) the list is showing. */
 export function viewScopeLabel(prefs: LoopViewPrefs, projects: readonly AuthProject[]): string {
   if (prefs.mode === 'all') return 'All loops';

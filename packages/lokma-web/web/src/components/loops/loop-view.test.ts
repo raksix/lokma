@@ -13,9 +13,12 @@
  * nothing.
  */
 import {
+  adoptActiveProject,
   DEFAULT_LOOP_VIEW_PREFS,
   elsewhereWarningLabel,
   findProject,
+  hasActiveFilters,
+  LOOP_FILTERED_EMPTY_COPY,
   LOOP_NO_PROJECT_COPY,
   LOOP_STATUS_FILTERS,
   LOOP_UNSCOPED_COPY,
@@ -334,7 +337,7 @@ assert(
 // ── the copy helpers ────────────────────────────────────────────────────────
 
 assert(
-  viewScopeLabel(prefs({ mode: 'all' }), PROJECTS) === 'All loops',
+  viewScopeLabel(prefs(), PROJECTS) === 'All loops',
   'the all-views header reads "All loops"',
 );
 assert(
@@ -343,5 +346,71 @@ assert(
 );
 assert(LOOP_UNSCOPED_COPY.includes('no-project bucket'), 'the unscoped copy points at where the loops went');
 assert(LOOP_NO_PROJECT_COPY.includes('no project'), 'the bucket copy describes the bucket');
+
+// ── the active session's project is adopted ONCE (kapsam 1) ─────────────────
+//
+// Each case below differs ONLY in the rule under test, so a mutation that drops
+// one of these guards flips exactly one assertion.
+
+const adoptProject = adoptActiveProject(
+  prefs({ mode: 'project', projectId: null }),
+  '/mnt/apopic/lokma',
+  PROJECTS,
+);
+assert(adoptProject.projectId === 'p_alpha', 'kapsam 1: the active cwd adopts its project');
+// The second call is a no-op: the id is set, so nothing can loop back.
+assert(
+  adoptActiveProject(adoptProject, '/mnt/apopic/lokma', PROJECTS) === adoptProject,
+  'kapsam 1: adopting twice returns the SAME object (no feedback loop)',
+);
+// A project the user picked must survive a later visit with another cwd.
+assert(
+  adoptActiveProject(
+    prefs({ mode: 'project', projectId: 'p_beta' }),
+    '/mnt/apopic/lokma',
+    PROJECTS,
+  ).projectId === 'p_beta',
+  'kapsam 1: an explicit project selection is never overridden by the cwd',
+);
+// `all` mode carries no scope, so no project may be implied into it.
+const allMode = adoptActiveProject(prefs({ mode: 'all', projectId: null }), '/mnt/apopic/lokma', PROJECTS);
+assert(allMode.projectId === null, 'kapsam 1: the all-loops view never adopts a project');
+// No opinion (no session / unknown cwd / list not loaded) => the bucket, not a
+// guess. `null` stands for all three at this layer.
+assert(
+  adoptActiveProject(prefs({ mode: 'project', projectId: null }), null, PROJECTS).projectId === null,
+  'kapsam 1: no active cwd adopts nothing (honest empty scope)',
+);
+assert(
+  adoptActiveProject(prefs({ mode: 'project', projectId: null }), '/mnt/apopic/nowhere', PROJECTS).projectId === null,
+  'kapsam 1: an unknown cwd adopts nothing',
+);
+
+// ── the empty state must distinguish "no loops" from "filters hid them" ─────
+
+assert(hasActiveFilters(prefs()) === false, 'no filter is active in the default view');
+assert(hasActiveFilters(prefs({ status: 'running' })) === true, 'a status filter counts as active');
+assert(hasActiveFilters(prefs({ query: 'x' })) === true, 'a search query counts as active');
+assert(hasActiveFilters(prefs({ query: '   ' })) === false, 'a whitespace-only query is not a filter');
+// The scope alone does NOT make the list "filtered": switching to a project with
+// no loops is an absence, not something a filter hid.
+assert(
+  hasActiveFilters(prefs({ mode: 'project', projectId: 'p_alpha' })) === false,
+  'kapsam 1: the project scope alone is not a filter',
+);
+assert(
+  LOOP_FILTERED_EMPTY_COPY.includes('Clear them'),
+  'the filtered-empty copy names the action that recovers the rows',
+);
+
+// The end-to-end shape the console renders: a search that hides every row in a
+// non-empty catalog yields an empty view WITH a filter active.
+const hiddenAll = selectLoopView(
+  [alpha, free],
+  prefs({ mode: 'project', projectId: 'p_alpha', query: 'zzz' }),
+  PROJECTS,
+);
+assert(hiddenAll.visible.length === 0 && hasActiveFilters(prefs({ query: 'zzz' })),
+  'kapsam 2: a non-matching query empties a scoped view that still has filters');
 
 console.log(`\n${passed} assertions passed`);

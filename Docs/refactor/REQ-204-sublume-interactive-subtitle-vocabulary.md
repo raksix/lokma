@@ -63,6 +63,56 @@ Two findings from the research that shape this:
    whole screen — the same reason `Design` became the third app mode
    (`packages/lokma-web/web/src/components/panes/panes.ts:54-55`).
 
+## Research phase — COMPLETE (2026-10-05)
+
+Six reports, 61,872 words, 383 sources, in the private repo `raksix/sublume` under
+`Docs/`. Fourteen decisions logged in `Docs/07-DECISIONS.md`.
+
+### The one that shapes the architecture
+
+**You cannot attach a click handler to a word in a native `<track>` cue.** Four
+independent proofs, from the research and confirmed by direct measurement:
+
+1. Cue rendering is not in the light DOM — hit-testing the caption band returned
+   `["VIDEO","BODY","HTML"]`, so there is no element to bind a listener to.
+2. `::cue` is a pseudo-element and cannot receive JS events at all.
+3. The WHATWG issue that proposed a constructor taking a `cueNode` — i.e. making cue
+   content addressable DOM — was **withdrawn**. The platform will not fix this.
+4. `document.activeNodes` is `undefined` in current Chrome, so even the debugging hook
+   for inspecting cue DOM is gone.
+
+**Therefore Sublume reads cues as data and renders its own per-word overlay, keeping the
+native track in `hidden` mode.** This is a gain, not a cost: the popover needs buttons and
+hit areas inside cues anyway, so the overlay was never optional.
+
+### Decisions the research settled (no owner input needed)
+
+| # | Decision |
+|---|---|
+| D11 | **v1 needs no word-level timing.** Sentence cues satisfy the whole loop; forced alignment (WhisperX/stable-ts/MFA) defers entirely. |
+| D12 | **Local files in v1; YouTube via `yt-dlp`; Netflix/Prime/Disney categorically out of scope** (DRM: pixels never reach JS, bypassing it is unlawful). |
+| D13 | **Turkish gloss, offline-first** — Wiktionary → pretranslated Argos → MyMemory for gaps only. Zero network calls on the click path. |
+| D14 | **Compete on retention, not lookup.** ~12 extensions already ship click-a-word; Netflix is building it natively. |
+
+### Measured, not assumed
+
+- **`api.dictionaryapi.dev` is dead** — HTTP 522 (Cloudflare origin timeout) from this
+  machine, three attempts; its marketing site still answers 200, so a casual check passes.
+  → the popover must be cache-first and multi-source.
+- **Raw YouTube `timedtext` returns HTTP 200 with a zero-byte body** — measured twice, on
+  both `fmt=json3` and `type=list`. A 200 carrying nothing is worse than an error.
+- **SUBTLEX-en 50k** (subtitle-derived frequency, 622 KB) is the right corpus — a word
+  frequent in subtitles and rare in books is exactly the word a learner keeps meeting.
+- **`bun:sqlite` is real and precedented** (`vault/fts.ts`, `session/search.ts`) and
+  arrives as a bun built-in, not a `package.json` dependency.
+
+### Corrections to the research docs
+
+Re-measuring produced different numbers than the agents reported: Kaikki English is
+**523 MB** gz, not 2.8 GB; Turkish is **35 MB**, not 42 MB. That changes the offline
+answer from disqualifying to tractable as a build-time step. Details in
+`Docs/08-MEASURED-FINDINGS.md`.
+
 ## Surfaces
 
 | Surface | Kind |
@@ -97,11 +147,17 @@ lists drift from each other.
 
 ## Decision needed from the owner
 
-- Approve the hybrid shape, or push toward a separate app?
-- Which slice is "first"?
-- Video sources for v1: local files only, or YouTube too?
-- Does the popover need Turkish translation, or is an English definition enough?
+- Approve the hybrid shape, or push toward a separate app? → **Q4**
+- Which slice is "first"? → **Q5** (recommendation: player + local file + sidecar
+  subtitle + per-word click + popover + bank. No alignment, no YouTube, no SRS yet.)
+- ~~Video sources for v1?~~ → answered, D12
+- ~~Does the popover need Turkish translation?~~ → answered, D13
+- ~~Word-level timing in v1?~~ → answered, D11
 
 ## Status log
 
 - 2026-10-05 — written as `pending`. Research phase only; no code written.
+- 2026-10-05 — research phase complete: 6 reports / 61,872 words / 383 sources in
+  `raksix/sublume`, 14 decisions in `Docs/07-DECISIONS.md`. Three of the five open
+  questions were answered by the research (D11 timing, D12 sourcing, D13 translation).
+  Two remain for the owner: Q4 hybrid shape, Q5 first slice. Still no code.

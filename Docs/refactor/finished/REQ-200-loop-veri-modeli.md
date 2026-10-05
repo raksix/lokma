@@ -1,7 +1,7 @@
 # REQ-200 — Loop veri modeli ve kalıcılığı (state + bütçe + ledger)
 
-**Status:** pending
-**Tarih:** 2026-10-03
+**Status:** done
+**Tarih:** 2026-10-03 (kapanış: 2026-10-05)
 **Kaynak:** Kullanıcı mesajı (3 Ekim 2026):
 > "abi var olan loopları lokmaya ekleme sadece biz ya da agent loop oluşturunca lokma harnessinde çalışan loopları arayüzden görebileceğiz.
 
@@ -65,5 +65,6 @@ istersek tüm looplar istersek proje bazlı"
 
 ## Notlar
 
-- **Write-only:** kod yazılmadı.
+- **Write-only:** kod yazılmadı (spec tick'i).
+- **Kapanış (2026-10-05):** iki commit — `0ddbaa9` veri modeli + ledger + rotalar, `1728162` cwd kilit disiplini (kapsam 5). Kanıt: birim 118/118 · canlı prob `scripts/probe-loop-store.cjs` 73/73 (kapı hiç açılmadı, tokenless 401) · proven-to-fail canlı probu kırmızıya düşürüyor · kök `tsc --noEmit` 0 · shared/ai/core/server build temiz · concept 1863 modül / 497 kB · `pm2 restart lokma-server` (tek proc, `pm2 kill` yok).
 - Kapsam disiplini: bu dalga **görünürlük + yönetim** katmanı; executor ayrı REQ (aşağıda). Kullanıcının "looplar arka planda çalışcak zaten" cümlesi = UI'ın onlara **dokunmaması**, panelin **izleme + kontrol** olması.

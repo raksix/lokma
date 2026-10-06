@@ -1,6 +1,6 @@
 # REQ-203 — Loop görünümü proje bazlı olabilsin (tüm looplar ↔ tek proje)
 
-**Status:** in-progress (tur 2/5 — konsol yüzeyi + satır rozeti)
+**Status:** in-progress (tur 3/5 — kapsam 3'ün yazan yarısı, canlıda kanıtlı)
 **Tarih:** 2026-10-03 · ilk uygulama 2026-10-05
 **Kaynak:** Kullanıcı mesajı (3 Ekim 2026):
 > "abi var olan loopları lokmaya ekleme sadece biz ya da agent loop oluşturunca lokma harnessinde çalışan loopları arayüzden görebileceğiz.
@@ -129,13 +129,60 @@ probe'la kanıtlandı — prob **84/0** (`loop.test.ts` 51/0 · `loop-console.te
 `data-loop-project-state` / `data-loop-filtered-empty` / `lokma-loops-view:v1` /
 `project conflict` **hepsi 1** (yeni kod gerçekten servis ediliyor) · `/health` 200.
 
-### Kalan (tur 3+)
+### Tur 3/5 — kapsam 3'ün YAZAN yarısı (`6c872ff`)
 
-- Sunucu: `createLoop`'ta `cwd` ↔ proje `cwd` eşleşmesi sözleşmesi (kapsam 3'ün
-  YAZAN yarısı — aynı cwd'de ikinci proje reddi dahil) — `auth/store.ts`.
+Tur 1 okuyan tarafı kurdu (çelişkiyi `conflict` rozetiyle **gösterir**). Bu tur
+diğer yarıyı kurdu: **yazan** taraf, çelişkinin hiç doğmamasına izin vermiyor.
+
+Yeni: `packages/lokma-core/src/loops/project-scope.ts` — `decideLoopScope()` saf
+bir fonksiyon (nesne fixture'ıyla disk'siz kanıtlanır), `projectsAtCwd()` eşleşen
+**LİSTEYİ** döndürür. `loops/store.ts`'e `assertLoopScope()` tek darboğaz olarak
+bağlandı: `createLoop` **ve** `updateLoop`.
+
+Ölçülen kararlar:
+
+1. **Bilinmeyen `projectId` reddedilir, saklanmaz** (`project_unknown`). Onu
+   saklamak, okuyucunun rozetlediği `missing` durumunu **üretmiş** olurdu.
+2. **Başka bir canlı projeye ait cwd reddedilir** (`project_cwd_mismatch`) ve
+   mesaj **İKİ** projeyi de adlandırır: kullanıcının iki sinyali çelişiyor,
+   sessizce biri kazanmamalı.
+3. **Hiçbir projeye düşmeyen cwd de reddedilir** — kapsam 3 "loop'un dizini bir
+   proje dizinidir" diyor; aksi halde loop, dosyaları hiç çalışmadığı bir projenin
+   altında dosyalanırdı.
+4. **Projesiz kova kendi cwd'sini korur** — meşru bir yer, doğrulama hatası değil.
+5. **Boş cwd'li proje kaydı hiçbir şeyi sahiplenmez** ve bir cwd ile
+   çelişemez (`sameCwd('','')` tasarım gereği true).
+6. **`projectsAtCwd` ilk eşleşmeyi değil TÜM eşleşmeleri döndürür:**
+   `findOrCreateProject` **sahip başına** idempotent, yani iki kullanıcı bir
+   dizin için iki kayıt tutabilir. İlk satırı seçmek, konsoldaki proje adını
+   store sırasına bağımlı kılardı.
+7. **cwd, proje kaydının kanonik yazımıyla saklanır** (REQ-087): sondaki `/`
+   bir projeyi iki oturum dizinine bölemez.
+8. **PATCH de yeniden denetlenir.** Yalnız create'i denetlemek, `PATCH {cwd}` ile
+   kapsamlı bir loop'u kendi projesinden dışarı çıkarmaya izin verirdi.
+
+**Ölçülen kırılma (regresyon, kendi düzeltmem):** `store.test.ts`'in eski kapsamlı
+fixture'ı **proje kaydı olmayan** çıplak `'demo-project'` id'si kullanıyordu —
+yani tam olarak bu sözleşmenin artık reddettiği durum. Fixture artık **gerçek**
+proje yaratıyor ve saklanan cwd'yi doğruluyor; prob gerçek kapsamlamayı kanıtlıyor,
+imkânsız bir kaydı değil.
+
+**Kanıt:** kök `bun x tsc --noEmit` **0** · core build 0 · server build 0 ·
+project-scope probu **38/0** · loops store **129/0** · loop araçları **70/70** ·
+executor 76/76 · run-route 31/31 · stop-abort 67/0 · loop-view 84 assert ·
+**PTF ×3, her biri FARKLI bir assertion'ı düşürdü**: mismatch reddi kaldırıldı →
+7. kontrolde kırmızı · bilinmeyen-id araması atlandı → 6. kontrolde · yalnız
+create'de denetlendi → 25 geçti, sonra "a PATCH cannot walk a scoped loop into
+another project directory" kırmızı. **Canlı (deploy edilmiş sunucu, gate AÇIK
+401):** `POST /api/loops` hayalet `projectId` ile **400 `project_unknown`**,
+projeless loop ile **201**; yeni semboller `core/dist` içinde doğrulandı,
+`pm2 restart lokma-server` sonrası `/health` 200.
+
+### Kalan (tur 4+)
+
 - `scripts/probe-loop-project-view.cjs`: canlı bundle'da toggle → filtre →
   uyarı satırı → kova akışı (prob klasörü henüz yok, bu REQ'nin ilk canlı
-  prob'u).
+  probu).
 - Ekran görüntüsü + close-out (`Status: done`, `finished/`, README + `Docs/00`).
 
 ## Bitirme (done)

@@ -1,6 +1,6 @@
 # REQ-203 — Loop görünümü proje bazlı olabilsin (tüm looplar ↔ tek proje)
 
-**Status:** in-progress (tur 3/5 — kapsam 3'ün yazan yarısı, canlıda kanıtlı)
+**Status:** done (2026-10-06 · tur 4/5 — ilk canlı prob, 55/0, PTF x3)
 **Tarih:** 2026-10-03 · ilk uygulama 2026-10-05
 **Kaynak:** Kullanıcı mesajı (3 Ekim 2026):
 > "abi var olan loopları lokmaya ekleme sadece biz ya da agent loop oluşturunca lokma harnessinde çalışan loopları arayüzden görebileceğiz.
@@ -178,18 +178,89 @@ another project directory" kırmızı. **Canlı (deploy edilmiş sunucu, gate A�
 projeless loop ile **201**; yeni semboller `core/dist` içinde doğrulandı,
 `pm2 restart lokma-server` sonrası `/health` 200.
 
-### Kalan (tur 4+)
+### Tur 4/5 — İLK CANLI PROB (`9ec5c33`)
 
-- `scripts/probe-loop-project-view.cjs`: canlı bundle'da toggle → filtre →
-  uyarı satırı → kova akışı (prob klasörü henüz yok, bu REQ'nin ilk canlı
-  probu).
-- Ekran görüntüsü + close-out (`Status: done`, `finished/`, README + `Docs/00`).
+Yeni: `scripts/probe-loop-project-view.cjs` (**55/0**, deploy edilen sunucu) +
+iki ekran görüntüsü. REQ'in Kontrol'ünün son satırı olan prob böyle doğrulandı.
 
-## Bitirme (done)
+**Neden ayrı prob (REQ-202'den ayrı):** o prob boş bir katalog karşısında **satır
+sayısı** assert'i yapar ve katalog boş değilse exit 2. Kapsam ise "hangi loop'lar
+hangi görünümde **görünür**" — yani "başka projenin loop'u ekranda **değil**"
+diye bir olumsuzluk ölçmek gerekiyor. Fixture şekli de farklı: **dört loop**,
+üç dizin.
 
-1. Kontroller PASS + prob (+ ekran görüntüsü).
-2. Atomik İngilizce commit(ler) + push.
-3. Dosya: `Status: done` + hash'ler; `git mv` → `finished/`; README index + `Docs/00`.
+**Fixture şekli ölçümü zorladı.** İlk sürümde her loop açık bir `projectId` taşıyordu
+ve prob **52/0** yeşildi. O koşuda `loopProjectState`'ten **cwd sinyali kaldırıldı**
+(kapsam 3'ün okuyan yarısı) — prob **yine yeşil** kaldı: yani o kural canlı
+prob'da **hiç ölçülmüyordu**. Dördüncü loop bunu çözdü: **projesi olmayan ama
+cwd'si proje A'nın dizini olan** bir loop ("proje sonradan oluşturulmuş" durumu —
+store'un yazan tarafı buna izin veriyor, yani fixture kısayolu değil gerçek
+ürün durumu). Bu loop A'nın görünümünde **listeleniyor**, çünkü cwd'si gerçekten
+A'nın dizini.
+
+**ÖLÇÜLEN, VARSAYILMAYAN DÖRT KARAR:**
+
+1. **Projesiz ama cwd'si bir proje olan loop, "no project" kovasında DEĞİLDİR**
+   (ölçüldü, varsayılmadı). İlk taslakta kova "iki satır" bekliyordu; ölçüm bir
+   satır verdi ve taslak bunu ürün hatası okudu — **beklenti yanlıştı**. Kova,
+   hiçbir proje kaydının sahiplenmediği loop'tur.
+2. **`adoptActiveProject` bu prob'da TETİKLENMEZ** (ölçüldü): kabuk taze bir
+   **yerel** oturum id'si uyduruyor (`sess_…`, sunucuda 404), `useKnownCwd` ona
+   `'missing'` dönüyor, görünüm dürüstçe kovada kalıyor. Yani "aktif oturumun
+   projesi seçili gelsin" kuralının canlı kanıtı **bu** prob'da yok; kapsam 1'in
+   o yarısı birim testle ölçülüyor.
+3. **Seçici kendisi assert edildi.** Satır kümesi iki farklı kuralla erişilebilir
+   (tıklama ve `adoptActiveProject`), bu yüzden "listede A'nın loop'u var" ikisini
+   ayırt edemiyor; `data-loop-project`'un **değeri** yalnız seçimin yazdığı durum.
+4. **Kova sentineli de ölçülüyor** (`__no_project__`): seçicinin değer uzayının
+   iki ucu sabitlenince, sentinel yeniden adlandırılsa iki taraf da yeni literal
+   üzerinde anlaşıp sessizce geçemez.
+
+**PROB KUSURLARI (hepsi yanlış kırmızı ya da ölçümsüz yeşil üretti, ürün hatası
+değil):** (a) kapsamsız `document.querySelector('[data-loop-project-state]')`
+ekrandaki **ilk** rozeti okuyor, yani `all loops`'ta **başka** projenin satırını
+ölçüyordu — iki rozet okuması da artık satır kapsamlı; (b) deep-link sorgusu modal
+açılınca URL'den **siliniyor**, düz reload varsayılan yüzeye düşüp konsol bulunamıyor
+→ yeniden deep link ile açılıyor; (c) `--ptf=x` bayrağı yarı ayrıştırılınca
+**sessizce normal yol koşuyordu** — üç yeşil "PTF" sonucu hiçbir şey kanıtlamıyordu;
+(d) ilk badge kontrolü kapsamsızdı ama tek satır varken doğru okuyordu, görünüm
+genişleyince sessizce komşuyu ölçecekti.
+
+**BİLEREK GÖNDERİLMEDİ: prob üstünde `--ptf` bayrağı.** Kendi test ettiği
+assert'i zayıflatan bir bayrak anti-tirnavur; dürüst PTF **ürün kaynağını**
+mutasyona uğratmak + yeniden kurmak + bayt-aynı geri almak.
+
+**PTF ×3 (ürün kaynağı mutasyonu, rebuild, md5 ile bayt-aynı geri alma) — her
+biri FARKLI bir assertion kümesini düşürdü:**
+
+| mutasyon | kırmızı | okuma |
+|---|---|---|
+| `loopProjectState`'ten cwd sinyali kaldırıldı | **49/6** — kapsam 3 satır kontrolü + kova assert'i | loop A'nın görünümünden kovaya kayıyor |
+| çapraz görünüm sayacı kaldırıldı | **49/1** — yalnız uyarı satırı | kapsam 5 tek başına ölçülüyor |
+| `unscoped` bayrağı kaldırıldı | **53/2** — kaybolan kapsam kutusu + genişlememe kontrolü | kapsam 1/4'ün sessiz genişlemesi |
+
+**Ekran görüntüleri (gerçek durum, elle doldurulmadı):**
+`assets/REQ-203-ss1-proje-gorunumu.png` — kapsam görünümü + uyarı satırı
+(OCR: `This project — shot-a-…` / `1 loop is running in another project — show
+all loops`); `assets/REQ-203-ss2-silinen-proje.png` — proje silindikten sonra
+(OCR: `That project is gone. Its loops are still listed under the no-project
+bucket`).
+
+**KAPI:** canlı prob **55/0** (RC=0, gate AÇIK: token'sız `/api/auth/me` 401 hem
+başta hem sonda) · saf kurallar **84/0** · konsol **7/0** · project-scope **38/0** ·
+kök `bun x tsc --noEmit` **0** · sterilize web build yeşil + `pm2 restart
+lokma-web` → servis edilen chunk == disk (`index-C6rvKis5.js`) · prob bıraktığı
+loop/proje **0** (`~/.lokma/loops` boş).
+
+## Bitirme (done) — tamamlandı 2026-10-06
+
+Kapsam 1-5 beş dilimde bitti ve beşi de ölçüldü: saf kurallar (tur 1), konsol
+yüzeyi (tur 2), **yazan** taraf — kapsam 3'ün reddeden yarısı (tur 3), ilk canlı
+prob + ekran görüntüleri (tur 4). Kalan tur 5 gerekti: kapsamların tümü kapalı
+olduğu için iş kalmadı, kırmızı bırakmak yerine kapılar yeniden ölçüldü.
+
+Commitler: `4226f7d` · `2e188b3` · `6c872ff` · `9ec5c33`. Prob:
+`scripts/probe-loop-project-view.cjs`.
 
 ## Notlar
 

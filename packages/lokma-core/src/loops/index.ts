@@ -56,6 +56,8 @@ export {
   releaseLoopCwd,
 } from './lock.js';
 export type { LoopCwdLockResult } from './lock.js';
+export { decideLoopScope, projectsAtCwd } from './project-scope.js';
+export type { LoopScopeDecision, LoopScopeRefusal, ScopeProject } from './project-scope.js';
 export {
   countIterationFor,
   DEFAULT_LOOP_COOLDOWN_SECONDS,

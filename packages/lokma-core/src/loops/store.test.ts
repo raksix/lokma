@@ -57,6 +57,7 @@ import { join } from 'node:path';
 import { sha1HexSync } from '@lokma/shared';
 import { ensureDir } from '../utils/fs.js';
 import { acquire, listLocks, release } from '../agents/locks.js';
+import { createProject, registerFirstAdmin } from '../auth/store.js';
 
 const HOME = process.env.HOME ?? '';
 if (!HOME.startsWith('/tmp/')) {
@@ -237,12 +238,23 @@ async function main(): Promise<void> {
   await expectCode(() => setLoopStatus(capped.id, 'paused'), 'loop_terminal', 'terminal wins over any transition');
 
   // ─── project scoping + listing ─────────────────────────────────────────
-  const projLoop = await createLoop({ ...mkBase('scoped'), projectId: 'demo-project' });
+  // REQ-203 kapsam 3: a loop that names a project must store THAT project's
+  // cwd, so a scoped loop needs a REAL project record — the old fixture used a
+  // bare `'demo-project'` id that now (correctly) describes an illegal state.
+  const scopeOwner = (await registerFirstAdmin({
+    email: 'loop-store@lokma.test',
+    password: 'probe-password-1',
+    name: 'Loop Store Probe',
+  })).user;
+  const demoDir = mkBase('demo-project').cwd;
+  const demoProject = await createProject(scopeOwner, { name: 'Demo Project', cwd: demoDir });
+  const projLoop = await createLoop({ ...mkBase('scoped'), cwd: demoDir, projectId: demoProject.id });
+  assert(projLoop.cwd === demoDir, 'a scoped loop stores the project cwd');
   const freeLoop = await createLoop(mkBase('unscoped'));
   const all = await listLoops();
   assert(all.length === 6, `list returns every loop (${all.length})`);
   assert(all[0].createdAt >= all[all.length - 1].createdAt, 'list is newest first');
-  const scoped = await listProjectLoops('demo-project');
+  const scoped = await listProjectLoops(demoProject.id);
   assert(scoped.length === 1 && scoped[0].id === projLoop.id, 'project view is scoped');
   const unscoped = await listProjectLoops(null);
   assert(unscoped.some((l) => l.id === freeLoop.id) && !unscoped.some((l) => l.id === projLoop.id), 'null project view holds the project-less loops');

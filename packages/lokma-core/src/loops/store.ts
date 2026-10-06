@@ -16,9 +16,11 @@ import {
   type LoopTriggerInput,
 } from '@lokma/shared';
 import { assertValidSchedule } from '../cron/cron.js';
+import { listProjects } from '../auth/store.js';
 import { ensureDir, readJson, writeAtomic } from '../utils/fs.js';
 import { appendLedger, formatLedgerEntry, LOOPS_DIR, ledgerPath, loopDir, readLedger } from './ledger.js';
 import { acquireLoopCwd, cwdLockConflict, releaseLoopCwd } from './lock.js';
+import { decideLoopScope } from './project-scope.js';
 
 /**
  * Harness-owned loop store (REQ-200). One directory per loop under
@@ -338,6 +340,22 @@ async function persist(loop: Loop): Promise<Loop> {
 }
 
 /**
+ * Enforce kapsam 3 ("a loop's cwd IS a project directory") at the ONE place
+ * every writer passes through, so the two scope signals cannot be born
+ * contradicting each other.
+ *
+ * Deliberately enforced on CREATE and on a PATCH that touches either signal:
+ * a create-only check would let `PATCH {cwd}` walk a scoped loop out of its
+ * project, which is the same conflict the create path refuses.
+ */
+async function assertLoopScope(loopCwd: string, projectId: string | null): Promise<string> {
+  const projects = await listProjects();
+  const decision = decideLoopScope({ loopCwd, projectId, projects });
+  if (!decision.ok) throw new LoopError(decision.code, decision.message);
+  return decision.cwd;
+}
+
+/**
  * Create a loop in `draft`. `startedAt` stays null — `draft → running` happens
  * only with the first real run (REQ-201), never at creation time, so a loop the
  * user saved but never ran is honestly reported as never having run.
@@ -364,11 +382,17 @@ export async function createLoop(input: {
   const origin: LoopOrigin = input.origin === undefined ? 'user' : (input.origin as LoopOrigin);
   assertOriginShape(origin);
   const now = new Date().toISOString();
+  // kapsam 3: a named project decides the cwd; a mismatch is refused, never
+  // silently preferred. Returns the canonical spelling to store.
+  const scopedCwd = await assertLoopScope(
+    (input.cwd as string).trim(),
+    (input.projectId as string | null | undefined) ?? null,
+  );
   const loop: Loop = {
     id: `l_${randomBytes(4).toString('hex')}`,
     name: (input.name as string).trim(),
     projectId: (input.projectId as string | null | undefined) ?? null,
-    cwd: (input.cwd as string).trim(),
+    cwd: scopedCwd,
     prompt: (input.prompt as string).trim(),
     origin,
     status: 'draft',
@@ -411,7 +435,13 @@ export async function updateLoop(loopId: string, patch: LoopPatch): Promise<Loop
   if (patch.cwd !== undefined) assertCwdShape(patch.cwd);
   if (patch.prompt !== undefined) assertPromptShape(patch.prompt);
   if (patch.projectId !== undefined) assertProjectIdShape(patch.projectId);
-  const nextCwd = patch.cwd === undefined ? current.cwd : patch.cwd.trim();
+  const requestedCwd = patch.cwd === undefined ? current.cwd : patch.cwd.trim();
+  const requestedProject =
+    patch.projectId === undefined ? current.projectId : patch.projectId;
+  // Same contract as create (kapsam 3): editing EITHER signal re-checks the pair,
+  // so a scoped loop cannot be walked into another directory (or another
+  // project) by a PATCH that only moved one of the two.
+  const nextCwd = await assertLoopScope(requestedCwd, requestedProject);
   // Editing the cwd of a RUNNING loop re-points its lock; the old directory must
   // be released and the new one claimed, or the loop keeps editing a directory it
   // no longer owns (or edits one that is already somebody else's).
@@ -422,7 +452,7 @@ export async function updateLoop(loopId: string, patch: LoopPatch): Promise<Loop
     name: patch.name === undefined ? current.name : patch.name.trim(),
     cwd: nextCwd,
     prompt: patch.prompt === undefined ? current.prompt : patch.prompt.trim(),
-    projectId: patch.projectId === undefined ? current.projectId : patch.projectId,
+    projectId: requestedProject,
     model: patch.model === undefined ? current.model : patch.model.trim(),
     reasoningEffort: patch.reasoningEffort === undefined ? current.reasoningEffort : patch.reasoningEffort.trim(),
     budget: patch.budget === undefined ? current.budget : resolveBudget(patch.budget, current.budget),

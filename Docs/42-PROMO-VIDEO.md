@@ -1,0 +1,117 @@
+# 42 — Lokma promo video (the 25-second harness film)
+
+> **Status: shipped.** Live at
+> <https://files.fermag.com.tr/share/lokma-harness-promo.mp4>
+> (1920×1080, 30 fps, 25 s, `video/mp4`, no auth).
+> Authoring project `/root/lokma-promo`; deliverable repo
+> <https://github.com/raksix/lokma-harness-promo> (private).
+
+## What was asked
+
+Make a promo for the Lokma harness in the shape of
+<https://skillry.dev/ai-videos/opus-5-5/justinbuilds-412401> — a 22-second
+kinetic-typography piece, built with HyperFrames.
+
+The reference was pulled apart before anything was written: 1280×960, 30 fps,
+22.5 s, and its own voiceover was transcribed with faster-whisper. Its structure
+is the whole lesson:
+
+| reference | beat |
+| --- | --- |
+| 0.0–6.3 | `How do you communicate that you're going through a change?` |
+| 6.3–7.7 | `You don't.` |
+| 7.7–10.4 | `You just show it.` |
+| 10.4–18.3 | `Action.` `Intention.` `Curiosity.` — one word per beat |
+| 18.3–22.5 | `Through one's own ability to love.` |
+
+A question, a refusal, a statement, three one-word hits, a close. Cream/paper
+grounds alternating with full-black ones, hard cuts, and a voiceover that owns
+the timing. Lokma's version keeps that rhythm exactly and swaps in its own
+words and numbers.
+
+## The film
+
+| t | scene | ground | on screen |
+| --- | --- | --- | --- |
+| 0.1–4.9 | the question | cream | `How do you explain a harness?` |
+| 4.9–6.1 | the refusal | ink | `You don't.` |
+| 6.1–8.0 | the statement | ink | `You just show it.` |
+| 8.0–11.3 | the harness | ink | `Tools.` `Context.` `Permission.` |
+| 11.3–17.0 | the proof | cream | a terminal types a real turn: edit → test → commit → push |
+| 17.0–19.6 | the loop | ink | prompt → stream → **tools** → verify → commit |
+| 19.6–21.4 | the point | cream | `The model only reasons.` / `The harness does the rest.` |
+| 21.4–23.1 | two surfaces | cream | `lokma tui` · `23 panes` · four themes |
+| 23.1–25.0 | sign-off | cream | `Lokma.` + `lokma.fermag.com.tr` |
+
+Copy is this repo's README, not invented marketing: the terminal's turn, the
+loop diagram's five stages and the pane count are all things Lokma actually does.
+
+Palette is Lokma's `claude` theme — cream `#FAF9F5`, terracotta `#C96442`, ink
+`#1A1917` — because it is the theme the owner ships and picked for the brand.
+
+## Sound
+
+Everything is generated, so nothing has to be licensed, and every render is
+reproducible.
+
+- **Voiceover** — eight lines through `edge-tts`
+  (`en-US-AndrewMultilingualNeural`, `+6%`, `-2Hz`), then silence-trimmed with
+  `silenceremove` and normalised with `loudnorm=I=-16`. Each line is a separate
+  `<audio>` clip placed at its own timestamp, so the voice lands on the word.
+- **Bed** — `scripts/gen_amb.py` (numpy, fixed seed): a warm A1 drone with slow
+  swells, an airy noise bed, and a 41 Hz lift under each beat flash. 25 s.
+- **Transitions** — the same script emits a filtered-noise whoosh, one per cut,
+  and a small UI tick for the typed terminal lines.
+
+## The composition
+
+One `index.html`: markup, CSS, and a single paused GSAP timeline registered on
+`window.__timelines["main"]`. `npx hyperframes check` passes with 0 errors.
+
+Notable decisions, each of which came from a measurement:
+
+- **One ease family for the whole film.** Arrivals are `expo.out`, exits are
+  `expo.in`. Changing easing between cuts is what makes a motion piece read as
+  separate screens instead of one camera move.
+- **Ground changes are a wipe, not a fade.** A cream or ink sheet peels off the
+  scene it was covering (`scaleX` 1 → 0) at every cut. A fade of the whole scene
+  is not seek-safe; a wipe is.
+- **The terminal lines reveal on themselves** (`y` + `opacity`), not behind an
+  opaque cover. A cover that only spans part of a line reads as a defect, and
+  `check` says so — see the skill note below.
+- **Terracotta is split into two tokens.** `#C96442` on cream measures 3.9:1 and
+  fails WCAG AA at body size, so small terracotta text uses `#B14E2E` (4.96:1).
+  On the ink ground, `#E08A63` (6.7:1).
+
+## Lessons worth keeping
+
+1. **`data-layout-allow-occlusion` belongs on the covering element**, not on the
+   text being covered — the rule reads where the intent sits. Marking the text
+   changes nothing, and a partial cover still leaves transient info findings.
+   When the goal is a staged reveal, revealing each element on itself is the
+   clean fix and needs no escape hatch at all.
+2. **`check`'s contrast audit is the gate that catches palette drift.** Two
+   greys used for terminal chrome (`#7d7972`, `#8d8981`) measured 3.4–3.8:1 on
+   cream and were reported as errors, not warnings.
+3. **A `clip_media_fit` warning is a real shortcut.** An `<audio>` slot longer
+   than the file gets shortened at render time; set `data-duration` to the file's
+   real length so the timeline says what it does.
+4. **Silence-trimming changes the edit.** `silenceremove` + `loudnorm` cut the
+   generated lines to 60–70 % of their raw length, so the on-screen timing was
+   retimed to the trimmed durations, not the raw ones.
+5. **`crossorigin` on media is a hard lint error** — never add it, including for
+   canvas/WebAudio readback.
+
+## Reproducing
+
+```bash
+cd /root/lokma-promo/project
+npx hyperframes@0.8.143 check             # lint + runtime + layout + motion + contrast
+npx hyperframes@0.8.143 render --quality delivery --crf 14 --output out/lokma-harness-promo-1080p.mp4
+```
+
+Rendering runs at roughly 1.2–1.35× realtime for 1080p30 on this box (Chrome
+screenshot path, software GPU): ~35 s for 750 frames.
+
+The project pins `hyperframes@0.8.143`, since the pin never advances on its own
+and an older CLI prints no warning about being behind.

@@ -29,6 +29,29 @@ grounds alternating with full-black ones, hard cuts, and a voiceover that owns
 the timing. Lokma's version keeps that rhythm exactly and swaps in its own
 words and numbers.
 
+## The extended cut (33.5s, 16 voice lines)
+
+The first pass was 25s with 7 lines. The second pass grew the voice to 16 lines
+and re-cut around them, and made the edit **flow**:
+
+- a scene change lands on the frame its voice line starts, and the next scene's
+  wipe begins **0.42 s before** the outgoing content is gone — so both scenes are
+  on screen together for a moment and **no frame in the film is a still**;
+- the picture never waits for the voice: the picture moves while the voice talks,
+  rather than the voice filling a gap in the picture;
+- the bed carries **one volume automation lane** that ducks to `0.42` under every
+  line and lifts back to `1.0` in the gaps (one lane on the track, no volume tween
+  — the contract says the lane wins and a tween would be ignored).
+
+Two structural notes worth keeping:
+
+1. **A scene's `data-duration` now overruns into the next scene's window.** That is
+   the overlap: `dur = next_start - start + 0.42`. It is legal (each section is its
+   own timed element on its own paint order) and it is what removes the still
+   frames. `timeline` will show the sections overlapping — that is the design.
+2. **More lines needed a longer bed**, so `gen_amb.py` was retargeted from 25 s to
+   40 s and given a low-end lift at each of the ten new scene changes.
+
 ## The film
 
 | t | scene | ground | on screen |

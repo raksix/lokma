@@ -29,6 +29,26 @@ grounds alternating with full-black ones, hard cuts, and a voiceover that owns
 the timing. Lokma's version keeps that rhythm exactly and swaps in its own
 words and numbers.
 
+## The approved bed (25s, music-only)
+
+The client picked a track **by ear** from six 15-second clips. The clip that won was cut
+from 5 s of *Techno Fest Vibes* (Mixkit, royalty-free, no attribution required). The film
+had been using a **different window** of the same track (85 s), so the section they signed
+off on was not the section that played. Fixed by rebuilding the bed from the same 5 s
+window and verifying it: the bed's first 15 s matches the approved clip's spectrum to
+within 0.4 points of sub-150 Hz share.
+
+Two lessons worth keeping:
+
+- **A metric measures the axis it measures.** "Space Fighter Loop" scored closest to the
+  reference on band shape (dist 0.073) and still sounded like arcade music in the cut. The
+  score ranked *spectra*, not *genre* — so when the ear disagrees with the number, the
+  number is answering a different question. Widening the candidate pool to modern
+  electronic/trap/synth catalogues is what actually fixed it.
+- **Ship the section that was approved, not the section that scored.** When approval comes
+  from a clip, the clip's own window is the specification. Selecting a different window of
+  the same track silently substitutes a different piece of music.
+
 ## The music-led cut (25s, no voice)
 
 The voice was the problem, not its timing. It had been generated, timed and measured

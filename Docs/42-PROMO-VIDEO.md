@@ -102,12 +102,53 @@ Notable decisions, each of which came from a measurement:
 5. **`crossorigin` on media is a hard lint error** — never add it, including for
    canvas/WebAudio readback.
 
+## Two formats, one source
+
+Landscape `1920x1080` and portrait `1080x1920` (Reels/TikTok/Shorts). The
+portrait composition is **generated** from the landscape master by
+`make_formats.py` — a measured transform, not a hand-forked copy, so the two
+cannot silently drift. Every substitution is asserted: a master change the
+generator cannot map fails loudly instead of shipping a wrong portrait.
+
+Portrait is not a scale-down. Usable width drops 1520 -> 920 px, so:
+
+- type scales **0.72–0.76**, not the raw 0.605 width ratio — portrait has far
+  more vertical room, so blocks sit lower and larger than a pure scale would;
+- the two surface cards stack into a column and the chips become stacked pills;
+- the loop diagram is **re-laid-out** for the narrower frame (boxes and wires
+  recomputed, pulses travel a start+delta so the geometry lives in one place);
+- the wordmark steps **236 -> 126 px** so it fits the 1080 px width.
+
+Two measured traps in this pass:
+
+1. **The root's framed size is `data-width`/`data-height`, not the CSS vars.**
+   Setting `--w`/`--h` to 1080/1920 leaves the root stamped at 1920x1080 — the
+   probe printed `data=1920x1080 box=1080x1920`, which is what exposed it.
+2. **A still page shows the START of the film, not its layout.** GSAP stamps
+   tween start values (`scale: 1.06`, `x: -56`) at build time, so a geometry
+   probe that does not neutralise transforms measures entrance offsets and
+   reports overlaps that do not exist. The probe now forces
+   `transform: none; opacity: 1` before measuring; the same three "overlaps"
+   went to zero.
+
+Portrait gate: `check --snapshots` **0 error**, geometry probe
+**0 out-of-frame selectors**.
+
 ## Reproducing
 
 ```bash
 cd /root/lokma-promo/project
 npx hyperframes@0.8.143 check             # lint + runtime + layout + motion + contrast
 npx hyperframes@0.8.143 render --quality delivery --crf 14 --output out/lokma-harness-promo-1080p.mp4
+```
+
+Portrait:
+
+```bash
+/usr/local/lib/hermes-agent/venv/bin/python3 /root/lokma-promo/make_formats.py
+cd /root/lokma-promo/portrait
+npx hyperframes@0.8.143 check
+npx hyperframes@0.8.143 render --quality delivery --crf 14 --resolution portrait --output out/lokma-harness-promo-portrait.mp4
 ```
 
 Rendering runs at roughly 1.2–1.35× realtime for 1080p30 on this box (Chrome

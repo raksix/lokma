@@ -29,6 +29,42 @@ grounds alternating with full-black ones, hard cuts, and a voiceover that owns
 the timing. Lokma's version keeps that rhythm exactly and swaps in its own
 words and numbers.
 
+## The music-led cut (25s, no voice)
+
+The voice was the problem, not its timing. It had been generated, timed and measured
+for continuity — and the fix was to remove it: the reference the user pointed at
+(`x.com/higgsfield_ai/status/2108308782757634471`) carries **no speech at all**. Its
+audio is music and sound design. That is the target.
+
+So the film now has one sound source, scored against the reference's own measurements:
+
+| measurement | reference | the cut |
+|---|---|---|
+| sub-150 Hz share | 80.8 % | 80.2 % |
+| 150–500 Hz | 8.5 % | 9.7 % |
+| 500 Hz–2 kHz | 4.8 % | 5.0 % |
+| 2–6 kHz | 3.3 % | 4.1 % |
+| integrated loudness | −14.4 LUFS | −14.4 LUFS |
+
+Bed: **"Space Fighter Loop" by Kevin MacLeod** (CC BY 4.0), cut at 10 s — the closest of
+nineteen candidates, chosen by band-shape distance, transient density and spectral
+centroid against the reference. Two traps worth keeping:
+
+1. **Do not measure bands with cascaded ffmpeg filters.** `lowpass=150` + `bandpass` +
+   `highpass=2000` are not disjoint; on the reference they summed to **153 %**, which
+   inflates whichever band you look at. The FFT of a windowed frame gives disjoint bands;
+   that is what the table above is built from.
+2. **The short candidate wins for the wrong reason.** The first scoring pass sampled a
+   25 s window at offsets up to 90 s without checking the window fit inside the file, so a
+   55 s track got sampled at 45 s with 10 s of it missing — and its truncated tail scored
+   as "energetic". Clamp the scan to `duration - window` or you are rewarding a
+   measurement artifact.
+
+Uploading the reference for measurement: `youtube-dl`-style extractors do not support
+`x.com/.../status/<id>` URLs; the syndication JSON
+(`cdn.syndication.twimg.com/tweet-result?id=<id>`) carries the direct
+`video.twimg.com/amplify_video/...` variants, including the 1080p mp4.
+
 ## The continuous cut (25s, unbroken voice, measured bed)
 
 The brief changed: **the voice must not stop for 25 seconds**, with music under it.

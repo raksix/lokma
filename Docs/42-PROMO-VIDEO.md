@@ -48,6 +48,11 @@ What changed, and how each claim is checked:
   a *hole* in the 300–3400 Hz speech band, and movement inside the window. Winner:
   **Impact Lento**, window from **182.5 s**, speech-band energy **3.6 %** (the next best
   was 23 %). Credit: *Music: "Impact Lento" by Kevin MacLeod — CC BY 4.0*.
+- **The licence travels with the film.** Impact Lento is CC BY 4.0, which requires
+  attribution wherever the work goes — a README does not satisfy it. The credit is burned
+  into the sign-off frame: `music · impact lento — kevin macleod · cc by 4.0`, set in the
+  cream-legible muted token (`#6b6862`, 5.03:1). Using `--muted-dk` there would have read
+  at 2.40:1 on cream and failed the contrast gate.
 - **Ducking is gentle on purpose.** The bed is cut at −27 LUFS and the lane ducks to
   `0.62`. Two hard attenuations (a quiet bed *and* a deep duck) make the music vanish
   instead of sitting under the voice.

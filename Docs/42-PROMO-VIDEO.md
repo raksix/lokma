@@ -29,6 +29,37 @@ grounds alternating with full-black ones, hard cuts, and a voiceover that owns
 the timing. Lokma's version keeps that rhythm exactly and swaps in its own
 words and numbers.
 
+## The continuous cut (25s, unbroken voice, measured bed)
+
+The brief changed: **the voice must not stop for 25 seconds**, with music under it.
+That kills the line-by-line approach — per-line files leave joins you can hear.
+
+What changed, and how each claim is checked:
+
+- **One unbroken read.** A single `edge-tts` utterance of the whole script, trimmed and
+  normalised once. Proof, not assertion: `silencedetect=n=-45dB:d=0.2` finds **no**
+  silence longer than 0.2 s in the voice track *or* in the final mix.
+- **Scene changes on measured speech, not a grid.** Whisper word timings give the real
+  moment each sentence starts (`"harness"` 3.50, `"prompt"` 4.94, `"reads"` 8.06,
+  `"visible"` 14.36, `"reasons"` 19.04, `"acts"` 20.30, `"session"` 22.36), and the cuts
+  land there. The picture follows the voice; the voice never waits for the picture.
+- **The bed is chosen by measurement.** Eight candidates (Kevin MacLeod / incompetech)
+  were scored for what actually matters under continuous speech: energy in the low end,
+  a *hole* in the 300–3400 Hz speech band, and movement inside the window. Winner:
+  **Impact Lento**, window from **182.5 s**, speech-band energy **3.6 %** (the next best
+  was 23 %). Credit: *Music: "Impact Lento" by Kevin MacLeod — CC BY 4.0*.
+- **Ducking is gentle on purpose.** The bed is cut at −27 LUFS and the lane ducks to
+  `0.62`. Two hard attenuations (a quiet bed *and* a deep duck) make the music vanish
+  instead of sitting under the voice.
+
+**A trap worth remembering: the builder must build from a fixed head.** The first
+attempt appended the new cut to the current file, so each rebuild left the previous
+cut's CSS in place — stale `#s10` rules from the 33.5 s version ended up after the live
+`#s8` rules and won the cascade, and the sign-off block measured as three stacked bars
+at the top of the frame. The builder now reads `project/_head-pristine.html` (the
+original film's CSS, extracted once) and appends everything else. Disposable assets do
+not accumulate in a file that is regenerated.
+
 ## The extended cut (33.5s, 16 voice lines)
 
 The first pass was 25s with 7 lines. The second pass grew the voice to 16 lines

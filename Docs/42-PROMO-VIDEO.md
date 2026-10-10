@@ -29,6 +29,55 @@ grounds alternating with full-black ones, hard cuts, and a voiceover that owns
 the timing. Lokma's version keeps that rhythm exactly and swaps in its own
 words and numbers.
 
+## The beat-synced cut (25s, every animation on the music)
+
+The brief: the animations were not on the music. So the music's grid was measured
+and the timeline was **generated from it** — no hand-typed times that can sit
+between beats.
+
+Measured from the bed itself (`find_beats.py`):
+
+    123.7 BPM  ->  one beat every 0.485 s
+    phase      ->  first kick at 0.32 s, so beats are 0.32 + k*0.485
+    bars       ->  every 4 beats = 1.94 s: 0.32, 2.26, 4.20, 6.14, 8.08, ...
+
+Note the autocorrelation first returned **61.9 BPM** — the half-tempo. The kick
+pass (low-band onsets) showed hits every 0.485 s, which is the real pulse; the
+autocorrelation had locked onto the two-beat period. Trust the instrument you
+measured with, but cross-check it with a second one.
+
+What rides the grid:
+
+| element | lands on |
+|---|---|
+| scene change (9 scenes) | bar lines |
+| first text of each scene | bar + 0.16 s (the wipe runs 0.14 s) |
+| terminal lines | one per two beats |
+| loop pulses | one leg per beat |
+| bar strip (bottom) | one segment filled per bar |
+| frame ring | one flash per kick |
+
+**Verified from the rendered mp4**, not from the code (`verify_beat_sync.py`):
+
+- the strip's lit-segment count matches the grid on **12/12** bars;
+- at **9/9** scene starts the cut changes the picture **11x–1872x** more than the
+  scene's own motion did in the 230 ms before it.
+
+Three measurement traps this cost, all of which produced a red gate that was not
+a product defect:
+
+1. **Two beat indicators in the same colour cannot be measured.** The ring's bottom
+   border painted over the strip (both terracotta), so the strip read 100% filled
+   from bar 9 on. The strip now sits above the ring band (bottom: 14px).
+2. **A frame-wide mean hides a real arrival.** Three small chips on a cream frame
+   move the whole-frame average by 0.7 while changing their own blocks by 40+. The
+   probe now takes the max over a block grid — and excludes the outer 22 px, or the
+   ring's own flash registers as content.
+3. **The probe's expectation has to be derived, not assumed.** It first demanded one
+   lit segment per elapsed bar (correct is n+1: bar n fills segment n), and demanded
+   a cut on every bar (correct: scenes span one or two bars). Both "failures" were
+   the probe, not the film.
+
 ## The approved bed (25s, music-only)
 
 The client picked a track **by ear** from six 15-second clips. The clip that won was cut

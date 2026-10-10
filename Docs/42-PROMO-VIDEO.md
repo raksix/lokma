@@ -320,3 +320,45 @@ screenshot path, software GPU): ~35 s for 750 frames.
 
 The project pins `hyperframes@0.8.143`, since the pin never advances on its own
 and an older CLI prints no warning about being behind.
+
+## The tool-call scene, rebuilt (and the portrait rebuilt with it)
+
+The first tool-call scene put all its weight top-left: three cream pills that
+read as tappable buttons, an empty top-right quadrant, and a loop diagram with
+two inputs converging on `tools` and **no outgoing edges** — so `verify` and
+`commit` read as an unfinished sketch, not a sequence.
+
+It is now three zones: the claim on the left, three proof points on the right,
+and a full-width `prompt → stream → tools → verify → commit` pipeline across
+the bottom, with real arrowheads and `tools` as the hero node.
+
+A redesign is not finished when the landscape looks right. The portrait is
+**generated** with every substitution asserted, and the redesign deleted three
+selectors the generator knew: it fired, printed all three, and stopped. Good
+behaviour — but its output was piped through `tail` in a background chain, so
+the failure was invisible and the portrait kept rendering from a stale file.
+**A piped failure is a swallowed failure.** Read the exit code, not the tail.
+
+Two things the portrait needed that are not CSS:
+
+1. **A vertical pipeline must animate on `scaleY`.** The arrows grow with
+   `scaleX`, and a vertical line scaled sideways does not move.
+2. **Stacking is not a style choice but a legibility one.** Five nodes plus
+   four arrows in a 1000 px band left each label near 6–8 px on a phone —
+   legible in a still, texture in motion. Stacked, every node gets the column.
+
+And one that is CSS:
+
+3. **Two rows that should read as a table need one grid for the block**, with
+   the list items lifted out (`display: contents`). Giving each row its own
+   grid centres every row on its own width, so the columns drift apart — the
+   labels never actually share an edge.
+
+The sign-off now carries both destinations, repository first (it is the call to
+action, and it takes the accent), and the dead CSS the redesign orphaned —
+`.box`, `.wire`, `.pulse`, `.chips`, `.chip` — was removed rather than left
+shipping in every build.
+
+Verified on the render, not the source: strip **12 of 12** bars, cuts **9 of 9**
+(before-cut diff ≤ 2.5, across-cut 10.9–200.9); both formats exactly 25.000 s;
+zero speech segments.

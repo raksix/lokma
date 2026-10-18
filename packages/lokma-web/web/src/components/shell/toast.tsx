@@ -48,6 +48,7 @@ export function ToastHost({ durationMs = 3200 }: { durationMs?: number }) {
   return (
     <div
       role="status"
+      data-lokma-toast
       className="fixed bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-full border border-white/10 bg-[#262624] px-3 py-1.5 text-xs text-white shadow-lg"
     >
       {msg}

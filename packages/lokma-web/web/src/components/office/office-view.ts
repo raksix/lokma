@@ -425,6 +425,16 @@ export function officeWorkerId(type: OfficeWorkerType, id: string): string {
   return type === 'run' ? 'run:' + id : 'loop:' + id;
 }
 
+/**
+ * Display label for a session work unit: its title, else the raw id. The one
+ * rule the worker/delivery rows already stand on, exported so a §4.6 notice
+ * names the SAME thing its row does — a second label vocabulary would drift.
+ */
+export function officeSessionLabel(row: Pick<OfficeSessionRow, 'id' | 'title'>): string {
+  const title = (row.title ?? '').trim();
+  return title || row.id;
+}
+
 /** The chest badge: the in-flight tool, else the latest completed one. */
 export function currentToolOf(live: OfficeSessionLive): string | null {
   const inFlight = live.tools.find((t) => t.running);
@@ -470,7 +480,7 @@ export function deriveOfficeWorkers(src: OfficeSources): OfficeWorker[] {
       runId: null,
       botId: s.botId ?? null,
       agentId: null,
-      label: title || s.id,
+      label: officeSessionLabel(s),
       task: title || null,
       currentTool: currentToolOf(live),
       lastTools: live.tools,
@@ -555,7 +565,7 @@ export function deriveOfficeDeliveries(src: OfficeSources): OfficeDelivery[] {
         projectId,
         claimedProjectId: projectId,
         projectBadge: project ? project.name : 'no project',
-        label: title || s.id,
+        label: officeSessionLabel(s),
         startedAt: w.startedAt,
         endedAt: w.endedAt,
         ok: w.ok,
@@ -630,6 +640,100 @@ export function officeStats(
     waiting: workers.filter((w) => w.status === 'waiting').length,
     delivered: deliveries.length,
   };
+}
+
+// ─── Notices (§4.6 — observed transitions the user must not miss) ───────────
+
+/**
+ * The notification half of §4.6. A notice exists ONLY for a transition the
+ * pane could observe:
+ *  - `waiting`: a gate frame arrived — built by the pane from the FRAME
+ *    itself (its `requestId` is the gate's exact identity, so the one-shot
+ *    ledger key is exact and a replay can never re-fire);
+ *  - `finished` / `loop-finished`: a delivery — a window this pane watched
+ *    close (`diffOfficeNotices`) or a loop turn it watched finish
+ *    (`diffLoopNotices`), never a guess from silence.
+ */
+export type OfficeNotice =
+  | { kind: 'waiting'; sessionId: string; requestId: string; tool: string | null }
+  | { kind: 'finished'; sessionId: string; window: OfficeClosedWindow }
+  | { kind: 'loop-finished'; loopId: string; ok: boolean | null; startedAt: string | null };
+
+/** A delivery notice the live-map diff produces (callers can trust the kind). */
+export type OfficeFinishedNotice = Extract<OfficeNotice, { kind: 'finished' }>;
+
+/** A loop delivery notice the loop diff produces. */
+export type OfficeLoopNotice = Extract<OfficeNotice, { kind: 'loop-finished' }>;
+
+/** Identity of ONE transition — the one-shot ledger key (never the message). */
+export function officeNoticeKey(notice: OfficeNotice): string {
+  switch (notice.kind) {
+    case 'waiting':
+      return 'wait:' + notice.sessionId + ':' + notice.requestId;
+    case 'finished':
+      return 'done:' + notice.sessionId + ':' + notice.window.startedAt + '@' + notice.window.endedAt;
+    case 'loop-finished':
+      return 'loopdone:' + notice.loopId + ':' + (notice.startedAt ?? 'na');
+  }
+}
+
+/** Toast copy for one notice; a null verdict is never dressed as a success. */
+export function officeNoticeText(notice: OfficeNotice, label: string): string {
+  if (notice.kind === 'waiting') {
+    return label + ' is waiting for you' + (notice.tool ? ' (' + notice.tool + ')' : '');
+  }
+  const ok = notice.kind === 'finished' ? notice.window.ok : notice.ok;
+  if (ok === false) return label + ' finished with an error';
+  if (ok === null) return label + ' run ended';
+  return label + ' finished';
+}
+
+/**
+ * NEW closed windows between two live-map snapshots (the delivery half).
+ * The window identity is `startedAt@endedAt`, so a snapshot echo of the SAME
+ * state produces no notice — only an actually new closed window does. The
+ * very first observation seeds; announcing history is the caller's choice to
+ * make, never this diff's.
+ */
+export function diffOfficeNotices(prev: OfficeLiveMap, next: OfficeLiveMap): OfficeFinishedNotice[] {
+  const out: OfficeFinishedNotice[] = [];
+  for (const sessionId of Object.keys(next)) {
+    const after = next[sessionId];
+    if (!after || after.closed.length === 0) continue;
+    const seen = new Set((prev[sessionId]?.closed ?? []).map((w) => w.startedAt + '@' + w.endedAt));
+    for (const window of after.closed) {
+      if (seen.has(window.startedAt + '@' + window.endedAt)) continue;
+      out.push({ kind: 'finished', sessionId, window });
+    }
+  }
+  return out;
+}
+
+/**
+ * Loops whose turn ended between two reads. The SAME delivery rule that gates
+ * the whiteboard row in `deriveOfficeDeliveries`: `running -> done/error`
+ * with a recorded outcome. A loop the pane never watched running stays
+ * silent (observed windows only), and `paused` is not a delivery.
+ */
+export function diffLoopNotices(
+  prev: readonly OfficeLoopRow[],
+  next: readonly OfficeLoopRow[],
+): OfficeLoopNotice[] {
+  const out: OfficeLoopNotice[] = [];
+  const before = new Map(prev.map((l) => [l.id, l]));
+  for (const l of next) {
+    const was = before.get(l.id);
+    if (!was || was.status !== 'running') continue;
+    if (l.status !== 'done' && l.status !== 'error') continue;
+    if (l.lastRunOutcome === null) continue;
+    out.push({
+      kind: 'loop-finished',
+      loopId: l.id,
+      ok: loopOutcomeOk(l.lastRunOutcome),
+      startedAt: l.lastRunStartedAt,
+    });
+  }
+  return out;
 }
 
 /** Honest empty state — shown when the sources have no live work at all. */

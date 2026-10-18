@@ -18,8 +18,13 @@ export const OFFICE_FRAME_EVENT = 'lokma:office-frame';
 export type OfficeFrame =
   | { kind: 'tool_start'; sessionId: string; callId: string; tool: string; input: unknown }
   | { kind: 'tool_result'; sessionId: string; callId: string; result: unknown; isError: boolean }
-  /** A user gate (approval or question) arrived unanswered. */
-  | { kind: 'gate'; sessionId: string }
+  /**
+   * A user gate (approval or question) arrived unanswered. `requestId` is
+   * the gate's EXACT identity — REQ-204 §4.6 keys its one-shot notice on it,
+   * so a replayed frame or a second office host can never double-fire. `tool`
+   * names the tool asking for approval; null for a question (there is none).
+   */
+  | { kind: 'gate'; sessionId: string; requestId: string; tool: string | null }
   | { kind: 'run_end'; sessionId: string; ok: boolean | null };
 
 /**
@@ -49,8 +54,9 @@ export function officeFrameOf(msg: ServerMessage): OfficeFrame | null {
     case 'tool_result':
       return { kind: 'tool_result', sessionId: msg.sessionId, callId: msg.callId, result: msg.result, isError: msg.isError };
     case 'permission_request':
+      return { kind: 'gate', sessionId: msg.sessionId, requestId: msg.requestId, tool: msg.tool };
     case 'ask_user_question':
-      return { kind: 'gate', sessionId: msg.sessionId };
+      return { kind: 'gate', sessionId: msg.sessionId, requestId: msg.requestId, tool: null };
     case 'done':
       return { kind: 'run_end', sessionId: msg.sessionId, ok: runEndOkFromDone(msg.reason) };
     case 'error':

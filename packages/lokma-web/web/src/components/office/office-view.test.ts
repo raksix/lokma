@@ -19,12 +19,17 @@ import {
   currentToolOf,
   deriveOfficeDeliveries,
   deriveOfficeWorkers,
+  diffLoopNotices,
+  diffOfficeNotices,
   emptyOfficeLive,
   foldOfficeFrame,
   loopOutcomeOk,
   OFFICE_DETAIL_MAX,
   OFFICE_TOOL_HISTORY_CAP,
   officeLiveFor,
+  officeNoticeKey,
+  officeNoticeText,
+  officeSessionLabel,
   officeStats,
   officeWorkerId,
   promptFirstLine,
@@ -32,9 +37,11 @@ import {
   toolDetail,
   type OfficeLiveMap,
   type OfficeLoopRow,
+  type OfficeNotice,
   type OfficeSessionRow,
   type OfficeSources,
 } from './office-view';
+import { announceOfficeNoticeOnce } from './office-notices';
 import { officeFrameOf, runEndOkFromDone } from '@/lib/office-frame';
 import type { ServerMessage } from '@lokma/shared/protocol/ws';
 import type { AuthProject } from '@/lib/api';
@@ -389,7 +396,11 @@ assert(longTask !== null && longTask.length === 200 && longTask.endsWith('...'),
 
 // A gate is settled by the NEXT observable event of that session — without
 // this rule an approved gate would pin `waiting` on forever.
-const gated = foldOfficeFrame({}, { kind: 'gate', sessionId: 's1' }, 'T1');
+const gated = foldOfficeFrame(
+  {},
+  { kind: 'gate', sessionId: 's1', requestId: 'g1', tool: 'terminal' },
+  'T1',
+);
 assert(officeLiveFor(gated, 's1').waiting === 1, 'a gate frame raises the pending count');
 const settled = foldOfficeFrame(
   gated,
@@ -430,9 +441,122 @@ const gateFrame = officeFrameOf(
   { type: 'permission_request', requestId: 'r1', tool: 'terminal', description: 'run it', sessionId: 's7' } as ServerMessage,
 );
 assert(
-  gateFrame !== null && gateFrame.kind === 'gate' && gateFrame.sessionId === 's7',
-  'a permission request becomes a gate frame for that session',
+  gateFrame !== null &&
+    gateFrame.kind === 'gate' &&
+    gateFrame.sessionId === 's7' &&
+    gateFrame.requestId === 'r1' &&
+    gateFrame.tool === 'terminal',
+  'a permission request becomes a gate frame carrying its requestId + tool',
 );
+// A question gate has NO tool to name — null stays null (no invented name);
+// the §4.6 notice keys on its requestId exactly like an approval's.
+const askFrame = officeFrameOf(
+  { type: 'ask_user_question', requestId: 'q1', question: 'Which one?', sessionId: 's7' } as ServerMessage,
+);
+assert(
+  askFrame !== null && askFrame.kind === 'gate' && askFrame.requestId === 'q1' && askFrame.tool === null,
+  'a question gate carries its requestId with no tool',
+);
+
+// ── L. §4.6 notices — observed transitions, announced exactly once ─────────
+
+// The delivery half: a window the pane WATCHED close is ONE notice, built
+// through the real fold path (snapshot running -> stopped), never by hand.
+const openLive = applySessionsSnapshot({}, [{ id: 's1', running: true }], 'T10');
+assert(diffOfficeNotices({}, openLive).length === 0, 'opening a window is not a delivery notice');
+const closedLive = applySessionsSnapshot(openLive, [{ id: 's1', running: false }], 'T11');
+const closeNotices = diffOfficeNotices(openLive, closedLive);
+assert(closeNotices.length === 1 && closeNotices[0].kind === 'finished', 'closing a watched window is ONE delivery notice');
+const firstClose = closeNotices[0];
+assert(
+  firstClose.kind === 'finished' && firstClose.window.startedAt === 'T10' && firstClose.window.endedAt === 'T11',
+  'the notice carries the SAME window identity the whiteboard row does',
+);
+assert(diffOfficeNotices(closedLive, closedLive).length === 0, 'a snapshot echo of the same state never re-announces');
+// Discrimination: a SECOND closed window announces only ITSELF (the first
+// window is history by then) — the pair differs only in which window is new.
+const twoClosed = applySessionsSnapshot(
+  applySessionsSnapshot(closedLive, [{ id: 's1', running: true }], 'T12'),
+  [{ id: 's1', running: false }],
+  'T13',
+);
+const secondNotices = diffOfficeNotices(closedLive, twoClosed);
+assert(
+  secondNotices.length === 1 && secondNotices[0].kind === 'finished' && secondNotices[0].window.endedAt === 'T13',
+  'only the NEW window announces (the earlier one stays quiet)',
+);
+assert(
+  diffOfficeNotices({}, applySessionsSnapshot({}, [{ id: 'idle', running: false }], 'T14')).length === 0,
+  'a session the pane never watched running yields no delivery notice',
+);
+
+// §4.6 loop turns — the SAME delivery rule the whiteboard gates on.
+const lrRunning = [loopRow({ id: 'l1', status: 'running', lastRunStartedAt: 'T1' })];
+const lrNotices = diffLoopNotices(lrRunning, [loopRow({ id: 'l1', status: 'done', lastRunStartedAt: 'T1', lastRunOutcome: 'ok' })]);
+assert(lrNotices.length === 1 && lrNotices[0].kind === 'loop-finished', 'a watched loop turn finishing is ONE notice');
+const firstLoop = lrNotices[0];
+assert(firstLoop.kind === 'loop-finished' && firstLoop.ok === true, 'an ok outcome announces a clean finish');
+assert(officeNoticeKey(firstLoop) === 'loopdone:l1:T1', 'the loop notice key is the loop + its run stamp');
+assert(officeNoticeText(firstLoop, 'Loop One') === 'Loop One finished', 'a clean loop delivery reads finished');
+const lrErr = diffLoopNotices(lrRunning, [loopRow({ id: 'l1', status: 'error', lastRunStartedAt: 'T1', lastRunOutcome: 'error' })]);
+assert(lrErr.length === 1 && lrErr[0].kind === 'loop-finished' && lrErr[0].ok === false, 'an errored loop turn is a failed delivery notice');
+assert(
+  diffLoopNotices(lrRunning, [loopRow({ id: 'l1', status: 'done', lastRunStartedAt: 'T1', lastRunOutcome: null })]).length === 0,
+  'done without a recorded outcome is not a delivery notice',
+);
+assert(diffLoopNotices(lrRunning, [loopRow({ id: 'l1', status: 'paused' })]).length === 0, 'paused is not a delivery notice');
+assert(
+  diffLoopNotices([loopRow({ id: 'l2', status: 'paused' })], [loopRow({ id: 'l2', status: 'done', lastRunOutcome: 'ok' })]).length === 0,
+  'a loop the pane never watched running stays silent',
+);
+
+// Key + copy vocabulary for the waiting half.
+const waitNotice: OfficeNotice = { kind: 'waiting', sessionId: 's1', requestId: 'r1', tool: 'write_file' };
+assert(officeNoticeKey(waitNotice) === 'wait:s1:r1', 'the gate key is the exact requestId (replays cannot re-fire)');
+assert(
+  officeNoticeText(waitNotice, 'Boss') === 'Boss is waiting for you (write_file)',
+  'a gate notice names the tool that is asking',
+);
+assert(
+  officeNoticeText({ kind: 'waiting', sessionId: 's1', requestId: 'r2', tool: null }, 'Boss') === 'Boss is waiting for you',
+  'a question gate names no tool',
+);
+assert(officeNoticeText(firstClose, 'Boss') === 'Boss run ended', 'a close with no observed verdict stays neutral');
+// The verdict rides the window: a done frame observed BEFORE the close makes
+// the same notice read as a clean finish — the discriminating pair.
+const okClosed = applySessionsSnapshot(
+  foldOfficeFrame(openLive, { kind: 'run_end', sessionId: 's1', ok: true }, 'T10b'),
+  [{ id: 's1', running: false }],
+  'T11b',
+);
+const okNotice = diffOfficeNotices(openLive, okClosed)[0];
+assert(
+  okNotice.kind === 'finished' && okNotice.window.ok === true && officeNoticeText(okNotice, 'Boss') === 'Boss finished',
+  'a clean delivery reads finished',
+);
+assert(
+  officeNoticeText(
+    { kind: 'finished', sessionId: 's1', window: { startedAt: 'a', endedAt: 'b', ok: false, toolCount: 3 } },
+    'X',
+  ) === 'X finished with an error',
+  'a failed delivery says so',
+);
+assert(
+  officeNoticeText(
+    { kind: 'finished', sessionId: 's1', window: { startedAt: 'a', endedAt: 'b', ok: null, toolCount: 0 } },
+    'X',
+  ) === 'X run ended',
+  'a verdictless close is neutral, never a success',
+);
+
+// Labels: the notice names what the ROW names (title trimmed, id fallback).
+assert(officeSessionLabel({ id: 'sx', title: '  Real Title  ' }) === 'Real Title', 'the session label trims the real title');
+assert(officeSessionLabel({ id: 'sx', title: '   ' }) === 'sx', 'a blank title falls back to the id');
+
+// The one-shot ledger — the door every notice goes through.
+assert(announceOfficeNoticeOnce('probe:key1', 'one') === true, 'a new transition announces');
+assert(announceOfficeNoticeOnce('probe:key1', 'one') === false, 'the same transition never announces twice');
+assert(announceOfficeNoticeOnce('', 'one') === false, 'a keyless notice is refused');
 
 console.log('---');
 console.log(passed + ' assertions passed');

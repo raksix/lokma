@@ -13,13 +13,20 @@ import {
   applySessionsSnapshot,
   deriveOfficeDeliveries,
   deriveOfficeWorkers,
+  diffLoopNotices,
+  diffOfficeNotices,
   foldOfficeFrame,
   OFFICE_EMPTY_COPY,
+  officeNoticeKey,
+  officeNoticeText,
+  officeSessionLabel,
   type OfficeDelivery,
   type OfficeLiveMap,
+  type OfficeNotice,
   type OfficeSources,
   type OfficeWorker,
 } from './office-view';
+import { announceOfficeNoticeOnce } from './office-notices';
 import {
   adoptOfficeActiveProject,
   DEFAULT_OFFICE_VIEW_PREFS,
@@ -90,6 +97,14 @@ export function OfficePane() {
   const projects = useSessionStore((s) => s.projects);
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
   const activeCwd = useKnownCwd(activeSessionId);
+
+  // §4.6 notices name the SAME label the rows do; resolved from the store on
+  // demand (`getState`) so the socket listener's deps stay stable — a session
+  // list change must not re-subscribe the frame listener mid-run.
+  const officeRunLabel = React.useCallback((sessionId: string): string => {
+    const row = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
+    return row ? officeSessionLabel(row) : sessionId;
+  }, []);
 
   // REQ-204 slice 5 — the view is ONE preference object persisted under
   // `lokma-office-view:v1`: the scope toggle, the scoped project, the status
@@ -262,6 +277,21 @@ export function OfficePane() {
       if (!frame || typeof frame !== 'object') return;
       lastOfficeFrameAtRef.current = Date.now();
       setLive((prev) => foldOfficeFrame(prev, frame, new Date().toISOString()));
+      // §4.6 — the notification half: a gate observed pending IS the "waiting
+      // for you" moment. One toast per gate — `requestId` is its exact
+      // identity, so a replay (or a second office host) fires it once.
+      if (frame.kind === 'gate') {
+        const notice: OfficeNotice = {
+          kind: 'waiting',
+          sessionId: frame.sessionId,
+          requestId: frame.requestId,
+          tool: frame.tool,
+        };
+        announceOfficeNoticeOnce(
+          officeNoticeKey(notice),
+          officeNoticeText(notice, officeRunLabel(frame.sessionId)),
+        );
+      }
       // Slice 4: a frame for the SELECTED worker's session means its
       // transcript just gained rows — one debounced read keeps the panel
       // matching the floor.
@@ -271,7 +301,7 @@ export function OfficePane() {
     }
     window.addEventListener(OFFICE_FRAME_EVENT, onFrame);
     return () => window.removeEventListener(OFFICE_FRAME_EVENT, onFrame);
-  }, [requestDetailRefetch]);
+  }, [requestDetailRefetch, officeRunLabel]);
 
   // Window observation: diff successive session snapshots and close the
   // window this pane actually saw go running -> stopped. Sessions it never
@@ -291,6 +321,37 @@ export function OfficePane() {
       if (state.sessions !== prev.sessions) fold(state.sessions);
     });
   }, []);
+
+  // §4.6 (delivery half): a window THIS pane watched close becomes one toast
+  // (the whiteboard's newest row, sounded). The diff runs against the last
+  // observation; the FIRST one only seeds, so mounting never replays history
+  // as a notification. The module-level ledger dedupes across office hosts.
+  const announcedLiveRef = React.useRef<OfficeLiveMap | null>(null);
+  React.useEffect(() => {
+    const before = announcedLiveRef.current;
+    announcedLiveRef.current = live;
+    if (before === null) return;
+    for (const notice of diffOfficeNotices(before, live)) {
+      announceOfficeNoticeOnce(
+        officeNoticeKey(notice),
+        officeNoticeText(notice, officeRunLabel(notice.sessionId)),
+      );
+    }
+  }, [live, officeRunLabel]);
+
+  // §4.6 (loop turns): a loop watched `running -> done/error` with a recorded
+  // outcome is a delivery too — the same announced-once door. A loop this
+  // pane never watched running stays silent (observed windows only).
+  const announcedLoopsRef = React.useRef<readonly LoopView[] | null>(null);
+  React.useEffect(() => {
+    const before = announcedLoopsRef.current;
+    announcedLoopsRef.current = loops;
+    if (before === null) return;
+    for (const notice of diffLoopNotices(before, loops)) {
+      const label = loops.find((l) => l.id === notice.loopId)?.name ?? notice.loopId;
+      announceOfficeNoticeOnce(officeNoticeKey(notice), officeNoticeText(notice, label));
+    }
+  }, [loops]);
 
   const workers = React.useMemo(
     () => deriveOfficeWorkers({ sessions, loops, projects, live, activeSessionId }),

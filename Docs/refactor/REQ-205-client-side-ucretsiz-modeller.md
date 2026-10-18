@@ -1,6 +1,6 @@
 # REQ-205 — Ücretsiz modeller **client-side** çalışsın (OmniRoute keyless yol)
 
-**Status:** pending — tur 2/5 tamam (dilim 1: katalog 46/46 ✓ · dilim 2: SSE koşucu 65/65 + PTF ✓; sırada dilim 3: kalıcılık `origin:'client-free'`)
+**Status:** pending — tur 3/5 tamam (dilim 1: katalog 46/46 ✓ · dilim 2: SSE koşucu 65/65 + PTF ✓ · dilim 3: kalıcılık `origin:'client-free'` ✓ canlı 19/19 + canlı PTF 12/19; sırada dilim 4: koşucunun UI bağlantısı — model seçici + `free` rozeti + gönderim yolu)
 **Tarih:** 2026-10-18
 **Kaynak:** Kullanıcı mesajı (10 Ekim 2026):
 > "abi opencode free kullanım var ya api üzerinden api key gerekmeden omniroute da var. o client side apiye bağla. kullancılar direkt ordan free modellere erişebilsin. client side olarak ama backenden istek gönderme şey için gelen sonuçları falan backende alırsın ama. ai tarafı client side olcak kullancının webten gönderdiği isteklere göre anladınnn."
@@ -95,3 +95,16 @@ Kullanıcı **hiçbir API anahtarı olmadan**, doğrudan **tarayıcıdan** OmniR
 - CANLI SADAKAT (kod sonrası, fixture ⊂ gerçek tel kanıtı): yazılan MODÜL gerçek uca karşı koşuldu (tek istek, anahtarsız) → `ok:true`, metin birebir `lokma live`, **579 karakter reasoning** deltası ayrıştırıldı, `finishReason:'stop'`, usage 294/169/463 (`estimated:true`), çözülen model `deepseek/deepseek-v4.1-flash`, 2.085 sn.
 - KAPILAR: kök `bun x tsc --noEmit` 0 · sterilize web build yeşil · concept build yeşil · uygulama chunk'ı `index-CsWBliF3.js` DEĞİŞMEDİ (modül henüz import edilmiyor).
 - SIRADA: dilim 3 (kalıcılık `origin:'client-free'`) + koşucunun UI bağlantısı (mevcut reducer çerçeveleri + `free` rozeti).
+
+### Tur 3/5 — dilim 3: kalıcılık `origin: 'client-free'` (istemci koşusu sunucuya yazılıyor) — 2026-10-18
+
+- SÖZLEŞME: yeni istemci çerçevesi `transcript_record` (`origin: 'client-free'` + 1..6 satır) → sunucu satırları mevcut `SessionStore.append` yoluyla yazar; `origin` damgasını SUNUCU vurur (gönderenin beyanına güvenilmez). Onay çerçevesi `transcript_recorded { count }`; tekrar oynatılan AYNI parti `count: 0` döner — kayıp ack sonrası çift kayıt YOK (saf `batchAlreadyRecorded`, `origin` karşılaştırmaya dahil).
+- TEK YAZICI: ikinci bir yazma yolu açılmadı — mevcut transcript deposu + REQ-149 beslemesi kullanılır; `toTranscriptRow` mapper'ına `origin` eklendi (REQ-160 tuzağı: mapper taşımazsa reload'da iz kaybolur → satır sunucu-ödemesi gibi okunur).
+- ROL SINIRI: şema yalnız `user|assistant|thinking` kabul eder — `tool` kanıtı sunucu döngüsünün malıdır, bu yoldan ÜRETİLEMEZ (canlı negatif kontrol: `Invalid message shape`).
+- DÜRÜSTLÜK: boş metinli koşu cevap sayılmaz → istemci yardımcısı `freeRunRecordRows` yalnız GERÇEK içeriği yazar: prompt her zaman (başarısız koşuda bile kaybolmaz), thinking yalnız reasoning geldiyse (12k tavan + işaret, döngüyle aynı), assistant yalnız METİN geldiyse (uydurma tur yok). Tavan aşımı tel sınırının İÇİNDE kırpılır (işaret dahil) → çerçeve tümden düşmez.
+- KANIT: birim `transcript-record.test.ts` 14/14 · `session-feed` 12 grup (origin mapper) · `free-runner` 65→**80** · `ws` genişletildi (kurucu round-trip + origin damgası + tool satırı reddi + ack çözümü) · kök `tsc --noEmit` 0 · sterilize web build yeşil (yeni hash `index-CYr2vXw3.js`).
+- CANLI PROB `scripts/probe-transcript-record.cjs` — **19/19** hem `127.0.0.1:3456` hem `https://lokma.fermag.com.tr` üzerinden: ack 3 · 3 `transcript_append` (origin telde) · JSONL baytlarında `"origin":"client-free"` · snapshot mapper'ı taşıyor · replay `count 0` + disk 4 satır · tool satırı / yabancı origin / olmayan transcript negatifleri · oturum silindi ve dosya gitmiş kalıyor.
+- CANLI PTF: sunucudan `origin` damgası kaldırılıp yeniden deploy edilince aynı prob **12/19** — kırmızılar TAM origin hattı (tel, JSONL, mapper + retry kontrolünün türevi); geri alım md5 bayt-aynı, rebuild+restart sonrası prob yeniden **19/19**.
+- Kapı: oturumsuz `/api/auth/me` **401** (login gate AÇIK kaldı); `pm2 restart lokma-server` + `pm2 restart lokma-web` (tek süreç, kill YOK); sunulan web bundle hash == disk.
+- Commit'ler: `f9c88a4` (core tip) · `1b8fbf4` (shared protokol) · `d645e5f` (sunucu + saf politika + prob) · `3756e59` (web kurucu + satır üreteci).
+- SIRADA: dilim 4 — koşucunun UI bağlantısı (model seçici yalnız ücretsiz katalogdan + `free` rozeti + gönderim yolu + tarayıcıdan tel kanıtı olan canlı E2E) ve dilim 5 — kapanış.

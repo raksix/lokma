@@ -37,6 +37,14 @@ export type SessionMessage = {
    * `PromptFileSchema`/`TranscriptRowSchema` — keep both in sync.
    */
   files?: SessionFile[];
+  /**
+   * REQ-205: this row was recorded by a CLIENT-side keyless run
+   * (`transcript_record` over the session socket) — the server never spent a
+   * provider key on it. Stamped server-side at append time; absent on rows
+   * the server's own provider path wrote. Mirrored in `lokma-shared`
+   * `TranscriptRowSchema` — keep both in sync.
+   */
+  origin?: 'client-free';
 };
 
 /** One chat attachment (path relative to the session cwd). */

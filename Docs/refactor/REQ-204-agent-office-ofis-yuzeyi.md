@@ -1,6 +1,6 @@
 # REQ-204 — Agent Office (pixel-art canlı ofis) Lokma'ya eklensin
 
-**Status:** pending (kaydedildi, **kod YOK** — kullanıcı "yap" demeden başlanmaz)
+**Status:** in-progress (2026-10-10 · kullanıcı "requsleri yap" dedi — kararlar §6'da sabitlendi)
 **Tarih:** 2026-10-10
 **Kaynak:** Kullanıcı mesajı (10 Ekim 2026):
 > "@url:https://github.com/isisever/agent-office/ — kanka adamın bu projesini bizim lokmaya ekleyek. bunun için request oluştur"
@@ -22,6 +22,35 @@ Agent Office'in **pixel-art canlı ofis** fikri Lokma'nın **kendi** verisiyle �
 - **Tek renderer, iki kabuk:** `app/src/office/core.mjs` ve `plugin/viewer/core.mjs` **aynı dosya** — ikisi de **70.684 bayt**. Electron penceresi ile terminal görüntüleyici aynı çizimi paylaşıyor (`/office` komutu + `/office band`).
 - **Özellik envanteri:** proje başına terminal · tüm projelerin paylaştığı ofis + **patron (boss)** · çalışana tıkla → görev / anlık araç (`Bash: npm test`, `Edit: src/app.ts`) / son 20 çağrı / sonuç paneli · **çoklu Claude hesabı** (hesap başına izole config dizini + tek tıkla `claude auth login`) · hesap başına **plan kullanım çubukları (5 saat / hafta)** + %80/%95 bildirimi · "seni bekliyor" (onay isteyen proje / biten koşu) için masaüstü bildirimi + Dock rozeti + satır işareti · git **worktree sekmesi** (`<repo>-wt-<n>`, branch `agent-office/<n>`) · beyaz tahta: günün teslimatları (süre, araç sayısı, başarı) · `/office stats` · tema sistemi (`Auto (per project)` + galeri + `themes.json` `match`) · botların rengi · **EN/TR arayüz** · tamamen yerel (telemetri yok) · GitHub Releases üzerinden kendi kendini güncelleme + Homebrew cask.
 - **Varlık durumu:** MIT olduğu için kod alınabilir (telif + lisans metni korunmak şartıyla); "yalnız fikir" yolu da tamamen açık.
+
+### 2.1 Ölçülen: renderer **yeniden kullanılabilir** (MIT, host-bağımsız)
+
+`plugin/viewer/core.mjs` (70.945 bayt) saf bir **renderer**; API'si ölçüldü:
+
+| Dışa açılan | Ne yapıyor |
+|---|---|
+| `render(now, data, opts)` | ofisi çizer, **piksel framebuffer** döner: `{ fb, LW, LH, S }` (fb = RGB, LW/LH = mantıksal ölçü, S = ölçek) |
+| `hitTest(pxX, pxY)` | canvas pikselinden **en üstteki çalışanın id'si** (tıklama → panel); `hitBoxes()` tanı için |
+| `setGeometry` / `resetOffice` | tuval ölçüsü / durum sıfırlama |
+| `setTheme` · `setThemes` · `setBotColor` · `themeColors` | tema — Lokma'nın `themes/` tokenlarıyla beslenebilir |
+| `setLanguage('tr'\|'en')` | ofis metinleri **Türkçe** (upstream'de hazır) |
+| `shellLabel`, `partyCount`, `demoOffice`, `themeFor` | yardımcılar; `demoOffice` = sahte veri (**yalnız prob için**, üründe kullanılmaz) |
+
+Tarayıcı host'u küçük bir iş: `const { fb, LW, LH, S } = render(now, data)` → framebuffer'ı S ölçeğiyle `<canvas>`'a bas; tıklamada `hitTest(x, y)` → o çalışanın panelini aç. Terminal görüntüleyici (`office.mjs`) aynı çıktıyı PNG'ye çeviriyor (`encodeRGB`/`writePng`) — yani **iki host zaten var**, üçüncüsü (bizim pane) aynı sözleşmeyi kullanır.
+
+**Veri sözleşmesi** (`plugin/types/index.d.ts`, upstream "contract v3.x") — Lokma eşlemesi:
+
+| Upstream | Alanlar | Lokma kaynağı |
+|---|---|---|
+| `Worker` | `id, type, description, spawnAt, doneAt?, isOk?, tool?, prompt?, detail?, history?, toolCount?, result?, dir?` | aktif **koşu** / **loop turu** / oturum: `prompt`+`dir` oturumdan, `tool`/`detail` `tool_start` çerçevesinden, `history` transcript'in son 20 araç satırı, `result` koşu özeti |
+| `ToolCall` | `at, tool, detail` | transcript araç satırları (tek satır özet) |
+| `Shell` | `id, command, description?, agentId?, startAt, endAt?, exitCode?, status?` | arka plan süreçleri (terminal / loop'lar) |
+| `Waiting` | `{ kind:'permission', tool, since }` | **araç onayı** bekleyen istek (onay kapısı / plan modu) |
+| `Delivery` | `id, type, description, spawnAt, doneAt, isOk, toolCount` | biten koşu |
+| `OfficeStats` | `delivered, isBusy, today?, waiting?, bossDir?` | sayımlar koşulardan **ölçülür** (uydurulmaz) |
+| `OfficeFrame` | `gen, accent, frameColor, title` | tema tokenları + başlık |
+
+**Karar:** renderer **vendor edilir** (MIT telif metni + dosya başında upstream atıfı ve değişiklik notu; `packages/lokma-web/web/src/components/office/vendor/`), veri **adaptörden** gelir. Sıfırdan canvas yazmak yerine bu, işi haftalardan günlere indirir.
 
 ## 3. Lokma'da bugün ne var (ölçülmüş, `file:line`)
 
@@ -59,15 +88,15 @@ Agent Office'in **pixel-art canlı ofis** fikri Lokma'nın **kendi** verisiyle �
 - 390 px'te taşma **0** ve tuval yerine liste; kontrast ≥4.5; emoji/ikon-font yok (Lucide).
 - Ekran kanıtı: ofis dolu + boş durum + dar ekran olmak üzere en az 3 görsel `Docs/refactor/assets/` altına.
 
-## 6. Karar bekleyen noktalar (kullanıcı kararı — kod yazılmadan ÖNCE netleşmeli)
+## 6. Kararlar (kullanıcı "yap" dedi — bu varsayılanlar uygulanır)
 
-1. **"Eklemek" ne demek?** (a) yalnız **fikir** → Lokma'nın kendi verisiyle yerli Office yüzeyi *(öneri)*, (b) upstream **kodu vendor** edilip uyarlanır (Electron kısmı bize yaramaz; `core.mjs` renderer'ı alınabilir), (c) yalnız **plugin** taşınır (Claude Code koşuları için — hook altyapısı gerekir).
-2. **Patron kim?** (a) loop'lar (arka plan işçileri) patron, (b) kullanıcıya en çok iş çıkaran proje, (c) kullanıcının kendisi (ofisin dışında).
-3. **"Subagent" yerine ne çizilsin?** Lokma'da subagent yok: (a) **koşu (run)**, (b) **loop turu**, (c) ikisi birlikte (farklı renk/kiyafet).
-4. **Çoklu Claude hesabı** istiyor muyuz (izole `CLAUDE_CONFIG_DIR` + 5 saat/hafta kullanım çubukları), yoksa mevcut sağlayıcı + `usage` yüzeyi yeter mi?
-5. **Çizim teknolojisi:** canvas 2D (upstream'in yolu) mi, DOM/CSS mi? (Öneri: veri katmanı tek, çizim iki kabuk — biri canvas biri liste.)
-6. **Paket yeri:** yeni `packages/lokma-office` mi, `web/src/components/office/*` mı, `plugins/` mı?
-7. **Kapsam 9 (Claude köprüsü)** bu REQ'te mi kalıyor, ayrı REQ'e mi bölünüyor?
+1. **"Eklemek" = fikir + renderer yeniden kullanımı.** Yerli **Office** yüzeyi; veri Lokma'nın kendi akışından. Electron kabuğu **alınmaz**; `core.mjs` renderer'ı **vendor** edilir (§2.1, MIT atıf şartı).
+2. **Patron (boss) = aktif oturumun ajanı** (kullanıcının konuştuğu). Loop'lar ve bot'lar **arka plan işçisi** olarak ayrı görünür (`type` ile ayrışır).
+3. **"Subagent" yerine:** birincil olarak **koşu (run)**, ikincil olarak **loop turu** — ikisi `type` ile ayrılır (`run` / `loop-turn`), farklı rozet.
+4. **Çoklu Claude hesabı YOK, 5 saat/hafta plan çubukları YOK** (Claude plan'ına özgü). Kullanım bilgisi mevcut `usage` yüzeyinde kalır — ofis onu **taklit etmez**.
+5. **Çizim:** canvas 2D (vendor renderer'ın framebuffer'ı) + **390 px'te liste görünümü** (aynı veri, DOM).
+6. **Paket yeri:** yeni paket **yok** — `packages/lokma-web/web/src/components/office/` (+ `office/vendor/`); yüzey satırı `packages/lokma-shared/src/surfaces.ts`.
+7. **Claude Code hook köprüsü bu REQ'te YOK** → ayrı iş (kullanıcı isterse yeni REQ).
 
 ## 7. Dokunulacak yerler (öngörü — uygulamada kesinleşir)
 

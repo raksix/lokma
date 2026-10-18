@@ -35,6 +35,7 @@ import {
   type WsUiState,
 } from '@/lib/ws';
 import { announceLoopChange } from '@/lib/loop-frame';
+import { announceOfficeFrame, officeFrameOf } from '@/lib/office-frame';
 
 /**
  * useWs — typed WS hook for harness chat streaming.
@@ -218,6 +219,11 @@ export function useWs(sessionId: string): UseWs {
         // would drag the console into the chat's initial chunk); the console
         // listens for the event and re-reads only the named loops.
         if (msg.type === 'loop') announceLoopChange(msg.loopIds);
+        // REQ-204 slice 3: the same one-way bridge carries the office's live
+        // frames (tools, gates, run end) — the office pane folds them into its
+        // own observation map and nothing here touches chat state.
+        const officeFrame = officeFrameOf(msg);
+        if (officeFrame) announceOfficeFrame(officeFrame);
       };
       ws.onerror = () => {
         // Error details arrive via onclose; just make sure a dead socket closes.

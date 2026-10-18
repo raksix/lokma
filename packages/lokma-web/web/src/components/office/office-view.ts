@@ -38,6 +38,7 @@
  *    kept watching, and null before the first observation.
  */
 import type { AuthProject, LoopRunOutcome, LoopView, SessionSummary } from '@/lib/api';
+import type { OfficeFrame } from '@/lib/office-frame';
 import {
   findProject,
   loopProjectState,
@@ -305,6 +306,27 @@ export function applyRunEnd(
 ): OfficeLiveMap {
   const cur = officeLiveFor(live, sessionId);
   return put(live, sessionId, { ...cur, lastRunOk: ok, waiting: 0 });
+}
+
+/**
+ * Fold one bridged office frame (REQ-204 slice 3 — `lib/office-frame.ts`).
+ *
+ * A gate is settled by EVIDENCE, not by a timer: the server has no
+ * "gate answered" frame, so the next observable event for that session — a
+ * tool starting or returning, or the run ending — settles one pending gate.
+ * Without that rule an approved gate would leave `waiting` stuck on forever.
+ */
+export function foldOfficeFrame(live: OfficeLiveMap, frame: OfficeFrame, at: string): OfficeLiveMap {
+  switch (frame.kind) {
+    case 'tool_start':
+      return applyToolStart(applyGateSettled(live, frame.sessionId), frame, at);
+    case 'tool_result':
+      return applyToolResult(applyGateSettled(live, frame.sessionId), frame);
+    case 'gate':
+      return applyGatePending(live, frame.sessionId);
+    case 'run_end':
+      return applyRunEnd(live, frame.sessionId, frame.ok);
+  }
 }
 
 /** Move the open window into `closed` (newest first, capped) and open fresh. */

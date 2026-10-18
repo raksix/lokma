@@ -20,6 +20,7 @@ import {
   deriveOfficeDeliveries,
   deriveOfficeWorkers,
   emptyOfficeLive,
+  foldOfficeFrame,
   loopOutcomeOk,
   OFFICE_DETAIL_MAX,
   OFFICE_TOOL_HISTORY_CAP,
@@ -34,6 +35,8 @@ import {
   type OfficeSessionRow,
   type OfficeSources,
 } from './office-view';
+import { officeFrameOf, runEndOkFromDone } from '@/lib/office-frame';
+import type { ServerMessage } from '@lokma/shared/protocol/ws';
 import type { AuthProject } from '@/lib/api';
 
 let passed = 0;
@@ -370,6 +373,55 @@ assert(promptFirstLine('\n\n  Ship the docs  \nmore') === 'Ship the docs', 'the 
 assert(promptFirstLine('') === null && promptFirstLine('  \n ') === null, 'a blank prompt has no task line');
 const longTask = promptFirstLine('y'.repeat(400));
 assert(longTask !== null && longTask.length === 200 && longTask.endsWith('...'), 'a long task line is capped');
+
+// ── J. bridged office frames (REQ-204 slice 3) ─────────────────────────────
+
+// A gate is settled by the NEXT observable event of that session — without
+// this rule an approved gate would pin `waiting` on forever.
+const gated = foldOfficeFrame({}, { kind: 'gate', sessionId: 's1' }, 'T1');
+assert(officeLiveFor(gated, 's1').waiting === 1, 'a gate frame raises the pending count');
+const settled = foldOfficeFrame(
+  gated,
+  { kind: 'tool_start', sessionId: 's1', callId: 'c1', tool: 'read', input: { path: 'a' } },
+  'T2',
+);
+assert(officeLiveFor(settled, 's1').waiting === 0, 'the next tool start settles the observed gate');
+assert(officeLiveFor(settled, 's1').tools.length === 1, 'and that same frame still records its tool row');
+// Discrimination: the SAME frame with no pending gate still records the row —
+// only the settle half differs, so this pair proves the settle is real.
+const noGate = foldOfficeFrame({}, { kind: 'tool_start', sessionId: 's1', callId: 'c2', tool: 'read', input: {} }, 'T3');
+assert(
+  officeLiveFor(noGate, 's1').waiting === 0 && officeLiveFor(noGate, 's1').tools.length === 1,
+  'tool start with no gate: row yes, waiting untouched',
+);
+// A tool_result for a call this pane never saw start is dropped, not invented.
+const orphan = foldOfficeFrame({}, { kind: 'tool_result', sessionId: 's1', callId: 'never', result: {}, isError: false }, 'T4');
+assert(officeLiveFor(orphan, 's1').tools.length === 0, 'an orphan tool_result invents nothing');
+// Run end records the observed verdict and clears any pending gate.
+const ended = foldOfficeFrame(gated, { kind: 'run_end', sessionId: 's1', ok: false }, 'T5');
+assert(
+  officeLiveFor(ended, 's1').lastRunOk === false && officeLiveFor(ended, 's1').waiting === 0,
+  'run end carries the verdict and clears waiting',
+);
+
+// done -> verdict: only complete/error are verdicts; aborted stays null.
+assert(runEndOkFromDone('complete') === true, 'done complete is an ok delivery');
+assert(runEndOkFromDone('error') === false, 'done error is a failed delivery');
+assert(runEndOkFromDone('aborted') === null, 'an aborted run claims no verdict');
+// Wire mapping: only office-relevant frames cross; an unattributable error is
+// dropped rather than filed against every worker.
+assert(
+  officeFrameOf({ type: 'text_delta', delta: 'x', sessionId: 's1' } as ServerMessage) === null,
+  'chat-only frames do not cross the office bridge',
+);
+assert(officeFrameOf({ type: 'error', message: 'boom' } as ServerMessage) === null, 'an unattributable error is dropped');
+const gateFrame = officeFrameOf(
+  { type: 'permission_request', requestId: 'r1', tool: 'terminal', description: 'run it', sessionId: 's7' } as ServerMessage,
+);
+assert(
+  gateFrame !== null && gateFrame.kind === 'gate' && gateFrame.sessionId === 's7',
+  'a permission request becomes a gate frame for that session',
+);
 
 console.log('---');
 console.log(passed + ' assertions passed');

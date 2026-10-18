@@ -9,6 +9,7 @@ import {
   applySessionsSnapshot,
   deriveOfficeDeliveries,
   deriveOfficeWorkers,
+  foldOfficeFrame,
   OFFICE_EMPTY_COPY,
   officeStats,
   type OfficeDelivery,
@@ -16,6 +17,7 @@ import {
   type OfficeSources,
   type OfficeWorker,
 } from './office-view';
+import { OFFICE_FRAME_EVENT, type OfficeFrame } from '@/lib/office-frame';
 import { OfficeCanvas } from './office-canvas';
 import { OFFICE_CANVAS_MIN_WIDTH } from './office-canvas-model';
 
@@ -110,6 +112,20 @@ export function OfficePane() {
     }, OFFICE_POLL_MS);
     return () => window.clearInterval(t);
   }, [lastFrameAt, loadLoops]);
+
+  // Live frames (REQ-204 slice 3): the socket bridges the tool/gate/run frames
+  // it already carries; folding them here is what fills `currentTool`,
+  // `waiting` and the tool history both the rows and the canvas render. No
+  // second feed is opened — same one-way bridge as the loop console.
+  React.useEffect(() => {
+    function onFrame(ev: Event): void {
+      const frame = (ev as CustomEvent<OfficeFrame>).detail;
+      if (!frame || typeof frame !== 'object') return;
+      setLive((prev) => foldOfficeFrame(prev, frame, new Date().toISOString()));
+    }
+    window.addEventListener(OFFICE_FRAME_EVENT, onFrame);
+    return () => window.removeEventListener(OFFICE_FRAME_EVENT, onFrame);
+  }, []);
 
   // Window observation: diff successive session snapshots and close the
   // window this pane actually saw go running -> stopped. Sessions it never

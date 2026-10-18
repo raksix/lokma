@@ -1,7 +1,7 @@
 # REQ-205 — Ücretsiz modeller **client-side** çalışsın (OmniRoute keyless yol)
 
 **Status:** pending (kullanıcı "requsleri yap" dedi — REQ-204 ile birlikte kuyrukta)
-**Tarih:** 2026-10-10
+**Tarih:** 2026-10-18
 **Kaynak:** Kullanıcı mesajı (10 Ekim 2026):
 > "abi opencode free kullanım var ya api üzerinden api key gerekmeden omniroute da var. o client side apiye bağla. kullancılar direkt ordan free modellere erişebilsin. client side olarak ama backenden istek gönderme şey için gelen sonuçları falan backende alırsın ama. ai tarafı client side olcak kullancının webten gönderdiği isteklere göre anladınnn."
 
@@ -13,7 +13,7 @@
 
 Kullanıcı **hiçbir API anahtarı olmadan**, doğrudan **tarayıcıdan** OmniRoute'un ücretsiz model havuzuna erişip sohbet edebilsin; AI çağrısı istemciden (client-side) gitsin, sonuç yine de oturuma/kayda işlensin.
 
-## 2. Ölçülen gerçek (10 Eki 2026, canlı problar — hepsi anahtarsız)
+## 2. Ölçülen gerçek (18 Eki 2026, canlı problar — hepsi anahtarsız)
 
 | Ölçüm | Sonuç |
 |---|---|

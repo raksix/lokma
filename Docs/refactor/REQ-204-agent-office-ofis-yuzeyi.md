@@ -1,6 +1,6 @@
 # REQ-204 — Agent Office (pixel-art canlı ofis) Lokma'ya eklensin
 
-**Status:** in-progress (2026-10-10 · kullanıcı "requsleri yap" dedi — kararlar §6'da sabitlendi)
+**Status:** in-progress (2026-10-18 · kullanıcı "requsleri yap" dedi — kararlar §6'da sabitlendi)
 **Tarih:** 2026-10-10
 **Kaynak:** Kullanıcı mesajı (10 Ekim 2026):
 > "@url:https://github.com/isisever/agent-office/ — kanka adamın bu projesini bizim lokmaya ekleyek. bunun için request oluştur"

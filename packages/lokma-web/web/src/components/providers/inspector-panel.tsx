@@ -10,6 +10,7 @@ import {
   LazyBrowserPane,
   LazyCronApprovalsPane,
   LazyLoopsPane,
+  LazyOfficePane,
   LazyExtrasPane,
   LazyGitPane,
   LazyModelsPane,
@@ -110,6 +111,8 @@ export type InspectorTab =
   | 'cron'
   // REQ-202 — the Loops console as an Inspector tab.
   | 'loops'
+  // REQ-204 — the Office pane as an Inspector tab (slice 2).
+  | 'office'
   | 'extras'
   | 'todos';
 
@@ -163,6 +166,9 @@ export function InspectorPanel({
         // REQ-202 — the Loops console, same component as the pane tab and
         // the Settings section (one implementation, three hosts).
         <LazyLoopsPane />
+      ) : tab === 'office' ? (
+        // REQ-204 — the Office pane, same component as the tiling tab.
+        <LazyOfficePane />
       ) : tab === 'observability' ? (
         <LazyObservabilityPane />
       ) : tab === 'plugins' ? (

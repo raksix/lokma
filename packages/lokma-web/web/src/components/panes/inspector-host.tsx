@@ -10,6 +10,7 @@ import {
   LazyBrowserPane,
   LazyCronApprovalsPane,
   LazyLoopsPane,
+  LazyOfficePane,
   LazyExtrasPane,
   LazyGitPane,
   LazyModelsPane,
@@ -88,6 +89,8 @@ function LazyTab({
   if (tab === 'cron') return <LazyCronApprovalsPane />;
   // REQ-202 — the Loops console (same component as Settings → Loops).
   if (tab === 'loops') return <LazyLoopsPane />;
+  // REQ-204 — the Office pane (slice 2): the live row view.
+  if (tab === 'office') return <LazyOfficePane />;
   if (tab === 'todos') return <LazyTodosPane sessionId={sessionId} onOpenSession={onOpenSession} />;
   if (tab === 'extras') {
     return <LazyExtrasPane onOpenTab={(t: ExtrasTabId) => onOpenInspectorTab(t)} />;

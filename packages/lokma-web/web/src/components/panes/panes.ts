@@ -62,6 +62,9 @@ export const INSPECTOR_TABS = [
   // REQ-202 — the Loops console: the rail entry's pane tab (kapsam 1).
   // Same component as Settings → Loops, one implementation.
   { id: 'loops', label: 'Loops' },
+  // REQ-204 — the Office pane (slice 2): the rail entry's tab — same pane
+  // route every other pane surface takes.
+  { id: 'office', label: 'Office' },
   { id: 'extras', label: 'Extras' },
   { id: 'todos', label: 'Todos' },
 ] as const;
@@ -81,6 +84,7 @@ export const TILING_BAR_TABS: InspectorTabId[] = [
   'observability', // onOpenObservability
   'cron', // onOpenCron
   'loops', // onOpenLoops (REQ-202)
+  'office', // onOpenOffice (REQ-204)
   'extras', // onOpenExtras
   'browser', // harness addition (W3-12 per-agent tabs)
 ];

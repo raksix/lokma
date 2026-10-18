@@ -4,7 +4,7 @@
  * No test framework — plain asserts. Excluded from the package build.
  *
  * Locks the catalog against the live chrome: the rail projection below must
- * equal the web Inspector rail (21 entries, same order), the activity
+ * equal the web Inspector rail (23 entries, same order), the activity
  * projection must equal the activity bar groups, and every tool named in the
  * REQ scope table must exist with a valid gate.
  */
@@ -69,6 +69,8 @@ assert.deepEqual(railIds, [
   'plugins',
   'observability',
   'cron',
+  'loops',
+  'office',
   'extras',
   'memory',
   'todos',
@@ -176,10 +178,16 @@ ok(surfaceTool('git_status')?.gate === 'read', 'git_status is a read');
 ok(surfaceTool('loop_list')?.surface === 'loops', 'loop tools belong to the loops surface');
 ok(surfaceTool('loop_list')?.gate === 'read', 'loop_list is a read');
 ok(surfaceTool('loop_create')?.gate === 'write', 'loop_create is a write');
-// The Loops surface has no chrome entry until its console pane ships (REQ-202)
-// — asserted here so adding the rail row without the pane is a RED, not a
-// silently dead button.
-ok(surfacesWithHost('inspector').every((s) => s.id !== 'loops'), 'loops has no rail entry until its pane exists');
+// REQ-202/REQ-204 — the rail entry ships WITH its pane: both consoles exist
+// in the web tree, so their catalog rows carry the `inspector` host and the
+// projection above lists them. The inverse (a rail row with no pane) is the
+// dead button this pair guards against.
+ok(surfacesWithHost('inspector').some((s) => s.id === 'loops'), 'loops has a rail entry now that its console exists');
+ok(surfacesWithHost('inspector').some((s) => s.id === 'office'), 'office has a rail entry now that its pane exists');
+// The Office ships with an EMPTY tool family until a later slice gives it
+// one — the surface row alone is the honest shape for an icon-only surface.
+ok(surfaceById('office')?.tools.length === 0, 'office ships with no agent tools yet');
+ok(surfaceById('office')?.opens === 'pane', 'office opens as a pane');
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 ok(surfaceById('vault')?.label === 'Vault', 'surfaceById resolves a label');

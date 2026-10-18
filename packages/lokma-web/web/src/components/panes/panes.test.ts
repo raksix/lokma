@@ -103,8 +103,8 @@ check("upsert session ignores file tabs", v4.tabs.length === 2);
 check("tab id prefix", makeTabId("tab-x").startsWith("tab-x-"));
 check("pane id prefix unique", makePaneId().startsWith("p-") && makePaneId() !== makePaneId());
 
-/* 2 — registry mirrors the left Inspector (17 tabs incl. REQ-062 Todos and REQ-202 Loops; REQ-161 moved Bots to its own mode; REQ-163 moved Agent Hub, REQ-164 Orchestration, REQ-165 Vault + Memory, REQ-166 Skills to the Settings modal, REQ-167 Archify to its own standalone modal, REQ-168 Design to its own page); tiling bar keeps the 13 open actions. */
-check("registry has 17 entries", INSPECTOR_TABS.length === 17);
+/* 2 — registry mirrors the left Inspector (18 tabs incl. REQ-062 Todos, REQ-202 Loops and REQ-204 Office; REQ-161 moved Bots to its own mode; REQ-163 moved Agent Hub, REQ-164 Orchestration, REQ-165 Vault + Memory, REQ-166 Skills to the Settings modal, REQ-167 Archify to its own standalone modal, REQ-168 Design to its own page); tiling bar keeps the 14 open actions. */
+check("registry has 18 entries", INSPECTOR_TABS.length === 18);
 check("registry has files first", INSPECTOR_TABS[0].id === "files");
 check("registry has browser", INSPECTOR_TABS.some((t) => t.id === "browser"));
 check("registry dropped orchestration and agents (REQ-163/164, Settings modal sections)", !INSPECTOR_TABS.some((t) => (t.id as string) === "orchestration") && !INSPECTOR_TABS.some((t) => (t.id as string) === "agents"));
@@ -115,7 +115,9 @@ check("registry dropped design (REQ-168, standalone page)", !INSPECTOR_TABS.some
 check("registry has todos", INSPECTOR_TABS.some((t) => t.id === "todos"));
 // REQ-202 — the Loops console is a real pane tab (its rail icon lands here).
 check("registry has loops (REQ-202)", INSPECTOR_TABS.some((t) => t.id === "loops"));
-check("tiling bar has 13 entries (REQ-202 added loops)", TILING_BAR_TABS.length === 13);
+// REQ-204 — the Office pane is a real pane tab (its rail icon lands here).
+check("registry has office (REQ-204)", INSPECTOR_TABS.some((t) => t.id === "office"));
+check("tiling bar has 14 entries (REQ-204 added office)", TILING_BAR_TABS.length === 14);
 check("tiling bar all in registry", TILING_BAR_TABS.every(isInspectorTabId));
 check("inspectorLabel known", inspectorLabel("git") === "Git");
 check("isInspectorTabId rejects unknown", !isInspectorTabId("nope"));

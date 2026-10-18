@@ -78,6 +78,11 @@ export const LazyCronApprovalsPane = React.lazy(() =>
 export const LazyLoopsPane = React.lazy(() =>
   import('@/components/loops/loop-console').then((m) => ({ default: m.LoopConsole })),
 );
+// REQ-204 — the Office pane (slice 2): the live "who is working" list. Own
+// chunk — only the Office rail pane / tab mounts it.
+export const LazyOfficePane = React.lazy(() =>
+  import('@/components/office/office-pane').then((m) => ({ default: m.OfficePane })),
+);
 export const LazyExtrasPane = React.lazy(() =>
   import('@/components/extras/extras-pane').then((m) => ({ default: m.ExtrasPane })),
 );

@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Beaker, Brain, Clock3, Cpu, Folder, FolderOpen, GitBranch, Globe, HardDrive, Info, Layers, ListTodo, Package, Plug2, Puzzle, Repeat, Settings, Star, Terminal, Users, Workflow } from 'lucide-react';
+import { Activity, BarChart3, Beaker, Brain, Building2, Clock3, Cpu, Folder, FolderOpen, GitBranch, Globe, HardDrive, Info, Layers, ListTodo, Package, Plug2, Puzzle, Repeat, Settings, Star, Terminal, Users, Workflow } from 'lucide-react';
 import { surfacesWithHost, type Surface, type SurfaceId } from '@lokma/shared/surfaces';
 import { cn } from '@/lib/utils';
 import { INSPECTOR_DRAG_MIME, encodeInspectorDrag } from '@/components/panes/panes';
@@ -111,6 +111,9 @@ const SURFACE_ICONS: Partial<Record<SurfaceId, typeof Info>> = {
   observability: Activity,
   cron: Clock3,
   loops: Repeat,
+  // REQ-204 — the Office pane's rail icon (its catalog row carries the
+  // `inspector` host; a missing icon here would throw at projection time).
+  office: Building2,
   extras: Star,
   memory: Brain,
   todos: ListTodo,

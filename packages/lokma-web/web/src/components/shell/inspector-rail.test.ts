@@ -34,12 +34,12 @@ check('rail sits opposite the Explorer (left)', inspectorRailSide('left') === 'r
 check('rail sits opposite the Explorer (right)', inspectorRailSide('right') === 'left');
 
 const tabs = INSPECTOR_RAIL_ITEMS.map((item) => item.tab);
-check('twenty-one rail items (15 Inspector menus + the 5 Settings-modal entries + the standalone Archify modal entry; REQ-168 removed Design)', tabs.length === 21);
+check('twenty-three rail items (17 Inspector menus + the 5 Settings-modal entries + the standalone Archify modal entry; REQ-168 removed Design, REQ-202 added Loops, REQ-204 added Office)', tabs.length === 23);
 check('rail tabs unique', new Set(tabs).size === tabs.length);
 check('files first (VS Code Explorer position), todos last', tabs[0] === 'files' && tabs[tabs.length - 1] === 'todos');
 check(
   'covers every Inspector menu',
-  ['files', 'providers', 'models', 'usage', 'settings', 'terminal', 'git', 'browser', 'agents', 'orchestration', 'vault', 'skills', 'archify', 'testing', 'setup', 'plugins', 'observability', 'cron', 'extras', 'memory'].every(
+  ['files', 'providers', 'models', 'usage', 'settings', 'terminal', 'git', 'browser', 'agents', 'orchestration', 'vault', 'skills', 'archify', 'testing', 'setup', 'plugins', 'observability', 'cron', 'loops', 'office', 'extras', 'memory'].every(
     (tab) => tabs.includes(tab as (typeof tabs)[number]),
   ),
 );

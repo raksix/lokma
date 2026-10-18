@@ -36,6 +36,7 @@ export type SurfaceId =
   | 'observability'
   | 'cron'
   | 'loops'
+  | 'office'
   | 'extras'
   | 'memory'
   | 'todos'
@@ -334,6 +335,20 @@ export const SURFACES: readonly Surface[] = [
       { name: 'loop_list', summary: 'List loops with status, trigger, spent budget and last turn outcome', gate: 'read' },
       { name: 'loop_create', summary: 'Create a repeating loop (approval-gated) with a prompt, cwd and trigger', gate: 'write' },
     ],
+  },
+  // ── Office (REQ-204) ────────────────────────────────────────────────────
+  // Who is working RIGHT NOW: live runs and loop turns on one canvas, all
+  // from Lokma's own feeds (sessions snapshot + loops catalog + the WS tool
+  // frames the pane observed). The rail entry arrives WITH the pane in the
+  // same slice (REQ-202 rule): a rail entry whose pane does not exist is a
+  // dead button. `tools: []` until a later slice gives the office an agent
+  // tool family — an icon-only surface needs none.
+  {
+    id: 'office',
+    label: 'Office',
+    opens: 'pane',
+    hosts: ['inspector'],
+    tools: [],
   },
   // ── Extras ───────────────────────────────────────────────────────────────
   {

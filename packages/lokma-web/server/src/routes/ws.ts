@@ -68,6 +68,7 @@ import {
   toTranscriptRow,
   unsubscribeSocket,
 } from '../session-feed.js';
+import { batchAlreadyRecorded } from '../transcript-record.js';
 
 /**
  * WS /ws/:sessionId — runs the agent tool loop (`../agent-loop.js`) over
@@ -1091,6 +1092,63 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
           encodeServerMessage({ type: 'transcript', sessionId: msg.sessionId, messages: messages.map(toTranscriptRow) }),
         );
         subscribeSessionTranscript(msg.sessionId, socket);
+      } else if (msg.type === 'transcript_record') {
+        // REQ-205 slice 3 — a browser-side KEYLESS run finished and asks for
+        // its rows to be persisted through the SAME store the server loop
+        // writes (never a second writer). `origin` is stamped HERE, not
+        // trusted from the sender: the only recordable origin is
+        // `client-free`, and the row must say what the server can vouch for.
+        const viewer = (await userFromToken(requestToken(req)).catch(() => null)) ?? handshakeUser;
+        const targetCwd =
+          msg.sessionId === sessionId
+            ? await effectiveCwd()
+            : ((await locateSession(msg.sessionId).catch(() => null))?.cwd ?? (await effectiveCwd()));
+        const store = new SessionStore(targetCwd);
+        const [messages, meta] = await Promise.all([store.read(msg.sessionId), store.readMeta(msg.sessionId)]);
+        if (messages.length === 0 && meta == null) {
+          socket.send(
+            encodeServerMessage({ type: 'error', message: `No transcript for ${msg.sessionId}`, code: 'session_not_found', sessionId }),
+          );
+          return;
+        }
+        // Same strictness as the prompt path (the other write path): on a
+        // gated instance an unattributed write must not land. Gate-off keeps
+        // the legacy open behavior.
+        if (await loginGateActive()) {
+          if (!viewer || !canViewSession(viewer, meta?.ownerId)) {
+            socket.send(
+              encodeServerMessage({ type: 'error', message: 'forbidden: not your session', code: 'forbidden', sessionId }),
+            );
+            return;
+          }
+        }
+        // Retry-safe: an ack lost on a socket drop makes the client replay
+        // the identical batch — it is already persisted, answer count 0
+        // instead of appending a second copy.
+        if (batchAlreadyRecorded(messages, msg.rows, msg.origin)) {
+          socket.send(
+            encodeServerMessage({ type: 'transcript_recorded', sessionId: msg.sessionId, count: 0 }),
+          );
+          return;
+        }
+        try {
+          for (const row of msg.rows) {
+            await store.append(msg.sessionId, {
+              role: row.role,
+              content: row.content,
+              timestamp: row.timestamp,
+              origin: msg.origin,
+            });
+          }
+          socket.send(
+            encodeServerMessage({ type: 'transcript_recorded', sessionId: msg.sessionId, count: msg.rows.length }),
+          );
+        } catch (e) {
+          app.log.warn(`[ws] transcript_record failed session=${msg.sessionId}: ${String(e)}`);
+          socket.send(
+            encodeServerMessage({ type: 'error', message: 'Failed to record transcript rows', code: 'transcript_record_failed', sessionId }),
+          );
+        }
       } else if (msg.type === 'terminal/input') {
         // Stdin for a live shell — errors come back as `error` frames so the
         // pane can toast instead of hanging on a dead terminal.

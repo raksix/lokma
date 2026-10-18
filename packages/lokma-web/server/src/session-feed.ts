@@ -65,6 +65,10 @@ export function toTranscriptRow(message: SessionMessage): TranscriptRow {
   // WS mapper must carry every row field or the card vanishes on reload and
   // nothing replays to the model.
   if (message.files?.length) row.files = message.files;
+  // REQ-205: client-free record marker — dropping it here would make every
+  // keyless-run row read as server-paid after a reload (the same REQ-160
+  // trap: the socket is the chat's primary source).
+  if (message.origin) row.origin = message.origin;
   return row;
 }
 

@@ -172,5 +172,18 @@ const withFile = toTranscriptRow({
 assert.equal(withFile.files?.length, 1, 'user file kept on the row');
 assert.equal(withFile.files?.[0]?.content, '# notes', 'user file content kept');
 
+// 12. REQ-205: the client-free record marker rides the wire row (same REQ-160
+// trap — the socket is the chat's primary source, so a dropped field makes
+// every keyless-run row read as server-paid after a reload). Absent stays
+// absent so a consumer can tell the two paths apart.
+const withOrigin = toTranscriptRow({
+  role: 'assistant',
+  content: 'lokma live',
+  timestamp: 'now',
+  origin: 'client-free',
+});
+assert.equal(withOrigin.origin, 'client-free', 'origin kept on the wire row');
+assert.ok(!('origin' in plain), 'rows without origin keep the key absent');
+
 unsubscribeSocket(listWatcher);
-console.log('REQ-149 session feed: 11 groups, all checks passed');
+console.log('REQ-149 session feed: 12 groups, all checks passed');

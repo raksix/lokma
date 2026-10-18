@@ -1333,6 +1333,13 @@ export type LoopTriggerInput = {
 
 export type LoopView = {
   id: string;
+  /**
+   * The loop's turn session — `sess_loop_<id>`, the executor's OWN derivation,
+   * mapped onto every loop response by the route (REQ-204 slice 4). The office
+   * reads a loop worker's tool rows from this session's transcript; clients
+   * never re-derive it.
+   */
+  sessionId: string;
   name: string;
   projectId: string | null;
   cwd: string;

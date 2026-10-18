@@ -57,6 +57,7 @@ function project(id: string, name: string, cwd: string): AuthProject {
 function loop(over: Partial<LoopView> & { id: string }): LoopView {
   return {
     name: 'loop ' + over.id,
+    sessionId: 'sess_loop_' + over.id,
     projectId: null,
     cwd: '/tmp/probe',
     prompt: 'do the thing',

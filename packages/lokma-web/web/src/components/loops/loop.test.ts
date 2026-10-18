@@ -42,6 +42,7 @@ function loop(over: Partial<LoopView> = {}): LoopView {
   return {
     id: 'l_00000001',
     name: 'probe loop',
+    sessionId: 'sess_loop_l_00000001',
     projectId: null,
     cwd: '/tmp/probe',
     prompt: 'do the thing',

@@ -60,12 +60,25 @@ function loopErr(reply: { status: (n: number) => { send: (b: unknown) => unknown
   throw e;
 }
 
+/**
+ * Loop record + its turn-session id (REQ-204 slice 4).
+ *
+ * The id comes from the SAME derivation the executor runs with
+ * (`loopSessionId`), mapped onto the response so no client re-invents the
+ * rule. The office pane reads a loop worker's tool history from this
+ * session's transcript — the loop session is the only place its turns'
+ * tool calls are written down.
+ */
+function withSession<T extends { id: string }>(loop: T): T & { sessionId: string } {
+  return { ...loop, sessionId: loopSessionId(loop.id) };
+}
+
 export async function loopRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/loops', async (req) => {
     const query = req.query as { projectId?: string } | undefined;
     const projectId = query?.projectId;
     const loops = projectId === undefined ? await listLoops() : await listProjectLoops(projectId === '-' ? null : projectId);
-    return { loops, count: loops.length };
+    return { loops: loops.map(withSession), count: loops.length };
   });
 
   app.get('/api/loops/:id', async (req, reply) => {
@@ -73,7 +86,7 @@ export async function loopRoutes(app: FastifyInstance): Promise<void> {
     try {
       assertLoopIdShape(id);
       const { loop } = await getLoopDetail(id);
-      return { loop };
+      return { loop: withSession(loop) };
     } catch (e) {
       return loopErr(reply, e);
     }
@@ -83,7 +96,8 @@ export async function loopRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     try {
       assertLoopIdShape(id);
-      return await getLoopDetail(id);
+      const detail = await getLoopDetail(id);
+      return { ...detail, loop: withSession(detail.loop) };
     } catch (e) {
       return loopErr(reply, e);
     }
@@ -123,7 +137,7 @@ export async function loopRoutes(app: FastifyInstance): Promise<void> {
       // REQ-202 kapsam 5: a NEW row means the catalog changed, not one record,
       // so the frame carries no id and every console re-reads its list.
       emitLoopChange();
-      return reply.status(201).send({ loop });
+      return reply.status(201).send({ loop: withSession(loop) });
     } catch (e) {
       return loopErr(reply, e);
     }
@@ -139,7 +153,7 @@ export async function loopRoutes(app: FastifyInstance): Promise<void> {
       assertLoopIdShape(id);
       const loop = await updateLoop(id, parsed.data);
       emitLoopChange([id]);
-      return { loop };
+      return { loop: withSession(loop) };
     } catch (e) {
       return loopErr(reply, e);
     }
@@ -211,7 +225,7 @@ export async function loopRoutes(app: FastifyInstance): Promise<void> {
       // agent already stopped.
       const { loop, deferred } = await requestStop(id);
       emitLoopChange([id]);
-      return { loop, deferred };
+      return { loop: withSession(loop), deferred };
     } catch (e) {
       return loopErr(reply, e);
     }
@@ -230,7 +244,7 @@ export async function loopRoutes(app: FastifyInstance): Promise<void> {
         const state = getRunState(loopSessionId(id));
         state.abort?.abort();
       }
-      return { loop, cutTurn };
+      return { loop: withSession(loop), cutTurn };
     } catch (e) {
       return loopErr(reply, e);
     }
@@ -242,7 +256,7 @@ export async function loopRoutes(app: FastifyInstance): Promise<void> {
       assertLoopIdShape(id);
       const loop = await setLoopStatus(id, 'running');
       emitLoopChange([id]);
-      return { loop };
+      return { loop: withSession(loop) };
     } catch (e) {
       return loopErr(reply, e);
     }

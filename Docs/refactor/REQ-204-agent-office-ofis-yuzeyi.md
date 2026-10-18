@@ -109,4 +109,10 @@ Tarayıcı host'u küçük bir iş: `const { fb, LW, LH, S } = render(now, data)
 
 ## 8. Uygulama günlüğü
 
-(bekliyor — kullanıcı "yap" dediğinde doldurulur)
+### Dilim 1 — veri sözleşmesi (tamam)
+
+- **Yazılan:** `packages/lokma-web/web/src/components/office/office-view.ts` (saf kurallar — I/O ve JSX yok, REQ-203 `loop-view.ts` deseni) + `office-view.test.ts` (probe).
+- **Sözleşme:** `OfficeWorker` / `OfficeToolRow` / `OfficeDelivery` + canlı katlama (`applyToolStart`/`applyToolResult`/`applyGatePending`/`applyGateSettled`/`applyRunEnd`/`applySessionsSnapshot`) + türetimler (`deriveOfficeWorkers`/`deriveOfficeDeliveries`/`officeStats`). Her alanın kaynağı yorumda `file:line`: oturum `running` ← `session-feed.ts` `toSessionRow` → `session-runs.ts` `runStatus`; araç çerçeveleri ← `protocol/ws.ts` (`tool_start`/`tool_result`/`permission_request`/`ask_user_question`); loop penceresi ← `LoopView.lastRunStartedAt`/`lastRunOutcome`; proje masası ← `loop-view.ts` kuralları (`projectIdForCwd`/`loopProjectState`) — **ikinci bir cwd eşleyici yazılmadı**.
+- **Uydurma yok (sözleşmenin çekirdeği):** `runId`/`agentId` v1'de daima `null` (kaynak yok: run kimliği oturum id'sidir, oturumda ajan bağı yok); run `startedAt` yalnız pane'in GÖZLEMLEDİĞİ pencere (sunucuda run-başlangıç alanı yok) ve gözlem yoksa `null`; loop `startedAt` gerçek alandan. "waiting" yalnız **gözlenen bekleyen kapıdan**; run "delivery" yalnız **iki ucu gözlenmiş** pencereden (`closed` halkası, cap 5), loop delivery yalnız `done`/`error` + `lastRunOutcome`'tan; `empty`/`aborted` verdict'i `null` (uydurma ok/fail yok); loop tool alanları boş (loop turu sohbete araç çerçevesi yaymaz).
+- **Kapılar:** probe **77/77** (`bun src/components/office/office-view.test.ts`) · web `tsc --noEmit` **0** · kök `bun x tsc --noEmit` **0**.
+- **Sıradaki:** dilim 2 — `surfaces.ts` satırı (`office`) + ray girişi + pane kabuğu (dürüst boş durum ile), ardından dilim 3 (canlı tuval).

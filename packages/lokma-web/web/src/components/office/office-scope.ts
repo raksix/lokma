@@ -26,6 +26,7 @@
 import type { AuthProject } from '@/lib/api';
 import { findProject, projectIdForCwd } from '@/components/loops/loop-view';
 import { officeStats, type OfficeDelivery, type OfficeStats, type OfficeWorker } from './office-view';
+import { OFFICE_THEME_MODES, type OfficeThemeMode } from './office-theme';
 
 export type OfficeScopeMode = 'all' | 'project';
 
@@ -55,6 +56,11 @@ export type OfficeViewPrefs = {
   projectId: string | null;
   status: OfficeStatusFilter;
   query: string;
+  /**
+   * Office palette source (REQ-204 slice 7): `app` = the app's active named
+   * theme, `auto` = the renderer's own per-project theme.
+   */
+  theme: OfficeThemeMode;
 };
 
 export const OFFICE_VIEW_KEY = 'lokma-office-view:v1';
@@ -64,6 +70,7 @@ export const DEFAULT_OFFICE_VIEW_PREFS: OfficeViewPrefs = {
   projectId: null,
   status: 'all',
   query: '',
+  theme: 'app',
 };
 
 const MODES: OfficeScopeMode[] = ['all', 'project'];
@@ -96,7 +103,10 @@ export function readOfficeViewPrefs(storage?: Pick<Storage, 'getItem'>): OfficeV
         ? parsed['projectId']
         : null;
     const query = typeof parsed['query'] === 'string' ? parsed['query'] : '';
-    return { mode, projectId, status, query };
+    const theme = OFFICE_THEME_MODES.includes(parsed['theme'] as OfficeThemeMode)
+      ? (parsed['theme'] as OfficeThemeMode)
+      : DEFAULT_OFFICE_VIEW_PREFS.theme;
+    return { mode, projectId, status, query, theme };
   } catch {
     return { ...DEFAULT_OFFICE_VIEW_PREFS };
   }

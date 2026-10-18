@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Building2, CheckCircle2, Crown, RefreshCw, Search, Wrench, X, XCircle } from 'lucide-react';
 import { api, type LoopView, type SessionSummary } from '@/lib/api';
 import { LOOP_CHANGED_EVENT } from '@/lib/loop-frame';
+import { subscribeTheme } from '@/components/shell';
 import { useKnownCwd, useSessionStore } from '@/stores/session';
 import { formatRunAgo } from '@/components/testing';
 import { cn } from '@/lib/utils';
@@ -48,6 +49,8 @@ import {
   officeCanvasPresentation,
   officeCanvasScrolls,
 } from './office-canvas-model';
+import { officeThemeForMode, officeThemeRegistry, type OfficeThemeMode } from './office-theme';
+import { setThemes } from './vendor/agent-office-core.mjs';
 
 /**
  * OfficePane — REQ-204 slice 2: the Office surface (rail icon + pane).
@@ -107,6 +110,42 @@ export function OfficePane() {
     const next = adoptOfficeActiveProject(prefs, activeCwd === 'loading' ? null : activeCwd, projects);
     if (next !== prefs) updatePrefs(next);
   }, [prefs, activeCwd, projects, updatePrefs]);
+
+  // REQ-204 slice 7 — the office wears the APP's theme. The named themes are
+  // registered with the renderer from the same `GET /api/themes` payload the
+  // Appearance cards show, and the ACTIVE one (`config.theme`, the value the
+  // Appearance pane persists) is forced onto the canvas. `subscribeTheme`
+  // fires on every apply — the header's light/dark toggle and an Appearance
+  // pick included — so a theme change lands without a reload. A failed read
+  // leaves the renderer's own per-project theme in place: an honest fallback,
+  // never an invented palette.
+  const [activeThemeId, setActiveThemeId] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    const load = async (): Promise<void> => {
+      try {
+        const list = await api.listThemes();
+        if (cancelled) return;
+        setThemes(officeThemeRegistry(list.themes));
+        const cfg = await api.getConfig();
+        if (cancelled) return;
+        const id = (cfg as { config?: { theme?: unknown } }).config?.theme;
+        setActiveThemeId(typeof id === 'string' && id.length > 0 ? id : null);
+      } catch {
+        // Offline or refused: keep the renderer's own per-project theme.
+      }
+    };
+    void load();
+    const unsubscribe = subscribeTheme(() => {
+      void load();
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
+
+  const officeThemeKey = officeThemeForMode(prefs.theme, activeThemeId);
 
   const [loops, setLoops] = React.useState<LoopView[]>([]);
   const [loopsError, setLoopsError] = React.useState<string | null>(null);
@@ -433,6 +472,20 @@ export function OfficePane() {
           triggerAttrs={{ 'data-office-status-filter': prefs.status }}
         />
 
+        {/* Slice 7 — the palette source: the app's active theme, or the
+            renderer's own per-project theme ("Auto (per project)"). */}
+        <SelectMenu
+          ariaLabel="Office theme"
+          size="xs"
+          value={prefs.theme}
+          onChange={(v) => updatePrefs({ ...prefs, theme: v as OfficeThemeMode })}
+          options={[
+            { value: 'app', label: 'App theme' },
+            { value: 'auto', label: 'Per project' },
+          ]}
+          triggerAttrs={{ 'data-office-theme-mode': prefs.theme }}
+        />
+
         <div className="relative min-w-[8rem] flex-1" data-office-search>
           <Search
             className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400"
@@ -498,6 +551,7 @@ export function OfficePane() {
                   deliveries={view.deliveries}
                   selectedId={selectedId}
                   onSelect={setSelectedId}
+                  themeName={officeThemeKey}
                 />
               </div>
             </div>

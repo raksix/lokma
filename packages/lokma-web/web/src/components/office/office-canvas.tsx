@@ -22,6 +22,7 @@ import {
   resetOffice,
   setGeometry,
   setLanguage,
+  setTheme,
 } from './vendor/agent-office-core.mjs';
 import { buildCanvasData, resolveCanvasSelection } from './office-canvas-model';
 import type { OfficeDelivery, OfficeWorker } from './office-view';
@@ -32,9 +33,15 @@ export type OfficeCanvasProps = {
   /** Selected worker id (Lokma id space); null = nothing selected. */
   selectedId: string | null;
   onSelect: (workerId: string | null) => void;
+  /**
+   * Forced office theme (REQ-204 slice 7): a key registered from the app's
+   * named themes (`officeThemeName(id)`), or `''` to keep the renderer's own
+   * per-project theme. The pane resolves it; the canvas only applies it.
+   */
+  themeName?: string;
 };
 
-export function OfficeCanvas({ workers, deliveries, selectedId, onSelect }: OfficeCanvasProps) {
+export function OfficeCanvas({ workers, deliveries, selectedId, onSelect, themeName = '' }: OfficeCanvasProps) {
   const hostRef = React.useRef<HTMLDivElement | null>(null);
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   /** First observation (epoch ms) per worker id — the walk-in anchor. */
@@ -70,6 +77,12 @@ export function OfficeCanvas({ workers, deliveries, selectedId, onSelect }: Offi
     const selected = selectedId !== null ? workers.find((w) => w.id === selectedId) : undefined;
     focusRef.current = selected && selected.projectId ? (selected.projectBadge ?? '') : '';
   }, [selectedId, workers]);
+
+  // Theme (REQ-204 slice 7): the renderer re-reads its palette on the next
+  // frame when the forced theme changes (`setThemes` resets its cache).
+  React.useEffect(() => {
+    setTheme(themeName);
+  }, [themeName]);
 
   // The animation loop: size via ResizeObserver, draw at the renderer's own
   // frame interval (the office is designed for ~9 fps, not 60).
@@ -149,7 +162,7 @@ export function OfficeCanvas({ workers, deliveries, selectedId, onSelect }: Offi
   };
 
   return (
-    <div ref={hostRef} className="h-full w-full" data-office-canvas-host>
+    <div ref={hostRef} className="h-full w-full" data-office-canvas-host data-office-theme={themeName || 'auto'}>
       <canvas
         ref={canvasRef}
         onClick={onClick}

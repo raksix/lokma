@@ -108,7 +108,7 @@ function reader(raw: string | null): Pick<Storage, 'getItem'> {
 
 // ── A. persistence: shape-validated, corrupt value falls back to defaults ──
 
-const roundTrip: OfficeViewPrefs = { mode: 'project', projectId: 'p_alpha', status: 'waiting', query: 'docs' };
+const roundTrip: OfficeViewPrefs = { mode: 'project', projectId: 'p_alpha', status: 'waiting', query: 'docs', theme: 'auto' };
 const written: Record<string, string> = {};
 writeOfficeViewPrefs(roundTrip, { setItem: (k: string, v: string) => void (written[k] = v) });
 assert(written[OFFICE_VIEW_KEY] === JSON.stringify(roundTrip), 'a write stores the whole snapshot under one key');
@@ -139,6 +139,15 @@ assert(
   kept.mode === 'project' && kept.projectId === 'p_alpha' && kept.query === 'x' && kept.status === 'all',
   'one bad field does not discard the good ones (discriminates the field-wise fallback)',
 );
+// REQ-204 slice 7 — the theme mode is part of the same snapshot.
+const themed = readOfficeViewPrefs(reader(JSON.stringify({ theme: 'auto' })));
+assert(themed.theme === 'auto', 'the office theme mode survives the round trip');
+const badTheme = readOfficeViewPrefs(reader(JSON.stringify({ theme: 'rainbow' })));
+assert(
+  badTheme.theme === 'app',
+  'an unknown theme mode reads back as the app theme (a bad value never reaches the renderer)',
+);
+assert(DEFAULT_OFFICE_VIEW_PREFS.theme === 'app', 'the default palette source is the app theme');
 
 // ── B. adopt once, and only when honest (REQ-203's three refusals) ─────────
 

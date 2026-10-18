@@ -12,6 +12,9 @@
  *      worker row carries that tool (`data-office-tool`);
  *   4. clicking a worker on the floor selects it (hitTest -> selection),
  *      the hint line names the selection;
+ *   4b. the slice-5 view controls: the search and the status filter hide the
+ *      SAME rows the canvas draws while the stats stay put (they follow the
+ *      scope, never the filters), and the view survives a reload;
  *   5. the WORKER DETAIL PANEL (slice 4): selecting opens the panel for that
  *      worker; its task is the REAL prompt from the transcript, its tool rows
  *      are the persisted read_file row, and its output is EXACTLY what the
@@ -19,8 +22,11 @@
  *      arrived yet, so a fabricated one would show up as a wrong string);
  *   6. when the run ends the worker AND its panel leave together ("no workers
  *      -> honest empty state"); the canvas keeps drawing;
- *   7. a sub-600px pane (split layout) falls back to the row list;
- *   8. 390px phone width: no sideways overflow, no canvas.
+ *   7. a sub-660px pane (split layout) STILL draws the canvas: the box keeps
+ *      its readable 660 px and the pane scrolls sideways (slice 6 — the
+ *      office is never replaced by a status card);
+ *   8. a phone-narrow pane (<390px): the list fallback plus the honest line
+ *      that the pixel office is live; no sideways overflow.
  *
  * The browser comes up FIRST and the prompt is only sent afterwards, so the
  * pane is provably listening before the run's frames exist (a frame sent
@@ -92,7 +98,7 @@ const WIDE = {
   },
 };
 
-/** Split layout: the Office pane ends up ~half the main area (<600px). */
+/** Split layout: the Office pane ends up ~half the main area (sub-660px). */
 const NARROW = {
   layout: {
     state: {
@@ -122,6 +128,45 @@ const NARROW = {
     right: {
       tabs: [{ id: 'tab-todos-narrow', title: 'Todos', kind: 'inspector', inspectorId: 'todos' }],
       active: 'tab-todos-narrow',
+    },
+  },
+};
+
+/**
+ * Split layout with a PHONE-NARROW Office pane (~1/3 of the main area, so
+ * below the 390px phone floor) in a DESKTOP viewport. The phone fallback is a
+ * pane-width rule, and the shell at a phone viewport does not render tiling
+ * panes at all — so the rule is measured where it actually applies.
+ */
+const PHONE_PANE = {
+  layout: {
+    state: {
+      layout: {
+        type: 'split',
+        id: 'root',
+        dir: 'row',
+        sizes: [32, 68],
+        children: [
+          { type: 'pane', id: 'left' },
+          { type: 'pane', id: 'right' },
+        ],
+      },
+      leftW: 268,
+      rightW: 300,
+      tiling: true,
+      windowed: false,
+      activeSessionId: null,
+    },
+    version: 1,
+  },
+  tabs: {
+    left: {
+      tabs: [{ id: 'tab-office-phone', title: 'Office', kind: 'inspector', inspectorId: 'office' }],
+      active: 'tab-office-phone',
+    },
+    right: {
+      tabs: [{ id: 'tab-todos-phone', title: 'Todos', kind: 'inspector', inspectorId: 'todos' }],
+      active: 'tab-todos-phone',
     },
   },
 };
@@ -262,7 +307,10 @@ const stub = http.createServer((req, res) => {
 
     const canvas = await page.waitForSelector('[data-office-canvas]', { timeout: 25_000 });
     const box = await canvas.boundingBox();
-    check(box !== null && box.width >= 600, 'the canvas renders at a readable width (' + (box ? Math.round(box.width) : 0) + 'px >= 600)');
+    check(
+      box !== null && box.width >= 660,
+      'the canvas renders at a readable width (' + (box ? Math.round(box.width) : 0) + 'px >= 660)',
+    );
 
     const readCanvas = () =>
       page.evaluate(() => {
@@ -362,6 +410,89 @@ const stub = http.createServer((req, res) => {
     }
     const frameTypes = [...new Set(frames.map((f) => f.type))];
     check(tool === 'read_file', 'the live tool badge shows the tool the run actually called (' + tool + '; frames: ' + frameTypes.join(',') + ')');
+
+    // 4b. slice 5 — the view controls filter the SAME rows the canvas draws,
+    // and stats follow the SCOPE, never the filters: a status filter must not
+    // be able to answer "0 working" for an office that is plainly working.
+    const statsBefore = await page.evaluate(() => {
+      const el = document.querySelector('[data-office-stats]');
+      return el ? (el.textContent || '').trim() : '';
+    });
+    await page.locator('[data-office-search] input').pressSequentially('zzz-no-such-worker', { delay: 15 });
+    await sleep(600);
+    const filtered = await page.evaluate(() => ({
+      rows: document.querySelectorAll('[data-office-worker]').length,
+      empty: Boolean(document.querySelector('[data-office-filtered-empty]')),
+      clear: Boolean(document.querySelector('[data-office-clear-filters]')),
+      canvasWorkers: (() => {
+        const el = document.querySelector('[data-office-canvas]');
+        return el ? Number(el.getAttribute('data-office-canvas-workers')) : -1;
+      })(),
+      stats: (() => {
+        const el = document.querySelector('[data-office-stats]');
+        return el ? (el.textContent || '').trim() : '';
+      })(),
+    }));
+    check(
+      filtered.rows === 0 && filtered.canvasWorkers === 0,
+      'the search filters BOTH the list and the canvas rows (rows ' + filtered.rows + ', canvas ' + filtered.canvasWorkers + ')',
+    );
+    check(filtered.empty === true && filtered.clear === true, 'the filtered-empty state names the filters and offers Clear filters');
+    check(filtered.stats === statsBefore, 'stats follow the scope, never the filters (' + statsBefore + ' stayed ' + filtered.stats + ')');
+
+    await page.locator('[data-office-clear-filters]').click();
+    await sleep(500);
+    const cleared = await page.evaluate(() => ({
+      rows: document.querySelectorAll('[data-office-worker]').length,
+      empty: Boolean(document.querySelector('[data-office-filtered-empty]')),
+      query: (() => {
+        const i = document.querySelector('[data-office-search] input');
+        return i ? i.value : null;
+      })(),
+      canvasWorkers: (() => {
+        const el = document.querySelector('[data-office-canvas]');
+        return el ? Number(el.getAttribute('data-office-canvas-workers')) : -1;
+      })(),
+    }));
+    check(
+      cleared.empty === false && cleared.query === '' && cleared.rows >= 1 && cleared.canvasWorkers === cleared.rows,
+      'Clear filters restores the office (rows ' + cleared.rows + ', canvas ' + cleared.canvasWorkers + ')',
+    );
+
+    // The status filter mid-run: the run is WORKING, so 'waiting' hides it —
+    // behind the honest filtered-empty state, with the stats unmoved.
+    await page.locator('[data-office-status-filter]').click();
+    await sleep(300);
+    await page.locator('[data-select-option="waiting"]').click();
+    await sleep(500);
+    const statusFiltered = await page.evaluate(() => ({
+      attr: (() => {
+        const el = document.querySelector('[data-office-status-filter]');
+        return el ? el.getAttribute('data-office-status-filter') : null;
+      })(),
+      empty: Boolean(document.querySelector('[data-office-filtered-empty]')),
+      stats: (() => {
+        const el = document.querySelector('[data-office-stats]');
+        return el ? (el.textContent || '').trim() : '';
+      })(),
+    }));
+    check(
+      statusFiltered.attr === 'waiting' && statusFiltered.empty === true,
+      'the status filter hides a working office behind the filtered-empty state (attr ' + statusFiltered.attr + ')',
+    );
+    check(statusFiltered.stats === statsBefore, 'stats still follow the scope under a status filter (' + statusFiltered.stats + ')');
+    await page.locator('[data-office-status-filter]').click();
+    await sleep(300);
+    await page.locator('[data-select-option="all"]').click();
+    await sleep(500);
+    const statusReset = await page.evaluate(() => ({
+      attr: (() => {
+        const el = document.querySelector('[data-office-status-filter]');
+        return el ? el.getAttribute('data-office-status-filter') : null;
+      })(),
+      rows: document.querySelectorAll('[data-office-worker]').length,
+    }));
+    check(statusReset.attr === 'all' && statusReset.rows >= 1, 'resetting the status filter brings the office back (' + statusReset.rows + ' rows)');
 
     // 5. click the boss on the floor -> selection. Real mouse clicks at
     // computed positions: the office layout is deterministic (boss seat at
@@ -493,7 +624,35 @@ const stub = http.createServer((req, res) => {
     const after = await readCanvas();
     check(after !== null && after.distinct >= 12, 'the canvas still draws after the run left (idle office)');
 
-    // 7. sub-600px pane -> the list fallback (split layout, same viewport)
+    // 6b. slice 5 — the view preference survives a reload: the scope mode and
+    // the search text live in ONE persisted object (`lokma-office-view:v1`),
+    // so a reload restores the same view instead of guessing.
+    await page.locator('[data-office-view="all"]').click();
+    await sleep(300);
+    await page.locator('[data-office-search] input').fill('zzz-persist-marker');
+    await sleep(500);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('[data-office-pane]', { timeout: 25_000 });
+    await sleep(1200);
+    const persisted = await page.evaluate(() => ({
+      query: (() => {
+        const i = document.querySelector('[data-office-search] input');
+        return i ? i.value : null;
+      })(),
+      mode: (() => {
+        const el = document.querySelector('[data-office-view="all"]');
+        return el ? el.getAttribute('aria-pressed') : null;
+      })(),
+    }));
+    check(persisted.query === 'zzz-persist-marker', 'the search text survives a reload (' + JSON.stringify(persisted.query) + ')');
+    check(persisted.mode === 'true', 'the scope mode survives a reload (aria-pressed=' + persisted.mode + ')');
+    await page.locator('[data-office-search] input').fill('');
+    await sleep(400);
+
+    // 7. sub-660px pane -> the canvas STAYS (slice 6, user correction): the
+    //    box keeps its readable 660 px and the pane scrolls sideways. The old
+    //    gate turned this width into a list-only pane; that is exactly what
+    //    the user rejected.
     await page.evaluate((payload) => {
       localStorage.setItem('lokma:layout:v1', JSON.stringify(payload.NARROW.layout));
       localStorage.setItem('lokma:tiling-tabs:v1', JSON.stringify(payload.NARROW.tabs));
@@ -504,8 +663,15 @@ const stub = http.createServer((req, res) => {
     const narrow = await page.evaluate(() => {
       const pane = document.querySelector('[data-office-pane]');
       const paneBox = pane ? pane.getBoundingClientRect() : null;
+      const box = document.querySelector('[data-office-canvas-box]');
+      const boxBox = box ? box.getBoundingClientRect() : null;
+      const scroll = document.querySelector('[data-office-canvas-scroll]');
       return {
         canvas: Boolean(document.querySelector('[data-office-canvas]')),
+        canvasBoxW: boxBox ? Math.round(boxBox.width) : 0,
+        scrollAttr: scroll ? scroll.getAttribute('data-office-canvas-scroll') : null,
+        scrolls: scroll ? scroll.scrollWidth > scroll.clientWidth + 1 : false,
+        phoneCopy: Boolean(document.querySelector('[data-office-phone-fallback]')),
         pane: Boolean(pane),
         paneW: paneBox ? Math.round(paneBox.width) : 0,
         panes: document.querySelectorAll('[data-pane]').length,
@@ -514,20 +680,59 @@ const stub = http.createServer((req, res) => {
         scrollW: document.documentElement.scrollWidth,
       };
     });
-    check(narrow.pane && narrow.workers, 'the sub-600px pane keeps the working list (pane ' + narrow.paneW + 'px, panes ' + narrow.panes + ')');
-    check(narrow.canvas === false, 'the sub-600px pane drops the canvas (narrow fallback; pane ' + narrow.paneW + 'px, tabs ' + narrow.tabs.join('/') + ')');
+    check(narrow.pane && narrow.workers, 'the sub-660px pane keeps the working list (pane ' + narrow.paneW + 'px, panes ' + narrow.panes + ')');
+    check(
+      narrow.canvas === true,
+      'the sub-660px pane STILL draws the canvas — no status card instead of the office (pane ' + narrow.paneW + 'px, tabs ' + narrow.tabs.join('/') + ')',
+    );
+    check(narrow.canvasBoxW >= 660, 'the canvas box keeps its readable width (' + narrow.canvasBoxW + ' >= 660)');
+    check(
+      narrow.scrollAttr === 'on' && narrow.scrolls === true,
+      'the narrow pane scrolls the canvas sideways instead of hiding it (attr ' + narrow.scrollAttr + ', scrollable ' + narrow.scrolls + ')',
+    );
+    check(narrow.phoneCopy === false, 'no phone fallback copy in a sub-660px desktop pane');
     check(narrow.scrollW <= 1620, 'no sideways overflow in the split layout (' + narrow.scrollW + ')');
-    if (SHOTS) await page.screenshot({ path: join(SHOTS, 'REQ-204-slice3-narrow.png') });
+    if (SHOTS) await page.screenshot({ path: join(SHOTS, 'REQ-204-slice6-narrow-canvas.png') });
 
-    // 8. phone width: the shell has no tiling there, but nothing may overflow
+    // 8. a phone-NARROW PANE (<390px) in a desktop viewport -> the list + the
+    //    honest line: the fallback is about the pane's width, never about an
+    //    empty office. Measured on a pane because the shell at a phone
+    //    VIEWPORT does not render the tiling panes at all (see 8b).
+    await page.evaluate((payload) => {
+      localStorage.setItem('lokma:layout:v1', JSON.stringify(payload.PHONE_PANE.layout));
+      localStorage.setItem('lokma:tiling-tabs:v1', JSON.stringify(payload.PHONE_PANE.tabs));
+    }, { PHONE_PANE });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('[data-office-pane]', { timeout: 25_000 });
+    await sleep(1800);
+    const phone = await page.evaluate(() => {
+      const pane = document.querySelector('[data-office-pane]');
+      const paneBox = pane ? pane.getBoundingClientRect() : null;
+      const copy = document.querySelector('[data-office-phone-fallback]');
+      return {
+        scrollW: document.documentElement.scrollWidth,
+        canvas: Boolean(document.querySelector('[data-office-canvas]')),
+        paneW: paneBox ? Math.round(paneBox.width) : 0,
+        phoneCopy: copy ? (copy.textContent || '').trim() : '',
+        workers: Boolean(document.querySelector('[data-office-workers]')),
+      };
+    });
+    check(phone.paneW > 0 && phone.paneW < 390, 'the phone-narrow pane is below the phone floor (' + phone.paneW + 'px < 390)');
+    check(phone.canvas === false, 'no canvas in a phone-narrow pane (pane ' + phone.paneW + 'px)');
+    check(
+      phone.phoneCopy.includes('pixel office is live'),
+      'the phone fallback says the office is live — a width fallback, not an empty-office state (' + phone.phoneCopy.slice(0, 90) + ')',
+    );
+    check(phone.workers === true, 'the phone fallback keeps the list');
+    check(phone.scrollW <= 1620, 'no sideways overflow with a phone-narrow pane (' + phone.scrollW + ')');
+    if (SHOTS) await page.screenshot({ path: join(SHOTS, 'REQ-204-slice6-phone.png') });
+
+    // 8b. the shell at a phone VIEWPORT: nothing may overflow (the tiling
+    //     panes live behind the shell's own phone layout there).
     await page.setViewportSize({ width: 390, height: 844 });
     await sleep(1200);
-    const phone = await page.evaluate(() => ({
-      scrollW: document.documentElement.scrollWidth,
-      canvas: Boolean(document.querySelector('[data-office-canvas]')),
-    }));
-    check(phone.scrollW <= 400, 'no sideways overflow at 390px (' + phone.scrollW + ' <= 400)');
-    check(phone.canvas === false, 'no canvas at phone width');
+    const phoneViewport = await page.evaluate(() => ({ scrollW: document.documentElement.scrollWidth }));
+    check(phoneViewport.scrollW <= 400, 'no sideways overflow at a 390px viewport (' + phoneViewport.scrollW + ' <= 400)');
 
     const err = consoleErrors.slice(0, 3);
     const bad = http404.slice(0, 4);

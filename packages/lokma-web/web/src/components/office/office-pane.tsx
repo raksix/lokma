@@ -1,10 +1,12 @@
 import * as React from 'react';
-import { Building2, CheckCircle2, Crown, RefreshCw, Wrench, X, XCircle } from 'lucide-react';
+import { Building2, CheckCircle2, Crown, RefreshCw, Search, Wrench, X, XCircle } from 'lucide-react';
 import { api, type LoopView, type SessionSummary } from '@/lib/api';
 import { LOOP_CHANGED_EVENT } from '@/lib/loop-frame';
-import { useSessionStore } from '@/stores/session';
+import { useKnownCwd, useSessionStore } from '@/stores/session';
 import { formatRunAgo } from '@/components/testing';
 import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { SelectMenu } from '@/components/ui/select-menu';
 import { ToolCallRow } from '@/components/chat/lokma-message';
 import {
   applySessionsSnapshot,
@@ -12,12 +14,31 @@ import {
   deriveOfficeWorkers,
   foldOfficeFrame,
   OFFICE_EMPTY_COPY,
-  officeStats,
   type OfficeDelivery,
   type OfficeLiveMap,
   type OfficeSources,
   type OfficeWorker,
 } from './office-view';
+import {
+  adoptOfficeActiveProject,
+  DEFAULT_OFFICE_VIEW_PREFS,
+  officeElsewhereLabel,
+  OFFICE_FILTERED_DELIVERIES_EMPTY,
+  OFFICE_FILTERED_EMPTY_COPY,
+  OFFICE_NO_PROJECT_COPY,
+  OFFICE_SCOPE_DELIVERIES_EMPTY,
+  OFFICE_SCOPE_EMPTY_COPY,
+  OFFICE_STATUS_FILTERS,
+  OFFICE_UNSCOPED_COPY,
+  officeScopeLabel,
+  officeStatusFilterLabel,
+  readOfficeViewPrefs,
+  selectOfficeView,
+  writeOfficeViewPrefs,
+  type OfficeScopeMode,
+  type OfficeStatusFilter,
+  type OfficeViewPrefs,
+} from './office-scope';
 import { buildOfficeWorkerDetail, mergeDetailTools, type OfficeWorkerDetail } from './office-detail';
 import { OFFICE_FRAME_EVENT, type OfficeFrame } from '@/lib/office-frame';
 import { OfficeCanvas } from './office-canvas';
@@ -48,10 +69,37 @@ import { OFFICE_CANVAS_MIN_WIDTH } from './office-canvas-model';
  */
 export const OFFICE_POLL_MS = 5_000;
 
+/**
+ * The project picker's sentinel for the no-project bucket (the loop console's
+ * convention: a server-minted id can never collide with this literal).
+ */
+const NO_PROJECT_VALUE = '__no_project__';
+
 export function OfficePane() {
   const sessions = useSessionStore((s) => s.sessions);
   const projects = useSessionStore((s) => s.projects);
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
+  const activeCwd = useKnownCwd(activeSessionId);
+
+  // REQ-204 slice 5 — the view is ONE preference object persisted under
+  // `lokma-office-view:v1`: the scope toggle, the scoped project, the status
+  // filter and the search box survive a reload together, and a corrupt value
+  // reads back as the defaults instead of taking the pane down.
+  const [prefs, setPrefs] = React.useState<OfficeViewPrefs>(() =>
+    typeof window === 'undefined' ? { ...DEFAULT_OFFICE_VIEW_PREFS } : readOfficeViewPrefs(window.localStorage),
+  );
+  const updatePrefs = React.useCallback((next: OfficeViewPrefs) => {
+    setPrefs(next);
+    writeOfficeViewPrefs(next, typeof window === 'undefined' ? undefined : window.localStorage);
+  }, []);
+
+  // Same one-shot adoption as the loop console (REQ-203 rule): an unset
+  // project scope adopts the active session's project — never in `all` mode,
+  // never overriding a project the user already picked.
+  React.useEffect(() => {
+    const next = adoptOfficeActiveProject(prefs, activeCwd === 'loading' ? null : activeCwd, projects);
+    if (next !== prefs) updatePrefs(next);
+  }, [prefs, activeCwd, projects, updatePrefs]);
 
   const [loops, setLoops] = React.useState<LoopView[]>([]);
   const [loopsError, setLoopsError] = React.useState<string | null>(null);
@@ -202,10 +250,18 @@ export function OfficePane() {
     () => deriveOfficeDeliveries({ sessions, loops, projects, live, activeSessionId }),
     [sessions, loops, projects, live, activeSessionId],
   );
-  const stats = officeStats(workers, deliveries);
+  // Slice 5: the scope + filters select what every surface in this pane draws.
+  // Stats follow the SCOPE (never the filters) so a status filter cannot
+  // answer "0 working" for an office that is plainly working.
+  const view = React.useMemo(
+    () => selectOfficeView(workers, deliveries, prefs, projects),
+    [workers, deliveries, prefs, projects],
+  );
+  const stats = view.stats;
 
-  const selectedWorker = selectedId !== null ? workers.find((w) => w.id === selectedId) ?? null : null;
+  const selectedWorker = selectedId !== null ? view.workers.find((w) => w.id === selectedId) ?? null : null;
   const canvasVisible = paneWidth >= OFFICE_CANVAS_MIN_WIDTH;
+  const elsewhere = officeElsewhereLabel(view.elsewhereBusy);
 
   const detailSessionId = selectedWorker?.sessionId ?? null;
   const detailLoopId = selectedWorker?.loopId ?? null;
@@ -304,6 +360,77 @@ export function OfficePane() {
         </span>
       </div>
 
+      {/* REQ-204 slice 5 — the view controls: which scope, which project,
+          which status, and the search box. Every control writes the ONE
+          persisted prefs object, so a reload restores the same view rather
+          than a guess (the loop console's toggle, same semantics). */}
+      <div
+        className="flex flex-wrap items-center gap-1.5 border-b border-line bg-[#FDFCFB] px-3 py-1.5 dark:bg-[#1E1E21]"
+        data-office-view-controls
+      >
+        <div
+          className="flex shrink-0 overflow-hidden rounded-md border border-line"
+          role="group"
+          aria-label="Office scope"
+          data-office-view-toggle
+        >
+          {(['all', 'project'] as OfficeScopeMode[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={prefs.mode === m}
+              data-office-view={m}
+              onClick={() => updatePrefs({ ...prefs, mode: m })}
+              className={
+                prefs.mode === m
+                  ? 'bg-terracotta px-2 py-1 text-[11px] font-medium text-white'
+                  : 'bg-paper px-2 py-1 text-[11px] font-medium text-zinc-500 hover:bg-muted dark:text-zinc-400'
+              }
+            >
+              {m === 'all' ? 'All projects' : 'This project'}
+            </button>
+          ))}
+        </div>
+
+        {prefs.mode === 'project' ? (
+          <SelectMenu
+            ariaLabel="Office project"
+            size="xs"
+            value={prefs.projectId ?? NO_PROJECT_VALUE}
+            onChange={(v) => updatePrefs({ ...prefs, projectId: v === NO_PROJECT_VALUE ? null : v })}
+            options={[
+              { value: NO_PROJECT_VALUE, label: 'No project' },
+              ...projects.map((p) => ({ value: p.id, label: p.name })),
+            ]}
+            triggerAttrs={{ 'data-office-project': prefs.projectId ?? NO_PROJECT_VALUE }}
+            className="min-w-[9rem]"
+          />
+        ) : null}
+
+        <SelectMenu
+          ariaLabel="Office status filter"
+          size="xs"
+          value={prefs.status}
+          onChange={(v) => updatePrefs({ ...prefs, status: v as OfficeStatusFilter })}
+          options={OFFICE_STATUS_FILTERS.map((f) => ({ value: f, label: officeStatusFilterLabel(f) }))}
+          triggerAttrs={{ 'data-office-status-filter': prefs.status }}
+        />
+
+        <div className="relative min-w-[8rem] flex-1" data-office-search>
+          <Search
+            className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400"
+            aria-hidden="true"
+          />
+          <Input
+            aria-label="Search office"
+            placeholder="Search workers and deliveries"
+            className="h-7 pl-7 text-[11px]"
+            value={prefs.query}
+            onChange={(e) => updatePrefs({ ...prefs, query: e.target.value })}
+          />
+        </div>
+      </div>
+
       <div className="flex-1 overflow-auto p-2 space-y-3">
         {loopsError ? (
           <p className="rounded border border-dashed px-2 py-1 text-[11px] text-zinc-500 dark:text-zinc-400" data-office-loops-error>
@@ -311,12 +438,42 @@ export function OfficePane() {
           </p>
         ) : null}
 
+        {/* Slice 5 — where the lists are scoped, and what is running OUTSIDE
+            that scope. The elsewhere count is taken before the filters: a
+            filter must not hide the fact that work exists elsewhere. */}
+        <p className="text-[11px] text-zinc-500 dark:text-zinc-400" data-office-view-scope>
+          {officeScopeLabel(prefs, projects)}
+          {prefs.mode === 'project' && prefs.projectId === null && !view.unscoped
+            ? ' — ' + OFFICE_NO_PROJECT_COPY
+            : ''}
+        </p>
+
+        {elsewhere ? (
+          <button
+            type="button"
+            data-office-running-elsewhere
+            onClick={() => updatePrefs({ ...prefs, mode: 'all' })}
+            className="flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-left text-[11px] text-amber-700 hover:bg-amber-500/15 dark:text-amber-400"
+          >
+            {elsewhere} — show everything
+          </button>
+        ) : null}
+
+        {view.unscoped ? (
+          <p
+            className="rounded-md border border-dashed border-line p-2 text-[11px] text-zinc-500 dark:text-zinc-400"
+            data-office-unscoped
+          >
+            {OFFICE_UNSCOPED_COPY}
+          </p>
+        ) : null}
+
         {canvasVisible ? (
           <section data-office-canvas-section>
             <div className="h-[360px] overflow-hidden rounded-lg border border-line bg-[#FDFCFB] dark:bg-[#1E1E21]">
               <OfficeCanvas
-                workers={workers}
-                deliveries={deliveries}
+                workers={view.workers}
+                deliveries={view.deliveries}
                 selectedId={selectedId}
                 onSelect={setSelectedId}
               />
@@ -339,9 +496,39 @@ export function OfficePane() {
             <p className="rounded border border-dashed p-3 text-xs text-muted-foreground" data-office-empty>
               {OFFICE_EMPTY_COPY}
             </p>
+          ) : view.scopedWorkers.length === 0 ? (
+            <div
+              className="flex flex-col items-start gap-2 rounded border border-dashed p-3 text-xs text-muted-foreground"
+              data-office-scope-empty
+            >
+              <span>{OFFICE_SCOPE_EMPTY_COPY}</span>
+              <button
+                type="button"
+                data-office-show-all
+                onClick={() => updatePrefs({ ...prefs, mode: 'all' })}
+                className="rounded border border-line px-2 py-0.5 text-[11px] text-zinc-500 hover:bg-muted dark:text-zinc-400 dark:hover:bg-[#232326]"
+              >
+                Show all projects
+              </button>
+            </div>
+          ) : view.workers.length === 0 ? (
+            <div
+              className="flex flex-col items-start gap-2 rounded border border-dashed p-3 text-xs text-muted-foreground"
+              data-office-filtered-empty
+            >
+              <span>{OFFICE_FILTERED_EMPTY_COPY}</span>
+              <button
+                type="button"
+                data-office-clear-filters
+                onClick={() => updatePrefs({ ...prefs, status: 'all', query: '' })}
+                className="rounded border border-line px-2 py-0.5 text-[11px] text-zinc-500 hover:bg-muted dark:text-zinc-400 dark:hover:bg-[#232326]"
+              >
+                Clear filters
+              </button>
+            </div>
           ) : (
             <div className="flex flex-col gap-2">
-              {workers.map((worker) => (
+              {view.workers.map((worker) => (
                 <OfficeWorkerRow
                   key={worker.id}
                   worker={worker}
@@ -362,9 +549,16 @@ export function OfficePane() {
             <p className="rounded border border-dashed p-3 text-xs text-muted-foreground" data-office-deliveries-empty>
               No recent deliveries observed yet.
             </p>
+          ) : view.deliveries.length === 0 ? (
+            <p
+              className="rounded border border-dashed p-3 text-xs text-muted-foreground"
+              data-office-deliveries-filtered-empty
+            >
+              {view.scopedDeliveries.length === 0 ? OFFICE_SCOPE_DELIVERIES_EMPTY : OFFICE_FILTERED_DELIVERIES_EMPTY}
+            </p>
           ) : (
             <div className="flex flex-col gap-1.5">
-              {deliveries.map((delivery) => (
+              {view.deliveries.map((delivery) => (
                 <OfficeDeliveryRow key={delivery.id} delivery={delivery} nowMs={nowMs} />
               ))}
             </div>

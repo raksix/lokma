@@ -34,6 +34,7 @@ function worker(over: Partial<OfficeWorker> & { id: string }): OfficeWorker {
     type: 'run',
     status: 'working',
     projectId: null,
+    claimedProjectId: null,
     projectBadge: 'no project',
     cwd: null,
     sessionId: null,
@@ -57,6 +58,7 @@ function delivery(over: Partial<OfficeDelivery> & { id: string }): OfficeDeliver
   return {
     type: 'run',
     projectId: null,
+    claimedProjectId: null,
     projectBadge: 'no project',
     label: over.id,
     startedAt: null,

@@ -157,6 +157,10 @@ const orphanLoop = deriveOfficeWorkers(
   sources({ loops: [loopRow({ id: 'l2', projectId: 'p_gone', cwd: '/mnt/gone' })] }),
 )[0];
 assert(orphanLoop.projectId === null && orphanLoop.projectBadge === 'project missing', 'a deleted project stays visible as a badge');
+assert(
+  orphanLoop.claimedProjectId === 'p_gone',
+  'the deleted project is still CLAIMED (slice 5 scope filter follows the claim, not the resolved desk)',
+);
 assert(orphanLoop.status === 'working', 'a loop whose project vanished is still working');
 
 const noProjectLoop = deriveOfficeWorkers(sources({ loops: [loopRow({ id: 'l3', cwd: '/mnt/nope' })] }))[0];
@@ -344,6 +348,7 @@ const shifted = sortOfficeDeliveries([
     id: 'old',
     type: 'run',
     projectId: null,
+    claimedProjectId: null,
     projectBadge: null,
     label: 'old',
     startedAt: null,
@@ -355,6 +360,7 @@ const shifted = sortOfficeDeliveries([
     id: 'new',
     type: 'run',
     projectId: null,
+    claimedProjectId: null,
     projectBadge: null,
     label: 'new',
     startedAt: null,

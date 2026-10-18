@@ -94,6 +94,15 @@ export type OfficeWorker = {
   status: OfficeWorkerStatus;
   /** Desk (project) resolved by the loop console's rules; null = no desk. */
   projectId: string | null;
+  /**
+   * The project this row still CLAIMS (REQ-204 slice 5): a loop's explicit
+   * `projectId`, kept even when the record is gone, or the cwd-resolved id
+   * for runs. `projectId` above stays the RESOLVED desk - the canvas must
+   * never draw a column for a project that no longer exists - while the
+   * view's scope filter follows this claim (REQ-203's `loopInProject` rule:
+   * a deleted project never drops the row out of its own scope).
+   */
+  claimedProjectId: string | null;
   /** Desk-cell badge text (`no project` stays visible, REQ-203 §4 style). */
   projectBadge: string | null;
   cwd: string | null;
@@ -128,6 +137,8 @@ export type OfficeDelivery = {
   id: string;
   type: OfficeWorkerType;
   projectId: string | null;
+  /** The claim kept for scope filtering — see `OfficeWorker.claimedProjectId`. */
+  claimedProjectId: string | null;
   projectBadge: string | null;
   label: string;
   startedAt: string | null;
@@ -451,6 +462,7 @@ export function deriveOfficeWorkers(src: OfficeSources): OfficeWorker[] {
       type: 'run',
       status: live.waiting > 0 ? 'waiting' : 'working',
       projectId,
+      claimedProjectId: projectId,
       projectBadge: project ? project.name : 'no project',
       cwd: s.cwd ?? null,
       sessionId: s.id,
@@ -473,6 +485,10 @@ export function deriveOfficeWorkers(src: OfficeSources): OfficeWorker[] {
     if (l.status !== 'running') continue;
     const state = loopProjectState(l, src.projects);
     const matched = state.kind === 'match' ? state.project : null;
+    // The CLAIM survives a deleted/conflicting record (scope filtering); the
+    // resolved desk does not (no fake canvas column for a vanished project).
+    const claimed =
+      state.kind === 'none' ? null : state.kind === 'match' ? state.project.id : state.projectId;
     rows.push({
       id: officeWorkerId('loop-turn', l.id),
       type: 'loop-turn',
@@ -480,6 +496,7 @@ export function deriveOfficeWorkers(src: OfficeSources): OfficeWorker[] {
       // absence of a waiting signal, not a claim that nothing waits.
       status: 'working',
       projectId: matched ? matched.id : null,
+      claimedProjectId: claimed,
       projectBadge: projectBadgeLabel(state),
       cwd: l.cwd ?? null,
       // The turn session IS real (`sess_loop_<id>`, route-mapped from the
@@ -536,6 +553,7 @@ export function deriveOfficeDeliveries(src: OfficeSources): OfficeDelivery[] {
         id: officeWorkerId('run', s.id) + '@' + w.endedAt,
         type: 'run',
         projectId,
+        claimedProjectId: projectId,
         projectBadge: project ? project.name : 'no project',
         label: title || s.id,
         startedAt: w.startedAt,
@@ -551,10 +569,13 @@ export function deriveOfficeDeliveries(src: OfficeSources): OfficeDelivery[] {
     if (l.lastRunOutcome === null) continue;
     const state = loopProjectState(l, src.projects);
     const matched = state.kind === 'match' ? state.project : null;
+    const claimed =
+      state.kind === 'none' ? null : state.kind === 'match' ? state.project.id : state.projectId;
     rows.push({
       id: officeWorkerId('loop-turn', l.id),
       type: 'loop-turn',
       projectId: matched ? matched.id : null,
+      claimedProjectId: claimed,
       projectBadge: projectBadgeLabel(state),
       label: l.name,
       startedAt: l.lastRunStartedAt,

@@ -16,6 +16,8 @@ import {
   type OfficeSources,
   type OfficeWorker,
 } from './office-view';
+import { OfficeCanvas } from './office-canvas';
+import { OFFICE_CANVAS_MIN_WIDTH } from './office-canvas-model';
 
 /**
  * OfficePane — REQ-204 slice 2: the Office surface (rail icon + pane).
@@ -52,6 +54,21 @@ export function OfficePane() {
   const [lastFrameAt, setLastFrameAt] = React.useState<number | null>(null);
   const [live, setLive] = React.useState<OfficeLiveMap>({});
   const [nowMs, setNowMs] = React.useState(() => Date.now());
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  // The pixel canvas only draws where it can be read; the pane measures itself
+  // (the same component serves a wide tab and the narrow inspector).
+  const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const [paneWidth, setPaneWidth] = React.useState(0);
+
+  React.useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const measure = (): void => setPaneWidth(Math.floor(el.getBoundingClientRect().width));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // The relative-age cells need a clock, but only while the pane is open.
   React.useEffect(() => {
@@ -123,8 +140,12 @@ export function OfficePane() {
   );
   const stats = officeStats(workers, deliveries);
 
+  const selectedWorker = selectedId !== null ? workers.find((w) => w.id === selectedId) ?? null : null;
+  const canvasVisible = paneWidth >= OFFICE_CANVAS_MIN_WIDTH;
+
   return (
     <div
+      ref={rootRef}
       className="h-full flex flex-col bg-white dark:bg-[#161618] rounded-lg overflow-hidden border border-line"
       data-office-pane
     >
@@ -153,6 +174,26 @@ export function OfficePane() {
           </p>
         ) : null}
 
+        {canvasVisible ? (
+          <section data-office-canvas-section>
+            <div className="h-[360px] overflow-hidden rounded-lg border border-line bg-[#FDFCFB] dark:bg-[#1E1E21]">
+              <OfficeCanvas
+                workers={workers}
+                deliveries={deliveries}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+              />
+            </div>
+            <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400" data-office-canvas-hint>
+              {selectedWorker
+                ? selectedWorker.currentTool
+                  ? `${selectedWorker.label} · ${selectedWorker.currentTool}`
+                  : selectedWorker.label
+                : 'Click a worker on the floor to select them.'}
+            </p>
+          </section>
+        ) : null}
+
         <section data-office-workers>
           <h4 className="mb-1 text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Right now</h4>
           {workers.length === 0 ? (
@@ -162,7 +203,13 @@ export function OfficePane() {
           ) : (
             <div className="flex flex-col gap-2">
               {workers.map((worker) => (
-                <OfficeWorkerRow key={worker.id} worker={worker} nowMs={nowMs} />
+                <OfficeWorkerRow
+                  key={worker.id}
+                  worker={worker}
+                  nowMs={nowMs}
+                  selected={worker.id === selectedId}
+                  onSelect={() => setSelectedId((prev) => (prev === worker.id ? null : worker.id))}
+                />
               ))}
             </div>
           )}
@@ -188,16 +235,30 @@ export function OfficePane() {
 }
 
 /** One live worker card: type, status, desk, the in-flight tool and the task. */
-function OfficeWorkerRow({ worker, nowMs }: { worker: OfficeWorker; nowMs: number }) {
+function OfficeWorkerRow({
+  worker,
+  nowMs,
+  selected,
+  onSelect,
+}: {
+  worker: OfficeWorker;
+  nowMs: number;
+  selected: boolean;
+  onSelect: () => void;
+}) {
   const waiting = worker.status === 'waiting';
   return (
-    <div
+    <button
+      type="button"
+      onClick={onSelect}
       data-office-worker={worker.id}
       data-office-worker-type={worker.type}
       data-office-worker-status={worker.status}
+      data-office-worker-selected={selected ? 'true' : 'false'}
       className={cn(
-        'rounded-lg border px-3 py-2',
+        'rounded-lg border px-3 py-2 text-left',
         waiting ? 'border-amber-400/60 bg-amber-400/5' : 'border-line bg-paper',
+        selected ? 'ring-2 ring-terracotta/60' : null,
       )}
     >
       <div className="flex items-center gap-2">
@@ -244,11 +305,11 @@ function OfficeWorkerRow({ worker, nowMs }: { worker: OfficeWorker; nowMs: numbe
         ) : null}
       </div>
       {worker.task ? (
-        <p className="mt-1 line-clamp-2 text-[11px] text-zinc-500 dark:text-zinc-400" title={worker.task}>
+        <span className="mt-1 line-clamp-2 block text-[11px] text-zinc-500 dark:text-zinc-400" title={worker.task}>
           {worker.task}
-        </p>
+        </span>
       ) : null}
-    </div>
+    </button>
   );
 }
 

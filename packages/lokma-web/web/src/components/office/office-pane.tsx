@@ -42,7 +42,12 @@ import {
 import { buildOfficeWorkerDetail, mergeDetailTools, type OfficeWorkerDetail } from './office-detail';
 import { OFFICE_FRAME_EVENT, type OfficeFrame } from '@/lib/office-frame';
 import { OfficeCanvas } from './office-canvas';
-import { OFFICE_CANVAS_MIN_WIDTH } from './office-canvas-model';
+import {
+  OFFICE_CANVAS_MIN_WIDTH,
+  OFFICE_PHONE_CANVAS_COPY,
+  officeCanvasPresentation,
+  officeCanvasScrolls,
+} from './office-canvas-model';
 
 /**
  * OfficePane — REQ-204 slice 2: the Office surface (rail icon + pane).
@@ -50,9 +55,11 @@ import { OFFICE_CANVAS_MIN_WIDTH } from './office-canvas-model';
  * This slice renders the honest ROW view of the office: who is working right
  * now (live runs + loop turns) and what finished recently, all derived from
  * the slice-1 contract (`office-view.ts`). The pixel-art canvas (the vendored
- * upstream renderer) lands in slice 3 behind this same data — and this list
- * doubles as the narrow-screen fallback the REQ asks for (a canvas does not
- * read on a phone), so it is not throwaway UI.
+ * upstream renderer) is slice 3's centerpiece and the pane's MAIN content at
+ * every width down to the phone floor (slice 6: an empty office still draws
+ * the room; a status card never replaces it). The row list below the canvas
+ * carries the same rows for scanning, and it is the pane's only fallback
+ * below `OFFICE_PHONE_WIDTH` — where a 660 px office cannot be read.
  *
  * Sources, all real — nothing is invented:
  *  - sessions: `useSessionStore.sessions` (the `running` flag rides from the
@@ -119,8 +126,12 @@ export function OfficePane() {
   const detailLoopRef = React.useRef<string | null>(null);
   const refetchTimerRef = React.useRef<number | null>(null);
   const lastOfficeFrameAtRef = React.useRef<number | null>(null);
-  // The pixel canvas only draws where it can be read; the pane measures itself
-  // (the same component serves a wide tab and the narrow inspector).
+  // The pane measures itself (the same component serves a wide tab and the
+  // narrow inspector). A LAYOUT effect, not a passive one: the first paint of
+  // a wide pane must already know its width, or it would flash the
+  // phone-narrow fallback for one frame before the canvas takes over — the
+  // office is what this pane shows, so it never advertises the fallback it
+  // does not need.
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const [paneWidth, setPaneWidth] = React.useState(0);
 
@@ -144,7 +155,7 @@ export function OfficePane() {
     [],
   );
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     const el = rootRef.current;
     if (!el) return;
     const measure = (): void => setPaneWidth(Math.floor(el.getBoundingClientRect().width));
@@ -260,7 +271,13 @@ export function OfficePane() {
   const stats = view.stats;
 
   const selectedWorker = selectedId !== null ? view.workers.find((w) => w.id === selectedId) ?? null : null;
-  const canvasVisible = paneWidth >= OFFICE_CANVAS_MIN_WIDTH;
+  // Slice 6 — the 2026-10-18 user correction: the pane draws the pixel office
+  // at EVERY width down to the phone floor (empty office included — the
+  // renderer draws the empty room), never a status card instead of it. Below
+  // the readable width the canvas box keeps its 660 px and the pane scrolls
+  // sideways; only a phone-narrow pane falls back to the list.
+  const canvasVisible = officeCanvasPresentation(paneWidth) === 'canvas';
+  const canvasScrolls = officeCanvasScrolls(paneWidth);
   const elsewhere = officeElsewhereLabel(view.elsewhereBusy);
 
   const detailSessionId = selectedWorker?.sessionId ?? null;
@@ -470,13 +487,19 @@ export function OfficePane() {
 
         {canvasVisible ? (
           <section data-office-canvas-section>
-            <div className="h-[360px] overflow-hidden rounded-lg border border-line bg-[#FDFCFB] dark:bg-[#1E1E21]">
-              <OfficeCanvas
-                workers={view.workers}
-                deliveries={view.deliveries}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-              />
+            <div className="overflow-x-auto" data-office-canvas-scroll={canvasScrolls ? 'on' : 'off'}>
+              <div
+                className="h-[360px] overflow-hidden rounded-lg border border-line bg-[#FDFCFB] dark:bg-[#1E1E21]"
+                style={{ minWidth: OFFICE_CANVAS_MIN_WIDTH }}
+                data-office-canvas-box
+              >
+                <OfficeCanvas
+                  workers={view.workers}
+                  deliveries={view.deliveries}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                />
+              </div>
             </div>
             <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400" data-office-canvas-hint>
               {selectedWorker
@@ -486,7 +509,14 @@ export function OfficePane() {
                 : 'Click a worker on the floor to select them.'}
             </p>
           </section>
-        ) : null}
+        ) : (
+          <p
+            className="rounded border border-dashed px-2 py-1 text-[11px] text-zinc-500 dark:text-zinc-400"
+            data-office-phone-fallback
+          >
+            {OFFICE_PHONE_CANVAS_COPY}
+          </p>
+        )}
 
         {canvasVisible ? detailPanel : null}
 

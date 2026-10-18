@@ -13,6 +13,9 @@ import {
   canvasProjects,
   canvasTypeTag,
   OFFICE_CANVAS_MIN_WIDTH,
+  OFFICE_PHONE_WIDTH,
+  officeCanvasPresentation,
+  officeCanvasScrolls,
   resolveCanvasSelection,
   toCanvasWorker,
 } from './office-canvas-model';
@@ -171,9 +174,32 @@ assert(resolveCanvasSelection('@boss', null, '@boss', '@today') === null, 'boss 
 assert(resolveCanvasSelection('@today', 'run:boss', '@boss', '@today') === null, 'the board is not a worker');
 assert(resolveCanvasSelection(null, 'run:boss', '@boss', '@today') === null, 'a miss on empty floor clears the selection');
 
-// ── G. surface constant ────────────────────────────────────────────────────
+// ── G. presentation constants + rules (slice 6) ────────────────────────────
 
-assert(OFFICE_CANVAS_MIN_WIDTH === 600, 'the narrow-screen switch point is pinned (REQ-204 §4.8)');
+assert(OFFICE_CANVAS_MIN_WIDTH === 660, 'the canvas box floor is the renderer S=2 width (660 = 2x the 330px office)');
+assert(OFFICE_PHONE_WIDTH === 390, 'the phone fallback point is pinned (REQ-204 §4.8)');
+assert(OFFICE_PHONE_WIDTH < OFFICE_CANVAS_MIN_WIDTH, 'the phone floor sits below the readable width (scroll band exists)');
+
+// The presentation rule: `canvas` from the phone floor up — ALWAYS (an empty
+// office included), `list` only below it. Discriminating pair around the
+// boundary, plus the empty-office case proving width alone decides.
+assert(officeCanvasPresentation(OFFICE_PHONE_WIDTH) === 'canvas', 'exactly at the phone floor the canvas is drawn');
+assert(officeCanvasPresentation(OFFICE_PHONE_WIDTH - 1) === 'list', 'one pixel below the floor falls back to the list');
+assert(officeCanvasPresentation(1440) === 'canvas', 'a wide pane draws the canvas');
+assert(
+  officeCanvasPresentation(0) === 'list',
+  'an unmeasured pane (width 0) falls back to the list rather than claiming a canvas it has not measured',
+);
+
+// The scroll rule: the box keeps its readable width and the PANE scrolls
+// instead — canvas never hidden just because the pane is narrow.
+assert(officeCanvasScrolls(OFFICE_CANVAS_MIN_WIDTH - 1) === true, 'below the readable width the canvas box scrolls');
+assert(officeCanvasScrolls(OFFICE_CANVAS_MIN_WIDTH) === false, 'exactly at the readable width there is nothing to scroll');
+assert(officeCanvasScrolls(1440) === false, 'a wide pane never scrolls');
+assert(
+  officeCanvasScrolls(OFFICE_PHONE_WIDTH) === true && officeCanvasPresentation(OFFICE_PHONE_WIDTH) === 'canvas',
+  'the 390..660 band is exactly "canvas that scrolls" — the band the old gate wrongly turned into a list',
+);
 
 console.log('---');
 console.log(passed + ' assertions passed');

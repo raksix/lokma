@@ -18,14 +18,50 @@ import type { OfficeDelivery, OfficeWorker, OfficeWorkerType } from './office-vi
 import type { AgentOfficeData, AgentOfficeProject, AgentOfficeWorker } from './vendor/agent-office-core.mjs';
 
 /**
- * Minimum pane width where the pixel office is readable. Below this the pane
- * keeps the row list (REQ-204 §4.8: a canvas does not read on a phone).
- * The number is the renderer's own floor, not a taste call: `setGeometry`
- * clamps the pixel scale at S>=2 and the office is designed at 330x200
- * logical, so 600 screen px is the first width that still yields the
- * renderer's minimum 300 logical columns.
+ * Minimum canvas box width (px) — the width the room READS at. This is NOT a
+ * visibility switch: the office is drawn at every pane width (REQ-204 slice 6,
+ * the 2026-10-18 user correction), and a narrower pane scrolls this box
+ * sideways instead of hiding the office. The number is the renderer's own
+ * floor, not a taste call: `setGeometry` clamps the pixel scale at S>=2 and
+ * the office is designed at 330x200 logical, so 660 px is exactly the 2x
+ * office — the first width that yields the renderer's minimum 330 logical
+ * columns.
  */
-export const OFFICE_CANVAS_MIN_WIDTH = 600;
+export const OFFICE_CANVAS_MIN_WIDTH = 660;
+
+/**
+ * Phone width (px). Below this the pane falls back to the row list: a 660 px
+ * office behind a phone viewport is not readable, so the list is the honest
+ * narrow fallback (REQ-204 §4.8) — and the pane states that the canvas is
+ * live, because the fallback is about the pane's width, never about the
+ * office being empty.
+ */
+export const OFFICE_PHONE_WIDTH = 390;
+
+/**
+ * The line shown where the canvas would sit when the pane is phone-narrow —
+ * honest about what is happening: the office is live, this view just cannot
+ * read it.
+ */
+export const OFFICE_PHONE_CANVAS_COPY =
+  'The pixel office is live — it needs 660 px to read, so this narrow view shows the list.';
+
+/** How the pane presents the office at a given pane width. */
+export type OfficeCanvasPresentation = 'canvas' | 'list';
+
+/**
+ * `canvas` at every width at or above the phone floor — ALWAYS, an empty
+ * office included (the renderer draws the empty room; a status card must
+ * never take the office's place). `list` only below `OFFICE_PHONE_WIDTH`.
+ */
+export function officeCanvasPresentation(paneWidth: number): OfficeCanvasPresentation {
+  return paneWidth >= OFFICE_PHONE_WIDTH ? 'canvas' : 'list';
+}
+
+/** True when the fixed-width canvas box is wider than its pane (it scrolls). */
+export function officeCanvasScrolls(paneWidth: number): boolean {
+  return paneWidth < OFFICE_CANVAS_MIN_WIDTH;
+}
 
 /** Chest tag text — short enough for the renderer's 8-char badge. */
 export function canvasTypeTag(type: OfficeWorkerType): string {

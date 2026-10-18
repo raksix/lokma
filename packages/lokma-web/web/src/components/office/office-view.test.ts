@@ -73,6 +73,7 @@ function loopRow(over: Partial<OfficeLoopRow> & { id: string }): OfficeLoopRow {
     projectId: null,
     prompt: 'do the thing',
     status: 'running',
+    sessionId: 'sess_loop_' + over.id,
     lastRunStartedAt: null,
     lastRunOutcome: null,
     ...over,
@@ -144,8 +145,12 @@ const loopWorkers = deriveOfficeWorkers(
 assert(loopWorkers.length === 1 && loopWorkers[0].type === 'loop-turn', 'a running loop is one loop-turn worker');
 assert(loopWorkers[0].startedAt === '2026-10-18T10:00:00.000Z', 'loop startedAt is the REAL lastRunStartedAt');
 assert(
-  loopWorkers[0].currentTool === null && loopWorkers[0].lastTools.length === 0 && loopWorkers[0].sessionId === null,
-  'loop workers carry no fabricated tool fields',
+  loopWorkers[0].currentTool === null && loopWorkers[0].lastTools.length === 0,
+  'loop workers carry no fabricated tool fields (loop turns emit no chat frames)',
+);
+assert(
+  loopWorkers[0].sessionId === 'sess_loop_l1',
+  'a loop worker carries its REAL turn session (slice 4 reads its transcript)',
 );
 
 const orphanLoop = deriveOfficeWorkers(

@@ -388,7 +388,15 @@ export type OfficeSessionRow = Pick<SessionSummary, 'id' | 'cwd' | 'title' | 'bo
 /** What the office reads from one loop (`LoopView` slice). */
 export type OfficeLoopRow = Pick<
   LoopView,
-  'id' | 'name' | 'prompt' | 'cwd' | 'projectId' | 'status' | 'lastRunStartedAt' | 'lastRunOutcome'
+  | 'id'
+  | 'name'
+  | 'prompt'
+  | 'cwd'
+  | 'projectId'
+  | 'status'
+  | 'sessionId'
+  | 'lastRunStartedAt'
+  | 'lastRunOutcome'
 >;
 
 /** Everything a derivation may read — the pane wires these once. */
@@ -474,7 +482,12 @@ export function deriveOfficeWorkers(src: OfficeSources): OfficeWorker[] {
       projectId: matched ? matched.id : null,
       projectBadge: projectBadgeLabel(state),
       cwd: l.cwd ?? null,
-      sessionId: null,
+      // The turn session IS real (`sess_loop_<id>`, route-mapped from the
+      // executor's own derivation) — slice 4 reads the loop's tool history
+      // from its transcript. It is NOT a live tool-frame source: loop turns
+      // emit no chat frames, so `currentTool`/`lastTools` still stay empty
+      // on the live fold and the detail panel reads the persisted rows.
+      sessionId: l.sessionId,
       loopId: l.id,
       runId: null,
       botId: null,

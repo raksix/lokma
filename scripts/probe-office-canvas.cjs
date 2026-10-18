@@ -32,7 +32,13 @@
  *      its readable 660 px and the pane scrolls sideways (slice 6 — the
  *      office is never replaced by a status card);
  *   8. a phone-narrow pane (<390px): the list fallback plus the honest line
- *      that the pixel office is live; no sideways overflow.
+ *      that the pixel office is live; no sideways overflow;
+ *   9. §4.6 — the notification half: the gated `write_file` (the probe
+ *      project's `auto` permissions; the live global config is `bypass`)
+ *      marks the worker "waiting for you" AND announces exactly ONE toast on
+ *      the app's existing bus, rendered by the toast host; the approval
+ *      resumes the run (the file lands on disk); the finished run announces
+ *      exactly ONE delivery toast, and the waiting notice never re-fires.
  *
  * The browser comes up FIRST and the prompt is only sent afterwards, so the
  * pane is provably listening before the run's frames exist (a frame sent
@@ -47,7 +53,7 @@
  */
 const { execFileSync } = require('node:child_process');
 const http = require('node:http');
-const { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } = require('node:fs');
+const { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { WebSocket } = require('ws');
@@ -78,6 +84,8 @@ function check(cond, label) {
 const PROBE_ID = 'office-probe-' + Date.now().toString(36);
 const MODEL = PROBE_ID + '/capture-model';
 const TOOL_FILE = 'notes.txt';
+/** §4.6: the gated write's target — its existence proves the approval resumed the run. */
+const GATE_FILE = 'gate-note.txt';
 /** The prompt the socket sends — the panel's task must equal this marker. */
 const TASK_MARKER = 'office-panel-task-marker';
 /** Text the stub streams BEFORE the run ends — the panel's "output so far". */
@@ -262,6 +270,11 @@ const stub = http.createServer((req, res) => {
     const cwd = mkdtempSync(join(tmpdir(), 'lokma-office-canvas-'));
     dirs.push(cwd);
     writeFileSync(join(cwd, TOOL_FILE), 'office probe file\n');
+    // §4.6: the gate must be REAL. The live global config says
+    // `defaultMode: bypass` (everything runs), so the probe project carries
+    // its own `auto` permissions — `write_file` then asks (reads stay auto).
+    mkdirSync(join(cwd, '.lokma'), { recursive: true });
+    writeFileSync(join(cwd, '.lokma', 'settings.json'), JSON.stringify({ permissions: { defaultMode: 'auto' } }));
     const created = await fetch(API + '/api/sessions', {
       method: 'POST',
       headers: jsonAuth,
@@ -281,6 +294,19 @@ const stub = http.createServer((req, res) => {
     await ctx.addInitScript(
       (payload) => {
         try {
+          // §4.6 recorder: EVERY toast event this tab saw, in order — the
+          // probe counts announcements without racing the host's ~3.2 s
+          // auto-dismiss. The guard keeps the list across a same-page init.
+          if (!Array.isArray(window.__lokmaToasts)) {
+            window.__lokmaToasts = [];
+            window.addEventListener('lokma-toast', (ev) => {
+              try {
+                window.__lokmaToasts.push({ detail: String(ev && ev.detail), at: Date.now() });
+              } catch {
+                /* ignore */
+              }
+            });
+          }
           localStorage.setItem('lokma-token', payload.token);
           // Seed the probe layout ONLY on a fresh profile: the init script runs
           // on every navigation, so an unconditional write would clobber the
@@ -352,6 +378,8 @@ const stub = http.createServer((req, res) => {
           tool: tool ? (tool.textContent || '').trim() : null,
         };
       }, sessionId);
+    const readToasts = () =>
+      page.evaluate(() => (Array.isArray(window.__lokmaToasts) ? window.__lokmaToasts.slice() : []));
 
     await sleep(1500);
     const shotA = await readCanvas();
@@ -369,11 +397,19 @@ const stub = http.createServer((req, res) => {
     // 30 s later, so the panel's "output so far" is provably the marker.
     script = [
       { text: OUTPUT_MARKER, toolCalls: [{ id: 'probe_read_1', name: 'read_file', args: { path: TOOL_FILE } }], delayMs: 5000 },
-      { text: 'PROBE-DONE', delayMs: 30_000 },
+      // §4.6: the GATED call lands AFTER the sections that watch the read
+      // tool (their live-fold assertions stay deterministic), then the gate
+      // section below holds it open, asserts the mark + toast, and answers.
+      { text: '', toolCalls: [{ id: 'probe_write_1', name: 'write_file', args: { path: GATE_FILE, content: 'gate probe' } }], delayMs: 18_000 },
+      { text: 'PROBE-DONE', delayMs: 20_000 },
     ];
     const frames = [];
     const ws = new WebSocket(WS_BASE + '/ws/' + sessionId + '?token=' + token);
     probeWs = ws;
+    /** §4.6: the live permission_request awaiting the probe's answer. */
+    let gateSeen = null;
+    const answerGate = (requestId, decision) =>
+      ws.send(JSON.stringify({ type: 'permission_response', requestId, decision }));
     const runDone = new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('timeout waiting for run end')), RUN_TIMEOUT_MS);
       ws.on('open', () => ws.send(JSON.stringify({ type: 'prompt', sessionId, model: MODEL, prompt: TASK_MARKER })));
@@ -385,6 +421,7 @@ const stub = http.createServer((req, res) => {
           return;
         }
         frames.push(msg);
+        if (msg.type === 'permission_request' && gateSeen === null) gateSeen = msg;
         if (msg.type === 'done' || msg.type === 'error') {
           clearTimeout(timer);
           resolve(msg);
@@ -608,6 +645,67 @@ const stub = http.createServer((req, res) => {
       await page.screenshot({ path: join(SHOTS, 'REQ-204-slice4-panel.png') });
     }
 
+    // 5c. REQ-204 §4.6 — the notification half. A gate observed pending marks
+    // the worker "waiting for you" AND announces exactly ONE toast on the
+    // app's existing bus (rendered by the toast host — event + pixels). The
+    // probe holds the gate open just long enough to see both, then answers:
+    // the run must RESUME and really write the file (approval, not a deny).
+    const waitEventsBefore = (await readToasts()).filter((t) => t.detail.indexOf('is waiting for you') !== -1);
+    check(waitEventsBefore.length === 0, 'no waiting notice before any gate (the notice never pre-fires)');
+
+    let gate = null;
+    for (let i = 0; i < 90 && gate === null; i++) {
+      gate = gateSeen;
+      if (gate === null) await sleep(1000);
+    }
+    check(gate !== null, 'the gated write_file asked for approval (permission_request on the wire)');
+    check(gate !== null && gate.tool === 'write_file', 'the gate names the tool that is asking (' + (gate ? gate.tool : '?') + ')');
+
+    // Hold the gate open: poll the WAITING mark and the rendered toast in the
+    // SAME window (the host auto-dismisses after ~3.2 s).
+    let mark = null;
+    let toastRendered = null;
+    for (let i = 0; i < 50; i++) {
+      const snap = await page.evaluate((sid) => {
+        const row = document.querySelector('[data-office-worker="run:' + sid + '"]');
+        const badge = row ? row.querySelector('[data-office-waiting]') : null;
+        const host = document.querySelector('[data-lokma-toast]');
+        return {
+          badge: Boolean(badge),
+          status: row ? row.getAttribute('data-office-worker-status') : null,
+          rendered: host ? (host.textContent || '').trim() : '',
+        };
+      }, sessionId);
+      if (snap.badge && mark === null) mark = snap;
+      if (snap.rendered.indexOf('is waiting for you') !== -1 && toastRendered === null) toastRendered = snap.rendered;
+      if (mark !== null && toastRendered !== null) break;
+      await sleep(300);
+    }
+    check(mark !== null && mark.status === 'waiting', 'the floor marks the worker as waiting for you');
+    check(toastRendered !== null, 'the toast host RENDERS the waiting notice (' + (toastRendered || 'not seen') + ')');
+
+    const waitEvents = (await readToasts()).filter((t) => t.detail.indexOf('is waiting for you') !== -1);
+    check(waitEvents.length === 1, 'the gate announced exactly ONE waiting toast (' + waitEvents.length + ')');
+    check(
+      waitEvents.length === 1 && waitEvents[0].detail.indexOf('write_file') !== -1,
+      'the waiting toast names the tool that is asking (' + (waitEvents[0] ? waitEvents[0].detail : '?') + ')',
+    );
+
+    if (SHOTS) {
+      mkdirSync(SHOTS, { recursive: true });
+      await page.screenshot({ path: join(SHOTS, 'REQ-204-slice8-waiting.png') });
+    }
+    if (gate !== null) answerGate(gate.requestId, 'allow');
+    let wrote = false;
+    for (let i = 0; i < 30 && !wrote; i++) {
+      wrote = existsSync(join(cwd, GATE_FILE));
+      if (!wrote) await sleep(500);
+    }
+    check(
+      wrote && readFileSync(join(cwd, GATE_FILE), 'utf8').indexOf('gate probe') === 0,
+      'the approval resumed the run (the written file is on disk)',
+    );
+
     // 6. run end -> the worker leaves
     const end = await runDone.catch((e) => ({ type: 'error', message: String(e && e.message) }));
     check(end && end.type === 'done', 'the run ended (' + (end && end.type) + ')');
@@ -629,6 +727,26 @@ const stub = http.createServer((req, res) => {
     }
     const after = await readCanvas();
     check(after !== null && after.distinct >= 12, 'the canvas still draws after the run left (idle office)');
+
+    // §4.6 (delivery half): the window this pane watched close announces
+    // exactly ONE delivery toast — and the waiting notice never re-fired
+    // across the whole run (the one-shot ledger held).
+    let deliveryEvents = [];
+    for (let i = 0; i < 30; i++) {
+      deliveryEvents = (await readToasts()).filter(
+        (t) => t.detail.indexOf('finished') !== -1 || t.detail.indexOf('run ended') !== -1,
+      );
+      if (deliveryEvents.length > 0) break;
+      await sleep(500);
+    }
+    check(deliveryEvents.length === 1, 'the finished run announced exactly ONE delivery toast (' + deliveryEvents.length + ')');
+    check(
+      deliveryEvents.length === 1 && deliveryEvents[0].detail.indexOf('is waiting for you') === -1,
+      'the delivery toast is the run-finished notice (' + (deliveryEvents[0] ? deliveryEvents[0].detail : '?') + ')',
+    );
+    const finalWait = (await readToasts()).filter((t) => t.detail.indexOf('is waiting for you') !== -1);
+    check(finalWait.length === 1, 'the waiting notice never re-fired across the run (still ' + finalWait.length + ')');
+    if (SHOTS) await page.screenshot({ path: join(SHOTS, 'REQ-204-slice8-delivery.png') });
 
     // 6b. slice 5 — the view preference survives a reload: the scope mode and
     // the search text live in ONE persisted object (`lokma-office-view:v1`),

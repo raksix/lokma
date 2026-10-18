@@ -114,6 +114,14 @@ export const TranscriptRowSchema = z.object({
    * and assembles labeled `<file>` blocks for the model.
    */
   files: z.array(PromptFileSchema).optional(),
+  /**
+   * REQ-205: rows recorded by a CLIENT-side keyless run (`transcript_record`)
+   * — the server spent no provider key on them. Stamped by the server, never
+   * trusted from whoever sent the request; absent on rows the server's own
+   * provider path wrote. Mirrored in lokma-core `SessionMessage` — keep both
+   * in sync (the wire validator strips unknown keys).
+   */
+  origin: z.enum(['client-free']).optional(),
 });
 export type TranscriptRow = z.infer<typeof TranscriptRowSchema>;
 
@@ -137,6 +145,29 @@ export const SessionRowSchema = z.object({
   queued: z.number().int().min(0).optional(),
 });
 export type SessionRow = z.infer<typeof SessionRowSchema>;
+
+/**
+ * REQ-205 — one row a browser-side keyless run asks the server to persist.
+ *
+ * The run happened entirely in the client (no server key); this is only the
+ * RECORD of it, written through the same `SessionStore.append` the server
+ * loop uses. Roles are text-only: `tool` evidence is written by the loop
+ * itself and must never be forgeable over this path. `timestamp` comes from
+ * the client (it owns the real send/answer times) and is what makes a lost
+ * ack retry idempotent — the same batch replayed posts identical stamps.
+ */
+export const CLIENT_FREE_RECORD_ROLES = ['user', 'assistant', 'thinking'] as const;
+/** Per-row content bound (chars) — well under the 16 MB frame cap, generous for long answers. */
+export const CLIENT_FREE_ROW_CHAR_CAP = 400_000;
+/** Row bound per record request (user + thinking + assistant + slack). */
+export const CLIENT_FREE_RECORD_MAX_ROWS = 6;
+
+export const ClientFreeRecordRowSchema = z.object({
+  role: z.enum(CLIENT_FREE_RECORD_ROLES),
+  content: z.string().min(1).max(CLIENT_FREE_ROW_CHAR_CAP),
+  timestamp: z.string().min(1).max(40),
+});
+export type ClientFreeRecordRow = z.infer<typeof ClientFreeRecordRowSchema>;
 
 export const ClientMessageSchema = z.discriminatedUnion('type', [
   z.object({
@@ -194,6 +225,17 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('transcript_get'),
     sessionId: z.string().min(1).max(128),
+  }),
+  // REQ-205 slice 3: a browser-side KEYLESS run (OmniRoute free pool, no API
+  // key anywhere) finished — persist the rows it produced through the SAME
+  // transcript store the server loop writes. `origin` names the run's source
+  // (today only `client-free`); the server stamps it onto every appended row
+  // so a reader can tell the server spent no provider key on them.
+  z.object({
+    type: z.literal('transcript_record'),
+    sessionId: z.string().min(1).max(128),
+    origin: z.literal('client-free'),
+    rows: z.array(ClientFreeRecordRowSchema).min(1).max(CLIENT_FREE_RECORD_MAX_ROWS),
   }),
 ]);
 
@@ -305,6 +347,14 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
     type: z.literal('transcript_append'),
     sessionId: z.string(),
     message: TranscriptRowSchema,
+  }),
+  // REQ-205 slice 3: ack for `transcript_record` — `count` rows were appended
+  // (0 = the identical batch was already persisted, which is success on a
+  // retry after a lost ack, never a failure).
+  z.object({
+    type: z.literal('transcript_recorded'),
+    sessionId: z.string(),
+    count: z.number().int().min(0),
   }),
   z.object({ type: z.literal('error'), message: z.string(), code: z.string().optional(), sessionId: z.string().optional() }),
 ]);

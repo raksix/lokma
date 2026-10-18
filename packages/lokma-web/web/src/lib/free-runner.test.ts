@@ -8,7 +8,16 @@
  * role delta, reasoning_content deltas, content deltas, an SSE comment line,
  * a final event with `finish_reason` + `usage`, then `data: [DONE]`.
  */
-import { FREE_DEFAULT_MAX_TOKENS, chatCompletionsUrl, drainSseData, parseStreamPayload, runFreeChat } from './free-runner';
+import {
+  FREE_DEFAULT_MAX_TOKENS,
+  FREE_THINKING_ROW_CAP,
+  chatCompletionsUrl,
+  drainSseData,
+  freeRunRecordRows,
+  parseStreamPayload,
+  runFreeChat,
+} from './free-runner';
+import { CLIENT_FREE_ROW_CHAR_CAP, ClientFreeRecordRowSchema } from '@lokma/shared/protocol/ws';
 import { FREE_BASE_URL } from './free-models';
 
 let passed = 0;
@@ -353,6 +362,72 @@ assert(chatCompletionsUrl('  https://probe.test/v1  ') === 'https://probe.test/v
   }) as unknown as typeof fetch;
   const res = await runFreeChat({ base: 'https://probe.test/v1/', model: 'm', messages: [{ role: 'user', content: 'x' }], fetchFn });
   assert(!res.ok && res.error === 'fetch failed', 'network: rejection message surfaces (no invented text)');
+}
+
+// ─── REQ-205 slice 3: freeRunRecordRows (the record half) ───────────────────
+{
+  // 6a. A successful run records user → thinking → assistant, in order.
+  const rows = freeRunRecordRows({
+    prompt: 'selam lokma',
+    promptAt: '2026-10-18T10:00:00.000Z',
+    answerAt: '2026-10-18T10:00:02.000Z',
+    result: { text: 'merhaba!', reasoning: 'kullanıcı selam veriyor' },
+  });
+  assert(rows.length === 3, 'record: success keeps user + thinking + assistant');
+  assert(rows[0]!.role === 'user' && rows[0]!.content === 'selam lokma', 'record: the prompt row comes first, verbatim');
+  assert(rows[0]!.timestamp === '2026-10-18T10:00:00.000Z', 'record: the prompt row carries its own send stamp');
+  assert(rows[1]!.role === 'thinking' && rows[2]!.role === 'assistant', 'record: thinking sits between prompt and answer');
+  assert(rows[2]!.timestamp === '2026-10-18T10:00:02.000Z', 'record: the answer rows carry the settle stamp');
+  assert(
+    rows.every((r) => ClientFreeRecordRowSchema.safeParse(r).success),
+    'record: every produced row passes the wire schema',
+  );
+}
+{
+  // 6b. Reasoning absent (or blank) → no thinking row.
+  const rows = freeRunRecordRows({ prompt: 'p', promptAt: 't0', answerAt: 't1', result: { text: 'cevap', reasoning: '   ' } });
+  assert(rows.length === 2 && rows[1]!.role === 'assistant', 'record: no reasoning → no thinking row');
+}
+{
+  // 6c. Failure before any answer: the prompt still survives; no fabricated turn.
+  const rows = freeRunRecordRows({ prompt: 'p', promptAt: 't0', answerAt: 't1', result: { text: '', reasoning: '' } });
+  assert(rows.length === 1 && rows[0]!.role === 'user', 'record: a failed run with no text records only the prompt');
+  assert(rows[0]!.content === 'p', 'record: the prompt is never dropped on failure');
+}
+{
+  // 6d. Abort mid-stream keeps the partial answer (never discarded).
+  const rows = freeRunRecordRows({ prompt: 'p', promptAt: 't0', answerAt: 't1', result: { text: 'kısmi', reasoning: 'düşün' } });
+  assert(rows.length === 3 && rows[2]!.content === 'kısmi', 'record: aborted partial answer is persisted');
+}
+{
+  // 6e. Thinking over its cap gets the loop's marker (parity with agent-loop).
+  const long = 'a'.repeat(FREE_THINKING_ROW_CAP + 500);
+  const rows = freeRunRecordRows({ prompt: 'p', promptAt: 't0', answerAt: 't1', result: { text: 'x', reasoning: long } });
+  const thinking = rows.find((r) => r.role === 'thinking');
+  assert(thinking !== undefined, 'record: capped thinking row exists');
+  assert(
+    thinking !== undefined && thinking.content.includes('[thinking truncated: ' + long.length + ' chars total]'),
+    'record: the thinking marker names the real total',
+  );
+}
+{
+  // 6f. An over-cap ANSWER clamps to the WIRE cap (marker inside it) so the
+  //     frame still validates instead of failing whole.
+  const huge = 'b'.repeat(CLIENT_FREE_ROW_CHAR_CAP + 1000);
+  const rows = freeRunRecordRows({ prompt: 'p', promptAt: 't0', answerAt: 't1', result: { text: huge, reasoning: '' } });
+  const assistant = rows.find((r) => r.role === 'assistant');
+  assert(
+    assistant !== undefined && assistant.content.length === CLIENT_FREE_ROW_CHAR_CAP,
+    'record: over-cap answer clamps to the wire cap',
+  );
+  assert(
+    assistant !== undefined && assistant.content.includes('[truncated: ' + huge.length + ' chars total]'),
+    'record: the clamped answer names the real total',
+  );
+  assert(
+    rows.every((r) => ClientFreeRecordRowSchema.safeParse(r).success),
+    'record: clamped rows still pass the wire schema',
+  );
 }
 
 console.log('\n' + passed + ' assertions passed');

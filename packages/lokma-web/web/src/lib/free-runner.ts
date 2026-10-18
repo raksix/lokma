@@ -31,6 +31,7 @@
  * Covered by `free-runner.test.ts` (`bun src/lib/free-runner.test.ts`).
  */
 import { FREE_BASE_URL, apiUrl } from './free-models';
+import { CLIENT_FREE_ROW_CHAR_CAP, type ClientFreeRecordRow } from '@lokma/shared/protocol/ws';
 
 /** Generous default budget — a small `max_tokens` leaves `content` empty on
  * reasoning models (REQ-205 §2 pitfall 1: the whole budget goes to
@@ -320,4 +321,61 @@ export async function runFreeChat(opts: FreeChatOpts): Promise<FreeChatResult> {
       reasoning,
     };
   }
+}
+
+// ─── REQ-205 slice 3: the record half (what the server persists) ────────────
+
+/**
+ * Thinking rows are capped exactly like the server loop's (`agent-loop.ts`
+ * THINK_CAP) so a free run and a server run persist thinking the same way.
+ */
+export const FREE_THINKING_ROW_CAP = 12_000;
+
+function truncationMarker(total: number): string {
+  return '\n…[truncated: ' + total + ' chars total]';
+}
+
+/** Clamp to the WIRE cap, marker included — an over-cap frame is rejected whole. */
+function clampRowContent(content: string): string {
+  if (content.length <= CLIENT_FREE_ROW_CHAR_CAP) return content;
+  const marker = truncationMarker(content.length);
+  return content.slice(0, Math.max(0, CLIENT_FREE_ROW_CHAR_CAP - marker.length)) + marker;
+}
+
+function clampThinking(reasoning: string): string {
+  if (reasoning.length <= FREE_THINKING_ROW_CAP) return reasoning;
+  return reasoning.slice(0, FREE_THINKING_ROW_CAP) + '\n…[thinking truncated: ' + reasoning.length + ' chars total]';
+}
+
+/**
+ * REQ-205 slice 3 — turn a settled free run into the rows the server
+ * persists through `transcript_record`. `origin` is NOT set here: the
+ * server stamps it (the client never declares its own provenance).
+ *
+ * Honesty rules (mirrors `runFreeChat`'s result contract):
+ *  - the user's prompt is always recorded — their message must survive a
+ *    reload even when the model call failed;
+ *  - a thinking row only when reasoning actually arrived (capped, marked);
+ *  - an assistant row only when answer TEXT actually arrived — a failed or
+ *    aborted run with no text leaves no fabricated turn behind.
+ */
+export function freeRunRecordRows(input: {
+  prompt: string;
+  /** ISO stamp of the user's send (the same one its optimistic row carries). */
+  promptAt: string;
+  /** ISO stamp of the run settling (success, abort or failure). */
+  answerAt: string;
+  result: { text: string; reasoning: string };
+}): ClientFreeRecordRow[] {
+  const rows: ClientFreeRecordRow[] = [
+    { role: 'user', content: clampRowContent(input.prompt), timestamp: input.promptAt },
+  ];
+  const reasoning = input.result.reasoning.trim();
+  if (reasoning) {
+    rows.push({ role: 'thinking', content: clampThinking(reasoning), timestamp: input.answerAt });
+  }
+  if (input.result.text.trim()) {
+    rows.push({ role: 'assistant', content: clampRowContent(input.result.text), timestamp: input.answerAt });
+  }
+  return rows;
 }

@@ -18,6 +18,7 @@ import {
   reconnectDelay,
   sessionsListMessage,
   transcriptGetMessage,
+  transcriptRecordMessage,
   withAuthToken,
   wsUrl,
 } from './ws';
@@ -325,6 +326,49 @@ assert(decodedAppend?.type === 'transcript_append', 'transcript_append decodes f
 assert(
   decodeServerFrame(JSON.stringify({ type: 'transcript_get', sessionId: 's' })) === null,
   'a client message is not mistaken for a server frame',
+);
+
+// 16. REQ-205: the client-free record builder validates like every other
+//     builder, stamps the origin, and keeps the rows verbatim.
+{
+  const raw = transcriptRecordMessage('sess_a', [
+    { role: 'user', content: 'selam', timestamp: 't0' },
+    { role: 'thinking', content: 'düşün', timestamp: 't1' },
+    { role: 'assistant', content: 'merhaba', timestamp: 't1' },
+  ]);
+  const parsed = ClientMessageSchema.safeParse(JSON.parse(raw));
+  assert(parsed.success, 'transcript_record builder validates against the wire schema');
+  const msg = parsed.success ? parsed.data : null;
+  assert(msg?.type === 'transcript_record', 'the record builder sends a transcript_record frame');
+  assert(
+    msg?.type === 'transcript_record' && msg.origin === 'client-free',
+    'the record builder stamps origin client-free',
+  );
+  assert(
+    msg?.type === 'transcript_record' && msg.rows.length === 3,
+    'the record builder keeps every row',
+  );
+  assert(
+    msg?.type === 'transcript_record' && msg.rows[2]?.content === 'merhaba',
+    'the record builder keeps row content verbatim (no trimming)',
+  );
+  // Negative control: `tool` evidence is written by the server loop itself —
+  // the builder must refuse it by construction, never send a shape the
+  // schema drops silently.
+  let rejected = false;
+  try {
+    transcriptRecordMessage('sess_a', [{ role: 'tool' as never, content: '{}', timestamp: 't0' }]);
+  } catch {
+    rejected = true;
+  }
+  assert(rejected, 'a tool row is refused by the record builder (never forgeable)');
+}
+// 17. REQ-205: the record ack decodes from the wire.
+const decodedAck = decodeServerFrame(JSON.stringify({ type: 'transcript_recorded', sessionId: 'sess_a', count: 3 }));
+assert(decodedAck?.type === 'transcript_recorded', 'transcript_recorded decodes from the wire');
+assert(
+  decodedAck?.type === 'transcript_recorded' && decodedAck.count === 3,
+  'the ack carries the appended count',
 );
 
 delete (globalThis as unknown as Record<string, unknown>).window;

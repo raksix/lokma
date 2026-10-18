@@ -10,6 +10,7 @@
 import {
   ClientMessageSchema,
   ServerMessageSchema,
+  type ClientFreeRecordRow,
   type ClientMessage,
   type PromptFile,
   type PromptImage,
@@ -249,6 +250,20 @@ export function transcriptGetMessage(sessionId: string): string {
   return checked({ type: 'transcript_get', sessionId });
 }
 
+/**
+ * REQ-205: persist the rows of a browser-side KEYLESS run (OmniRoute free
+ * pool — no API key anywhere) into the session transcript through the
+ * server's own store. The server answers with `transcript_recorded`
+ * (`count` 0 = the identical batch was already persisted — success on a
+ * retry after a lost ack).
+ */
+export function transcriptRecordMessage(
+  sessionId: string,
+  rows: ClientFreeRecordRow[],
+): string {
+  return checked({ type: 'transcript_record', sessionId, origin: 'client-free', rows });
+}
+
 // ─── Pure UI reducer (React state derives from this, unit-tested) ────────────
 
 export function initialWsUiState(): WsUiState {
@@ -356,6 +371,10 @@ export function applyServerFrame(state: WsUiState, msg: ServerMessage): WsUiStat
       // REQ-149: session data belongs to the session store (sidebar rows +
       // transcript cache, folded there via `applyWsEvent`) — the chat UI
       // state never changes on it.
+      return state;
+    case 'transcript_recorded':
+      // REQ-205: ack for a client-free record — the awaiting caller (the
+      // chat's free-run path) keys on it; chat state is untouched.
       return state;
     case 'done':
       return {

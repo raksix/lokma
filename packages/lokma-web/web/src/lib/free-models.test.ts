@@ -8,10 +8,12 @@ import {
   FREE_CATALOG_KEY,
   FREE_CATALOG_TTL_MS,
   fetchFreeCatalog,
+  freeModelId,
   isFreeId,
   loadFreeCatalog,
   modelsUrl,
   normalizeFreeCatalog,
+  parseFreeModelId,
   type FreeCatalogStorage,
   type FreeModel,
 } from './free-models';
@@ -196,6 +198,25 @@ const CACHED_MODEL: FreeModel = { id: 'free-opencode', label: 'free-opencode', a
 {
   const res = await fetchFreeCatalog('https://x.test/v1', throwingFetch);
   assert(!res.ok && res.error.indexOf('boom') >= 0, 'fetch: network rejection surfaces its message');
+}
+
+// ─── REQ-205 slice 4: the `free:` sentinel (picker → send routing) ──────────
+{
+  assert(freeModelId('free-opencode') === 'free:free-opencode', 'sentinel: freeModelId prefixes the catalog id');
+  assert(
+    parseFreeModelId('free:free-opencode') === 'free-opencode',
+    'sentinel: parseFreeModelId returns the catalog id',
+  );
+  assert(
+    parseFreeModelId('anthropic/claude-opus-4') === null,
+    'sentinel: a server model id never parses as free',
+  );
+  assert(parseFreeModelId('free:') === null, 'sentinel: a bare prefix is not a runnable id');
+  assert(parseFreeModelId('free:   ') === null, 'sentinel: a whitespace-only id is refused');
+  assert(
+    parseFreeModelId(freeModelId('cmd/x:free')) === 'cmd/x:free',
+    'sentinel: round-trips ids carrying colons and slashes',
+  );
 }
 
 console.log('\n' + passed + ' assertions passed');

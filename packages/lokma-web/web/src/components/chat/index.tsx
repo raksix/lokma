@@ -11,6 +11,8 @@ import {
 } from './submit-guard';
 import { SingleChatView, type PendingMessage, type TranscriptMessage } from './single-chat-view';
 import { useWs, type UseWs } from '@/hooks/use-ws';
+import { useFreeRun } from '@/hooks/use-free-run';
+import { parseFreeModelId } from '@/lib/free-models';
 import { api } from '@/lib/api';
 import { normalizeConfig } from '@/components/settings/settings';
 import { resolveDefaultModel } from '@/components/providers/models';
@@ -101,11 +103,33 @@ export function Chat({
   const streaming = (socketOpen && !done && stream.length > 0) || runActive;
   const [answerBusy, setAnswerBusy] = React.useState<string | null>(null);
 
+  /**
+   * REQ-205 slice 4: the client-free run (keyless OmniRoute pool). A picked
+   * `free:` model routes the send here instead of the WS prompt path; the
+   * same chat surface renders its deltas, and the settled exchange is
+   * recorded back through the server's own transcript store.
+   */
+  const transcriptRef = React.useRef<TranscriptMessage[]>([]);
+  const freeRun = useFreeRun(sessionId, ws, () => transcriptRef.current, {
+    onSettled: () => {
+      setPending([]);
+      markSessionSeen(sessionId);
+    },
+  });
+  const freePhase = freeRun.view.phase;
+  /** A live or settled free run owns the live area — the WS buffers are idle. */
+  const freeOwnsLive = freePhase !== 'idle';
+  const liveStream = freeOwnsLive ? freeRun.view.text : streamVisible ? stream : '';
+  const liveThinking = freeOwnsLive ? freeRun.view.reasoning : thinking;
+  const liveStreaming = freePhase === 'running' || streaming;
+  const liveRunError = freeOwnsLive ? freeRun.view.error : done && lastError ? lastError : null;
+  const liveRunErrorCode = freeOwnsLive ? null : done && lastError ? lastErrorCode : null;
+
   // Loading line under the composer while the AI works (REQ-112): what is
   // happening right now — retry, approval wait, running tool, thinking,
   // writing, or generic working. Null when idle.
   const runStatus = React.useMemo((): string | null => {
-    if (!streaming) return null;
+    if (!liveStreaming) return null;
     if (retry) {
       const waitS = Math.round(retry.waitMs / 1000);
       return `Tekrar deneniyor (${retry.attempt}/${retry.maxAttempts}, ${waitS}sn)…`;
@@ -114,10 +138,10 @@ export function Chat({
     const entries = Object.values(toolCalls);
     const running = [...entries].reverse().find((t) => t.result === undefined);
     if (running) return `Çalışıyor: ${running.tool}…`;
-    if (thinking.trim().length > 0) return 'Düşünüyor…';
-    if (stream.trim().length > 0) return 'Yazıyor…';
+    if (liveThinking.trim().length > 0) return 'Düşünüyor…';
+    if (liveStream.trim().length > 0) return 'Yazıyor…';
     return 'Çalışıyor…';
-  }, [streaming, retry, permissions.length, questions.length, toolCalls, thinking, stream]);
+  }, [liveStreaming, retry, permissions.length, questions.length, toolCalls, liveThinking, liveStream]);
 
   // REQ-070: on mount (fresh boot after F5) ask the backend whether a run is
   // still in flight; while it is, poll status + transcript so the refresh
@@ -203,6 +227,10 @@ export function Chat({
     const raw = transcripts[sessionId] ?? [];
     return raw.filter(isTranscriptMessage);
   }, [transcripts, sessionId]);
+  // REQ-205 slice 4: the free runner replays the recent conversation — the
+  // getter reads through a ref so a mid-stream send sees the latest rows
+  // without re-creating the hook callbacks on every transcript update.
+  transcriptRef.current = transcript;
 
   /**
    * REQ-149: the socket pushes persisted rows live, so an optimistic pending
@@ -322,7 +350,11 @@ export function Chat({
     } catch {
       initial = null;
     }
-    if (initial) sendText(initial, model ? { model } : {});
+    if (initial) {
+      // REQ-205: the handed-off first prompt rides the same router as a
+      // composer send — a `free:` model goes through the keyless runner.
+      send({ text: initial, model, contextPaths: [], reasoningEffort: readThinking(), images: [], files: [] });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, sessionId]);
 
@@ -350,6 +382,19 @@ export function Chat({
 
   const send = React.useCallback(
     (s: ComposerSend) => {
+      const freeId = parseFreeModelId(s.model);
+      // REQ-205 slice 4: a `free:` pick never reaches the server prompt path —
+      // the browser talks to the keyless pool directly. Second gate for
+      // programmatic callers (the composer refuses earlier, with the draft
+      // intact); the free wire is text-only in this version.
+      if (freeId && (s.images.length > 0 || s.files.length > 0)) {
+        emitToast('Free models are text-only here — remove the attachments or pick a provider model.');
+        return;
+      }
+      if (freeId && freeRun.view.phase === 'running') {
+        emitToast('A free-model run is already in flight — wait for it or press Stop.');
+        return;
+      }
       // REQ-156: a fast second Enter (or Enter + click) leaves the composer text
       // in place and used to send the same prompt twice — the user's own message
       // then painted twice optimistically plus the server echo (three copies of
@@ -365,6 +410,18 @@ export function Chat({
       setPending((prev) => [...prev, { key: keySeq.current, text: pendingText }]);
       setStreamVisible(true);
       doneSeen.current = false;
+      if (freeId) {
+        // A new prompt starts a new free view; the previous run's settled
+        // notice belongs to it, not to this one.
+        freeRun.reset();
+        if (!freeRun.start(s.text, freeId)) {
+          // Refused (an empty prompt reached this path programmatically): the
+          // optimistic row would never get a run — drop it and say why.
+          setPending((prev) => prev.filter((p) => p.key !== keySeq.current));
+          emitToast('Nothing to send to the free model — type a prompt first.');
+        }
+        return;
+      }
       sendText(s.text, {
         model: s.model || undefined,
         contextPaths: s.contextPaths.length ? s.contextPaths : undefined,
@@ -373,8 +430,21 @@ export function Chat({
         files: s.files.length ? s.files : undefined,
       });
     },
-    [sendText],
+    [freeRun, sendText],
   );
+
+  /**
+   * Stop is ONE affordance for both paths: a live free run kills its fetch
+   * (partial text survives, then persists), anything else interrupts the
+   * server-side run over WS.
+   */
+  const stop = React.useCallback(() => {
+    if (freeRun.view.phase === 'running') {
+      freeRun.abort();
+      return;
+    }
+    interrupt();
+  }, [freeRun, interrupt]);
 
   const openSession = React.useCallback(
     (id: string, initialPrompt?: string) => {
@@ -519,13 +589,13 @@ export function Chat({
         .rewindSession(sessionId, index)
         .then(() => reloadTranscript())
         .then(() => {
-          setStreamVisible(true);
-          doneSeen.current = false;
-          sendText(text, model ? { model } : {});
+          // REQ-205: the resend rides the same router as a normal send — a
+          // `free:` model must not fall back onto the server prompt path.
+          send({ text, model, contextPaths: [], reasoningEffort: readThinking(), images: [], files: [] });
         })
         .catch((e: Error) => emitToast(`Edit failed: ${e.message}`));
     },
-    [sessionId, reloadTranscript, sendText, model],
+    [sessionId, reloadTranscript, send, model],
   );
 
   const rewindTo = React.useCallback(
@@ -628,11 +698,11 @@ export function Chat({
           cwd={known !== null && typeof known === 'object' ? known.cwd : undefined}
           transcript={transcript}
           pending={visiblePending}
-          stream={streamVisible ? stream : ''}
-          streaming={streaming}
-          thinking={thinking}
-          runError={done && lastError ? lastError : null}
-          runErrorCode={done && lastError ? lastErrorCode : null}
+          stream={liveStream}
+          streaming={liveStreaming}
+          thinking={liveThinking}
+          runError={liveRunError}
+          runErrorCode={liveRunErrorCode}
           costLabel={costLabel}
           toolCalls={toolCalls}
           toolMarks={toolMarks}
@@ -654,13 +724,13 @@ export function Chat({
         </span>
         <Composer
           model={model}
-          streaming={streaming}
+          streaming={liveStreaming}
           status={runStatus}
           socketOpen={socketOpen}
           paletteSignal={paletteSignal}
           dropSignal={dropSignal}
           onSend={send}
-          onStop={interrupt}
+          onStop={stop}
           onSlash={runSlash}
           onPickModel={pickModel}
           placeholder={composerPlaceholder}

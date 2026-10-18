@@ -20,8 +20,10 @@ import {
   terminalKill,
   terminalResize,
   transcriptGetMessage,
+  transcriptRecordMessage,
   withAuthToken,
   wsUrl,
+  type ClientFreeRecordRow,
   type CostTotal,
   type PermissionRequest,
   type PromptFile,
@@ -104,6 +106,15 @@ export type UseWs = {
    * arrives as `transcript_append` — no REST reload needed.
    */
   requestTranscript: (sessionId: string) => void;
+  /**
+   * REQ-205 slice 4: persist a browser-side keyless run's rows through the
+   * server's own store (`transcript_record`; the server stamps `origin`).
+   * Returns false when no socket is open — the caller must then say the run
+   * could not be saved instead of pretending it was. The server answers
+   * with `transcript_recorded` (count 0 = the identical batch was already
+   * persisted).
+   */
+  recordTranscript: (rows: ClientFreeRecordRow[]) => boolean;
   /** Write stdin bytes to a live shell (answer arrives as `terminal/data`). */
   sendTerminal: (terminalId: string, data: string) => void;
   /** Record the pane size for a live shell. */
@@ -352,6 +363,20 @@ export function useWs(sessionId: string): UseWs {
     socketSend(wsRef.current, transcriptGetMessage(id));
   }, []);
 
+  /**
+   * REQ-205 slice 4: record a client-free run's rows. The socket is the only
+   * writer — a send on a dead socket reports failure (the caller keeps the
+   * content on screen and says it was not saved) instead of dropping rows
+   * silently.
+   */
+  const recordTranscript = useCallback((rows: ClientFreeRecordRow[]) => {
+    if (!rows.length) return false;
+    const socket = wsRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) return false;
+    socket.send(transcriptRecordMessage(sessionRef.current, rows));
+    return true;
+  }, []);
+
   const sendTerminal = useCallback((terminalId: string, data: string) => {
     if (!terminalId || !data) return;
     socketSend(wsRef.current, terminalInput(terminalId, data));
@@ -411,6 +436,7 @@ export function useWs(sessionId: string): UseWs {
     answerQuestion,
     interrupt,
     requestTranscript,
+    recordTranscript,
     sendTerminal,
     resizeTerminal,
     killTerminal,

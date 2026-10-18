@@ -10,9 +10,12 @@
  */
 import {
   FREE_DEFAULT_MAX_TOKENS,
+  FREE_HISTORY_LIMIT,
+  FREE_HISTORY_ROW_CAP,
   FREE_THINKING_ROW_CAP,
   chatCompletionsUrl,
   drainSseData,
+  freeHistoryMessages,
   freeRunRecordRows,
   parseStreamPayload,
   runFreeChat,
@@ -428,6 +431,47 @@ assert(chatCompletionsUrl('  https://probe.test/v1  ') === 'https://probe.test/v
     rows.every((r) => ClientFreeRecordRowSchema.safeParse(r).success),
     'record: clamped rows still pass the wire schema',
   );
+}
+
+// ─── REQ-205 slice 4: freeHistoryMessages (context replayed to the pool) ────
+{
+  // 7a. Only real user/assistant rows ride along, in order; tool/thinking
+  //     rows and blank content never reach the free endpoint.
+  const rows = freeHistoryMessages([
+    { role: 'user', content: 'ilk' },
+    { role: 'assistant', content: 'cevap' },
+    { role: 'tool', content: '{"x":1}' },
+    { role: 'thinking', content: 'gizli' },
+    { role: 'user', content: '   ' },
+    { role: 'user', content: 'son' },
+  ]);
+  assert(rows.length === 3, 'history: only user/assistant rows with real content ride along');
+  assert(
+    rows[0]!.role === 'user' && rows[1]!.role === 'assistant' && rows[2]!.content === 'son',
+    'history: order preserved (oldest first, blanks dropped)',
+  );
+  assert(!rows.some((r) => r.content === '{"x":1}'), 'history: tool rows are excluded');
+}
+{
+  // 7b. The cap keeps the NEWEST turns.
+  const many = Array.from({ length: 12 }, (_, i) => ({ role: 'user', content: 'm' + i }));
+  const rows = freeHistoryMessages(many, FREE_HISTORY_LIMIT);
+  assert(rows.length === FREE_HISTORY_LIMIT, 'history: capped to the newest N rows');
+  assert(rows[0]!.content === 'm4' && rows[7]!.content === 'm11', 'history: the cap drops the OLDEST rows');
+}
+{
+  // 7c. An over-cap row carries the truncation marker with the real total.
+  const long = 'x'.repeat(FREE_HISTORY_ROW_CAP + 1000);
+  const rows = freeHistoryMessages([{ role: 'user', content: long }]);
+  assert(
+    rows[0]!.content.length < long.length && rows[0]!.content.includes('[truncated: ' + long.length + ' chars total]'),
+    'history: an over-cap row is clamped with a visible marker',
+  );
+}
+{
+  // 7d. Unknown roles / roleless / non-string rows never reach the model.
+  const rows = freeHistoryMessages([{ role: 'system', content: 'sys' }, { content: 'no role' }, {}, null as never]);
+  assert(rows.length === 0, 'history: unknown roles and roleless rows are refused');
 }
 
 console.log('\n' + passed + ' assertions passed');

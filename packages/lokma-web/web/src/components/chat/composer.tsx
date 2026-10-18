@@ -23,6 +23,12 @@ import { MAX_IMAGE_EDGE, downscaleDims, formatImageMarker, hasOsFiles, isImageAt
 import { COMPOSER_ENTER_HINT, COMPOSER_SHELL_CLASS, ComposerInput, type ComposerInputHandle } from './composer-input';
 import { appendMention } from '@/components/files';
 import { enabledModels } from '@/components/providers/models';
+import {
+  freeModelId,
+  loadFreeCatalog,
+  parseFreeModelId,
+  type FreeCatalogResult,
+} from '@/lib/free-models';
 
 /**
  * Composer — chat input ported from the concept shell into the harness.
@@ -334,6 +340,13 @@ export function Composer({
   const [attachments, setAttachments] = React.useState<Attachment[]>([]);
   const [dragActive, setDragActive] = React.useState(false);
   const [recording, setRecording] = React.useState(false);
+  /**
+   * REQ-205 slice 4: the keyless free catalog. Loaded lazily on the first
+   * dropdown open (a user who never opens the picker makes no request), and
+   * re-attempted on every open while it is unavailable — the honest failure
+   * row disappears by itself once the upstream answers.
+   */
+  const [freeCatalog, setFreeCatalog] = React.useState<FreeCatalogResult | null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
   /** REQ-188 — the textarea lives inside the shared `ComposerInput`. */
   const inputRef = React.useRef<ComposerInputHandle>(null);
@@ -354,6 +367,20 @@ export function Composer({
       .then((res) => setCommands(res.commands))
       .catch(() => emitToast('Slash commands unavailable — server unreachable'));
   }, [refreshProviders]);
+
+  // REQ-205 slice 4: pull the keyless free catalog when the picker opens.
+  // A fresh cache answers without a network call (slice 1 TTL), an outage
+  // lands in `ok:false` and the dropdown shows the honest reason.
+  React.useEffect(() => {
+    if (!modelOpen || (freeCatalog && freeCatalog.ok)) return;
+    let alive = true;
+    void loadFreeCatalog().then((res) => {
+      if (alive) setFreeCatalog(res);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [modelOpen, freeCatalog]);
 
   // File dropped from the explorer — splice `@path` into the draft (the
   // existing mention parser turns it into `contextPaths` on send).
@@ -388,7 +415,17 @@ export function Composer({
     return [...groups.entries()];
   }, [storeModels, modelQuery]);
 
-  const activeLabel = storeModels.find((m) => m.id === model)?.label ?? model ?? 'Select model';
+  /** REQ-205 slice 4: the picked value routes through the client-free runner. */
+  const pickedFreeId = parseFreeModelId(model);
+  /** The trigger label: a free pick shows the bare catalog id, never the sentinel. */
+  const activeLabel = pickedFreeId ?? storeModels.find((m) => m.id === model)?.label ?? model ?? 'Select model';
+  /** Free catalog rows matching the search (aliases already collapsed). */
+  const freeModels = React.useMemo(() => {
+    if (!freeCatalog?.ok) return [];
+    const q = modelQuery.trim().toLowerCase();
+    if (!q) return freeCatalog.models;
+    return freeCatalog.models.filter((m) => `${m.label} ${m.id}`.toLowerCase().includes(q));
+  }, [freeCatalog, modelQuery]);
 
   const switchMode = (next: 'steer' | 'queue'): void => {
     setMode(next);
@@ -405,6 +442,20 @@ export function Composer({
       // REQ-187: attachments are first-class inputs — a file-only (or
       // image-only) message has no text but is still a send.
       if (!body && attachments.length === 0) return;
+      // REQ-205 slice 4: the client-free wire is text-only in this version
+      // (the server assembles file blocks and the free endpoint would need a
+      // multimodal body). Refuse BEFORE clearing the draft so nothing the
+      // user attached is lost, and say why.
+      if (pickedFreeId && attachments.length > 0) {
+        emitToast('Free models are text-only here — remove the attachments or pick a provider model.');
+        return;
+      }
+      // One in-flight free run per session (REQ-205 §4.6): a second send while
+      // it streams is refused with the draft intact, not queued silently.
+      if (pickedFreeId && streaming) {
+        emitToast('A free-model run is already in flight — wait for it or press Stop.');
+        return;
+      }
       // REQ-186: image markers stay in the text (they orient the model).
       // REQ-187: file content NO LONGER dumps into the text — files ride the
       // frame's `files` array, the server assembles the model's `<file>`
@@ -437,7 +488,7 @@ export function Composer({
       }
       onSend({ text: full, model, contextPaths: parseMentions(body).map((m) => m.path), reasoningEffort: thinking, images, files });
     },
-    [attachments, commands, contextPaths, model, onSend, thinking],
+    [attachments, commands, contextPaths, model, onSend, streaming, thinking],
   );
 
   const handleSend = (): void => {
@@ -647,6 +698,15 @@ export function Composer({
             >
               <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[#262624] text-[9px] text-white">L</span>
               <span className="truncate">{activeLabel}</span>
+              {pickedFreeId && (
+                <span
+                  data-free-badge
+                  title="Keyless free model — the request goes straight from this browser, no API key"
+                  className="shrink-0 rounded border border-emerald-300 bg-emerald-50 px-1 py-px text-[9px] font-semibold text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-400"
+                >
+                  free
+                </span>
+              )}
               <ChevronDown className={cn('h-3 w-3 shrink-0 text-zinc-400 transition-transform', modelOpen && 'rotate-180')} />
             </Button>
             {modelOpen && (
@@ -666,8 +726,62 @@ export function Composer({
                     </div>
                   </div>
                   <div className="flex-1 overflow-y-auto py-1">
-                    {groupedModels.length === 0 && (
-                      <div className="px-3 py-6 text-center text-xs text-zinc-500">No models — check Providers</div>
+                    {/* REQ-205 slice 4: the keyless free pool — available
+                        without any provider entry, sourced live from the
+                        upstream catalog. An outage shows the real reason;
+                        an invented list is never rendered. */}
+                    {freeCatalog && !freeCatalog.ok && (
+                      <div data-free-catalog-error className="mx-2 my-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-[11px] leading-snug text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300">
+                        {freeCatalog.error}
+                      </div>
+                    )}
+                    {freeModels.length > 0 && (
+                      <div>
+                        <div className="px-2.5 pt-2 pb-1 text-[10px] font-semibold tracking-widest text-zinc-500 uppercase">
+                          Free · no key
+                        </div>
+                        {freeModels.map((m) => (
+                          <Button
+                            key={m.id}
+                            variant="ghost"
+                            size="sm"
+                            data-free-model={m.id}
+                            onClick={() => {
+                              onPickModel(freeModelId(m.id));
+                              setModelOpen(false);
+                              setModelQuery('');
+                            }}
+                            className={cn(
+                              'mx-1 w-[calc(100%-8px)] justify-start text-[13px] text-ink hover:bg-muted dark:text-white dark:hover:bg-white/10 dark:hover:text-white',
+                              model === freeModelId(m.id) && 'border border-line bg-muted dark:border-white/5 dark:bg-white/10',
+                            )}
+                          >
+                            <span className="flex items-center gap-1.5">
+                              {model === freeModelId(m.id) && <span className="h-1.5 w-1.5 rounded-full bg-terracotta" />}
+                              {m.label}
+                              <span
+                                className="shrink-0 rounded border border-emerald-300 bg-emerald-50 px-1 py-px text-[9px] font-medium text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-400"
+                                title="Keyless — sent from this browser without an API key"
+                              >
+                                free
+                              </span>
+                              {m.aliases.length > 0 && (
+                                <span
+                                  className="shrink-0 text-[9px] text-zinc-400"
+                                  title={`${m.aliases.length} other id(s) route here: ${m.aliases.join(', ')}`}
+                                >
+                                  +{m.aliases.length}
+                                </span>
+                              )}
+                            </span>
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                    {groupedModels.length === 0 && freeModels.length === 0 && (
+                      <div className="px-3 py-6 text-center text-xs text-zinc-500">
+                        {modelQuery.trim() ? 'No matching models' : 'No models — check Providers'}
+                      </div>
                     )}
                     {groupedModels.map(([provider, items]) => (
                       <div key={provider}>

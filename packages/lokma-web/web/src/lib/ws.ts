@@ -18,7 +18,7 @@ import {
   type ServerMessage,
 } from '@lokma/shared/protocol/ws';
 
-export type { ClientMessage, PromptFile, PromptImage, ReasoningEffort, ServerMessage };
+export type { ClientMessage, ClientFreeRecordRow, PromptFile, PromptImage, ReasoningEffort, ServerMessage };
 
 export type WsStatus = 'idle' | 'connecting' | 'open' | 'closed' | 'error';
 

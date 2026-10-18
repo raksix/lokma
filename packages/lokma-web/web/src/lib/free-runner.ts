@@ -379,3 +379,42 @@ export function freeRunRecordRows(input: {
   }
   return rows;
 }
+
+// ─── REQ-205 slice 4: chat context for the client-free turn ─────────────────
+
+/** Newest N prior rows ride along so the free path is a conversation, not a
+ * one-shot ping (a chat that forgets the previous message reads as broken). */
+export const FREE_HISTORY_LIMIT = 8;
+
+/** Per-row cap for the replayed context — a giant pasted row must not crowd
+ * out the actual prompt (the transcript holds whatever was persisted). */
+export const FREE_HISTORY_ROW_CAP = 4000;
+
+/**
+ * Slice the recent conversation into OpenAI `messages` for a free run:
+ * user/assistant rows only (tool/thinking rows belong to server runs the
+ * free endpoint never saw), oldest → newest, capped count and capped per
+ * row with a visible marker — mirroring the wire-truncation doctrine so
+ * the model knows the rest exists.
+ */
+export function freeHistoryMessages(
+  rows: Array<{ role?: unknown; content?: unknown }>,
+  limit: number = FREE_HISTORY_LIMIT,
+  perRowCap: number = FREE_HISTORY_ROW_CAP,
+): FreeChatMessage[] {
+  const out: FreeChatMessage[] = [];
+  for (const raw of rows) {
+    const role = raw?.role;
+    if (role !== 'user' && role !== 'assistant') continue;
+    const content = typeof raw?.content === 'string' ? raw.content : '';
+    if (!content.trim()) continue;
+    out.push({
+      role,
+      content:
+        content.length > perRowCap
+          ? content.slice(0, perRowCap) + '\n…[truncated: ' + content.length + ' chars total]'
+          : content,
+    });
+  }
+  return out.slice(-Math.max(0, limit));
+}

@@ -64,6 +64,33 @@ export function isFreeId(id: string): boolean {
 }
 
 /**
+ * REQ-205 slice 4 — the picked-model SENTINEL for the client-free path.
+ *
+ * `free:<catalog-id>` is a UI-level value only: the chat routes a send
+ * through the browser-side runner when it parses, and the server-side prompt
+ * path never receives it as a runnable model id. Keeping the route in the
+ * model string (rather than a second picker state) means the picker, the
+ * session persistence and the send path all agree on ONE value.
+ */
+export const FREE_MODEL_PREFIX = 'free:';
+
+/** `free-opencode` → `free:free-opencode` (what the picker emits). */
+export function freeModelId(id: string): string {
+  return FREE_MODEL_PREFIX + id;
+}
+
+/**
+ * Parse a picked model into its free catalog id, or `null` when it is a
+ * regular (server-run) model. A bare prefix with no id parses to `null` —
+ * a half-written value must never route a run with an empty model.
+ */
+export function parseFreeModelId(picked: string): string | null {
+  if (!picked.startsWith(FREE_MODEL_PREFIX)) return null;
+  const id = picked.slice(FREE_MODEL_PREFIX.length).trim();
+  return id.length > 0 ? id : null;
+}
+
+/**
  * Alias prefixes that list the SAME route under several names. `rank` picks
  * the canonical spelling (lower wins — the most explicit name first); the
  * family groups the prefixes that measured to the same upstream.

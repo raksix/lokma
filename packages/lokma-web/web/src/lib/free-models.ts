@@ -179,11 +179,20 @@ export function normalizeFreeCatalog(payload: unknown): FreeModel[] {
   return models.sort((a, b) => a.id.localeCompare(b.id));
 }
 
-/** `{base}/models` without a regex (trailing slashes stripped). */
-export function modelsUrl(base: string): string {
+/**
+ * Join a base URL with an API path without a regex (trailing slashes
+ * stripped). Shared by every client-free call site (slice 1 `/models`,
+ * slice 2 `/chat/completions`) so the single-configuration-point rule holds.
+ */
+export function apiUrl(base: string, path: string): string {
   let trimmed = base.trim();
   while (trimmed.endsWith('/')) trimmed = trimmed.slice(0, -1);
-  return trimmed + '/models';
+  return trimmed + path;
+}
+
+/** `{base}/models` without a regex (trailing slashes stripped). */
+export function modelsUrl(base: string): string {
+  return apiUrl(base, '/models');
 }
 
 /** Human-readable failure text — never a fabricated catalog. */

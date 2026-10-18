@@ -1,6 +1,6 @@
 # REQ-205 — Ücretsiz modeller **client-side** çalışsın (OmniRoute keyless yol)
 
-**Status:** pending — tur 1/5 tamam (dilim 1: ücretsiz katalog modülü + 46/46 prob; sırada dilim 2)
+**Status:** pending — tur 2/5 tamam (dilim 1: katalog 46/46 ✓ · dilim 2: SSE koşucu 65/65 + PTF ✓; sırada dilim 3: kalıcılık `origin:'client-free'`)
 **Tarih:** 2026-10-18
 **Kaynak:** Kullanıcı mesajı (10 Ekim 2026):
 > "abi opencode free kullanım var ya api üzerinden api key gerekmeden omniroute da var. o client side apiye bağla. kullancılar direkt ordan free modellere erişebilsin. client side olarak ama backenden istek gönderme şey için gelen sonuçları falan backende alırsın ama. ai tarafı client side olcak kullancının webten gönderdiği isteklere göre anladınnn."
@@ -85,3 +85,12 @@ Kullanıcı **hiçbir API anahtarı olmadan**, doğrudan **tarayıcıdan** OmniR
 - PROB: `free-models.test.ts` **46/46** (`bun src/lib/free-models.test.ts`; 4 negatif kontrol: bozuk uç + bayat önbellek, HTTP 502, boş katalog, ağ reddi).
 - KAPILAR: kök `bun x tsc --noEmit` 0 · sterilize web build yeşil · uygulama chunk'ı `index-CsWBliF3.js` değişmedi (modül henüz import edilmiyor).
 - SIRADA: dilim 2 (istemci koşucu — SSE ayrıştırıcı + akış) ve dilim 3 (kalıcılık `origin: 'client-free'`).
+
+### Tur 2/5 — dilim 2: istemci koşucu (anahtarsız SSE akışı) — 2026-10-18
+
+- `packages/lokma-web/web/src/lib/free-runner.ts` — `runFreeChat` tarayıcıdan DOĞRUDAN `POST {base}/chat/completions` (`stream:true`, **anahtar yok**); `drainSseData` (kanal sınırına dayanıklı satır tamponu — çok-baytlı karakter ortasından bölünen chunk'lar dahil), `parseStreamPayload` (saf; `[DONE]` olay üretmez, `error` payload'ı ve bozuk JSON dürüst hataya düşer), `chatCompletionsUrl`. DRY: base birleştirme `free-models.ts`'teki paylaşılan `apiUrl` yardımcısına çıkarıldı (`modelsUrl` onu kullanır); tek yapılandırma noktası korunuyor.
+- TEL ŞEKLİ CANLI ÖLÇÜLDÜ (anahtarsız, gerçek 5.192 baytlık akış): rol deltası → `reasoning_content` deltaları → `content` deltaları → `finish_reason:'stop'` + `usage` (294/48/342, `estimated:true`) → `: x-omniroute-*` yorum satırları → `data: [DONE]`.
+- DÜRÜSTLÜK (kabul kriterleri): HTTP 502/429 aynen gösterilir (anahtar yokluğu diye yorumlanmaz, `HTTP 502: bad_gateway` biçiminde durum + upstream detayı); yanıt METNİ olmayan koşu tamamlama SAYILMAZ (yalnız reasoning da yetmez — thinking bloğu cevap değildir), `finish_reason:'length'` ise gerçek sebep ('token bütçesi') yazılır; hata/abort'ta kısmi metin+reasoning KORUNUR (kalıcılık dilimi onu yazabilsin); terminal hatada `reader.cancel()` (yetim fetch kalmaz). Varsayılan `max_tokens` 4000 (REQ §2 tuzağı 1: küçük bütçe `content`'i boş bırakır).
+- PROB: `free-runner.test.ts` **65/65** (ölçülen şekle birebir fixture; sınır testi: chunk'lar çok-baytlı karakter ve JSON satırı ORTASINDAN bölünüyor; 10 negatif kontrol). PTF: boş-metin dürüstlük kuralı `if (false && …)` ile mutasyona uğratıldı → prob **RC=1, 2 kırmızı**; geri alma md5 bayt-aynı.
+- KAPILAR: kök `bun x tsc --noEmit` 0 · sterilize web build yeşil · concept build yeşil · uygulama chunk'ı `index-CsWBliF3.js` DEĞİŞMEDİ (modül henüz import edilmiyor).
+- SIRADA: dilim 3 (kalıcılık `origin:'client-free'`) + koşucunun UI bağlantısı (mevcut reducer çerçeveleri + `free` rozeti).

@@ -5,6 +5,20 @@
 **Kaynak:** Kullanıcı mesajı (10 Ekim 2026):
 > "@url:https://github.com/isisever/agent-office/ — kanka adamın bu projesini bizim lokmaya ekleyek. bunun için request oluştur"
 
+**Kullanıcı düzeltmesi (2026-10-18 17:23 — ekran görüntüsüyle):**
+> "office kısmı sana atığım repo vardı ya onunla aynı görünüm pixel görünüm olsun pane olarak açılsın"
+
+Ölçülen sorun (ekran görüntüsündeki pane): `office-pane.tsx:208` →
+`canvasVisible = paneWidth >= OFFICE_CANVAS_MIN_WIDTH` (600). Dar pane'de canvas **hiç çizilmiyor**, yerine durum kartı + "Nothing is running right now." liste görünümü çıkıyor. Kullanıcı bunu **istemiyor**: pane upstream'deki **piksel ofis** olmalı.
+
+Bağlayıcı kurallar:
+1. Office ray ikonuna basınca pane **piksel ofisi çizer** — ve bu **her zaman** geçerli, ofis boşken bile (upstream'de ofis her zaman çizilir: boş oda + masalar + patron; "boş durum metin kartı" pane'in ana içeriği olamaz).
+2. Pane, odanın okunabildiği genişlikte açılır: renderer zemini `S>=2`, mantıksal ofis 330x200 → **660 px**; pane bu genişliğin altına düşerse içerik **yatay kaydırılır**, canvas gizlenmez.
+3. Liste görünümü **yalnız telefon genişliğinde** (< 390 px) fallback olarak kalır (REQ-204 §4.8) ve orada da canvas'ın canlı olduğu dürüstçe söylenir.
+4. Görünüm upstream ile **birebir**: `vendor/agent-office-core.mjs` tek doğruluk kaynağı; yeniden tasarım, sadeleştirme, "daha modern" hale getirme **yasak**.
+5. Dürüstlük korunur: sahte çalışan/`demoOffice` verisi üründe **kullanılmaz**; boş ofis gerçekten boş çizilir.
+6. Kabul kanıtı: canlı prob — Office açılır, canvas DOM'da **var** (`[data-office-canvas-workers]`), genişlik ≥ 660 px, ekran görüntüsünde upstream demo'ya benzeyen piksel oda görünür; negatif kontrol: daraltınca liste + dürüst metin.
+
 **İlişkiler:** REQ-181 (yüzey kataloğu — yeni yüzey **tek satır** olarak oraya girer) · REQ-200/201/202/203 (loop'lar = arka plan işçileri) · REQ-116 FAZ B (`claude -p` motoru — hook altyapısı **yok**) · REQ-062 (proje kapsamı + kilit disiplini) · Docs/23 (Cordis-uyarlaması plugin sistemi) · Docs/31 (Archify: bugünkü tek "görsel" yüzey) · Docs/35 + Docs/37 (bots) · Docs/30 (ajan orkestrasyonu) · `themes/` (4 tema).
 
 ---

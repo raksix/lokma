@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * REQ-204 slice 3 live probe — the pixel office canvas.
+ * REQ-204 live probe — the office surface (pixel canvas + worker detail panel).
  *
- * Proves the DEPLOYED bundle draws the office from LIVE Lokma data:
+ * Proves the DEPLOYED bundle draws the office from LIVE Lokma data and the
+ * slice-4 panel reads the REAL transcript:
  *   1. the seeded Office tab mounts wide, the canvas is painted (distinct
  *      colours, opaque pixels) and ANIMATED (two fingerprints differ);
  *   2. a real run (ephemeral provider -> slow capture stub) appears as a
@@ -11,8 +12,15 @@
  *      worker row carries that tool (`data-office-tool`);
  *   4. clicking a worker on the floor selects it (hitTest -> selection),
  *      the hint line names the selection;
- *   5. when the run ends the worker LEAVES and the honest empty state stays;
- *   6. a sub-600px pane (split layout) falls back to the row list.
+ *   5. the WORKER DETAIL PANEL (slice 4): selecting opens the panel for that
+ *      worker; its task is the REAL prompt from the transcript, its tool rows
+ *      are the persisted read_file row, and its output is EXACTLY what the
+ *      run has produced SO FAR (the stub's marker — the final answer has not
+ *      arrived yet, so a fabricated one would show up as a wrong string);
+ *   6. when the run ends the worker AND its panel leave together ("no workers
+ *      -> honest empty state"); the canvas keeps drawing;
+ *   7. a sub-600px pane (split layout) falls back to the row list;
+ *   8. 390px phone width: no sideways overflow, no canvas.
  *
  * The browser comes up FIRST and the prompt is only sent afterwards, so the
  * pane is provably listening before the run's frames exist (a frame sent
@@ -23,7 +31,7 @@
  *   NODE_PATH=/root/test-hermes/node_modules \
  *     xvfb-run -a node scripts/probe-office-canvas.cjs [--url https://lokma.fermag.com.tr] [--shots DIR]
  *
- * Exit 0 = every office-canvas invariant held; 1 = regression or a leak.
+ * Exit 0 = every office-surface invariant held; 1 = regression or a leak.
  */
 const { execFileSync } = require('node:child_process');
 const http = require('node:http');
@@ -58,6 +66,10 @@ function check(cond, label) {
 const PROBE_ID = 'office-probe-' + Date.now().toString(36);
 const MODEL = PROBE_ID + '/capture-model';
 const TOOL_FILE = 'notes.txt';
+/** The prompt the socket sends — the panel's task must equal this marker. */
+const TASK_MARKER = 'office-panel-task-marker';
+/** Text the stub streams BEFORE the run ends — the panel's "output so far". */
+const OUTPUT_MARKER = 'PANEL-OUTPUT-MARKER';
 
 /** Wide layout: ONE pane with the Office tab. */
 const WIDE = {
@@ -131,7 +143,15 @@ const stub = http.createServer((req, res) => {
     const delayMs = typeof step.delayMs === 'number' ? step.delayMs : 2000;
     setTimeout(() => {
       const chunks = [];
-      if (Array.isArray(step.toolCalls) && step.toolCalls.length > 0) {
+      const hasTools = Array.isArray(step.toolCalls) && step.toolCalls.length > 0;
+      // REQ-204 slice 4: a step may carry text AND tool calls. The loop
+      // persists the step's text row BEFORE the tools run, which is what
+      // lets the detail panel show "output so far" while the run is alive.
+      const text = typeof step.text === 'string' && step.text ? step.text : hasTools ? '' : 'PROBE-OK';
+      if (text) {
+        chunks.push({ choices: [{ index: 0, finish_reason: null, delta: { content: text } }] });
+      }
+      if (hasTools) {
         step.toolCalls.forEach((call, i) => {
           chunks.push({
             choices: [
@@ -149,7 +169,6 @@ const stub = http.createServer((req, res) => {
         });
         chunks.push({ choices: [{ index: 0, finish_reason: 'tool_calls', delta: {} }] });
       } else {
-        chunks.push({ choices: [{ index: 0, finish_reason: null, delta: { content: step.text || 'PROBE-OK' } }] });
         chunks.push({ choices: [{ index: 0, finish_reason: 'stop', delta: {} }] });
       }
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store' });
@@ -291,9 +310,11 @@ const stub = http.createServer((req, res) => {
     check(fresh.canvasWorkers === fresh.rows, 'canvas worker counter == rendered rows before the run (' + fresh.canvasWorkers + ')');
     check(fresh.rows === 0 ? fresh.emptyVisible : !fresh.emptyVisible, 'rows and the honest empty state are mutually exclusive');
 
-    // 3. NOW start the run (pane listening): read_file first, slow answer after
+    // 3. NOW start the run (pane listening): the first step carries BOTH its
+    // output-so-far text and the read_file call; the slow final answer lands
+    // 30 s later, so the panel's "output so far" is provably the marker.
     script = [
-      { toolCalls: [{ id: 'probe_read_1', name: 'read_file', args: { path: TOOL_FILE } }], delayMs: 5000 },
+      { text: OUTPUT_MARKER, toolCalls: [{ id: 'probe_read_1', name: 'read_file', args: { path: TOOL_FILE } }], delayMs: 5000 },
       { text: 'PROBE-DONE', delayMs: 30_000 },
     ];
     const frames = [];
@@ -301,7 +322,7 @@ const stub = http.createServer((req, res) => {
     probeWs = ws;
     const runDone = new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('timeout waiting for run end')), RUN_TIMEOUT_MS);
-      ws.on('open', () => ws.send(JSON.stringify({ type: 'prompt', sessionId, model: MODEL, prompt: 'REQ-204 office canvas probe' })));
+      ws.on('open', () => ws.send(JSON.stringify({ type: 'prompt', sessionId, model: MODEL, prompt: TASK_MARKER })));
       ws.on('message', (raw) => {
         let msg;
         try {
@@ -394,9 +415,60 @@ const stub = http.createServer((req, res) => {
     );
     check(bossChip, 'the active session is drawn as the boss row (your own agent)');
 
+    // 5b. REQ-204 slice 4 — the worker detail panel. The selected worker's
+    // panel reads the REAL transcript: the task is the prompt the socket sent,
+    // the tool rows are the persisted read_file call, and the output is
+    // EXACTLY what the run has produced so far (the stub's marker — the final
+    // answer has not arrived yet, so an invented one would be a wrong string).
+    const detailRoot = await page.waitForSelector('[data-office-detail]', { timeout: 10_000 }).catch(() => null);
+    check(detailRoot !== null, 'selecting a worker opens the detail panel');
+    check(
+      detailRoot !== null && (await detailRoot.getAttribute('data-office-detail')) === selected,
+      'the panel belongs to the SELECTED worker',
+    );
+    check(
+      detailRoot !== null && (await detailRoot.getAttribute('data-office-detail-type')) === 'run',
+      'the panel is typed like its worker',
+    );
+    let panel = null;
+    for (let i = 0; i < 20; i++) {
+      panel = await page.evaluate(() => {
+        const pick = (sel) => {
+          const el = document.querySelector(sel);
+          return el ? (el.textContent || '').trim() : '';
+        };
+        return {
+          task: pick('[data-office-detail-task]'),
+          tool: pick('[data-office-detail-tool]'),
+          output: pick('[data-office-detail-output]'),
+          rows: [...document.querySelectorAll('[data-office-detail-tool-row]')].map((r) => (r.textContent || '').trim()),
+          loading: Boolean(document.querySelector('[data-office-detail-loading]')),
+          error: pick('[data-office-detail-error]'),
+        };
+      });
+      if (panel.task === TASK_MARKER && panel.rows.length > 0 && panel.output === OUTPUT_MARKER) break;
+      await sleep(1000);
+    }
+    check(panel !== null && panel.task === TASK_MARKER, 'the panel task is the REAL prompt from the transcript (' + (panel ? panel.task : '?') + ')');
+    check(panel !== null && panel.tool === 'read_file', 'the panel current tool is the live-fold tool (' + (panel ? panel.tool : '?') + ')');
+    check(
+      panel !== null && panel.rows.length > 0,
+      'the panel tool list comes from the persisted transcript (' + (panel ? panel.rows.length : 0) + ' rows)',
+    );
+    check(
+      panel !== null && panel.rows.some((r) => r.indexOf('Read ' + TOOL_FILE) !== -1),
+      'the tool row names the REAL file the run read (' + TOOL_FILE + ')',
+    );
+    check(
+      panel !== null && panel.output === OUTPUT_MARKER,
+      'the panel output is what the run has produced SO FAR (' + (panel ? JSON.stringify(panel.output).slice(0, 60) : '?') + ')',
+    );
+    check(panel !== null && panel.error === '' && panel.loading === false, 'no error/loading line once the transcript is read');
+
     if (SHOTS) {
       mkdirSync(SHOTS, { recursive: true });
       await page.screenshot({ path: join(SHOTS, 'REQ-204-slice3-canvas.png') });
+      await page.screenshot({ path: join(SHOTS, 'REQ-204-slice4-panel.png') });
     }
 
     // 6. run end -> the worker leaves
@@ -409,6 +481,10 @@ const stub = http.createServer((req, res) => {
       await sleep(1000);
     }
     check(left.mine === false, 'the finished run leaves the floor (worker row gone)');
+    // Slice 4: the panel belongs to a WORKER — when the worker leaves, the
+    // panel leaves with it instead of freezing a stale read on screen.
+    const panelGone = await page.evaluate(() => !document.querySelector('[data-office-detail]'));
+    check(panelGone, 'the detail panel left with the worker (no panel for a gone worker)');
     if (left.rows === 0) {
       check(left.emptyVisible === true, 'no workers -> the honest empty state is what remains');
     } else {

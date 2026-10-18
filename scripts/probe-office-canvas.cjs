@@ -22,6 +22,12 @@
  *      arrived yet, so a fabricated one would show up as a wrong string);
  *   6. when the run ends the worker AND its panel leave together ("no workers
  *      -> honest empty state"); the canvas keeps drawing;
+ *   6b. slice 7 — the palette source is part of the SAME persisted view
+ *      object as the scope: the theme mode survives a reload too;
+ *   6c. slice 7 — the canvas wears the LIVE app theme key (`lokma-<id>`
+ *      derived from the server's `config.theme`), switching to `auto` really
+ *      repaints the canvas (dominant-colour histogram, the live counterpart
+ *      of the unit smoke) and switching back returns the app palette;
  *   7. a sub-660px pane (split layout) STILL draws the canvas: the box keeps
  *      its readable 660 px and the pane scrolls sideways (slice 6 — the
  *      office is never replaced by a status card);
@@ -630,6 +636,12 @@ const stub = http.createServer((req, res) => {
     await page.locator('[data-office-view="all"]').click();
     await sleep(300);
     await page.locator('[data-office-search] input').fill('zzz-persist-marker');
+    // Slice 7: the palette source rides the SAME persisted object — flip it
+    // AWAY from the default so the reload assertion can only pass if the
+    // theme mode really round-trips.
+    await page.locator('[data-office-theme-mode]').click();
+    await sleep(300);
+    await page.locator('[data-select-option="auto"]').click();
     await sleep(500);
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-office-pane]', { timeout: 25_000 });
@@ -643,11 +655,116 @@ const stub = http.createServer((req, res) => {
         const el = document.querySelector('[data-office-view="all"]');
         return el ? el.getAttribute('aria-pressed') : null;
       })(),
+      theme: (() => {
+        const el = document.querySelector('[data-office-theme-mode]');
+        return el ? el.getAttribute('data-office-theme-mode') : null;
+      })(),
     }));
     check(persisted.query === 'zzz-persist-marker', 'the search text survives a reload (' + JSON.stringify(persisted.query) + ')');
     check(persisted.mode === 'true', 'the scope mode survives a reload (aria-pressed=' + persisted.mode + ')');
+    check(persisted.theme === 'auto', 'the office theme mode survives a reload (' + persisted.theme + ')');
     await page.locator('[data-office-search] input').fill('');
     await sleep(400);
+    // Flip the palette source back to the app theme for the 6c round trip.
+    await page.locator('[data-office-theme-mode]').click();
+    await sleep(300);
+    await page.locator('[data-select-option="app"]').click();
+    await sleep(500);
+
+    // 6c. REQ-204 slice 7 — the office wears the APP theme. The forced key is
+    // derived from the LIVE server config (`config.theme`), so a DOM reading
+    // of `lokma-<id>` proves the whole chain (GET /api/themes -> registry ->
+    // renderer palette). Switching to `auto` must really REPAINT the canvas —
+    // the live counterpart of the unit smoke — and switching back must
+    // return the app palette.
+    const cfgRes = await fetch(API + '/api/config', { headers: jsonAuth });
+    const cfgBody = await cfgRes.json();
+    const liveThemeId = cfgBody && cfgBody.config ? cfgBody.config.theme : null;
+    const wantThemeKey = typeof liveThemeId === 'string' && liveThemeId.length > 0 ? 'lokma-' + liveThemeId : '';
+    check(wantThemeKey !== '', 'the live config names an active app theme (' + liveThemeId + ')');
+
+    const readThemeAttrs = () =>
+      page.evaluate(() => {
+        const mode = document.querySelector('[data-office-theme-mode]');
+        const host = document.querySelector('[data-office-canvas-host]');
+        return {
+          mode: mode ? mode.getAttribute('data-office-theme-mode') : null,
+          theme: host ? host.getAttribute('data-office-theme') : null,
+        };
+      });
+    // Dominant-colour histogram of the canvas: the top flat fills are the
+    // room itself, so a palette swap cannot hide behind animation.
+    const readCanvasTop = () =>
+      page.evaluate(() => {
+        const el = document.querySelector('[data-office-canvas]');
+        if (!el) return null;
+        const g = el.getContext('2d');
+        const img = g.getImageData(0, 0, el.width, el.height).data;
+        const counts = new Map();
+        const total = el.width * el.height;
+        const step = Math.max(1, Math.floor(total / 120000));
+        for (let i = 0; i < total; i += step) {
+          const o = i * 4;
+          const c = (img[o] << 16) | (img[o + 1] << 8) | img[o + 2];
+          counts.set(c, (counts.get(c) || 0) + 1);
+        }
+        return [...counts.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([c]) => c);
+      });
+    const overlap = (a, b) => a.filter((c) => b.includes(c)).length;
+
+    // The async config read settles shortly after mount — wait for the key.
+    let appAttrs = await readThemeAttrs();
+    for (let i = 0; i < 15 && appAttrs.theme !== wantThemeKey; i++) {
+      await sleep(700);
+      appAttrs = await readThemeAttrs();
+    }
+    check(appAttrs.mode === 'app', 'the default palette source is the app theme (mode ' + appAttrs.mode + ')');
+    check(
+      appAttrs.theme === wantThemeKey,
+      'the canvas wears the LIVE active theme key (' + appAttrs.theme + ' == ' + wantThemeKey + ')',
+    );
+    const topApp = await readCanvasTop();
+    check(
+      topApp !== null && topApp.length === 3,
+      'the app-theme canvas histogram reads (' + (topApp ? topApp.length : '?') + ' dominant colours)',
+    );
+    if (SHOTS) await page.screenshot({ path: join(SHOTS, 'REQ-204-slice7-theme-app.png') });
+
+    await page.locator('[data-office-theme-mode]').click();
+    await sleep(300);
+    await page.locator('[data-select-option="auto"]').click();
+    await sleep(900);
+    const autoAttrs = await readThemeAttrs();
+    const topAuto = await readCanvasTop();
+    check(
+      autoAttrs.mode === 'auto' && autoAttrs.theme === 'auto',
+      'auto mode returns the canvas to the renderer per-project theme (mode ' + autoAttrs.mode + ', theme ' + autoAttrs.theme + ')',
+    );
+    check(
+      topApp !== null && topAuto !== null && overlap(topApp, topAuto) === 0,
+      'switching the palette source REPAINTS the canvas (dominant-colour overlap ' +
+        (topApp && topAuto ? overlap(topApp, topAuto) : '?') +
+        '/3 == 0)',
+    );
+    if (SHOTS) await page.screenshot({ path: join(SHOTS, 'REQ-204-slice7-theme-auto.png') });
+
+    await page.locator('[data-office-theme-mode]').click();
+    await sleep(300);
+    await page.locator('[data-select-option="app"]').click();
+    await sleep(900);
+    const backAttrs = await readThemeAttrs();
+    const topBack = await readCanvasTop();
+    check(
+      backAttrs.mode === 'app' && backAttrs.theme === wantThemeKey,
+      'switching back re-applies the app theme key (' + backAttrs.theme + ')',
+    );
+    check(
+      topApp !== null && topBack !== null && overlap(topApp, topBack) >= 2,
+      'the app palette returns after the round trip (overlap ' + (topApp && topBack ? overlap(topApp, topBack) : '?') + '/3 >= 2)',
+    );
 
     // 7. sub-660px pane -> the canvas STAYS (slice 6, user correction): the
     //    box keeps its readable 660 px and the pane scrolls sideways. The old
